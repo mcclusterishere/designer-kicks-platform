@@ -26,8 +26,8 @@ const navLinks = [
   { href: "/battles", label: "Battles" },
   { href: "/news", label: "News" },
   { href: "/quiz", label: "Quiz" },
+  { href: "/artists", label: "League" },
   { href: "/heat-list", label: "Heat List" },
-  { href: "/shop", label: "Shop" },
   { href: "/submit", label: "Submit" },
 ];
 
@@ -89,8 +89,10 @@ export default async function RootLayout({
               </div>
               <div className="flex flex-wrap gap-6">
                 <Link href="/battles" className="hover:text-white">Battles</Link>
+                <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>
+                <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>
               </div>

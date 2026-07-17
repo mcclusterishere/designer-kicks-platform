@@ -10,7 +10,7 @@ datasource db {
 model Submission {
   id           String   @id @default(cuid())
   title        String
-  artistName   String
+  artistName   String // denormalized from the artist profile at submit time
   socialHandle String?
   email        String
   baseShoe     String
@@ -19,10 +19,39 @@ model Submission {
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
   createdAt    DateTime @default(now())
 
+  artistId String?
+  artist   ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: SetNull)
+
   battlesAsA Battle[] @relation("battleSubA")
   battlesAsB Battle[] @relation("battleSubB")
   battlesWon Battle[] @relation("battleWinner")
   votes      Vote[]
+}
+
+model ArtistProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug        String   @unique
+  displayName String
+  bio         String?
+  instagram   String?
+  city        String?
+  createdAt   DateTime @default(now())
+
+  submissions Submission[]
+  followers   ArtistFollow[]
+}
+
+model ArtistFollow {
+  id        String   @id @default(cuid())
+  artistId  String
+  artist    ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([artistId, userId])
 }
 
 model Battle {
@@ -91,6 +120,8 @@ model User {
   creditTxns     CreditTransaction[]
   giveawayEntries GiveawayEntry[]
   giveawaysWon   Giveaway[]          @relation("giveawayWinner")
+  artistProfile  ArtistProfile?
+  artistFollows  ArtistFollow[]
 }
 
 model Account {

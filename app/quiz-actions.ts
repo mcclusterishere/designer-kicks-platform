@@ -9,7 +9,6 @@ import {
   getCurrentQuestion,
   getStrikeState,
   grantCredits,
-  toPublicQuestion,
   HEAT_CHECK_TARGET,
   RUN_QUEUE_SIZE,
   PACK_SIZE,

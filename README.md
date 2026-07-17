@@ -15,6 +15,7 @@ monetizes it.
 | `/submit` | Artists upload a photo of their custom + their story (goes to a review queue) |
 | `/battles` | Live vote battles with countdowns + past battle results |
 | `/battles/[id]` | Head-to-head page — sign in to vote, one vote per member, live percentages |
+| `/artists` `/artists/[slug]` | The League — artists ranked by career W-L records, with profile pages and followers |
 | `/heat-list` | Every approved custom, ranked by battle wins then total votes |
 | `/news` | Drop Report — SEO-driven articles on upcoming releases (dates, prices, raffle links) |
 | `/quiz` | The Heat Check — Jordan trivia; 12 correct answers earns a giveaway entry |
@@ -53,6 +54,19 @@ login attempts are rate-limited.
 - Profiles collect phone, city, shoe size, favorite silhouette,
   Instagram, and a marketing opt-in. View/export everything from the
   admin Members table (CSV button).
+
+## The League (artist profiles)
+
+- Submitting requires an account. The first submission creates the
+  artist's league profile (display name, Instagram, unique URL slug);
+  every later submission posts under that same identity — no more
+  "KickGod" vs "@kickgod" fragmentation.
+- Artist pages (`/artists/[slug]`) show a career record (W–L, win rate,
+  total votes), follower count, and the full portfolio with per-shoe
+  records. Members can follow artists.
+- `/artists` is the league table: every artist with an approved shoe,
+  ranked by career wins then total votes. The Heat List still ranks
+  individual shoes; artist names link across both.
 
 ## How the battles work
 

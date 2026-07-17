@@ -7,6 +7,7 @@ type Side = {
   submissionId: string;
   title: string;
   artistName: string;
+  artistSlug: string | null;
   socialHandle: string | null;
   baseShoe: string;
   imageUrl: string;
@@ -76,7 +77,17 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                 <p className="tag text-smoke">{side.baseShoe}</p>
                 <h3 className="display mt-1 text-xl text-white">{side.title}</h3>
                 <p className="mt-1 text-sm text-smoke">
-                  by <span className="text-white">{side.artistName}</span>
+                  by{" "}
+                  {side.artistSlug ? (
+                    <a
+                      href={`/artists/${side.artistSlug}`}
+                      className="text-white underline decoration-volt hover:text-volt"
+                    >
+                      {side.artistName}
+                    </a>
+                  ) : (
+                    <span className="text-white">{side.artistName}</span>
+                  )}
                   {side.socialHandle && (
                     <span className="text-volt"> @{side.socialHandle}</span>
                   )}

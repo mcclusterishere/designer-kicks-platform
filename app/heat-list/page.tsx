@@ -15,7 +15,11 @@ export default async function HeatListPage() {
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Every approved custom, ranked by battle wins first and total votes
-        second. Win battles to climb.
+        second. Win battles to climb — and check the{" "}
+        <Link href="/artists" className="text-volt underline">
+          artist league table
+        </Link>{" "}
+        for career records.
       </p>
 
       {heat.length === 0 ? (
@@ -51,7 +55,17 @@ export default async function HeatListPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold text-white">{entry.title}</p>
                 <p className="truncate text-sm text-smoke">
-                  {entry.baseShoe} · by {entry.artistName}
+                  {entry.baseShoe} · by{" "}
+                  {entry.artistSlug ? (
+                    <Link
+                      href={`/artists/${entry.artistSlug}`}
+                      className="text-white underline decoration-volt hover:text-volt"
+                    >
+                      {entry.artistName}
+                    </Link>
+                  ) : (
+                    entry.artistName
+                  )}
                   {entry.socialHandle && (
                     <span className="text-volt"> @{entry.socialHandle}</span>
                   )}
