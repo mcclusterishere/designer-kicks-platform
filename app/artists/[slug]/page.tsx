@@ -5,7 +5,8 @@ import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
-import TransferForm from "@/components/TransferForm";
+import RecordSaleForm from "@/components/RecordSaleForm";
+import { formatUsd } from "@/lib/market";
 
 export const dynamic = "force-dynamic";
 
@@ -153,6 +154,8 @@ export default async function ArtistPage({ params }: Props) {
               s.battlesAsA.filter((b) => b.status === "COMPLETED").length +
               s.battlesAsB.filter((b) => b.status === "COMPLETED").length;
             const rank = heatRank.get(s.id);
+            const pendingSale = s.sales.find((sale) => sale.status === "PENDING");
+            const lastSale = s.sales.find((sale) => sale.status === "CONFIRMED");
             return (
               <div key={s.id} className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50">
                 <div className="relative overflow-hidden">
@@ -179,6 +182,11 @@ export default async function ArtistPage({ params }: Props) {
                       {"🏆".repeat(Math.min(s.tournamentsWon.length, 3))}
                     </span>
                   )}
+                  {pendingSale && (
+                    <span className="tag absolute bottom-2 left-2 rounded bg-heat px-2 py-1 font-bold text-white">
+                      ⏳ Sale Pending
+                    </span>
+                  )}
                 </div>
                 <div className="p-4">
                   <p className="tag text-smoke">{s.baseShoe}</p>
@@ -190,6 +198,16 @@ export default async function ArtistPage({ params }: Props) {
                       <span className="text-volt"> · champion</span>
                     )}
                   </p>
+                  {lastSale && (
+                    <p className="mt-1 text-sm">
+                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      {lastSale.verified ? (
+                        <span className="tag text-volt" title="Sale substantiated with evidence or admin-verified">✓ verified sale</span>
+                      ) : (
+                        <span className="tag text-smoke">unverified sale</span>
+                      )}
+                    </p>
+                  )}
                   {s.owner && (
                     <p className="mt-1.5 text-sm text-smoke">
                       🔑 In{" "}
@@ -205,7 +223,7 @@ export default async function ArtistPage({ params }: Props) {
                       )}
                     </p>
                   )}
-                  {isOwnPage && <TransferForm submissionId={s.id} />}
+                  {isOwnPage && !pendingSale && !s.owner && <RecordSaleForm submissionId={s.id} />}
                 </div>
               </div>
             );

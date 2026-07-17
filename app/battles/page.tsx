@@ -44,6 +44,7 @@ export default async function BattlesPage() {
           { href: "/tournaments", label: "🏆 Brackets" },
           { href: "/artists", label: "🥇 League" },
           { href: "/heat-list", label: "🔥 Heat List" },
+          { href: "/market", label: "💸 Market" },
         ].map((l) => (
           <Link
             key={l.href}

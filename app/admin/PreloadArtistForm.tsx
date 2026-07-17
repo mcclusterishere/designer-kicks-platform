@@ -80,9 +80,17 @@ export default function PreloadArtistForm() {
           <input id="pl-title" name="shoeTitle" required maxLength={80} placeholder='"Toxic Drip AF1"' className={inputClass} />
         </div>
         <div>
-          <label className="tag text-smoke" htmlFor="pl-base">Base shoe *</label>
+          <label className="tag text-smoke" htmlFor="pl-base">Base item *</label>
           <input id="pl-base" name="baseShoe" required maxLength={60} placeholder="Air Force 1" className={inputClass} />
         </div>
+      </div>
+      <div>
+        <label className="tag text-smoke" htmlFor="pl-cat">Category</label>
+        <select id="pl-cat" name="category" defaultValue="sneakers" className={inputClass}>
+          <option value="sneakers">👟 Sneakers</option>
+          <option value="apparel">🧥 Apparel</option>
+          <option value="accessories">🧢 Accessories</option>
+        </select>
       </div>
       <div>
         <label className="tag text-smoke" htmlFor="pl-desc">The story (optional)</label>
