@@ -113,8 +113,18 @@ export async function getArtistBySlug(slug: string) {
           _count: { select: { votes: true, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
+          tournamentsWon: { select: { id: true, name: true } },
         },
       },
     },
+  });
+}
+
+/** Championship titles won by any of the artist's shoes. */
+export async function getArtistTrophies(artistId: string) {
+  return prisma.tournament.findMany({
+    where: { status: "COMPLETED", champion: { artistId } },
+    orderBy: { createdAt: "desc" },
+    include: { champion: { select: { title: true, imageUrl: true } } },
   });
 }
