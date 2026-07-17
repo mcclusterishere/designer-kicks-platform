@@ -29,7 +29,9 @@ await page.screenshot({ path: `${SHOTS}/mobile-home.png` });
 await tabBar.getByText("Arena").click();
 await page.waitForURL("**/battles", { timeout: 10000 });
 check("Arena tab navigates to battles", true);
-check("arena hub pills present", await page.getByText("🏆 Brackets").isVisible());
+const pills = page.getByText("🏆 Brackets");
+await pills.waitFor({ timeout: 10000 }).catch(() => {});
+check("arena hub pills present", await pills.isVisible());
 
 await tabBar.getByText("Heat Check").click();
 await page.waitForURL("**/quiz", { timeout: 10000 });

@@ -40,7 +40,7 @@ function SideThumb({
       <img
         src={sub.imageUrl}
         alt={`${sub.title} by ${sub.artistName}`}
-        className={`aspect-square w-full object-cover transition ${
+        className={`aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.05] ${
           completed && !isWinner ? "opacity-40 grayscale" : ""
         }`}
       />

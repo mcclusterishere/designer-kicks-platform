@@ -27,7 +27,7 @@ export default async function BattlesPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-heat">Vote-offs</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Battle <span className="text-heat">Arena</span>
+        Battle <span className="text-gradient-heat">Arena</span>
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Two customs enter. The culture votes. Winners take a spot on the{" "}

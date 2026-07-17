@@ -20,13 +20,13 @@ export default function ArticleCard({ article, large = false }: Props) {
       href={`/news/${article.slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-edge bg-surface transition hover:-translate-y-0.5 hover:border-volt/50"
     >
-      <div className={`w-full bg-panel ${large ? "aspect-[2/1]" : "aspect-[16/9]"}`}>
+      <div className={`w-full overflow-hidden bg-panel ${large ? "aspect-[2/1]" : "aspect-[16/9]"}`}>
         {article.coverImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={article.coverImage}
             alt={article.title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
