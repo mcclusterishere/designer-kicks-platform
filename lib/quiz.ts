@@ -24,9 +24,11 @@ export async function getStrikeState(userId: string): Promise<StrikeState> {
 
 /**
  * Spends one strike (a wrong answer): free daily strikes first, then
- * purchased credits. Returns false when the user has neither.
+ * purchased credits. Returns which kind was spent so runs can track
+ * paid-strike usage (paid runs are ineligible for giveaway entries),
+ * or null when the user has neither.
  */
-export async function consumeStrike(userId: string): Promise<boolean> {
+export async function consumeStrike(userId: string): Promise<"free" | "paid" | null> {
   const today = todayStr();
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUniqueOrThrow({
@@ -40,7 +42,7 @@ export async function consumeStrike(userId: string): Promise<boolean> {
         where: { id: userId },
         data: { freeStrikesDate: today, freeStrikesUsed: usedToday + 1 },
       });
-      return true;
+      return "free" as const;
     }
     if (user.credits > 0) {
       await tx.user.update({
@@ -50,10 +52,79 @@ export async function consumeStrike(userId: string): Promise<boolean> {
       await tx.creditTransaction.create({
         data: { userId, delta: -1, reason: "strike" },
       });
-      return true;
+      return "paid" as const;
     }
-    return false;
+    return null;
   });
+}
+
+export type QuizBadge = { key: string; label: string; emoji: string; description: string };
+
+export type LeaderboardEntry = {
+  userId: string;
+  name: string;
+  wins: number;
+  answered: number;
+  correct: number;
+  accuracy: number; // 0-100
+  badges: QuizBadge[];
+};
+
+export function computeBadges(stats: { wins: number; answered: number; correct: number }): QuizBadge[] {
+  const badges: QuizBadge[] = [];
+  const accuracy = stats.answered > 0 ? (stats.correct / stats.answered) * 100 : 0;
+  if (stats.wins >= 1) badges.push({ key: "first", label: "Certified", emoji: "🏅", description: "Passed your first Heat Check" });
+  if (stats.wins >= 5) badges.push({ key: "five", label: "Heat Scholar", emoji: "🎓", description: "5 Heat Checks passed" });
+  if (stats.wins >= 10) badges.push({ key: "ten", label: "Encyclopedia", emoji: "📚", description: "10 Heat Checks passed" });
+  if (stats.answered >= 100) badges.push({ key: "grinder", label: "Grinder", emoji: "⚙️", description: "100+ questions answered" });
+  if (stats.answered >= 50 && accuracy >= 90) badges.push({ key: "sharp", label: "Sharpshooter", emoji: "🎯", description: "90%+ accuracy over 50+ answers" });
+  return badges;
+}
+
+/**
+ * All-time Heat Check leaderboard: ranked by checks passed, then
+ * accuracy. Includes both free and paid runs — this is the prestige
+ * layer where purchased strikes DO count (unlike giveaway entries).
+ */
+export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]> {
+  const rows = await prisma.quizRun.groupBy({
+    by: ["userId"],
+    _sum: { correctCount: true, wrongCount: true },
+    _count: { _all: true },
+  });
+  const wonRows = await prisma.quizRun.groupBy({
+    by: ["userId"],
+    where: { status: "WON" },
+    _count: { _all: true },
+  });
+  const winsByUser = new Map(wonRows.map((r) => [r.userId, r._count._all]));
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: rows.map((r) => r.userId) } },
+    select: { id: true, name: true },
+  });
+  const nameByUser = new Map(users.map((u) => [u.id, u.name ?? "Sneakerhead"]));
+
+  return rows
+    .map((r) => {
+      const correct = r._sum.correctCount ?? 0;
+      const wrong = r._sum.wrongCount ?? 0;
+      const answered = correct + wrong;
+      const wins = winsByUser.get(r.userId) ?? 0;
+      const stats = { wins, answered, correct };
+      return {
+        userId: r.userId,
+        name: nameByUser.get(r.userId) ?? "Sneakerhead",
+        wins,
+        answered,
+        correct,
+        accuracy: answered > 0 ? Math.round((correct / answered) * 100) : 0,
+        badges: computeBadges(stats),
+      };
+    })
+    .filter((e) => e.answered > 0)
+    .sort((a, b) => b.wins - a.wins || b.accuracy - a.accuracy || b.answered - a.answered)
+    .slice(0, limit);
 }
 
 export async function grantCredits(

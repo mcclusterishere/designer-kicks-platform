@@ -11,9 +11,10 @@ import {
   registerLoginAttempt,
 } from "@/lib/admin";
 import { headers } from "next/headers";
-import { finalizeExpiredBattles } from "@/lib/battles";
+import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
 import { ensureArtistProfile } from "@/lib/artists";
+import { createTournament } from "@/lib/tournaments";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt } from "crypto";
@@ -347,6 +348,68 @@ export async function deleteArticle(id: string) {
   await requireAdmin();
   await prisma.article.delete({ where: { id } });
   revalidatePath("/news");
+  revalidatePath("/admin");
+}
+
+// ---------- Tournaments ----------
+
+export async function createTournamentAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const prize = String(formData.get("prize") ?? "").trim();
+  const size = Number(formData.get("size"));
+  const roundDays = Number(formData.get("roundDays") ?? 3);
+  const participants = formData.getAll("participants").map(String);
+
+  if (!name || name.length > 80) return { ok: false, error: "Tournament name is required." };
+  if (![4, 8, 16].includes(size)) return { ok: false, error: "Size must be 4, 8, or 16." };
+  if (!Number.isFinite(roundDays) || roundDays < 1 || roundDays > 14) {
+    return { ok: false, error: "Round length must be 1–14 days." };
+  }
+  if (participants.length !== size) {
+    return { ok: false, error: `Pick exactly ${size} shoes (you picked ${participants.length}).` };
+  }
+
+  const subs = await prisma.submission.findMany({
+    where: { id: { in: participants }, status: "APPROVED" },
+  });
+  if (subs.length !== size) return { ok: false, error: "All entrants must be approved submissions." };
+
+  // Seed by current heat: better-performing shoes get the higher seeds.
+  const heat = await getHeatList();
+  const heatRank = new Map(heat.map((h, i) => [h.id, i]));
+  const seeded = [...participants].sort(
+    (a, b) => (heatRank.get(a) ?? Infinity) - (heatRank.get(b) ?? Infinity)
+  );
+
+  await createTournament({ name, prize, size, roundDays, seededSubmissionIds: seeded });
+
+  revalidatePath("/tournaments");
+  revalidatePath("/battles");
+  revalidatePath("/");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function forceAdvanceTournament(tournamentId: string) {
+  await requireAdmin();
+  const matches = await prisma.tournamentMatch.findMany({
+    where: { tournamentId, battle: { status: "ACTIVE" } },
+    select: { battleId: true },
+  });
+  const battleIds = matches.map((m) => m.battleId).filter((id): id is string => Boolean(id));
+  if (battleIds.length > 0) {
+    await prisma.battle.updateMany({
+      where: { id: { in: battleIds } },
+      data: { endsAt: new Date(Date.now() - 1000) },
+    });
+  }
+  await finalizeExpiredBattles();
+  revalidatePath("/tournaments");
+  revalidatePath("/battles");
   revalidatePath("/admin");
 }
 

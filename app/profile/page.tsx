@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logoutUser } from "@/app/account-actions";
+import { computeBadges } from "@/lib/quiz";
 import ProfileForm from "./ProfileForm";
 
 export const metadata = { title: "Your Profile — Designer Kicks" };
@@ -20,9 +21,16 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/signin");
 
-  const wonRuns = await prisma.quizRun.count({
-    where: { userId: user.id, status: "WON" },
-  });
+  const [wonRuns, quizAgg] = await Promise.all([
+    prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
+    prisma.quizRun.aggregate({
+      where: { userId: user.id },
+      _sum: { correctCount: true, wrongCount: true },
+    }),
+  ]);
+  const correct = quizAgg._sum.correctCount ?? 0;
+  const answered = correct + (quizAgg._sum.wrongCount ?? 0);
+  const badges = computeBadges({ wins: wonRuns, answered, correct });
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -52,6 +60,20 @@ export default async function ProfilePage() {
           </div>
         ))}
       </div>
+
+      {badges.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {badges.map((b) => (
+            <span
+              key={b.key}
+              title={b.description}
+              className="rounded-full border border-volt/40 bg-surface px-3 py-1.5 text-sm text-white"
+            >
+              {b.emoji} {b.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between rounded-xl border border-edge bg-surface p-4">
         <div>

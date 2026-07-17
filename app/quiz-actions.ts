@@ -25,6 +25,7 @@ export type QuizState = {
   status: "ACTIVE" | "NEEDS_CREDITS" | "WON" | "OUT_OF_QUESTIONS";
   correctCount: number;
   wrongCount: number;
+  usedPaidStrikes: boolean;
   target: number;
   strikes: StrikeState;
   question: PublicQuestion | null;
@@ -57,6 +58,7 @@ async function buildState(
     status: string;
     correctCount: number;
     wrongCount: number;
+    usedPaidStrikes: boolean;
     questionIds: string;
     currentIndex: number;
   }
@@ -72,6 +74,7 @@ async function buildState(
     status: run.status as QuizState["status"],
     correctCount: run.correctCount,
     wrongCount: run.wrongCount,
+    usedPaidStrikes: run.usedPaidStrikes,
     target: HEAT_CHECK_TARGET,
     strikes,
     question,
@@ -147,15 +150,21 @@ export async function answerQuestion(
 
     let earnedEntry = false;
     if (won) {
-      const giveaway = await getActiveGiveaway();
-      if (giveaway) {
-        await prisma.giveawayEntry.create({
-          data: { giveawayId: giveaway.id, userId, source: "quiz" },
-        });
-        earnedEntry = true;
+      // Sweepstakes-law guard: giveaway entries come ONLY from runs
+      // completed without purchased strikes. Paid runs count for the
+      // leaderboard and badges, never for the prize.
+      if (!run.usedPaidStrikes) {
+        const giveaway = await getActiveGiveaway();
+        if (giveaway) {
+          await prisma.giveawayEntry.create({
+            data: { giveawayId: giveaway.id, userId, source: "quiz" },
+          });
+          earnedEntry = true;
+        }
       }
       revalidatePath("/giveaway");
       revalidatePath("/profile");
+      revalidatePath("/quiz");
     }
 
     return {
@@ -166,16 +175,17 @@ export async function answerQuestion(
   }
 
   // Wrong answer: costs a strike (free daily first, then purchased credits).
-  const paid = await consumeStrike(userId);
+  const strike = await consumeStrike(userId);
   const outOfQuestions = run.currentIndex + 1 >= ids.length;
   const updated = await prisma.quizRun.update({
     where: { id: run.id },
     data: {
       wrongCount: run.wrongCount + 1,
+      usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
       // Always advance so answers can't be brute-forced by retrying.
       currentIndex: run.currentIndex + 1,
-      status: !paid ? "NEEDS_CREDITS" : outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
-      completedAt: outOfQuestions && paid ? new Date() : null,
+      status: !strike ? "NEEDS_CREDITS" : outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
+      completedAt: outOfQuestions && strike ? new Date() : null,
     },
   });
 
@@ -196,13 +206,17 @@ export async function resumeRun(runId: string): Promise<QuizActionResult> {
   if (!run || run.userId !== userId) return { ok: false, error: "Run not found." };
 
   if (run.status === "NEEDS_CREDITS") {
-    const strikes = await getStrikeState(userId);
-    if (strikes.freeLeft + strikes.credits <= 0) {
+    // The wrong answer that stalled this run hasn't been charged yet —
+    // resuming spends that strike now. Free strikes are used first (a
+    // midnight rollover can rescue the run for free), and a purchased
+    // strike marks the run leaderboard-only.
+    const strike = await consumeStrike(userId);
+    if (!strike) {
       return { ok: false, error: "Still no strikes available — grab a credit pack first." };
     }
     const updated = await prisma.quizRun.update({
       where: { id: run.id },
-      data: { status: "ACTIVE" },
+      data: { status: "ACTIVE", usedPaidStrikes: run.usedPaidStrikes || strike === "paid" },
     });
     return { ok: true, state: await buildState(userId, updated) };
   }

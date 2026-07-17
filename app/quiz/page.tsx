@@ -6,9 +6,11 @@ import {
   getActiveRun,
   getCurrentQuestion,
   getStrikeState,
+  getQuizLeaderboard,
   FREE_STRIKES_PER_DAY,
   HEAT_CHECK_TARGET,
   PACK_SIZE,
+  type LeaderboardEntry,
 } from "@/lib/quiz";
 import { verifyCheckoutSession } from "@/app/quiz-actions";
 import type { QuizState } from "@/app/quiz-actions";
@@ -35,8 +37,11 @@ export default async function QuizPage({
     await verifyCheckoutSession(session_id);
   }
 
-  const giveaway = await getActiveGiveaway();
-  const questionCount = await prisma.quizQuestion.count({ where: { active: true } });
+  const [giveaway, questionCount, leaderboard] = await Promise.all([
+    getActiveGiveaway(),
+    prisma.quizQuestion.count({ where: { active: true } }),
+    getQuizLeaderboard(10),
+  ]);
 
   if (!session?.user?.id) {
     return (
@@ -56,6 +61,7 @@ export default async function QuizPage({
             </Link>
           </div>
         </div>
+        <Leaderboard entries={leaderboard} />
         <Rules />
       </div>
     );
@@ -71,6 +77,7 @@ export default async function QuizPage({
         status: run.status as QuizState["status"],
         correctCount: run.correctCount,
         wrongCount: run.wrongCount,
+        usedPaidStrikes: run.usedPaidStrikes,
         target: HEAT_CHECK_TARGET,
         strikes,
         question,
@@ -106,8 +113,53 @@ export default async function QuizPage({
         />
       </div>
 
+      <Leaderboard entries={leaderboard} />
       <Rules />
     </div>
+  );
+}
+
+function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+  if (entries.length === 0) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="display text-2xl text-white">
+        Heat Check <span className="text-volt">Leaderboard</span>
+      </h2>
+      <p className="mt-1 text-sm text-smoke">
+        All-time checks passed, then accuracy. Paid runs count here — this
+        is for bragging rights, not giveaway odds.
+      </p>
+      <ol className="mt-4 space-y-2">
+        {entries.map((e, i) => (
+          <li
+            key={e.userId}
+            className={`flex items-center gap-3 rounded-lg border bg-surface px-4 py-2.5 ${
+              i === 0 ? "border-volt" : "border-edge"
+            }`}
+          >
+            <span className={`display w-8 text-center text-xl ${i < 3 ? "text-volt" : "text-smoke"}`}>
+              {i + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-bold text-white">
+                {e.name}{" "}
+                {e.badges.map((b) => (
+                  <span key={b.key} title={`${b.label} — ${b.description}`}>{b.emoji}</span>
+                ))}
+              </p>
+              <p className="tag text-smoke">
+                {e.answered} answered · {e.accuracy}% accuracy
+              </p>
+            </div>
+            <p className="display shrink-0 text-xl text-white">
+              {e.wins}
+              <span className="tag ml-1 text-smoke">passed</span>
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -138,16 +190,24 @@ function Rules() {
     <div className="mt-10 rounded-xl border border-edge bg-surface p-5 text-sm text-smoke">
       <p className="tag text-volt">How it works</p>
       <ul className="mt-2 list-disc space-y-1 pl-5">
-        <li>Hit {HEAT_CHECK_TARGET} correct answers in a run to earn a giveaway entry.</li>
+        <li>Hit {HEAT_CHECK_TARGET} correct answers in a run to pass the Heat Check.</li>
         <li>Wrong answers cost a strike and skip to the next question.</li>
         <li>{FREE_STRIKES_PER_DAY} free strikes every day — resets at midnight UTC.</li>
-        <li>Need more strikes? $1 gets you a pack of {PACK_SIZE}. Unused ones roll over.</li>
-        <li>Multiple entries allowed — every passed heat check counts.</li>
+        <li>
+          <strong className="text-white">Giveaway entries come only from runs completed on free
+          strikes.</strong> Every free-strike pass earns an entry.
+        </li>
+        <li>
+          Need more strikes? $1 gets you a pack of {PACK_SIZE}. Purchased
+          strikes keep your run alive for the <strong className="text-white">leaderboard and
+          badges</strong> — they never earn entries or affect giveaway odds.
+        </li>
       </ul>
       <p className="mt-4 border-t border-edge pt-3 text-xs">
-        <strong>No purchase necessary to enter.</strong> Free daily strikes
-        provide a free path to entry every day. Must be 18+. Giveaway void
-        where prohibited — see the{" "}
+        <strong>No purchase necessary to enter — and purchases never improve
+        your odds.</strong> Free daily strikes provide the only path to
+        entries, every day. Must be 18+. Giveaway void where prohibited —
+        see the{" "}
         <Link href="/giveaway" className="underline">giveaway page</Link> for
         official rules.
       </p>

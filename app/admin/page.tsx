@@ -10,6 +10,7 @@ import {
   drawGiveawayWinner,
   toggleQuestion,
   deleteQuestion,
+  forceAdvanceTournament,
 } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
@@ -17,6 +18,7 @@ import ProductForm from "./ProductForm";
 import ArticleForm from "./ArticleForm";
 import GiveawayForm from "./GiveawayForm";
 import QuestionForm from "./QuestionForm";
+import TournamentForm from "./TournamentForm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +60,7 @@ export default async function AdminPage({
     editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
   ]);
 
-  const [giveaways, questions, users] = await Promise.all([
+  const [giveaways, questions, users, tournaments] = await Promise.all([
     prisma.giveaway.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -71,6 +73,10 @@ export default async function AdminPage({
       orderBy: { createdAt: "desc" },
       take: 50,
       include: { _count: { select: { votes: true, giveawayEntries: true } } },
+    }),
+    prisma.tournament.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { champion: true },
     }),
   ]);
 
@@ -171,6 +177,51 @@ export default async function AdminPage({
             </div>
           ))}
           {battles.length === 0 && <p className="text-sm text-smoke">No battles yet.</p>}
+        </div>
+      </section>
+
+      {/* Tournaments */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">Tournaments</h2>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <p className="tag text-heat">Launch a bracket</p>
+          <div className="mt-3">
+            <TournamentForm
+              options={approved.map((s) => ({
+                id: s.id,
+                title: s.title,
+                artistName: s.artistName,
+              }))}
+            />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {tournaments.map((t) => (
+            <div
+              key={t.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+            >
+              <div>
+                <Link href={`/tournaments/${t.slug}`} className="font-bold text-white hover:text-volt">
+                  {t.name}
+                </Link>{" "}
+                <span className={t.status === "ACTIVE" ? "text-heat" : "text-smoke"}>
+                  · {t.status.toLowerCase()} · {t.size} customs
+                </span>
+                {t.champion && (
+                  <p className="text-xs text-smoke">🏆 {t.champion.title} by {t.champion.artistName}</p>
+                )}
+              </div>
+              {t.status === "ACTIVE" && (
+                <form action={forceAdvanceTournament.bind(null, t.id)}>
+                  <button className="rounded border border-heat px-3 py-1.5 tag text-heat">
+                    End round now
+                  </button>
+                </form>
+              )}
+            </div>
+          ))}
+          {tournaments.length === 0 && <p className="text-sm text-smoke">No tournaments yet.</p>}
         </div>
       </section>
 

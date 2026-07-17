@@ -7,12 +7,14 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
 
-  const [articles, battles] = await Promise.all([
+  const [articles, battles, tournaments, artists] = await Promise.all([
     prisma.article.findMany({
       where: { status: "PUBLISHED" },
       select: { slug: true, updatedAt: true },
     }),
     prisma.battle.findMany({ select: { id: true, createdAt: true } }),
+    prisma.tournament.findMany({ select: { slug: true, createdAt: true } }),
+    prisma.artistProfile.findMany({ select: { slug: true, createdAt: true } }),
   ]);
 
   return [
@@ -32,6 +34,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${base}/battles/${b.id}`,
       lastModified: b.createdAt,
       changeFrequency: "hourly" as const,
+      priority: 0.6,
+    })),
+    ...tournaments.map((t) => ({
+      url: `${base}/tournaments/${t.slug}`,
+      lastModified: t.createdAt,
+      changeFrequency: "hourly" as const,
+      priority: 0.8,
+    })),
+    ...artists.map((a) => ({
+      url: `${base}/artists/${a.slug}`,
+      lastModified: a.createdAt,
+      changeFrequency: "weekly" as const,
       priority: 0.6,
     })),
   ];
