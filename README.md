@@ -26,9 +26,14 @@ monetizes it.
 
 ## Run it locally
 
+You need a PostgreSQL database. Easiest options: local Postgres
+(`docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16`)
+or a free [Neon](https://neon.tech) database.
+
 ```bash
+cp .env.example .env # then set DATABASE_URL to your Postgres
 npm install          # also runs prisma generate
-npm run db:push      # creates prisma/dev.db (SQLite)
+npm run db:deploy    # applies the committed migrations
 npm run db:seed      # loads demo battles, 60 trivia questions, shop, articles
 npm run dev          # http://localhost:3000
 ```
@@ -160,14 +165,16 @@ npx prisma db push --force-reset   # wipe everything
 
 ## Going live
 
-- **Stack**: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Prisma + SQLite
-- Any Node host with a persistent disk works out of the box (Railway,
-  Render, Fly.io, a VPS): `npm run build && npm start`.
-- On **Vercel** the filesystem is ephemeral — swap SQLite for a hosted
-  Postgres (Neon/Supabase: change `provider` in `prisma/schema.prisma`
-  and `DATABASE_URL`) and store uploads in Vercel Blob or S3
-  (`app/actions.ts` → `createSubmission`, `app/api/uploads/`).
-- Set a strong `ADMIN_PASSWORD` before you share the link anywhere.
+- **Stack**: Next.js 16 (App Router) · TypeScript · Tailwind v4 ·
+  Prisma + PostgreSQL · S3-compatible object storage for uploads
+  (falls back to local disk in dev) · scheduled battle finalization via
+  `/api/cron/finalize`.
+- **[DEPLOY.md](./DEPLOY.md) is the full launch checklist** — database
+  (Neon), storage (Cloudflare R2), hosting (Vercel or a persistent-disk
+  host), email (Resend), Stripe live mode, OAuth apps, and the
+  pre-announcement checklist.
+- Hot actions (voting, sign-up, password reset, submissions) are
+  rate-limited in-process; swap `lib/ratelimit.ts` to Redis at scale.
 
 ## Pointing the Facebook page at it
 

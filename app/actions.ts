@@ -17,12 +17,11 @@ import { ensureArtistProfile } from "@/lib/artists";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt } from "crypto";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { saveUpload } from "@/lib/storage";
+import { allowAttempt } from "@/lib/ratelimit";
 
 export type ActionResult = { ok: boolean; error?: string };
 
-const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -58,13 +57,20 @@ export async function createSubmission(
   const ext = ALLOWED_TYPES[image.type];
   if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
 
+  if (!allowAttempt("submit", user.id, 10, 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of submissions — try again in an hour." };
+  }
+
   // First submission creates the artist's league profile; later ones
   // keep the same identity (and career record) automatically.
   const artist = await ensureArtistProfile(user.id, artistName, socialHandle || null);
 
   const fileName = `${randomUUID()}.${ext}`;
-  await mkdir(UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(UPLOAD_DIR, fileName), Buffer.from(await image.arrayBuffer()));
+  const imageUrl = await saveUpload(
+    Buffer.from(await image.arrayBuffer()),
+    fileName,
+    image.type
+  );
 
   await prisma.submission.create({
     data: {
@@ -74,7 +80,7 @@ export async function createSubmission(
       email: user.email,
       baseShoe,
       description: description || null,
-      imageUrl: `/api/uploads/${fileName}`,
+      imageUrl,
       artistId: artist.id,
     },
   });
@@ -110,6 +116,9 @@ export async function castVote(battleId: string, submissionId: string): Promise<
   const session = await auth();
   if (!session?.user?.id) {
     return { ok: false, error: "Sign in to vote — it takes 10 seconds and your vote counts." };
+  }
+  if (!allowAttempt("vote", session.user.id, 30, 60 * 1000)) {
+    return { ok: false, error: "Slow down — try again in a minute." };
   }
 
   await finalizeExpiredBattles();

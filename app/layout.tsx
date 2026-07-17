@@ -42,6 +42,15 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
+        <head>
+          <script
+            defer
+            data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
+            src="https://plausible.io/js/script.js"
+          />
+        </head>
+      )}
       <body className="min-h-full flex flex-col">
         <header className="sticky top-0 z-50 border-b border-edge bg-ink/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">

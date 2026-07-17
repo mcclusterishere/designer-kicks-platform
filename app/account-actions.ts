@@ -3,13 +3,20 @@
 import { prisma } from "@/lib/db";
 import { auth, signIn, signOut } from "@/auth";
 import { sendMail } from "@/lib/mailer";
+import { allowAttempt } from "@/lib/ratelimit";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { AuthError } from "next-auth";
 import type { ActionResult } from "./actions";
 
 const HOUR = 60 * 60 * 1000;
+
+async function clientIp(): Promise<string> {
+  const hdrs = await headers();
+  return (hdrs.get("x-forwarded-for") ?? "local").split(",")[0].trim();
+}
 
 function validPassword(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters.";
@@ -29,6 +36,10 @@ export async function registerUser(
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+
+  if (!allowAttempt("register", await clientIp(), 5, HOUR)) {
+    return { ok: false, error: "Too many sign-ups from this connection — try again later." };
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "An account with that email already exists — try signing in." };
@@ -74,6 +85,10 @@ export async function requestPasswordReset(
 ): Promise<ActionResult & { devResetLink?: string }> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+
+  if (!allowAttempt("pwreset", await clientIp(), 5, 15 * 60 * 1000)) {
+    return { ok: false, error: "Too many reset requests — try again in 15 minutes." };
+  }
 
   const user = await prisma.user.findUnique({ where: { email } });
   // Always report success so the form can't be used to probe for accounts.
