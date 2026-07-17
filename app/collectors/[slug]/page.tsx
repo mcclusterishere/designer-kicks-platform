@@ -141,7 +141,7 @@ export default async function CollectorPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{s.baseShoe}</p>
+                  <p className="tag text-smoke">{s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     by{" "}
