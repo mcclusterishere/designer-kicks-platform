@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getOrCreateVoterKey } from "@/lib/voter";
 import { checkPassword, setAdminSession, clearAdminSession, isAdmin } from "@/lib/admin";
 import { finalizeExpiredBattles } from "@/lib/battles";
+import { slugify } from "@/lib/articles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
@@ -215,5 +216,72 @@ export async function deleteProduct(id: string) {
   await requireAdmin();
   await prisma.product.delete({ where: { id } });
   revalidatePath("/shop");
+  revalidatePath("/admin");
+}
+
+// ---------- Newsroom ----------
+
+export async function saveArticle(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const excerpt = String(formData.get("excerpt") ?? "").trim();
+  const content = String(formData.get("content") ?? "").trim();
+  const coverImage = String(formData.get("coverImage") ?? "").trim();
+  const tags = String(formData.get("tags") ?? "").trim();
+  const publish = formData.get("publish") === "on";
+
+  if (!title || title.length > 120) return { ok: false, error: "Title is required (max 120 characters)." };
+  if (!excerpt || excerpt.length > 200) return { ok: false, error: "Excerpt is required (max 200 characters) — it's also the meta description." };
+  if (!content) return { ok: false, error: "Article body is required." };
+
+  const slug = slugify(rawSlug || title);
+  if (!slug) return { ok: false, error: "Couldn't derive a URL slug from that title." };
+
+  const clash = await prisma.article.findUnique({ where: { slug } });
+  if (clash && clash.id !== id) return { ok: false, error: `Slug "${slug}" is already used by another article.` };
+
+  const data = {
+    title,
+    slug,
+    excerpt,
+    content,
+    coverImage: coverImage || null,
+    tags: tags || null,
+    status: publish ? "PUBLISHED" : "DRAFT",
+  };
+
+  if (id) {
+    const existing = await prisma.article.findUnique({ where: { id } });
+    if (!existing) return { ok: false, error: "Article not found." };
+    await prisma.article.update({
+      where: { id },
+      data: {
+        ...data,
+        // Stamp publishedAt on the first publish; keep the original date on edits.
+        publishedAt: publish ? existing.publishedAt ?? new Date() : existing.publishedAt,
+      },
+    });
+  } else {
+    await prisma.article.create({
+      data: { ...data, publishedAt: publish ? new Date() : null },
+    });
+  }
+
+  revalidatePath("/news");
+  revalidatePath(`/news/${slug}`);
+  revalidatePath("/");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function deleteArticle(id: string) {
+  await requireAdmin();
+  await prisma.article.delete({ where: { id } });
+  revalidatePath("/news");
   revalidatePath("/admin");
 }

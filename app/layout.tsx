@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { siteUrl } from "@/lib/articles";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: "Designer Kicks — Custom Sneaker Battles & The Heat List",
   description:
     "Submit your customized kicks, battle other artists in head-to-head vote-offs, and climb the Heat List. Plus the hottest releases and customization gear.",
@@ -22,6 +24,7 @@ export const metadata: Metadata = {
 const navLinks = [
   { href: "/battles", label: "Battles" },
   { href: "/heat-list", label: "Heat List" },
+  { href: "/news", label: "News" },
   { href: "/shop", label: "Shop" },
   { href: "/submit", label: "Submit" },
 ];
@@ -75,9 +78,10 @@ export default function RootLayout({
                   your next grail.
                 </p>
               </div>
-              <div className="flex gap-6">
+              <div className="flex flex-wrap gap-6">
                 <Link href="/battles" className="hover:text-white">Battles</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
+                <Link href="/news" className="hover:text-white">News</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>
               </div>
