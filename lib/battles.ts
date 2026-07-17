@@ -33,6 +33,7 @@ export type HeatEntry = {
   id: string;
   title: string;
   artistName: string;
+  artistSlug: string | null;
   socialHandle: string | null;
   baseShoe: string;
   imageUrl: string;
@@ -53,6 +54,7 @@ export async function getHeatList(): Promise<HeatEntry[]> {
       _count: { select: { votes: true, battlesWon: true } },
       battlesAsA: { select: { status: true } },
       battlesAsB: { select: { status: true } },
+      artist: { select: { slug: true } },
     },
   });
 
@@ -66,6 +68,7 @@ export async function getHeatList(): Promise<HeatEntry[]> {
       id: s.id,
       title: s.title,
       artistName: s.artistName,
+      artistSlug: s.artist?.slug ?? null,
       socialHandle: s.socialHandle,
       baseShoe: s.baseShoe,
       imageUrl: s.imageUrl,
@@ -82,7 +85,10 @@ export async function getHeatList(): Promise<HeatEntry[]> {
 export async function getBattleWithVotes(battleId: string) {
   const battle = await prisma.battle.findUnique({
     where: { id: battleId },
-    include: { subA: true, subB: true },
+    include: {
+      subA: { include: { artist: { select: { slug: true } } } },
+      subB: { include: { artist: { select: { slug: true } } } },
+    },
   });
   if (!battle) return null;
 

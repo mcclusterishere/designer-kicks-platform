@@ -5,9 +5,13 @@ import Link from "next/link";
 import { createSubmission, type ActionResult } from "@/app/actions";
 
 const inputClass =
-  "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
+  "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none disabled:opacity-60";
 
-export default function SubmitForm() {
+type Props = {
+  artistDefaults: { artistName: string; socialHandle: string; locked: boolean };
+};
+
+export default function SubmitForm({ artistDefaults }: Props) {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     createSubmission,
     null
@@ -50,12 +54,17 @@ export default function SubmitForm() {
         <div>
           <label htmlFor="artistName" className="tag text-smoke">
             Artist / crew name *
+            {artistDefaults.locked && (
+              <span className="normal-case"> (from your artist profile)</span>
+            )}
           </label>
           <input
             id="artistName"
             name="artistName"
             required
             maxLength={60}
+            defaultValue={artistDefaults.artistName}
+            readOnly={artistDefaults.locked}
             placeholder="Who made it"
             className={inputClass}
           />
@@ -68,39 +77,26 @@ export default function SubmitForm() {
             id="socialHandle"
             name="socialHandle"
             maxLength={40}
+            defaultValue={artistDefaults.socialHandle}
+            readOnly={artistDefaults.locked}
             placeholder="@yourhandle"
             className={inputClass}
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <div>
-          <label htmlFor="email" className="tag text-smoke">
-            Email * <span className="normal-case">(never shown publicly)</span>
-          </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            required
-            placeholder="you@example.com"
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label htmlFor="baseShoe" className="tag text-smoke">
-            Base shoe *
-          </label>
-          <input
-            id="baseShoe"
-            name="baseShoe"
-            required
-            maxLength={60}
-            placeholder="e.g. Air Force 1, Dunk Low, AJ1"
-            className={inputClass}
-          />
-        </div>
+      <div>
+        <label htmlFor="baseShoe" className="tag text-smoke">
+          Base shoe *
+        </label>
+        <input
+          id="baseShoe"
+          name="baseShoe"
+          required
+          maxLength={60}
+          placeholder="e.g. Air Force 1, Dunk Low, AJ1"
+          className={inputClass}
+        />
       </div>
 
       <div>

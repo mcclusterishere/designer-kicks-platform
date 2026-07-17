@@ -346,10 +346,38 @@ async function main() {
   await prisma.article.deleteMany();
   await prisma.quizQuestion.deleteMany();
 
+  // Demo artists get real (passwordless) accounts + league profiles so
+  // the rankings and artist pages work out of the box.
+  const artistIds = {};
+  for (const s of submissions) {
+    if (artistIds[s.artistName] !== undefined) continue;
+    const user = await prisma.user.upsert({
+      where: { email: s.email },
+      update: {},
+      create: { name: s.artistName, email: s.email },
+    });
+    const slug = s.artistName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/[\s-]+/g, "-");
+    const profile = await prisma.artistProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        slug,
+        displayName: s.artistName,
+        instagram: s.socialHandle ?? null,
+      },
+    });
+    artistIds[s.artistName] = profile.id;
+  }
+
   const subs = {};
   for (const { key, ...data } of submissions) {
     subs[key] = await prisma.submission.create({
-      data: { ...data, status: "APPROVED" },
+      data: { ...data, status: "APPROVED", artistId: artistIds[data.artistName] },
     });
   }
 

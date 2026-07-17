@@ -13,6 +13,7 @@ import {
 import { headers } from "next/headers";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
+import { ensureArtistProfile } from "@/lib/artists";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt } from "crypto";
@@ -35,17 +36,20 @@ export async function createSubmission(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to submit your customs." };
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user) return { ok: false, error: "Sign in to submit your customs." };
+
   const title = String(formData.get("title") ?? "").trim();
   const artistName = String(formData.get("artistName") ?? "").trim();
-  const socialHandle = String(formData.get("socialHandle") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const socialHandle = String(formData.get("socialHandle") ?? "").trim().replace(/^@/, "");
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const image = formData.get("image");
 
   if (!title || title.length > 80) return { ok: false, error: "Give your custom a name (max 80 characters)." };
-  if (!artistName || artistName.length > 60) return { ok: false, error: "Artist name is required." };
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "A valid email is required so we can reach you if you win." };
+  if (!artistName || artistName.length > 60) return { ok: false, error: "Artist / crew name is required." };
   if (!baseShoe) return { ok: false, error: "Tell us the base shoe (e.g. Air Force 1, Dunk Low)." };
   if (description.length > 600) return { ok: false, error: "Description is too long (max 600 characters)." };
 
@@ -54,6 +58,10 @@ export async function createSubmission(
   const ext = ALLOWED_TYPES[image.type];
   if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
 
+  // First submission creates the artist's league profile; later ones
+  // keep the same identity (and career record) automatically.
+  const artist = await ensureArtistProfile(user.id, artistName, socialHandle || null);
+
   const fileName = `${randomUUID()}.${ext}`;
   await mkdir(UPLOAD_DIR, { recursive: true });
   await writeFile(path.join(UPLOAD_DIR, fileName), Buffer.from(await image.arrayBuffer()));
@@ -61,16 +69,38 @@ export async function createSubmission(
   await prisma.submission.create({
     data: {
       title,
-      artistName,
-      socialHandle: socialHandle ? socialHandle.replace(/^@/, "") : null,
-      email,
+      artistName: artist.displayName,
+      socialHandle: artist.instagram ?? (socialHandle || null),
+      email: user.email,
       baseShoe,
       description: description || null,
       imageUrl: `/api/uploads/${fileName}`,
+      artistId: artist.id,
     },
   });
 
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function toggleFollowArtist(artistId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to follow artists." };
+
+  const existing = await prisma.artistFollow.findUnique({
+    where: { artistId_userId: { artistId, userId: session.user.id } },
+  });
+  if (existing) {
+    await prisma.artistFollow.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.artistFollow.create({
+      data: { artistId, userId: session.user.id },
+    });
+  }
+
+  const artist = await prisma.artistProfile.findUnique({ where: { id: artistId } });
+  if (artist) revalidatePath(`/artists/${artist.slug}`);
+  revalidatePath("/artists");
   return { ok: true };
 }
 
