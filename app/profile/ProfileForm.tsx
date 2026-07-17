@@ -10,6 +10,8 @@ type Defaults = {
   city: string;
   shoeSize: string;
   favoriteSilhouette: string;
+  favoriteBrands: string;
+  styleInterests: string;
   instagram: string;
   marketingOptIn: boolean;
 };
@@ -53,6 +55,16 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
         <div>
           <label htmlFor="p-ig" className="tag text-smoke">Instagram</label>
           <input id="p-ig" name="instagram" maxLength={40} defaultValue={defaults.instagram} placeholder="@yourhandle" className={inputClass} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="p-brands" className="tag text-smoke">Favorite brands</label>
+          <input id="p-brands" name="favoriteBrands" maxLength={120} defaultValue={defaults.favoriteBrands} placeholder="Jordan, Nike, New Balance" className={inputClass} />
+        </div>
+        <div>
+          <label htmlFor="p-style" className="tag text-smoke">Style interests</label>
+          <input id="p-style" name="styleInterests" maxLength={120} defaultValue={defaults.styleInterests} placeholder="Retro, Customs, Streetwear" className={inputClass} />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">

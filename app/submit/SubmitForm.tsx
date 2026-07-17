@@ -85,18 +85,30 @@ export default function SubmitForm({ artistDefaults }: Props) {
         </div>
       </div>
 
-      <div>
-        <label htmlFor="baseShoe" className="tag text-smoke">
-          Base shoe *
-        </label>
-        <input
-          id="baseShoe"
-          name="baseShoe"
-          required
-          maxLength={60}
-          placeholder="e.g. Air Force 1, Dunk Low, AJ1"
-          className={inputClass}
-        />
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="baseShoe" className="tag text-smoke">
+            Base item *
+          </label>
+          <input
+            id="baseShoe"
+            name="baseShoe"
+            required
+            maxLength={60}
+            placeholder="e.g. Air Force 1, hoodie blank, fitted cap"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="category" className="tag text-smoke">
+            Category *
+          </label>
+          <select id="category" name="category" className={inputClass} defaultValue="sneakers">
+            <option value="sneakers">👟 Sneakers</option>
+            <option value="apparel">🧥 Apparel</option>
+            <option value="accessories">🧢 Accessories</option>
+          </select>
+        </div>
       </div>
 
       <div>

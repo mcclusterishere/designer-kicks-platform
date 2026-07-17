@@ -6,6 +6,7 @@ import { getActiveGiveaway } from "@/lib/quiz";
 import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
+import HypeTicker from "@/components/HypeTicker";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +44,12 @@ export default async function HomePage() {
         <div className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-heat/10 blur-3xl" />
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24">
           <p className="tag text-volt">Custom sneaker battles</p>
-          <h1 className="display mt-3 max-w-3xl text-5xl text-white sm:text-7xl">
+          <h1 className="display mt-3 max-w-3xl text-6xl text-white sm:text-8xl">
             Your customs.
             <br />
             Their votes.
             <br />
-            <span className="text-volt">The Heat List.</span>
+            <span className="text-gradient-volt">The Heat List.</span>
           </h1>
           <p className="mt-6 max-w-xl text-lg text-smoke">
             Submit the hardest custom kicks you&apos;ve painted, go head-to-head
@@ -71,6 +72,8 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      <HypeTicker />
 
       {/* Giveaway / quiz banner */}
       {giveaway && (

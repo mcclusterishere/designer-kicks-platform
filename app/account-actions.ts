@@ -150,11 +150,17 @@ export async function updateProfile(
   const city = String(formData.get("city") ?? "").trim();
   const shoeSize = String(formData.get("shoeSize") ?? "").trim();
   const favoriteSilhouette = String(formData.get("favoriteSilhouette") ?? "").trim();
+  const favoriteBrands = String(formData.get("favoriteBrands") ?? "").trim();
+  const styleInterests = String(formData.get("styleInterests") ?? "").trim();
   const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
   const marketingOptIn = formData.get("marketingOptIn") === "on";
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
-  if (phone.length > 30 || city.length > 60 || shoeSize.length > 10 || favoriteSilhouette.length > 60 || instagram.length > 40) {
+  if (
+    phone.length > 30 || city.length > 60 || shoeSize.length > 10 ||
+    favoriteSilhouette.length > 60 || favoriteBrands.length > 120 ||
+    styleInterests.length > 120 || instagram.length > 40
+  ) {
     return { ok: false, error: "One of the fields is too long." };
   }
 
@@ -166,6 +172,8 @@ export async function updateProfile(
       city: city || null,
       shoeSize: shoeSize || null,
       favoriteSilhouette: favoriteSilhouette || null,
+      favoriteBrands: favoriteBrands || null,
+      styleInterests: styleInterests || null,
       instagram: instagram || null,
       marketingOptIn,
     },
