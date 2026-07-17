@@ -37,6 +37,28 @@ export default async function BattlesPage() {
         . One vote per battle — make it count.
       </p>
 
+      {/* Arena hub: quick jumps to the competitive surfaces */}
+      <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+        {[
+          { href: "/battles", label: "⚔️ Battles", current: true },
+          { href: "/tournaments", label: "🏆 Brackets" },
+          { href: "/artists", label: "🥇 League" },
+          { href: "/heat-list", label: "🔥 Heat List" },
+        ].map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className={`tag shrink-0 rounded-full border px-4 py-2 transition ${
+              l.current
+                ? "border-volt bg-volt/10 text-volt"
+                : "border-edge text-smoke hover:border-volt hover:text-white"
+            }`}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
+
       {activeTournaments.length > 0 && (
         <div className="mt-8 space-y-3">
           {activeTournaments.map((t) => (

@@ -139,11 +139,13 @@ model User {
   image         String?
   passwordHash  String? // null for OAuth-only accounts
 
-  // Profile / contact info
+  // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
   shoeSize           String?
   favoriteSilhouette String?
+  favoriteBrands     String? // comma-separated, e.g. "Jordan, Nike, New Balance"
+  styleInterests     String? // comma-separated, e.g. "Retro, Customs, Streetwear"
   instagram          String?
   marketingOptIn     Boolean @default(false)
 

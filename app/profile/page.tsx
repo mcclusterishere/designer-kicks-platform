@@ -97,6 +97,8 @@ export default async function ProfilePage() {
             city: user.city ?? "",
             shoeSize: user.shoeSize ?? "",
             favoriteSilhouette: user.favoriteSilhouette ?? "",
+            favoriteBrands: user.favoriteBrands ?? "",
+            styleInterests: user.styleInterests ?? "",
             instagram: user.instagram ?? "",
             marketingOptIn: user.marketingOptIn,
           }}
