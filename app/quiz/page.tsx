@@ -109,6 +109,11 @@ export default async function QuizPage({
           initialState={initialState}
           purchaseResult={purchase ?? null}
           stripeConfigured={Boolean(process.env.STRIPE_SECRET_KEY)}
+          purchasesEnabled={
+            Boolean(process.env.STRIPE_SECRET_KEY) ||
+            process.env.NODE_ENV !== "production" ||
+            process.env.PAYMENTS_DEV_MODE === "true"
+          }
           questionCount={questionCount}
         />
       </div>

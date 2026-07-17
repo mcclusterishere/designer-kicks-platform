@@ -17,8 +17,9 @@ import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { randomUUID, randomInt } from "crypto";
+import { randomUUID, randomInt, randomBytes } from "crypto";
 import { saveUpload } from "@/lib/storage";
+import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
 
 export type ActionResult = { ok: boolean; error?: string };
@@ -146,6 +147,118 @@ export async function applyForArtist(
   // any revalidation would rerender /submit into its PENDING view before
   // the client confirmation card can show.
   return { ok: true };
+}
+
+export type PreloadResult = ActionResult & {
+  artistSlug?: string;
+  claimUrl?: string;
+  inviteText?: string;
+  emailSent?: boolean;
+};
+
+/**
+ * Onboarding accelerator: admin creates an artist's page + first shoe
+ * on their behalf (with permission), already approved and votable. The
+ * artist gets a claim link (14-day password-set token) so the account
+ * becomes theirs in one tap — plus a ready-to-send invite message, and
+ * an automatic email when a mail provider is configured.
+ */
+export async function preloadArtist(
+  _prev: PreloadResult | null,
+  formData: FormData
+): Promise<PreloadResult> {
+  await requireAdmin();
+
+  const artistName = String(formData.get("artistName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  const city = String(formData.get("city") ?? "").trim();
+  const shoeTitle = String(formData.get("shoeTitle") ?? "").trim();
+  const baseShoe = String(formData.get("baseShoe") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const image = formData.get("image");
+
+  if (!artistName) return { ok: false, error: "Artist name is required." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "A valid artist email is required (it becomes their claimable account)." };
+  if (!shoeTitle || !baseShoe) return { ok: false, error: "Shoe title and base shoe are required." };
+  if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of the custom." };
+  if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
+  const ext = ALLOWED_TYPES[image.type];
+  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
+
+  // Claimable account: no password until the artist sets one via the link.
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { name: artistName, email },
+  });
+
+  let artist = await prisma.artistProfile.findUnique({ where: { userId: user.id } });
+  if (!artist) {
+    artist = await prisma.artistProfile.create({
+      data: {
+        userId: user.id,
+        slug: await uniqueArtistSlug(artistName),
+        displayName: artistName,
+        instagram: instagram || null,
+        city: city || null,
+        status: "APPROVED",
+      },
+    });
+  } else if (artist.status !== "APPROVED") {
+    artist = await prisma.artistProfile.update({
+      where: { id: artist.id },
+      data: { status: "APPROVED" },
+    });
+  }
+
+  const fileName = `${randomUUID()}.${ext}`;
+  const imageUrl = await saveUpload(Buffer.from(await image.arrayBuffer()), fileName, image.type);
+
+  await prisma.submission.create({
+    data: {
+      title: shoeTitle,
+      artistName: artist.displayName,
+      socialHandle: artist.instagram,
+      email,
+      baseShoe,
+      description: description || null,
+      imageUrl,
+      status: "APPROVED",
+      artistId: artist.id,
+    },
+  });
+
+  // 14-day claim token (rides the password-reset flow).
+  const token = randomBytes(32).toString("hex");
+  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+  await prisma.passwordResetToken.create({
+    data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+  });
+
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const artistUrl = `${base}/artists/${artist.slug}`;
+  const claimUrl = `${base}/reset-password/${token}`;
+  const inviteText =
+    `Yo ${artistName} — your customs are officially in the arena on Designer Kicks 🔥\n\n` +
+    `The culture votes on head-to-head custom battles, and "${shoeTitle}" is already live on your artist page:\n${artistUrl}\n\n` +
+    `Claim your account here (sets your password, takes 30 seconds):\n${claimUrl}\n\n` +
+    `Every battle builds your W–L record on the league table, fans can follow you, and when you sell a pair you can transfer it to the buyer's collector closet. Come defend your heat.`;
+
+  let emailSent = false;
+  if (process.env.RESEND_API_KEY) {
+    const { delivered } = await sendMail({
+      to: email,
+      subject: `${artistName} — your customs are live on Designer Kicks 🔥`,
+      text: inviteText,
+    });
+    emailSent = delivered;
+  }
+
+  revalidatePath("/artists");
+  revalidatePath(`/artists/${artist.slug}`);
+  revalidatePath("/admin");
+  return { ok: true, artistSlug: artist.slug, claimUrl, inviteText, emailSent };
 }
 
 export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED") {

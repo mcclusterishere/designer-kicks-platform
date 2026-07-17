@@ -20,6 +20,7 @@ import ArticleForm from "./ArticleForm";
 import GiveawayForm from "./GiveawayForm";
 import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
+import PreloadArtistForm from "./PreloadArtistForm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -139,6 +140,19 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+
+      {/* Pre-load artist (onboarding accelerator) */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">Pre-load An Artist</h2>
+        <p className="mt-1 text-sm text-smoke">
+          Create an artist&apos;s page and first shoe on their behalf (with
+          permission). You get a 14-day claim link and a ready-to-send DM —
+          and the invite emails itself when Resend is configured.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <PreloadArtistForm />
+        </div>
       </section>
 
       {/* Artist applications */}

@@ -248,7 +248,13 @@ export async function buyCreditPack(packs: number): Promise<{ ok: false; error: 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
 
   if (!stripeKey) {
-    // Dev mode: no Stripe configured — grant instantly so the flow is testable.
+    const devGrantsAllowed =
+      process.env.NODE_ENV !== "production" || process.env.PAYMENTS_DEV_MODE === "true";
+    if (!devGrantsAllowed) {
+      // Launched without Stripe: never grant free credits in public.
+      return { ok: false, error: "Credit packs aren't on sale yet — your free strikes refill at midnight UTC." };
+    }
+    // Dev/test mode: no Stripe configured — grant instantly so the flow is testable.
     await grantCredits(userId, qty * PACK_SIZE, "purchase-dev");
     revalidatePath("/quiz");
     revalidatePath("/profile");
