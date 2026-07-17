@@ -120,12 +120,205 @@ const products = [
   { name: "Cedar Shoe Trees", merchant: "Amazon", category: "accessories", blurb: "Shape + moisture control for pairs that matter.", price: "From $19.99", affiliateUrl: "https://www.amazon.com/s?k=cedar+shoe+trees", sortOrder: 43 },
 ];
 
+// Drop Report seed articles. Release info researched July 2026 from
+// sneaker release calendars (Sole Retriever, Sneaker Bar Detroit, Nice
+// Kicks, Sneaker News, House of Heat) — dates shift, re-verify before
+// promoting a post.
+const articles = [
+  {
+    slug: "air-jordan-4-tour-yellow-release-date-2026",
+    title: "Air Jordan 4 'Tour Yellow' Release Date: The 20-Year Wait Ends September 5",
+    excerpt:
+      "The Air Jordan 4 'Tour Yellow' finally retros September 5, 2026 for $220 (IO2463-102). Release info, where to cop, and why this one will not sit.",
+    tags: "Jordan, Release Dates, SNKRS",
+    coverImage: "/seed/news-1.svg",
+    daysAgo: 1,
+    content: [
+      "## The drop at a glance",
+      "",
+      "| | |",
+      "|---|---|",
+      "| **Release date** | September 5, 2026 |",
+      "| **Retail price** | $220 |",
+      "| **Style code** | IO2463-102 |",
+      "| **Colorway** | White / Tour Yellow / Dark Blue Grey / Black |",
+      "| **Where** | Nike SNKRS + select Jordan Brand retailers |",
+      "",
+      "## Why this one matters",
+      "",
+      "The 'Tour Yellow' Air Jordan 4 dropped once — May 2006 — and then vanished for two decades. This September it gets its **first retro ever**, and colorways that skip a generation are exactly the ones that disappear on release day. Rare Air-era nostalgia is real, and AJ4s are consistently among the most-flipped retros on the market.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS draw** — enter the minute it goes live; set a reminder now.",
+      "2. **Retailer raffles** — most Jordan accounts run raffles in the days before the drop.",
+      "3. **Miss it?** Marketplaces like StockX, GOAT, and KicksCrew will have pairs above retail — check our [Shop](/shop) for the marketplaces we trust.",
+      "",
+      "## The customizer angle",
+      "",
+      "That white-and-yellow blocking is basically a blank canvas with a head start. If you grab a pair and flip it into something the culture has never seen, [submit it to the Battle Arena](/submit) — Tour Yellow customs are going to be a wave this fall.",
+      "",
+      "*Release dates can shift — follow the Drop Report for updates.*",
+    ].join("\n"),
+  },
+  {
+    slug: "air-jordan-1-royal-2026-release-date",
+    title: "Air Jordan 1 'Royal' Is Back October 10 — First OG-Leather Version in 9 Years",
+    excerpt:
+      "The Air Jordan 1 High OG 'Royal' returns October 10, 2026 for $185 (IQ5495-005) in smooth 1985-style leather. Everything we know about the grail's fourth-ever release.",
+    tags: "Jordan, Release Dates, Grails",
+    coverImage: "/seed/news-2.svg",
+    daysAgo: 3,
+    content: [
+      "## The drop at a glance",
+      "",
+      "| | |",
+      "|---|---|",
+      "| **Release date** | October 10, 2026 |",
+      "| **Retail price** | $185 |",
+      "| **Style code** | IQ5495-005 |",
+      "| **Colorway** | Black / Royal Blue |",
+      "| **Where** | Nike SNKRS, Foot Locker, Finish Line, select Jordan retailers |",
+      "",
+      "## One of the three original grails",
+      "",
+      "Bred. Chicago. **Royal.** Those are the three 1985 originals, and the Royal has only ever seen three High OG releases. This fourth release matters because Nike is going back to the **smooth leather closer to the 1985 original** — not the tumbled leather of the 2017 pair — which is exactly what collectors have been asking for.",
+      "",
+      "Expect one of the most contested SNKRS drops of Q4. If you only chase one pair this fall, this is a defensible pick.",
+      "",
+      "## How to cop",
+      "",
+      "- **SNKRS** — it will almost certainly be a draw, not first-come-first-served.",
+      "- **Foot Locker / Finish Line apps** — reservation systems give you extra entries.",
+      "- **Resale reality check** — Royals historically hold strong above retail. If you strike out, check the [marketplaces in our Shop](/shop) and know the market price before you pay it.",
+      "",
+      "## Keep them alive",
+      "",
+      "Black and royal blue shows every scuff. Ice the outsoles, protect them before first wear — the [care gear in our Shop](/shop) is what we actually use.",
+      "",
+      "*Release dates can shift — follow the Drop Report for updates.*",
+    ].join("\n"),
+  },
+  {
+    slug: "air-jordan-6-oreo-2026-release-date",
+    title: "Air Jordan 6 'Oreo' Returns August 8 After 16 Years — Release Info & Where To Buy",
+    excerpt:
+      "The Air Jordan 6 'Oreo' retros August 8, 2026 for $215 (CT8529-108) — its first return since 2010. Release details, stockists, and resale outlook.",
+    tags: "Jordan, Release Dates, SNKRS",
+    coverImage: "/seed/news-3.svg",
+    daysAgo: 5,
+    content: [
+      "## The drop at a glance",
+      "",
+      "| | |",
+      "|---|---|",
+      "| **Release date** | August 8, 2026 |",
+      "| **Retail price** | $215 |",
+      "| **Style code** | CT8529-108 |",
+      "| **Colorway** | White / Black — white tumbled leather, black speckled suede |",
+      "| **Where** | Nike.com / SNKRS, Finish Line, Foot Locker, JD Sports, Hibbett |",
+      "",
+      "## 16 years is a long time",
+      "",
+      "The 'Oreo' 6 last released in **2010**, and this return stays close to the original blocking — white tumbled leather up top, black speckled midsole doing the cookie work. Long-dormant colorways carry real nostalgia demand: people who missed it as teenagers now have adult money.",
+      "",
+      "Expect a fast sell-through. Wide sizing helps your odds, but do not sleep on release morning.",
+      "",
+      "## How to cop",
+      "",
+      "1. SNKRS + Nike.com at 10AM ET on drop day.",
+      "2. Finish Line and Foot Locker app reservations open earlier in the week.",
+      "3. JD Sports and Hibbett raffles are consistently underrated odds.",
+      "",
+      "Miss it? [Our Shop's marketplace links](/shop) get you authenticated pairs without the fake-check anxiety.",
+      "",
+      "*Release dates can shift — follow the Drop Report for updates.*",
+    ].join("\n"),
+  },
+  {
+    slug: "travis-scott-jordan-1-reverse-mocha-high-2026",
+    title: "Travis Scott x Air Jordan 1 High 'Reverse Mocha': What We Know So Far",
+    excerpt:
+      "The rumored Travis Scott Air Jordan 1 High 'Reverse Mocha' is expected fall 2026 around $200. Colorway details, expected SNKRS draw info, and resale outlook.",
+    tags: "Travis Scott, Jordan, Rumors",
+    coverImage: "/seed/news-4.svg",
+    daysAgo: 7,
+    content: [
+      "## Rumor status: strong, but not official",
+      "",
+      "Nothing confirmed by Nike yet — treat everything below as the current best intel, expected to land **fall 2026** (September–November window).",
+      "",
+      "| | |",
+      "|---|---|",
+      "| **Expected window** | Fall 2026 (rumored) |",
+      "| **Expected price** | ~$200 |",
+      "| **Colorway** | White tumbled leather, brown suede, black reverse Swoosh, sail midsole |",
+      "| **Where** | Nike SNKRS (likely exclusive-access/draw), travisscott.com |",
+      "",
+      "## Why it is the most anticipated shoe of the year",
+      "",
+      "This is the **high-top follow-up to 2022's Reverse Mocha Low** — the shoe that broke SNKRS entry records. It inverts the blocking of the 2019 'Mocha' High that started the whole Travis AJ1 era. Travis Scott AJ1 Highs are the most heavily traded modern Jordans, and early expectations put resale in the several-hundred-to-four-figure range.",
+      "",
+      "## Realistic ways in",
+      "",
+      "- **SNKRS exclusive access** — buy Jordan product on your Nike account all year; access drops favor active accounts.",
+      "- **travisscott.com surprise drops** — his site drops with minimal warning. Notifications on.",
+      "- **Resale** — if you pay after-market, use authenticated platforms only. This will be the most-faked shoe of the year the week it drops. [Trusted marketplaces here](/shop).",
+      "",
+      "*We will update this story as real dates surface — the Drop Report has it first.*",
+    ].join("\n"),
+  },
+  {
+    slug: "august-2026-sneaker-release-dates-calendar",
+    title: "August 2026 Sneaker Release Dates: Every Drop That Actually Matters",
+    excerpt:
+      "The full August 2026 sneaker release calendar — Jordan 1 'Love Letter', Flint 13s, Oreo 6s, three Kobe Protros, and the Space Jam 9s, with dates and prices.",
+    tags: "Release Dates, Calendar, SNKRS",
+    coverImage: "/seed/news-5.svg",
+    daysAgo: 0,
+    content: [
+      "## The calendar",
+      "",
+      "| Date | Release | Price |",
+      "|---|---|---|",
+      "| Aug 1 | Air Jordan 1 High OG 'Love Letter' (DZ5485-201) | $185 |",
+      "| Aug 1 | Air Jordan 13 Retro 'Flint' (IW3808-400) | $215 |",
+      "| Aug 8 | Air Jordan 6 'Oreo' (CT8529-108) | $215 |",
+      "| Aug 8 | Nike Kobe 8 Protro 'Mambacurial' | $200 |",
+      "| Aug 15 | Nike Kobe 5 Protro 'Dodgers' | $190 |",
+      "| Aug 23 | Kobe 10 Elite Low Protro 'Halo' (Mamba Day) | TBC |",
+      "| Aug 29 | Air Jordan 9 Retro OG 'Space Jam' (HV4794-106) | $215 |",
+      "",
+      "## The ones to actually chase",
+      "",
+      "**Jordan 1 'Love Letter' (Aug 1)** — MJ's retirement letter to basketball, printed on the medial side. Story pairs like this age well.",
+      "",
+      "**Jordan 6 'Oreo' (Aug 8)** — first return in 16 years. [Full breakdown here](/news/air-jordan-6-oreo-2026-release-date).",
+      "",
+      "**The Kobe month** — three Protro drops in four weeks, capped by Mamba Day on August 23. Kobe releases are still the hardest wins on SNKRS; enter everything.",
+      "",
+      "**Space Jam 9s (Aug 29)** — timed to the movie's 30th anniversary with OG-style packaging and shaping closer to the 1993 original.",
+      "",
+      "## Game plan",
+      "",
+      "1. Load your SNKRS payment info **now**, not at 9:59 on drop day.",
+      "2. Enter every retailer raffle — Foot Locker, Finish Line, JD, Hibbett. Odds compound.",
+      "3. Set a resale ceiling before each drop so you never panic-buy. [Marketplace links in the Shop](/shop).",
+      "",
+      "And when your pairs land — you know what to do. Paint them, flip them into something nobody else has, and [enter the Battle Arena](/submit).",
+      "",
+      "*Dates from Nike/retailer calendars as of mid-July 2026; they shift often. Bookmark this page — we keep it current.*",
+    ].join("\n"),
+  },
+];
+
 async function main() {
   // Wipe in dependency order so reseeding is idempotent.
   await prisma.vote.deleteMany();
   await prisma.battle.deleteMany();
   await prisma.submission.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.article.deleteMany();
 
   const subs = {};
   for (const { key, ...data } of submissions) {
@@ -167,8 +360,18 @@ async function main() {
     await prisma.product.create({ data: p });
   }
 
+  for (const { daysAgo, ...a } of articles) {
+    await prisma.article.create({
+      data: {
+        ...a,
+        status: "PUBLISHED",
+        publishedAt: new Date(now - daysAgo * DAY),
+      },
+    });
+  }
+
   console.log(
-    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products.`
+    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles.`
   );
 }
 
