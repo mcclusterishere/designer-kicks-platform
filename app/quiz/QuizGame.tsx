@@ -18,10 +18,11 @@ type Props = {
   initialState: QuizState | null;
   purchaseResult: string | null;
   stripeConfigured: boolean;
+  purchasesEnabled: boolean;
   questionCount: number;
 };
 
-export default function QuizGame({ initialState, purchaseResult, stripeConfigured, questionCount }: Props) {
+export default function QuizGame({ initialState, purchaseResult, stripeConfigured, purchasesEnabled, questionCount }: Props) {
   const [state, setState] = useState<QuizState | null>(initialState);
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -143,24 +144,33 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
           entries only come from runs completed on free strikes — purchases
           never affect your odds of winning.
         </p>
-        <BuyPanel
-          pending={pending}
-          stripeConfigured={stripeConfigured}
-          onBuy={(packs) =>
-            run(async () => {
-              const res = await buyCreditPack(packs);
-              if (res.ok && "dev" in res) {
-                // Dev purchase granted instantly — resume the run.
-                return resumeRun(state.runId);
+        {purchasesEnabled ? (
+          <>
+            <BuyPanel
+              pending={pending}
+              stripeConfigured={stripeConfigured}
+              onBuy={(packs) =>
+                run(async () => {
+                  const res = await buyCreditPack(packs);
+                  if (res.ok && "dev" in res) {
+                    // Dev purchase granted instantly — resume the run.
+                    return resumeRun(state.runId);
+                  }
+                  return res;
+                })
               }
-              return res;
-            })
-          }
-        />
-        <p className="mt-4 text-xs text-smoke">
-          Or come back tomorrow — your free strikes reset daily and the run
-          will be waiting.
-        </p>
+            />
+            <p className="mt-4 text-xs text-smoke">
+              Or come back tomorrow — your free strikes reset daily and the run
+              will be waiting.
+            </p>
+          </>
+        ) : (
+          <p className="mx-auto mt-5 max-w-md rounded-lg border border-edge bg-panel p-4 text-sm text-smoke">
+            Credit packs aren&apos;t on sale yet. Your free strikes refill at
+            midnight UTC — this run will be waiting for you.
+          </p>
+        )}
         {error && <p className="mt-3 text-sm text-heat">{error}</p>}
       </div>
     );

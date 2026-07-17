@@ -337,15 +337,61 @@ function loadQuestions() {
 }
 
 async function main() {
+  // SEED_DEMO=false loads launch content only (trivia bank, articles,
+  // shop, giveaway) and skips the placeholder artists/battles — use it
+  // for production, then pre-load real artists from /admin.
+  const includeDemo = process.env.SEED_DEMO !== "false";
+
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
-  await prisma.tournament.deleteMany();
-  await prisma.vote.deleteMany({ where: { userId: null } });
-  await prisma.battle.deleteMany();
-  await prisma.submission.deleteMany();
+  if (includeDemo) {
+    await prisma.tournament.deleteMany();
+    await prisma.vote.deleteMany({ where: { userId: null } });
+    await prisma.battle.deleteMany();
+    await prisma.submission.deleteMany();
+  }
   await prisma.product.deleteMany();
   await prisma.article.deleteMany();
   await prisma.quizQuestion.deleteMany();
+
+  if (!includeDemo) {
+    for (const p of products) {
+      await prisma.product.create({ data: p });
+    }
+    for (const { daysAgo, ...a } of articles) {
+      await prisma.article.create({
+        data: { ...a, status: "PUBLISHED", publishedAt: new Date(Date.now() - daysAgo * DAY) },
+      });
+    }
+    for (const q of loadQuestions()) {
+      await prisma.quizQuestion.create({
+        data: {
+          question: q.question,
+          options: JSON.stringify(q.options),
+          answerIndex: q.answerIndex,
+          difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
+          category: q.category || "history",
+          explanation: q.explanation || null,
+        },
+      });
+    }
+    const activeGiveaway = await prisma.giveaway.findFirst({
+      where: { status: "ACTIVE", endsAt: { gt: new Date() } },
+    });
+    if (!activeGiveaway) {
+      await prisma.giveaway.create({
+        data: {
+          title: "Launch Giveaway",
+          prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+          description:
+            "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+          endsAt: new Date(Date.now() + 30 * DAY),
+        },
+      });
+    }
+    console.log("Seeded launch content only (no demo artists/battles): products, articles, quiz bank, giveaway.");
+    return;
+  }
 
   // Demo artists get real (passwordless) accounts + league profiles so
   // the rankings and artist pages work out of the box.
