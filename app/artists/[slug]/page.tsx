@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
+import TransferForm from "@/components/TransferForm";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export default async function ArtistPage({ params }: Props) {
   ]);
   // Every shoe's live position on the Heat List
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
+  // The artist managing their own page can record sales/transfers.
+  const isOwnPage = session?.user?.id === artist.userId;
 
   let wins = 0;
   let battles = 0;
@@ -187,6 +190,22 @@ export default async function ArtistPage({ params }: Props) {
                       <span className="text-volt"> · champion</span>
                     )}
                   </p>
+                  {s.owner && (
+                    <p className="mt-1.5 text-sm text-smoke">
+                      🔑 In{" "}
+                      {s.owner.collectorSlug ? (
+                        <Link
+                          href={`/collectors/${s.owner.collectorSlug}`}
+                          className="text-volt underline"
+                        >
+                          {s.owner.name ?? "a collector"}&apos;s closet
+                        </Link>
+                      ) : (
+                        <span className="text-white">{s.owner.name ?? "a collector"}&apos;s closet</span>
+                      )}
+                    </p>
+                  )}
+                  {isOwnPage && <TransferForm submissionId={s.id} />}
                 </div>
               </div>
             );

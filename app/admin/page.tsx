@@ -11,6 +11,7 @@ import {
   toggleQuestion,
   deleteQuestion,
   forceAdvanceTournament,
+  setArtistStatus,
 } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
@@ -80,6 +81,12 @@ export default async function AdminPage({
     }),
   ]);
 
+  const artistApplications = await prisma.artistProfile.findMany({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex items-center justify-between">
@@ -123,6 +130,59 @@ export default async function AdminPage({
                     </form>
                     <form action={setSubmissionStatus.bind(null, s.id, "REJECTED")} className="flex-1">
                       <button className="w-full rounded border border-heat py-2 tag text-heat">
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Artist applications */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Artist Applications{" "}
+          <span className={artistApplications.length ? "text-heat" : "text-smoke"}>
+            ({artistApplications.length})
+          </span>
+        </h2>
+        {artistApplications.length === 0 ? (
+          <p className="mt-3 text-sm text-smoke">No pending applications.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {artistApplications.map((a) => (
+              <div key={a.id} className="rounded-xl border border-edge bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-white">{a.displayName}</p>
+                    <p className="text-sm text-smoke">
+                      {a.user.name} · {a.user.email}
+                      {a.instagram && <span className="text-volt"> · @{a.instagram}</span>}
+                      {a.city && ` · ${a.city}`}
+                    </p>
+                    {a.portfolioUrl && (
+                      <a
+                        href={a.portfolioUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-volt underline"
+                      >
+                        {a.portfolioUrl}
+                      </a>
+                    )}
+                    {a.bio && <p className="mt-1 text-sm text-smoke">{a.bio}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <form action={setArtistStatus.bind(null, a.id, "APPROVED")}>
+                      <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                        Approve
+                      </button>
+                    </form>
+                    <form action={setArtistStatus.bind(null, a.id, "REJECTED")}>
+                      <button className="rounded border border-heat px-4 py-2 tag text-heat">
                         Reject
                       </button>
                     </form>

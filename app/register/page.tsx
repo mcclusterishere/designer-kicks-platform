@@ -14,7 +14,9 @@ export default async function RegisterPage() {
       <p className="tag text-volt">Join the culture</p>
       <h1 className="display mt-2 text-4xl text-white">Create Account</h1>
       <p className="mt-2 text-sm text-smoke">
-        One account for battles, the Heat Check trivia game, and giveaway entries.
+        A fan account is instant — vote in battles, play the Heat Check,
+        win giveaways, and build your collector closet. Artists apply for
+        an upgraded account after joining (approval required).
       </p>
       <div className="mt-6">
         <RegisterForm />
