@@ -16,7 +16,7 @@ export default async function SignInPage() {
       <p className="tag text-volt">Welcome back</p>
       <h1 className="display mt-2 text-4xl text-white">Sign In</h1>
       <p className="mt-2 text-sm text-smoke">
-        Vote in battles, play the trivia gauntlet, and win giveaways.
+        Vote in battles, take the Heat Check, and win giveaways.
       </p>
 
       {hasOAuth && (

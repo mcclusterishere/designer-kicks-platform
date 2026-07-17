@@ -14,7 +14,7 @@ export default async function RegisterPage() {
       <p className="tag text-volt">Join the culture</p>
       <h1 className="display mt-2 text-4xl text-white">Create Account</h1>
       <p className="mt-2 text-sm text-smoke">
-        One account for battles, the trivia gauntlet, and giveaway entries.
+        One account for battles, the Heat Check trivia game, and giveaway entries.
       </p>
       <div className="mt-6">
         <RegisterForm />

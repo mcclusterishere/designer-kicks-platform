@@ -43,7 +43,7 @@ export default async function ProfilePage() {
         {[
           { label: "Votes cast", value: user._count.votes },
           { label: "Quiz runs", value: user._count.quizRuns },
-          { label: "Gauntlets won", value: wonRuns },
+          { label: "Heat checks passed", value: wonRuns },
           { label: "Giveaway entries", value: user._count.giveawayEntries },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-edge bg-surface p-4 text-center">
@@ -59,7 +59,7 @@ export default async function ProfilePage() {
           <p className="display text-2xl text-white">{user.credits}</p>
         </div>
         <Link href="/quiz" className="rounded-lg bg-heat px-5 py-2.5 tag font-bold text-white">
-          Play The Gauntlet
+          Take The Heat Check
         </Link>
       </div>
 

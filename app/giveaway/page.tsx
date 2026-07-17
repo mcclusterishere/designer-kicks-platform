@@ -7,7 +7,7 @@ import Countdown from "@/components/Countdown";
 export const metadata = {
   title: "Rare Shoe Giveaway — Designer Kicks",
   description:
-    "Win rare kicks by beating the Jordan trivia gauntlet. No purchase necessary — free entries available daily.",
+    "Win rare kicks by passing the Jordan trivia Heat Check. No purchase necessary — free entries available daily.",
 };
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,7 @@ export default async function GiveawayPage() {
             href="/quiz"
             className="mt-5 inline-block rounded-lg bg-heat px-8 py-3.5 tag font-bold text-white glow-heat"
           >
-            Earn An Entry — Play The Gauntlet
+            Earn An Entry — Take The Heat Check
           </Link>
         </div>
       ) : (
@@ -92,7 +92,7 @@ export default async function GiveawayPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong>No purchase necessary.</strong> Every player receives free
-            daily strikes sufficient to complete the gauntlet and earn entries
+            daily strikes sufficient to pass the Heat Check and earn entries
             without paying. Buying credit packs does not increase your odds
             beyond the additional entries earned through gameplay.
           </li>

@@ -85,7 +85,7 @@ export default async function HomePage() {
               </div>
             </div>
             <span className="rounded-lg bg-heat px-6 py-3 tag font-bold text-white glow-heat">
-              Play The Gauntlet →
+              Take The Heat Check →
             </span>
           </Link>
         </section>
