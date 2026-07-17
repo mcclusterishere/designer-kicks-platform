@@ -47,6 +47,7 @@ export async function createSubmission(
   const socialHandle = String(formData.get("socialHandle") ?? "").trim().replace(/^@/, "");
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
   const category = String(formData.get("category") ?? "sneakers");
+  const size = String(formData.get("size") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const image = formData.get("image");
 
@@ -57,6 +58,7 @@ export async function createSubmission(
     return { ok: false, error: "Pick a category." };
   }
   if (description.length > 600) return { ok: false, error: "Description is too long (max 600 characters)." };
+  if (size.length > 20) return { ok: false, error: "Size should be short — e.g. US 10.5, L, 7 3/8." };
 
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of your custom." };
   if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
@@ -95,14 +97,31 @@ export async function createSubmission(
       email: user.email,
       baseShoe,
       category,
+      size: size || null,
       description: description || null,
       imageUrl,
       artistId: artist.id,
     },
   });
 
+  notifyAdmin(
+    "New submission in the review queue",
+    `"${title}" by ${artist.displayName} just hit the queue. Review it at ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+  );
+
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Best-effort heads-up to the site owner (ADMIN_EMAIL) so applications
+ * and sales don't sit unseen until someone thinks to open /admin.
+ * Never blocks or fails the calling action.
+ */
+function notifyAdmin(subject: string, text: string) {
+  const to = process.env.ADMIN_EMAIL;
+  if (!to) return;
+  sendMail({ to, subject: `[Heat Chart] ${subject}`, text }).catch(() => {});
 }
 
 export async function applyForArtist(
@@ -147,6 +166,11 @@ export async function applyForArtist(
       data: { ...data, userId: session.user.id, slug: await uniqueArtistSlug(displayName) },
     });
   }
+
+  notifyAdmin(
+    "New artist application",
+    `${displayName}${city ? ` (${city})` : ""}${instagram ? ` · @${instagram}` : ""} applied for an artist account. Approve or reject at ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+  );
 
   // No revalidatePath at all: every affected page is force-dynamic, and
   // any revalidation would rerender /submit into its PENDING view before
@@ -270,7 +294,27 @@ export async function preloadArtist(
 
 export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED") {
   await requireAdmin();
-  await prisma.artistProfile.update({ where: { id }, data: { status } });
+  const profile = await prisma.artistProfile.update({
+    where: { id },
+    data: { status },
+    include: { user: { select: { email: true } } },
+  });
+
+  // Applicants shouldn't have to poll the site to learn they're in.
+  if (status === "APPROVED" && profile.user?.email) {
+    const site = process.env.NEXT_PUBLIC_SITE_URL || "";
+    sendMail({
+      to: profile.user.email,
+      subject: `${profile.displayName} — you're approved on The Heat Chart 🔥`,
+      text:
+        `Your artist account is live.\n\n` +
+        `Your league page: ${site}/artists/${profile.slug}\n` +
+        `Submit your first piece: ${site}/submit\n\n` +
+        `Every submission can be drafted into battles — wins climb the Heat List, and your closet tracks every sale with provenance.\n\n` +
+        `— The Heat Chart`,
+    }).catch(() => {});
+  }
+
   revalidatePath("/admin");
   revalidatePath("/artists");
   revalidatePath("/submit");
@@ -357,6 +401,11 @@ export async function recordSale(
       evidenceUrl,
     },
   });
+
+  notifyAdmin(
+    "Sale recorded — pending buyer claim",
+    `"${submission.title}" recorded sold for $${price}${evidenceUrl ? " (evidence attached)" : " (no evidence)"}. It confirms when the buyer claims it; ledger: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+  );
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
   revalidatePath("/market");
@@ -448,6 +497,152 @@ export async function setAskingPrice(
   if (me?.collectorSlug) revalidatePath(`/collectors/${me.collectorSlug}`);
   revalidatePath("/market");
   return { ok: true };
+}
+
+// ---------- Offers (the demand side of the index) ----------
+//
+// No money moves on-platform: an offer is a standing bid the seller can
+// accept. Accepting creates a PENDING Sale to the buyer's email and the
+// existing claim flow finishes the hand-off (buyer confirms from their
+// own account, ownership transfers, the sale prices the market board).
+
+export async function placeOffer(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to make an offer." };
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const amountRaw = String(formData.get("amount") ?? "").replace(/[$,\s]/g, "");
+  const amount = Number(amountRaw);
+  if (!Number.isFinite(amount) || amount < 1 || amount > 100000) {
+    return { ok: false, error: "Offer must be 1–100,000 dollars." };
+  }
+
+  if (!allowAttempt("offer", session.user.id, 20, 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of offers — try again in an hour." };
+  }
+
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: {
+      artist: { select: { userId: true, user: { select: { email: true } } } },
+      owner: { select: { id: true, email: true } },
+      sales: { where: { status: "PENDING" }, select: { id: true } },
+    },
+  });
+  if (!submission || submission.status !== "APPROVED") return { ok: false, error: "Piece not found." };
+  if (submission.sales.length > 0) {
+    return { ok: false, error: "This piece has a sale pending — offers reopen if it falls through." };
+  }
+
+  // The current seller can't bid on their own piece (owner if sold on,
+  // otherwise the artist) — but an artist CAN offer to buy a piece back.
+  const sellerUserId = submission.owner?.id ?? submission.artist?.userId ?? null;
+  if (sellerUserId === session.user.id) {
+    return { ok: false, error: "This one's already yours to sell — set an ask instead." };
+  }
+
+  const existing = await prisma.offer.findFirst({
+    where: { submissionId, buyerId: session.user.id, status: "OPEN" },
+  });
+  if (existing) {
+    await prisma.offer.update({ where: { id: existing.id }, data: { amountCents: Math.round(amount * 100) } });
+  } else {
+    await prisma.offer.create({
+      data: { submissionId, buyerId: session.user.id, amountCents: Math.round(amount * 100) },
+    });
+  }
+
+  // Ping the seller — offers nobody sees are offers nobody accepts.
+  const sellerEmail = submission.owner?.email ?? submission.artist?.user?.email;
+  if (sellerEmail) {
+    sendMail({
+      to: sellerEmail,
+      subject: `$${amount} offer on "${submission.title}" 💸`,
+      text:
+        `Someone just offered $${amount} for "${submission.title}" on The Heat Chart.\n\n` +
+        `Accept or decline from your profile: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/profile\n\n` +
+        `Accepting records the sale to the buyer — they confirm it from their account and the piece (plus its provenance) transfers on the spot.`,
+    }).catch(() => {});
+  }
+
+  // No revalidatePath: /market is force-dynamic, and revalidating here
+  // would unmount the form before its confirmation shows.
+  return { ok: true };
+}
+
+export async function withdrawOffer(offerId: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  await prisma.offer.updateMany({
+    where: { id: offerId, buyerId: session.user.id, status: "OPEN" },
+    data: { status: "WITHDRAWN" },
+  });
+  revalidatePath("/profile");
+}
+
+export async function respondOffer(offerId: string, accept: boolean): Promise<void> {
+  const session = await auth();
+  const offer = await prisma.offer.findUnique({
+    where: { id: offerId },
+    include: {
+      buyer: { select: { id: true, email: true } },
+      submission: {
+        include: {
+          artist: { select: { userId: true, slug: true } },
+          sales: { where: { status: "PENDING" }, select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!offer || offer.status !== "OPEN") return;
+
+  const sellerUserId = offer.submission.ownerId ?? offer.submission.artist?.userId ?? null;
+  const admin = await isAdmin();
+  if (!admin && (!session?.user?.id || session.user.id !== sellerUserId)) return;
+
+  if (!accept) {
+    await prisma.offer.update({ where: { id: offerId }, data: { status: "DECLINED" } });
+    revalidatePath("/profile");
+    return;
+  }
+
+  // Accept: one pending sale per piece, ever.
+  if (offer.submission.sales.length > 0) return;
+  const sellerId = sellerUserId ?? offer.submission.artist?.userId;
+  if (!sellerId || sellerId === offer.buyer.id) return;
+
+  await prisma.$transaction([
+    prisma.sale.create({
+      data: {
+        submissionId: offer.submissionId,
+        sellerId,
+        buyerEmail: offer.buyer.email.toLowerCase(),
+        priceCents: offer.amountCents,
+        note: "Accepted platform offer",
+      },
+    }),
+    prisma.offer.update({ where: { id: offerId }, data: { status: "ACCEPTED" } }),
+    // Clear the field: other bidders' offers close when one is taken.
+    prisma.offer.updateMany({
+      where: { submissionId: offer.submissionId, status: "OPEN", id: { not: offerId } },
+      data: { status: "DECLINED" },
+    }),
+  ]);
+
+  sendMail({
+    to: offer.buyer.email,
+    subject: `Offer accepted — claim "${offer.submission.title}" 🔥`,
+    text:
+      `Your $${Math.round(offer.amountCents / 100)} offer on "${offer.submission.title}" was accepted.\n\n` +
+      `Settle payment with the seller however you two agree, then claim the piece from your profile to lock in ownership and provenance: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/profile`,
+  }).catch(() => {});
+
+  if (offer.submission.artist) revalidatePath(`/artists/${offer.submission.artist.slug}`);
+  revalidatePath("/market");
+  revalidatePath("/profile");
 }
 
 export async function toggleFollowArtist(artistId: string): Promise<ActionResult> {
@@ -658,11 +853,20 @@ export async function saveArticle(
   const content = String(formData.get("content") ?? "").trim();
   const coverImage = String(formData.get("coverImage") ?? "").trim();
   const tags = String(formData.get("tags") ?? "").trim();
+  const dropAtRaw = String(formData.get("dropAt") ?? "").trim();
+  const raffleUrl = String(formData.get("raffleUrl") ?? "").trim();
   const publish = formData.get("publish") === "on";
 
   if (!title || title.length > 120) return { ok: false, error: "Title is required (max 120 characters)." };
   if (!excerpt || excerpt.length > 200) return { ok: false, error: "Excerpt is required (max 200 characters) — it's also the meta description." };
   if (!content) return { ok: false, error: "Article body is required." };
+  if (raffleUrl && !/^https?:\/\//.test(raffleUrl)) {
+    return { ok: false, error: "Raffle link must start with http(s)://" };
+  }
+  const dropAt = dropAtRaw ? new Date(`${dropAtRaw}T12:00:00Z`) : null;
+  if (dropAt && Number.isNaN(dropAt.getTime())) {
+    return { ok: false, error: "Drop date didn't parse — use the date picker." };
+  }
 
   const slug = slugify(rawSlug || title);
   if (!slug) return { ok: false, error: "Couldn't derive a URL slug from that title." };
@@ -677,6 +881,8 @@ export async function saveArticle(
     content,
     coverImage: coverImage || null,
     tags: tags || null,
+    dropAt,
+    raffleUrl: raffleUrl || null,
     status: publish ? "PUBLISHED" : "DRAFT",
   };
 
@@ -699,6 +905,7 @@ export async function saveArticle(
 
   revalidatePath("/news");
   revalidatePath(`/news/${slug}`);
+  revalidatePath("/drops");
   revalidatePath("/");
   revalidatePath("/admin");
   return { ok: true };

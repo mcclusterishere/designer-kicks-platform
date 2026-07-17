@@ -67,6 +67,7 @@ await page.goto(`${BASE}/submit`, { waitUntil: "networkidle" });
 check("approved artist badge on submit page", await page.getByText("approved artist").isVisible());
 await page.fill("#title", "League Test Custom");
 await page.fill("#baseShoe", "Air Max 1");
+await page.fill("#size", "US 10");
 await page.setInputFiles("#image", { name: "c.png", mimeType: "image/png", buffer: PNG_1x1 });
 await page.getByRole("button", { name: "Submit To The Arena" }).click();
 await page.getByText("You're in.").waitFor({ timeout: 15000 });
@@ -172,8 +173,48 @@ await buyerPage.goto(`${BASE}/market`, { waitUntil: "networkidle" });
 check("market lists the piece after the claim", await buyerPage.getByText("League Test Custom").isVisible());
 check("market shows the verified last sale", await buyerPage.getByText("$450").first().isVisible());
 check("market shows the open ask", await buyerPage.getByText("$600").first().isVisible());
+check("market shows the size", await buyerPage.getByText("US 10").first().isVisible());
 await buyerPage.screenshot({ path: `${SHOTS}/market.png`, fullPage: true });
+
+// ---- Offers: the artist bids to buy the piece back ----
+await page.goto(`${BASE}/market`, { waitUntil: "networkidle" });
+await page.getByRole("button", { name: "💸 Make an Offer" }).first().click();
+await page.fill("input[name='amount']", "500");
+await page.getByRole("button", { name: "Offer", exact: true }).click();
+await page.getByText("Offer in ✓").waitFor({ timeout: 15000 });
+
+const offer = await prisma.offer.findFirst({ where: { submission: { email: EMAIL }, status: "OPEN" } });
+check("offer stored OPEN at $500", offer?.amountCents === 50000);
+const marketWithOffer = await (await fetch(`${BASE}/market`)).text();
+check("top offer column prices the board", marketWithOffer.includes("$500"));
+
+// Seller (current owner) sees and accepts it from their profile
+await buyerPage.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
+check("offer surfaces for the seller", await buyerPage.getByRole("heading", { name: "Offers On Your Pieces" }).isVisible());
+check("offer amount shown to seller", await buyerPage.getByText("$500").first().isVisible());
+await buyerPage.getByRole("button", { name: "Accept", exact: true }).click();
+await buyerPage.getByRole("heading", { name: "Offers On Your Pieces" }).waitFor({ state: "hidden", timeout: 15000 });
+
+const offerSale = await prisma.sale.findFirst({
+  where: { submission: { email: EMAIL }, status: "PENDING" },
+});
+check(
+  "accepting creates a pending sale to the bidder",
+  offerSale?.priceCents === 50000 && offerSale?.buyerEmail === EMAIL
+);
 await buyerCtx.close();
+
+// The artist claims their buy-back — ownership boomerangs home
+await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
+check("buy-back claim waits on the artist", await page.getByRole("heading", { name: "Pending Claims" }).isVisible());
+await page.getByRole("button", { name: "Claim This Piece" }).click();
+await page.getByRole("heading", { name: "Pending Claims" }).waitFor({ state: "hidden", timeout: 15000 });
+
+const artistUser = await prisma.user.findUnique({ where: { email: EMAIL } });
+const bounced = await prisma.submission.findFirst({ where: { email: EMAIL } });
+const secondSale = await prisma.sale.findUnique({ where: { id: offerSale.id } });
+check("buy-back transfers ownership to the artist", bounced?.ownerId === artistUser?.id);
+check("offer sale confirms unverified (no evidence)", secondSale?.status === "CONFIRMED" && secondSale?.verified === false);
 
 // Admin sales ledger shows the evidence-verified sale
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
@@ -181,7 +222,8 @@ check("sale in admin ledger, evidence-verified", await page.getByText("✓ verif
 
 // Provenance shown on the artist page
 await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });
-check("artist closet shows provenance", await page.getByText(/In Collector Fan/).isVisible());
+// After the buy-back the piece sits in the artist's own collector closet.
+check("artist closet shows provenance", await page.getByText(/In League Tester/).isVisible());
 
 // Battle page cross-links still work
 await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });

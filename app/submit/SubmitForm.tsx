@@ -85,7 +85,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div>
           <label htmlFor="baseShoe" className="tag text-smoke">
             Base item *
@@ -108,6 +108,18 @@ export default function SubmitForm({ artistDefaults }: Props) {
             <option value="apparel">🧥 Apparel</option>
             <option value="accessories">🧢 Accessories</option>
           </select>
+        </div>
+        <div>
+          <label htmlFor="size" className="tag text-smoke">
+            Size <span className="normal-case">(buyers need this)</span>
+          </label>
+          <input
+            id="size"
+            name="size"
+            maxLength={20}
+            placeholder="US 10.5 / L / 7 3-8"
+            className={inputClass}
+          />
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getPublishedArticles, siteUrl } from "@/lib/articles";
 import ArticleCard from "@/components/ArticleCard";
 
@@ -35,6 +36,20 @@ export default async function NewsPage() {
         Release dates, raffle intel, and the story behind every drop that
         matters — so you cop instead of catching Ls.
       </p>
+
+      <Link
+        href="/drops"
+        className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-heat/50 bg-surface p-4 transition hover:border-heat"
+      >
+        <div>
+          <p className="tag text-heat">📅 The Drop Calendar</p>
+          <p className="text-sm text-smoke">
+            Every date + raffle link we track — <span className="text-white">free forever</span>,
+            no subscription.
+          </p>
+        </div>
+        <span className="tag rounded-lg bg-heat px-4 py-2 font-bold text-white">Open →</span>
+      </Link>
 
       {articles.length === 0 ? (
         <p className="mt-8 rounded-xl border border-edge bg-surface p-8 text-center text-smoke">

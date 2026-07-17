@@ -7,6 +7,7 @@ import { computeBadges } from "@/lib/quiz";
 import { formatUsd } from "@/lib/market";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
+import { respondOffer, withdrawOffer } from "@/app/actions";
 
 export const metadata = { title: "Your Profile — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/signin");
 
-  const [wonRuns, quizAgg, pendingClaims] = await Promise.all([
+  const [wonRuns, quizAgg, pendingClaims, incomingOffers, myOffers] = await Promise.all([
     prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
     prisma.quizRun.aggregate({
       where: { userId: user.id },
@@ -41,6 +42,29 @@ export default async function ProfilePage() {
         submission: { select: { title: true, imageUrl: true, artistName: true } },
         seller: { select: { name: true } },
       },
+    }),
+    // Open offers on pieces this member currently sells: pieces they
+    // own, or their unsold artist pieces (no owner yet).
+    prisma.offer.findMany({
+      where: {
+        status: "OPEN",
+        submission: {
+          sales: { none: { status: "PENDING" } },
+          OR: [
+            { ownerId: user.id },
+            { ownerId: null, artist: { userId: user.id } },
+          ],
+        },
+      },
+      orderBy: { amountCents: "desc" },
+      include: {
+        submission: { select: { title: true, imageUrl: true } },
+        buyer: { select: { name: true } },
+      },
+    }),
+    prisma.offer.findMany({
+      where: { buyerId: user.id, status: "OPEN" },
+      include: { submission: { select: { title: true } } },
     }),
   ]);
   const correct = quizAgg._sum.correctCount ?? 0;
@@ -161,6 +185,78 @@ export default async function ProfilePage() {
                   </p>
                 </div>
                 <ClaimSaleButton saleId={sale.id} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Offers on pieces this member is selling */}
+      {incomingOffers.length > 0 && (
+        <div className="mt-10">
+          <h2 className="display text-2xl text-white">
+            Offers On <span className="text-gradient-volt">Your Pieces</span>
+          </h2>
+          <p className="mt-1 text-sm text-smoke">
+            Accepting records the sale to the buyer — they confirm it from
+            their account and ownership transfers with full provenance.
+          </p>
+          <div className="mt-4 space-y-3">
+            {incomingOffers.map((o) => (
+              <div
+                key={o.id}
+                className="flex flex-wrap items-center gap-4 rounded-xl border border-volt/50 bg-surface p-4"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={o.submission.imageUrl}
+                  alt={o.submission.title}
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-white">{o.submission.title}</p>
+                  <p className="text-sm text-smoke">
+                    <span className="display text-lg text-volt">{formatUsd(o.amountCents)}</span>{" "}
+                    from {o.buyer.name ?? "a collector"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <form action={respondOffer.bind(null, o.id, true)}>
+                    <button className="tag rounded bg-volt px-4 py-2 font-bold text-ink">
+                      Accept
+                    </button>
+                  </form>
+                  <form action={respondOffer.bind(null, o.id, false)}>
+                    <button className="tag rounded border border-edge px-4 py-2 text-smoke hover:border-heat hover:text-heat">
+                      Decline
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* This member's open offers on other people's pieces */}
+      {myOffers.length > 0 && (
+        <div className="mt-10">
+          <h2 className="display text-2xl text-white">
+            Your Open <span className="text-gradient-heat">Offers</span>
+          </h2>
+          <div className="mt-4 space-y-2">
+            {myOffers.map((o) => (
+              <div
+                key={o.id}
+                className="flex items-center justify-between rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+              >
+                <p className="text-smoke">
+                  <span className="text-white">{formatUsd(o.amountCents)}</span> on{" "}
+                  <span className="text-white">{o.submission.title}</span> — waiting on the seller
+                </p>
+                <form action={withdrawOffer.bind(null, o.id)}>
+                  <button className="tag text-smoke hover:text-heat">Withdraw</button>
+                </form>
               </div>
             ))}
           </div>

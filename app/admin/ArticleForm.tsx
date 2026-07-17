@@ -12,6 +12,8 @@ type Defaults = {
   coverImage?: string | null;
   tags?: string | null;
   status?: string;
+  dropAt?: Date | null;
+  raffleUrl?: string | null;
 };
 
 const inputClass =
@@ -64,6 +66,21 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
           <label className="tag text-smoke" htmlFor="a-tags">Tags (comma-separated)</label>
           <input id="a-tags" name="tags" defaultValue={defaults?.tags ?? ""}
             placeholder="Jordan, Release Dates, SNKRS" className={inputClass} />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="tag text-smoke" htmlFor="a-drop">
+            Drop date <span className="normal-case">(fills the free Drop Calendar)</span>
+          </label>
+          <input id="a-drop" name="dropAt" type="date"
+            defaultValue={defaults?.dropAt ? new Date(defaults.dropAt).toISOString().slice(0, 10) : ""}
+            className={inputClass} />
+        </div>
+        <div>
+          <label className="tag text-smoke" htmlFor="a-raffle">Raffle / where-to-cop link</label>
+          <input id="a-raffle" name="raffleUrl" defaultValue={defaults?.raffleUrl ?? ""}
+            placeholder="https://www.nike.com/launch" className={inputClass} />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">

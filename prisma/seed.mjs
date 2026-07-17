@@ -139,6 +139,8 @@ const articles = [
     tags: "Jordan, Release Dates, SNKRS",
     coverImage: "/seed/news-1.svg",
     daysAgo: 1,
+    dropAt: new Date("2026-09-05T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
     content: [
       "## The drop at a glance",
       "",
@@ -175,6 +177,8 @@ const articles = [
     tags: "Jordan, Release Dates, Grails",
     coverImage: "/seed/news-2.svg",
     daysAgo: 3,
+    dropAt: new Date("2026-10-10T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
     content: [
       "## The drop at a glance",
       "",
@@ -213,6 +217,8 @@ const articles = [
     tags: "Jordan, Release Dates, SNKRS",
     coverImage: "/seed/news-3.svg",
     daysAgo: 5,
+    dropAt: new Date("2026-08-08T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
     content: [
       "## The drop at a glance",
       "",
@@ -349,10 +355,23 @@ async function main() {
     await prisma.vote.deleteMany({ where: { userId: null } });
     await prisma.battle.deleteMany();
     await prisma.submission.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.article.deleteMany();
+    await prisma.quizQuestion.deleteMany();
+  } else {
+    // Launch mode runs on EVERY deploy via the start command, so it must
+    // never wipe — the admin's live edits (articles, products, quiz
+    // questions) have to survive releases. Seed only into empty tables.
+    const [articleCount, productCount, questionCount] = await Promise.all([
+      prisma.article.count(),
+      prisma.product.count(),
+      prisma.quizQuestion.count(),
+    ]);
+    if (articleCount + productCount + questionCount > 0) {
+      console.log("Live content already present — seed skipped, nothing wiped.");
+      return;
+    }
   }
-  await prisma.product.deleteMany();
-  await prisma.article.deleteMany();
-  await prisma.quizQuestion.deleteMany();
 
   if (!includeDemo) {
     for (const p of products) {
