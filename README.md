@@ -178,12 +178,23 @@ use actual uploaded photos (stored in `data/uploads/`, served via
 npx prisma db push --force-reset   # wipe everything
 ```
 
+## Mobile app shell
+
+On phones the site behaves like an app: a fixed bottom tab bar
+(**Home · Arena · 🔥 Heat Check · Drops · Profile**) replaces the top
+nav, with the quiz in the raised center slot. The Arena tab is the
+competitive hub (battles, brackets, league, Heat List via pill links).
+The site is an installable **PWA** (`manifest.webmanifest` + icons):
+"Add to Home Screen" gives a full-screen, home-icon app experience with
+no app store — which also keeps quiz credit purchases on Stripe instead
+of Apple's 30% in-app-purchase cut. Desktop keeps the top nav.
+
 ## Tests
 
 Browser end-to-end suites live in `e2e/` and cover accounts, gated
 voting, the full quiz/credits loop (including the paid-run/giveaway
 separation), tournament advancement, the artist league, and the
-newsroom's SEO surface (53 checks).
+newsroom's SEO surface, and the mobile tab-bar/PWA shell (66 checks).
 
 ```bash
 npm run build && npm start     # in one terminal, against a seeded DB
