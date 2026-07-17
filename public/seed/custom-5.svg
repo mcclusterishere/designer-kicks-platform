@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd500"/>
+      <stop offset="1" stop-color="#4d3a00"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <g opacity="0.15" fill="none" stroke="#000" stroke-width="2">
+    <line x1="-40" y1="640" x2="160" y2="0"/>
+    <line x1="20" y1="640" x2="220" y2="0"/>
+    <line x1="80" y1="640" x2="280" y2="0"/>
+    <line x1="140" y1="640" x2="340" y2="0"/>
+    <line x1="200" y1="640" x2="400" y2="0"/>
+    <line x1="260" y1="640" x2="460" y2="0"/>
+    <line x1="320" y1="640" x2="520" y2="0"/>
+    <line x1="380" y1="640" x2="580" y2="0"/>
+    <line x1="440" y1="640" x2="640" y2="0"/>
+    <line x1="500" y1="640" x2="700" y2="0"/>
+    <line x1="560" y1="640" x2="760" y2="0"/>
+    <line x1="620" y1="640" x2="820" y2="0"/>
+  </g>
+  <text x="320" y="120" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="64"
+        font-weight="900" fill="#0a0a0a" opacity="0.85" letter-spacing="2">24K</text>
+  
+  <g transform="translate(45,150)">
+    <!-- sole -->
+    <path d="M10 310 L 530 310 Q 555 310 555 335 Q 555 362 525 362 L 40 362 Q 5 362 5 335 Q 5 310 10 310 Z"
+          fill="#0a0a0a" stroke="#fff6c8" stroke-width="4"/>
+    <!-- upper -->
+    <path d="M25 310
+             C 25 260, 60 215, 120 205
+             C 175 195, 210 175, 245 130
+             C 268 100, 300 88, 330 100
+             L 352 109
+             C 372 117, 392 117, 412 112
+             L 472 97
+             C 512 87, 540 112, 545 152
+             L 552 275
+             C 554 295, 542 310, 522 310 Z"
+          fill="#0a0a0a" stroke="#fff6c8" stroke-width="4"/>
+    <!-- swoosh-ish accent -->
+    <path d="M120 275 C 220 268, 350 230, 470 160 C 480 200, 420 262, 320 285 C 250 300, 160 295, 120 275 Z"
+          fill="#fff6c8" opacity="0.9"/>
+    <!-- laces -->
+    <g stroke="#fff6c8" stroke-width="5" stroke-linecap="round" opacity="0.85">
+      <line x1="268" y1="128" x2="330" y2="152"/>
+      <line x1="288" y1="108" x2="352" y2="132"/>
+      <line x1="310" y1="94"  x2="374" y2="116"/>
+      <line x1="334" y1="86"  x2="396" y2="104"/>
+    </g>
+    <!-- toe cap line -->
+    <path d="M25 305 C 30 250, 75 225, 130 235" fill="none" stroke="#fff6c8" stroke-width="3" opacity="0.5"/>
+  </g>
+  <text x="320" y="600" text-anchor="middle" font-family="monospace" font-size="20" fill="#0a0a0a" opacity="0.6">DEMO SUBMISSION — REPLACE WITH REAL PHOTOS</text>
+</svg>
