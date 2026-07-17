@@ -2,7 +2,15 @@
 
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
-import { checkPassword, setAdminSession, clearAdminSession, isAdmin } from "@/lib/admin";
+import {
+  checkPassword,
+  setAdminSession,
+  clearAdminSession,
+  isAdmin,
+  adminLoginAvailable,
+  registerLoginAttempt,
+} from "@/lib/admin";
+import { headers } from "next/headers";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
 import { revalidatePath } from "next/cache";
@@ -111,6 +119,16 @@ export async function adminLogin(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
+  if (!adminLoginAvailable()) {
+    return { ok: false, error: "Admin login is disabled — set ADMIN_PASSWORD on the server." };
+  }
+
+  const hdrs = await headers();
+  const ip = (hdrs.get("x-forwarded-for") ?? "local").split(",")[0].trim();
+  if (!registerLoginAttempt(ip)) {
+    return { ok: false, error: "Too many attempts — try again in 15 minutes." };
+  }
+
   const password = String(formData.get("password") ?? "");
   if (!checkPassword(password)) return { ok: false, error: "Wrong password." };
   await setAdminSession();

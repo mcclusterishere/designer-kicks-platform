@@ -32,8 +32,11 @@ npm run db:seed      # loads demo battles, 60 trivia questions, shop, articles
 npm run dev          # http://localhost:3000
 ```
 
-Admin panel: go to `/admin`, password is `heatcheck` — **change it** by
-setting `ADMIN_PASSWORD` in `.env` (copy `.env.example` to `.env`).
+Admin panel: go to `/admin`. In development the password defaults to
+`heatcheck`. **In production, admin login is disabled until you set a
+real `ADMIN_PASSWORD`** — there is no default. Sessions are signed,
+expire after 12 hours, die immediately if you change the password, and
+login attempts are rate-limited.
 
 ## Accounts
 
