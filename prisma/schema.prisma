@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Submission {
+  id           String   @id @default(cuid())
+  title        String
+  artistName   String
+  socialHandle String?
+  email        String
+  baseShoe     String
+  description  String?
+  imageUrl     String
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt    DateTime @default(now())
+
+  battlesAsA Battle[] @relation("battleSubA")
+  battlesAsB Battle[] @relation("battleSubB")
+  battlesWon Battle[] @relation("battleWinner")
+  votes      Vote[]
+}
+
+model Battle {
+  id       String    @id @default(cuid())
+  title    String?
+  status   String    @default("ACTIVE") // ACTIVE | COMPLETED
+  startsAt DateTime  @default(now())
+  endsAt   DateTime
+  createdAt DateTime @default(now())
+
+  subAId String
+  subA   Submission @relation("battleSubA", fields: [subAId], references: [id])
+  subBId String
+  subB   Submission @relation("battleSubB", fields: [subBId], references: [id])
+
+  winnerId String?
+  winner   Submission? @relation("battleWinner", fields: [winnerId], references: [id])
+
+  votes Vote[]
+}
+
+model Vote {
+  id           String   @id @default(cuid())
+  battleId     String
+  battle       Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  voterKey     String
+  createdAt    DateTime @default(now())
+
+  @@unique([battleId, voterKey])
+  @@index([battleId, submissionId])
+}
+
+model Product {
+  id           String  @id @default(cuid())
+  name         String
+  merchant     String
+  category     String // marketplace | retail | customization | cleaning | accessories
+  blurb        String?
+  price        String?
+  imageUrl     String?
+  affiliateUrl String
+  featured     Boolean @default(false)
+  sortOrder    Int     @default(0)
+  createdAt    DateTime @default(now())
+}
