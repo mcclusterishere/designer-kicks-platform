@@ -52,6 +52,7 @@ const navLinks = [
   { href: "/news", label: "News" },
   { href: "/quiz", label: "Quiz" },
   { href: "/artists", label: "League" },
+  { href: "/market", label: "Market" },
   { href: "/heat-list", label: "Heat List" },
   { href: "/submit", label: "Submit" },
 ];
@@ -133,6 +134,7 @@ export default async function RootLayout({
                 <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>
+                <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>

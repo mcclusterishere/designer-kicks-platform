@@ -120,6 +120,7 @@ export async function getArtistBySlug(slug: string) {
           battlesAsB: { select: { status: true } },
           tournamentsWon: { select: { id: true, name: true } },
           owner: { select: { name: true, collectorSlug: true } },
+          sales: { orderBy: { soldAt: "desc" } },
         },
       },
     },

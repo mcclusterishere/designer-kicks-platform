@@ -4,7 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logoutUser } from "@/app/account-actions";
 import { computeBadges } from "@/lib/quiz";
+import { formatUsd } from "@/lib/market";
 import ProfileForm from "./ProfileForm";
+import ClaimSaleButton from "@/components/ClaimSaleButton";
 
 export const metadata = { title: "Your Profile — Designer Kicks" };
 export const dynamic = "force-dynamic";
@@ -27,11 +29,18 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/signin");
 
-  const [wonRuns, quizAgg] = await Promise.all([
+  const [wonRuns, quizAgg, pendingClaims] = await Promise.all([
     prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
     prisma.quizRun.aggregate({
       where: { userId: user.id },
       _sum: { correctCount: true, wrongCount: true },
+    }),
+    prisma.sale.findMany({
+      where: { buyerEmail: user.email.toLowerCase(), status: "PENDING" },
+      include: {
+        submission: { select: { title: true, imageUrl: true, artistName: true } },
+        seller: { select: { name: true } },
+      },
     }),
   ]);
   const correct = quizAgg._sum.correctCount ?? 0;
@@ -116,6 +125,47 @@ export default async function ProfilePage() {
           </p>
         )}
       </div>
+
+      {/* Pending sale claims — pieces waiting on this buyer */}
+      {pendingClaims.length > 0 && (
+        <div className="mt-10">
+          <h2 className="display text-2xl text-white">
+            Pending <span className="text-gradient-heat">Claims</span>
+          </h2>
+          <p className="mt-1 text-sm text-smoke">
+            A seller recorded a sale to your email. Claiming confirms the
+            purchase and puts the piece in your closet.
+          </p>
+          <div className="mt-4 space-y-3">
+            {pendingClaims.map((sale) => (
+              <div
+                key={sale.id}
+                className="flex flex-wrap items-center gap-4 rounded-xl border border-heat/50 bg-surface p-4"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={sale.submission.imageUrl}
+                  alt={sale.submission.title}
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-white">{sale.submission.title}</p>
+                  <p className="text-sm text-smoke">
+                    {formatUsd(sale.priceCents)} · sold by{" "}
+                    {sale.seller.name ?? sale.submission.artistName}
+                    {sale.evidenceUrl ? (
+                      <span className="text-volt"> · evidence attached ✓</span>
+                    ) : (
+                      <span> · no evidence (sale will show unverified)</span>
+                    )}
+                  </p>
+                </div>
+                <ClaimSaleButton saleId={sale.id} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* My Closet — pieces this member owns */}
       <div className="mt-10 flex items-end justify-between">

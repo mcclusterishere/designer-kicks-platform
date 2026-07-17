@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { computeBadges } from "@/lib/quiz";
+import { formatUsd } from "@/lib/market";
+import AskForm from "@/components/AskForm";
+import RecordSaleForm from "@/components/RecordSaleForm";
 
 export const dynamic = "force-dynamic";
 
@@ -32,12 +36,16 @@ export default async function CollectorPage({ params }: Props) {
           _count: { select: { votes: true, battlesWon: true } },
           artist: { select: { slug: true, displayName: true } },
           tournamentsWon: { select: { id: true, name: true } },
+          sales: { orderBy: { soldAt: "desc" } },
         },
       },
       _count: { select: { votes: true } },
     },
   });
   if (!user) notFound();
+
+  const session = await auth();
+  const isOwnCloset = session?.user?.id === user.id;
 
   const [heat, quizAgg, wonRuns] = await Promise.all([
     getHeatList(),
@@ -90,6 +98,8 @@ export default async function CollectorPage({ params }: Props) {
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {user.ownedPieces.map((s) => {
             const rank = heatRank.get(s.id);
+            const pendingSale = s.sales.find((sale) => sale.status === "PENDING");
+            const lastSale = s.sales.find((sale) => sale.status === "CONFIRMED");
             return (
               <div
                 key={s.id}
@@ -119,6 +129,16 @@ export default async function CollectorPage({ params }: Props) {
                       {"🏆".repeat(Math.min(s.tournamentsWon.length, 3))}
                     </span>
                   )}
+                  {s.askingPriceCents && (
+                    <span className="tag absolute bottom-2 left-2 rounded bg-heat px-2 py-1 font-bold text-white">
+                      Ask {formatUsd(s.askingPriceCents)}
+                    </span>
+                  )}
+                  {pendingSale && (
+                    <span className="tag absolute bottom-2 right-2 rounded bg-ink/85 px-2 py-1 font-bold text-heat">
+                      ⏳ Sale Pending
+                    </span>
+                  )}
                 </div>
                 <div className="p-4">
                   <p className="tag text-smoke">{s.baseShoe}</p>
@@ -134,6 +154,22 @@ export default async function CollectorPage({ params }: Props) {
                     )}{" "}
                     · {s._count.votes} votes
                   </p>
+                  {lastSale && (
+                    <p className="mt-1 text-sm">
+                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      {lastSale.verified ? (
+                        <span className="tag text-volt">✓ verified sale</span>
+                      ) : (
+                        <span className="tag text-smoke">unverified sale</span>
+                      )}
+                    </p>
+                  )}
+                  {isOwnCloset && !pendingSale && (
+                    <>
+                      <AskForm submissionId={s.id} currentAskCents={s.askingPriceCents} />
+                      <RecordSaleForm submissionId={s.id} />
+                    </>
+                  )}
                 </div>
               </div>
             );

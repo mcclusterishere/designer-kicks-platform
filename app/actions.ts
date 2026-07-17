@@ -46,12 +46,16 @@ export async function createSubmission(
   const artistName = String(formData.get("artistName") ?? "").trim();
   const socialHandle = String(formData.get("socialHandle") ?? "").trim().replace(/^@/, "");
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
+  const category = String(formData.get("category") ?? "sneakers");
   const description = String(formData.get("description") ?? "").trim();
   const image = formData.get("image");
 
   if (!title || title.length > 80) return { ok: false, error: "Give your custom a name (max 80 characters)." };
   if (!artistName || artistName.length > 60) return { ok: false, error: "Artist / crew name is required." };
-  if (!baseShoe) return { ok: false, error: "Tell us the base shoe (e.g. Air Force 1, Dunk Low)." };
+  if (!baseShoe) return { ok: false, error: "Tell us the base item (e.g. Air Force 1, hoodie blank)." };
+  if (!["sneakers", "apparel", "accessories"].includes(category)) {
+    return { ok: false, error: "Pick a category." };
+  }
   if (description.length > 600) return { ok: false, error: "Description is too long (max 600 characters)." };
 
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of your custom." };
@@ -90,6 +94,7 @@ export async function createSubmission(
       socialHandle: artist.instagram ?? (socialHandle || null),
       email: user.email,
       baseShoe,
+      category,
       description: description || null,
       imageUrl,
       artistId: artist.id,
@@ -175,6 +180,7 @@ export async function preloadArtist(
   const city = String(formData.get("city") ?? "").trim();
   const shoeTitle = String(formData.get("shoeTitle") ?? "").trim();
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
+  const plCategory = String(formData.get("category") ?? "sneakers");
   const description = String(formData.get("description") ?? "").trim();
   const image = formData.get("image");
 
@@ -222,6 +228,7 @@ export async function preloadArtist(
       socialHandle: artist.instagram,
       email,
       baseShoe,
+      category: ["sneakers", "apparel", "accessories"].includes(plCategory) ? plCategory : "sneakers",
       description: description || null,
       imageUrl,
       status: "APPROVED",
@@ -270,50 +277,176 @@ export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED
 }
 
 /**
- * Records a sale/transfer of a one-of-one to a fan's closet. Allowed
- * for the shoe's artist (marking their own sale) or an admin.
+ * Records an off-platform sale of a one-of-one (no payment rails).
+ * Allowed for the piece's artist, its current owner (resale), or an
+ * admin. The sale sits PENDING — with a pending sticker on the piece —
+ * until the buyer claims it from their own account, which is when
+ * ownership actually moves. Evidence (receipt/payment screenshot)
+ * earns the verified badge; without it, only an admin override can.
  */
-export async function transferOwnership(
+export async function recordSale(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
   const session = await auth();
   const submissionId = String(formData.get("submissionId") ?? "");
   const buyerEmail = String(formData.get("buyerEmail") ?? "").trim().toLowerCase();
+  const priceRaw = String(formData.get("price") ?? "").replace(/[$,\s]/g, "");
+  const soldAtRaw = String(formData.get("soldAt") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  const evidence = formData.get("evidence");
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail)) {
-    return { ok: false, error: "Enter the buyer's account email." };
+    return { ok: false, error: "Enter the buyer's email — the sale waits for them to claim it." };
   }
+  const price = Number(priceRaw);
+  if (!Number.isFinite(price) || price < 1 || price > 100000) {
+    return { ok: false, error: "Enter the sale price in dollars (1–100,000)." };
+  }
+  const soldAt = soldAtRaw ? new Date(`${soldAtRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(soldAt.getTime()) || soldAt > new Date()) {
+    return { ok: false, error: "Sale date can't be in the future." };
+  }
+  if (note.length > 200) return { ok: false, error: "Note is too long (max 200 characters)." };
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { artist: true },
+    include: { artist: true, sales: { where: { status: "PENDING" } } },
   });
-  if (!submission) return { ok: false, error: "Shoe not found." };
-
-  const isArtistOwner =
-    session?.user?.id && submission.artist?.userId === session.user.id;
-  if (!isArtistOwner && !(await isAdmin())) {
-    return { ok: false, error: "Only the artist (or an admin) can transfer this piece." };
+  if (!submission) return { ok: false, error: "Piece not found." };
+  if (submission.sales.length > 0) {
+    return { ok: false, error: "This piece already has a sale pending the buyer's claim." };
   }
 
-  const buyer = await prisma.user.findUnique({ where: { email: buyerEmail } });
-  if (!buyer) {
-    return { ok: false, error: "No member with that email — the buyer needs a free fan account first." };
-  }
-  if (submission.artist && buyer.id === submission.artist.userId) {
-    return { ok: false, error: "That's the artist's own account." };
+  const isArtist = session?.user?.id && submission.artist?.userId === session.user.id;
+  const isCurrentOwner = session?.user?.id && submission.ownerId === session.user.id;
+  const admin = await isAdmin();
+  if (!isArtist && !isCurrentOwner && !admin) {
+    return { ok: false, error: "Only the piece's artist or current owner can record its sale." };
   }
 
-  await prisma.submission.update({
-    where: { id: submission.id },
-    data: { ownerId: buyer.id },
+  const sellerId =
+    session?.user?.id ?? submission.ownerId ?? submission.artist?.userId;
+  if (!sellerId) return { ok: false, error: "Couldn't determine the seller account." };
+
+  const sellerUser = await prisma.user.findUnique({ where: { id: sellerId } });
+  if (sellerUser?.email.toLowerCase() === buyerEmail) {
+    return { ok: false, error: "Buyer and seller can't be the same account." };
+  }
+
+  let evidenceUrl: string | null = null;
+  if (evidence instanceof File && evidence.size > 0) {
+    if (evidence.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Evidence file must be under 6MB." };
+    const ext = ALLOWED_TYPES[evidence.type];
+    if (!ext) return { ok: false, error: "Evidence must be a JPG, PNG, or WebP (screenshot the receipt)." };
+    evidenceUrl = await saveUpload(
+      Buffer.from(await evidence.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      evidence.type
+    );
+  }
+
+  await prisma.sale.create({
+    data: {
+      submissionId: submission.id,
+      sellerId,
+      buyerEmail,
+      priceCents: Math.round(price * 100),
+      soldAt,
+      note: note || null,
+      evidenceUrl,
+    },
   });
-  const collectorSlug = await ensureCollectorSlug(buyer.id);
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
-  revalidatePath(`/collectors/${collectorSlug}`);
+  revalidatePath("/market");
   revalidatePath("/profile");
+  return { ok: true };
+}
+
+/** Buyer confirms a pending sale from their own account → ownership moves. */
+export async function claimSale(saleId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to claim your piece." };
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: { submission: { include: { artist: true } } },
+  });
+  if (!sale || !user) return { ok: false, error: "Sale not found." };
+  if (sale.status !== "PENDING") return { ok: false, error: "This sale was already claimed." };
+  if (sale.buyerEmail !== user.email.toLowerCase()) {
+    return { ok: false, error: "This sale is waiting on a different buyer account." };
+  }
+  if (sale.sellerId === user.id) return { ok: false, error: "You can't claim your own sale." };
+
+  await prisma.$transaction([
+    prisma.sale.update({
+      where: { id: sale.id },
+      data: {
+        status: "CONFIRMED",
+        buyerId: user.id,
+        verified: Boolean(sale.evidenceUrl),
+        verifiedBy: sale.evidenceUrl ? "evidence" : null,
+      },
+    }),
+    prisma.submission.update({
+      where: { id: sale.submissionId },
+      // New owner sets their own ask.
+      data: { ownerId: user.id, askingPriceCents: null },
+    }),
+  ]);
+  const collectorSlug = await ensureCollectorSlug(user.id);
+
+  if (sale.submission.artist) revalidatePath(`/artists/${sale.submission.artist.slug}`);
+  revalidatePath(`/collectors/${collectorSlug}`);
+  revalidatePath("/market");
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
+/** Admin override for the verified badge (both directions). */
+export async function setSaleVerified(saleId: string, verified: boolean) {
+  await requireAdmin();
+  await prisma.sale.update({
+    where: { id: saleId },
+    data: { verified, verifiedBy: verified ? "admin" : null },
+  });
+  revalidatePath("/market");
+  revalidatePath("/admin");
+}
+
+/** Current owner lists (or delists) their piece with an open ask. */
+export async function setAskingPrice(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const priceRaw = String(formData.get("price") ?? "").replace(/[$,\s]/g, "");
+
+  const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+  if (!submission || submission.ownerId !== session.user.id) {
+    return { ok: false, error: "Only the current owner can set an ask." };
+  }
+
+  let askingPriceCents: number | null = null;
+  if (priceRaw !== "") {
+    const price = Number(priceRaw);
+    if (!Number.isFinite(price) || price < 1 || price > 100000) {
+      return { ok: false, error: "Ask must be 1–100,000 dollars (leave blank to delist)." };
+    }
+    askingPriceCents = Math.round(price * 100);
+  }
+
+  await prisma.submission.update({ where: { id: submissionId }, data: { askingPriceCents } });
+
+  const me = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (me?.collectorSlug) revalidatePath(`/collectors/${me.collectorSlug}`);
+  revalidatePath("/market");
   return { ok: true };
 }
 

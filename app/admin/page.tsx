@@ -12,7 +12,9 @@ import {
   deleteQuestion,
   forceAdvanceTournament,
   setArtistStatus,
+  setSaleVerified,
 } from "@/app/actions";
+import { formatUsd } from "@/lib/market";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
 import ProductForm from "./ProductForm";
@@ -86,6 +88,16 @@ export default async function AdminPage({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
     include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
+  const sales = await prisma.sale.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      submission: { select: { title: true } },
+      seller: { select: { name: true, email: true } },
+      buyer: { select: { name: true } },
+    },
   });
 
   return (
@@ -431,6 +443,60 @@ export default async function AdminPage({
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Sales ledger */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Sales Ledger <span className="text-smoke">({sales.length})</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Off-platform sales recorded by sellers. ✓ verification requires
+          evidence + buyer claim — or your override here.
+        </p>
+        <div className="mt-4 space-y-2">
+          {sales.map((s) => (
+            <div
+              key={s.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+            >
+              <div className="min-w-0">
+                <span className="font-bold text-white">{s.submission.title}</span>{" "}
+                <span className="text-white">{formatUsd(s.priceCents)}</span>{" "}
+                <span className={s.status === "PENDING" ? "text-heat" : "text-volt"}>
+                  · {s.status === "PENDING" ? "pending claim" : "confirmed"}
+                </span>
+                {s.verified ? (
+                  <span className="text-volt"> · ✓ verified ({s.verifiedBy})</span>
+                ) : (
+                  <span className="text-smoke"> · unverified</span>
+                )}
+                <p className="text-xs text-smoke">
+                  {s.seller.name ?? s.seller.email} → {s.buyer?.name ?? s.buyerEmail} ·{" "}
+                  {s.soldAt.toISOString().slice(0, 10)}
+                  {s.evidenceUrl && (
+                    <>
+                      {" · "}
+                      <a href={s.evidenceUrl} target="_blank" rel="noopener noreferrer" className="text-volt underline">
+                        view evidence
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+              <form action={setSaleVerified.bind(null, s.id, !s.verified)}>
+                <button
+                  className={`rounded border px-3 py-1.5 tag ${
+                    s.verified ? "border-heat text-heat" : "border-volt text-volt"
+                  }`}
+                >
+                  {s.verified ? "Remove ✓" : "Verify ✓"}
+                </button>
+              </form>
+            </div>
+          ))}
+          {sales.length === 0 && <p className="text-sm text-smoke">No sales recorded yet.</p>}
         </div>
       </section>
 
