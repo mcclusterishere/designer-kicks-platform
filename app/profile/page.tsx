@@ -17,6 +17,12 @@ export default async function ProfilePage() {
     where: { id: session.user.id },
     include: {
       _count: { select: { votes: true, giveawayEntries: true, quizRuns: true } },
+      artistProfile: { select: { slug: true, displayName: true, status: true } },
+      ownedPieces: {
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
+        include: { artist: { select: { slug: true, displayName: true } } },
+      },
     },
   });
   if (!user) redirect("/signin");
@@ -84,6 +90,69 @@ export default async function ProfilePage() {
           Take The Heat Check
         </Link>
       </div>
+
+      {/* Account type */}
+      <div className="mt-4 rounded-xl border border-edge bg-surface p-4 text-sm">
+        {user.artistProfile?.status === "APPROVED" ? (
+          <p className="text-smoke">
+            <span className="tag text-volt">✓ Artist account</span> — posting as{" "}
+            <Link href={`/artists/${user.artistProfile.slug}`} className="font-bold text-volt">
+              {user.artistProfile.displayName}
+            </Link>
+          </p>
+        ) : user.artistProfile?.status === "PENDING" ? (
+          <p className="text-smoke">
+            <span className="tag text-heat">Artist application under review</span> —
+            you&apos;ll be able to submit customs once approved.
+          </p>
+        ) : (
+          <p className="text-smoke">
+            <span className="tag text-white">Fan account</span> — vote, play, collect.
+            Make customs?{" "}
+            <Link href="/submit" className="text-volt underline">
+              Apply for an artist account
+            </Link>
+            .
+          </p>
+        )}
+      </div>
+
+      {/* My Closet — pieces this member owns */}
+      <div className="mt-10 flex items-end justify-between">
+        <h2 className="display text-2xl text-white">
+          My <span className="text-gradient-heat">Closet</span>
+        </h2>
+        {user.collectorSlug && (
+          <Link href={`/collectors/${user.collectorSlug}`} className="tag text-volt underline">
+            Public closet →
+          </Link>
+        )}
+      </div>
+      {user.ownedPieces.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-edge bg-surface p-5 text-sm text-smoke">
+          No pieces yet. When you buy a one-of-one from an artist, they
+          transfer it here — your collection, on display.
+        </p>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {user.ownedPieces.map((s) => (
+            <div key={s.id} className="overflow-hidden rounded-xl border border-edge bg-surface">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={s.imageUrl}
+                alt={s.title}
+                className="aspect-square w-full object-cover"
+              />
+              <div className="p-3">
+                <p className="truncate text-sm font-bold text-white">{s.title}</p>
+                <p className="truncate text-xs text-smoke">
+                  by {s.artist?.displayName ?? s.artistName}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 className="display mt-10 text-2xl text-white">Your Info</h2>
       <p className="mt-1 text-sm text-smoke">

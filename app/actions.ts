@@ -13,7 +13,7 @@ import {
 import { headers } from "next/headers";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
-import { ensureArtistProfile } from "@/lib/artists";
+import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -62,9 +62,18 @@ export async function createSubmission(
     return { ok: false, error: "That's a lot of submissions — try again in an hour." };
   }
 
-  // First submission creates the artist's league profile; later ones
-  // keep the same identity (and career record) automatically.
-  const artist = await ensureArtistProfile(user.id, artistName, socialHandle || null);
+  // Submitting requires an APPROVED artist account (fan accounts apply
+  // and get reviewed first).
+  const artist = await prisma.artistProfile.findUnique({ where: { userId: user.id } });
+  if (!artist || artist.status !== "APPROVED") {
+    return {
+      ok: false,
+      error:
+        artist?.status === "PENDING"
+          ? "Your artist application is still under review."
+          : "You need an approved artist account to submit — apply on this page.",
+    };
+  }
 
   const fileName = `${randomUUID()}.${ext}`;
   const imageUrl = await saveUpload(
@@ -87,6 +96,111 @@ export async function createSubmission(
   });
 
   revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function applyForArtist(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  const city = String(formData.get("city") ?? "").trim();
+  const portfolioUrl = String(formData.get("portfolioUrl") ?? "").trim();
+  const bio = String(formData.get("bio") ?? "").trim();
+
+  if (!displayName || displayName.length > 60) return { ok: false, error: "Artist / crew name is required." };
+  if (portfolioUrl && !/^https?:\/\//.test(portfolioUrl)) {
+    return { ok: false, error: "Portfolio link must start with http(s)://" };
+  }
+  if (bio.length > 400) return { ok: false, error: "Bio is too long (max 400 characters)." };
+
+  const existing = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (existing?.status === "PENDING") return { ok: false, error: "Your application is already under review." };
+  if (existing?.status === "APPROVED") return { ok: false, error: "You already have an approved artist account." };
+
+  const data = {
+    displayName,
+    instagram: instagram || null,
+    city: city || null,
+    portfolioUrl: portfolioUrl || null,
+    bio: bio || null,
+    status: "PENDING",
+  };
+
+  if (existing) {
+    // Rejected applicants can reapply with updated info.
+    await prisma.artistProfile.update({ where: { id: existing.id }, data });
+  } else {
+    await prisma.artistProfile.create({
+      data: { ...data, userId: session.user.id, slug: await uniqueArtistSlug(displayName) },
+    });
+  }
+
+  // No revalidatePath at all: every affected page is force-dynamic, and
+  // any revalidation would rerender /submit into its PENDING view before
+  // the client confirmation card can show.
+  return { ok: true };
+}
+
+export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED") {
+  await requireAdmin();
+  await prisma.artistProfile.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+  revalidatePath("/artists");
+  revalidatePath("/submit");
+}
+
+/**
+ * Records a sale/transfer of a one-of-one to a fan's closet. Allowed
+ * for the shoe's artist (marking their own sale) or an admin.
+ */
+export async function transferOwnership(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const buyerEmail = String(formData.get("buyerEmail") ?? "").trim().toLowerCase();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail)) {
+    return { ok: false, error: "Enter the buyer's account email." };
+  }
+
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: { artist: true },
+  });
+  if (!submission) return { ok: false, error: "Shoe not found." };
+
+  const isArtistOwner =
+    session?.user?.id && submission.artist?.userId === session.user.id;
+  if (!isArtistOwner && !(await isAdmin())) {
+    return { ok: false, error: "Only the artist (or an admin) can transfer this piece." };
+  }
+
+  const buyer = await prisma.user.findUnique({ where: { email: buyerEmail } });
+  if (!buyer) {
+    return { ok: false, error: "No member with that email — the buyer needs a free fan account first." };
+  }
+  if (submission.artist && buyer.id === submission.artist.userId) {
+    return { ok: false, error: "That's the artist's own account." };
+  }
+
+  await prisma.submission.update({
+    where: { id: submission.id },
+    data: { ownerId: buyer.id },
+  });
+  const collectorSlug = await ensureCollectorSlug(buyer.id);
+
+  if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
+  revalidatePath(`/collectors/${collectorSlug}`);
+  revalidatePath("/profile");
   return { ok: true };
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import SubmitForm from "./SubmitForm";
+import ApplyForm from "./ApplyForm";
 
 export const metadata = {
   title: "Submit Your Customs — Designer Kicks",
@@ -49,23 +50,59 @@ export default async function SubmitPage() {
             </Link>
           </div>
         </div>
+      ) : !artist ? (
+        <div className="mt-8">
+          <div className="mb-5 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">
+            <p>
+              <span className="font-bold text-white">You have a fan account</span>{" "}
+              — vote, play the Heat Check, win giveaways, and build your
+              collector closet. To compete with your own customs, apply for
+              an <span className="text-volt">artist account</span> below.
+            </p>
+          </div>
+          <ApplyForm />
+        </div>
+      ) : artist.status === "PENDING" ? (
+        <div className="mt-8 rounded-xl border border-heat/50 bg-surface p-8 text-center">
+          <p className="display text-2xl text-heat">Application Under Review</p>
+          <p className="mt-3 text-smoke">
+            We&apos;re looking at <span className="text-white">{artist.displayName}</span>
+            &apos;s application. You&apos;ll be able to submit customs the moment
+            you&apos;re approved — keep voting and playing in the meantime.
+          </p>
+        </div>
+      ) : artist.status === "REJECTED" ? (
+        <div className="mt-8">
+          <div className="mb-5 rounded-xl border border-heat/50 bg-surface p-4 text-sm text-smoke">
+            Your last application wasn&apos;t approved. Update your info and
+            portfolio and apply again.
+          </div>
+          <ApplyForm
+            defaults={{
+              displayName: artist.displayName,
+              instagram: artist.instagram,
+              city: artist.city,
+              portfolioUrl: artist.portfolioUrl,
+              bio: artist.bio,
+            }}
+          />
+        </div>
       ) : (
         <div className="mt-8">
-          {artist && (
-            <p className="mb-4 rounded-lg border border-edge bg-surface px-4 py-3 text-sm text-smoke">
-              Posting as{" "}
-              <Link href={`/artists/${artist.slug}`} className="font-bold text-volt">
-                {artist.displayName}
-              </Link>{" "}
-              — this shoe joins your league record.
-            </p>
-          )}
+          <p className="mb-4 rounded-lg border border-edge bg-surface px-4 py-3 text-sm text-smoke">
+            Posting as{" "}
+            <Link href={`/artists/${artist.slug}`} className="font-bold text-volt">
+              {artist.displayName}
+            </Link>{" "}
+            <span className="tag text-volt">✓ approved artist</span> — this
+            shoe joins your league record.
+          </p>
           <SubmitForm
-            artistDefaults={
-              artist
-                ? { artistName: artist.displayName, socialHandle: artist.instagram ?? "", locked: true }
-                : { artistName: session.user.name ?? "", socialHandle: "", locked: false }
-            }
+            artistDefaults={{
+              artistName: artist.displayName,
+              socialHandle: artist.instagram ?? "",
+              locked: true,
+            }}
           />
         </div>
       )}

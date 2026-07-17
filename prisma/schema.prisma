@@ -22,6 +22,10 @@ model Submission {
   artistId String?
   artist   ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: SetNull)
 
+  // Provenance: set when the one-of-one is sold/transferred to a fan.
+  ownerId String?
+  owner   User?   @relation("ownedPieces", fields: [ownerId], references: [id], onDelete: SetNull)
+
   battlesAsA Battle[] @relation("battleSubA")
   battlesAsB Battle[] @relation("battleSubB")
   battlesWon Battle[] @relation("battleWinner")
@@ -41,6 +45,11 @@ model ArtistProfile {
   bio         String?
   instagram   String?
   city        String?
+  portfolioUrl String?
+  // Fan accounts are instant; artist accounts are reviewed (payout
+  // rails later require vetted identities). Existing/seed artists
+  // default APPROVED; applications are created PENDING.
+  status      String   @default("APPROVED") // PENDING | APPROVED | REJECTED
   createdAt   DateTime @default(now())
 
   submissions Submission[]
@@ -165,6 +174,10 @@ model User {
   giveawaysWon   Giveaway[]          @relation("giveawayWinner")
   artistProfile  ArtistProfile?
   artistFollows  ArtistFollow[]
+
+  // Fan collector identity — public closet URL, minted on first piece.
+  collectorSlug String?      @unique
+  ownedPieces   Submission[] @relation("ownedPieces")
 }
 
 model Account {
