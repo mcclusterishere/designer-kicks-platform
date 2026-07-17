@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: Props) {
   const artist = await prisma.artistProfile.findUnique({ where: { slug } });
   if (!artist) return { title: "Artist not found" };
   return {
-    title: `${artist.displayName} — Custom Sneaker Artist | Designer Kicks`,
-    description: `${artist.displayName}'s customs, battle record, and league ranking on Designer Kicks.`,
+    title: `${artist.displayName} — Custom Sneaker Artist | The Heat Chart`,
+    description: `${artist.displayName}'s customs, battle record, and league ranking on The Heat Chart.`,
   };
 }
 

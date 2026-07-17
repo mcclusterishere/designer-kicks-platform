@@ -4,7 +4,7 @@ import { finalizeExpiredBattles } from "@/lib/battles";
 import BattleCard from "@/components/BattleCard";
 
 export const metadata = {
-  title: "Battle Arena — Vote On Custom Sneaker Matchups | Designer Kicks",
+  title: "Battle Arena — Vote On Custom Sneaker Matchups | The Heat Chart",
 };
 
 export const dynamic = "force-dynamic";

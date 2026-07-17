@@ -43,7 +43,7 @@ export async function GET() {
   return new NextResponse([header, ...rows].join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="designer-kicks-users.csv"`,
+      "Content-Disposition": `attachment; filename="heat-chart-users.csv"`,
     },
   });
 }

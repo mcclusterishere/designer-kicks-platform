@@ -25,13 +25,13 @@ const anton = Anton({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: "Designer Kicks — Custom Sneaker Battles & The Heat List",
+  title: "The Heat Chart — Custom Sneaker Battles, Rankings & Drops",
   description:
-    "Submit your customized kicks, battle other artists in head-to-head vote-offs, and climb the Heat List. Plus the hottest releases and customization gear.",
+    "Submit your customized kicks, battle other artists in head-to-head vote-offs, and climb the chart. Plus the hottest releases and customization gear.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Designer Kicks",
+    title: "Heat Chart",
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -81,7 +81,8 @@ export default async function RootLayout({
         <header className="sticky top-0 z-50 border-b border-edge bg-ink/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="display text-xl text-white">
-              Designer<span className="text-volt">Kicks</span>
+              The<span className="text-heat">Heat</span>
+              <span className="text-volt">Chart</span>
             </Link>
             <nav className="hidden items-center gap-1 sm:gap-2 md:flex">
               {navLinks.map((l) => (
@@ -122,11 +123,12 @@ export default async function RootLayout({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="display text-lg text-white">
-                  Designer<span className="text-volt">Kicks</span>
+                  The<span className="text-heat">Heat</span>
+                  <span className="text-volt">Chart</span>
                 </p>
                 <p className="mt-1 max-w-md">
                   Custom sneaker battles, the Heat List, and the gear to build
-                  your next grail.
+                  your next grail. Formerly Designer Kicks.
                 </p>
               </div>
               <div className="flex flex-wrap gap-6">

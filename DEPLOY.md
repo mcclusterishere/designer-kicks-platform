@@ -1,4 +1,4 @@
-# Launch Checklist — Designer Kicks
+# Launch Checklist — The Heat Chart
 
 ## What it costs (budget path: ~$17 first month, ~$5–7/month after)
 
@@ -52,14 +52,14 @@ schema changes deploy with `npm run db:deploy` — no destructive pushes.
 
 Skip this on Path B (local disk works there) — required on Vercel.
 
-1. Cloudflare dashboard → R2 → Create bucket, e.g. `designer-kicks`.
+1. Cloudflare dashboard → R2 → Create bucket, e.g. `theheatchart`.
 2. Enable public access for the bucket (R2.dev subdomain or a custom
    domain) — copy the public base URL.
 3. Create an R2 API token (Object Read & Write) — copy key + secret.
 4. Set the env vars:
 
 ```
-S3_BUCKET="designer-kicks"
+S3_BUCKET="theheatchart"
 S3_ACCESS_KEY_ID="..."
 S3_SECRET_ACCESS_KEY="..."
 S3_ENDPOINT="https://<account-id>.r2.cloudflarestorage.com"
@@ -104,7 +104,7 @@ server log without it).
 
 1. Create an account at <https://resend.com>, verify your domain (add
    the DNS records they give you).
-2. Set `RESEND_API_KEY` and `EMAIL_FROM="Designer Kicks <noreply@yourdomain.com>"`.
+2. Set `RESEND_API_KEY` and `EMAIL_FROM="The Heat Chart <noreply@theheatchart.com>"`.
 
 ## 5. Payments — Stripe (~15 min)
 

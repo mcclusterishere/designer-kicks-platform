@@ -11,7 +11,7 @@ export async function sendMail(opts: {
   text: string;
 }): Promise<{ delivered: boolean }> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "Designer Kicks <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM || "The Heat Chart <onboarding@resend.dev>";
 
   if (!apiKey) {
     console.log(`[mailer] (no RESEND_API_KEY — email not sent)\nTo: ${opts.to}\nSubject: ${opts.subject}\n\n${opts.text}`);
