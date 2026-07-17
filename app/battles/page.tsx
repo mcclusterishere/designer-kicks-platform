@@ -3,15 +3,22 @@ import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import BattleCard from "@/components/BattleCard";
 
+export const metadata = {
+  title: "Battle Arena — Vote On Custom Sneaker Matchups | Designer Kicks",
+};
+
 export const dynamic = "force-dynamic";
 
 export default async function BattlesPage() {
   await finalizeExpiredBattles();
 
-  const battles = await prisma.battle.findMany({
-    orderBy: [{ status: "asc" }, { endsAt: "desc" }],
-    include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
-  });
+  const [battles, activeTournaments] = await Promise.all([
+    prisma.battle.findMany({
+      orderBy: [{ status: "asc" }, { endsAt: "desc" }],
+      include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
+    }),
+    prisma.tournament.findMany({ where: { status: "ACTIVE" } }),
+  ]);
 
   const active = battles.filter((b) => b.status === "ACTIVE");
   const completed = battles.filter((b) => b.status === "COMPLETED");
@@ -29,6 +36,27 @@ export default async function BattlesPage() {
         </Link>
         . One vote per battle — make it count.
       </p>
+
+      {activeTournaments.length > 0 && (
+        <div className="mt-8 space-y-3">
+          {activeTournaments.map((t) => (
+            <Link
+              key={t.id}
+              href={`/tournaments/${t.slug}`}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heat/60 bg-surface p-4 transition hover:border-heat"
+            >
+              <div>
+                <p className="tag text-heat">🏆 Tournament in progress</p>
+                <p className="display text-xl text-white">{t.name}</p>
+                {t.prize && <p className="text-sm text-smoke">Prize: {t.prize}</p>}
+              </div>
+              <span className="rounded-lg bg-heat px-5 py-2.5 tag font-bold text-white">
+                View Bracket →
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <h2 className="display mt-10 text-2xl text-white">Live Now</h2>
       {active.length === 0 ? (

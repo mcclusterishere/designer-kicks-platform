@@ -28,6 +28,10 @@ export default async function HomePage() {
     getPublishedArticles(3),
   ]);
   const giveaway = await getActiveGiveaway();
+  const tournament = await prisma.tournament.findFirst({
+    where: { status: "ACTIVE" },
+    orderBy: { createdAt: "desc" },
+  });
 
   const top3 = heat.slice(0, 3);
 
@@ -93,6 +97,20 @@ export default async function HomePage() {
 
       {/* Live battles */}
       <section className="mx-auto max-w-6xl px-4 py-12">
+        {tournament && (
+          <Link
+            href={`/tournaments/${tournament.slug}`}
+            className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heat/60 bg-surface p-4 transition hover:border-heat"
+          >
+            <div>
+              <p className="tag text-heat">🏆 Championship bracket — live now</p>
+              <p className="display text-xl text-white sm:text-2xl">{tournament.name}</p>
+            </div>
+            <span className="rounded-lg bg-heat px-5 py-2.5 tag font-bold text-white glow-heat">
+              View Bracket →
+            </span>
+          </Link>
+        )}
         <div className="flex items-end justify-between">
           <h2 className="display text-3xl text-white">
             Live <span className="text-heat">Battles</span>

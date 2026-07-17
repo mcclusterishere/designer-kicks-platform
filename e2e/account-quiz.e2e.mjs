@@ -55,16 +55,16 @@ if ((await voteBtns.count()) === 2) {
 // ---------- Quiz: strikes → paywall → purchase → win ----------
 await page.goto(`${BASE}/quiz`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Start The Heat Check" }).click();
-await page.locator("h2").waitFor({ timeout: 10000 });
+await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 10000 });
 check("quiz run starts with a question", true);
 
 async function currentQuestion() {
-  const text = (await page.locator("h2").first().textContent())?.trim();
+  const text = (await page.locator("[data-testid=quiz-question]").first().textContent())?.trim();
   return prisma.quizQuestion.findFirst({ where: { question: text ?? "" } });
 }
 
 async function clickOption(index) {
-  const before = (await page.locator("h2").first().textContent())?.trim();
+  const before = (await page.locator("[data-testid=quiz-question]").first().textContent())?.trim();
   await page.locator("div.space-y-3 > button").nth(index).click();
   // Terminal headings use the .display class, so page copy can't false-match.
   await page.waitForFunction(
@@ -73,7 +73,7 @@ async function clickOption(index) {
       const blocked = headings.some((t) =>
         t.startsWith("Out of strikes") || t.startsWith("Heat Check Passed") || t.startsWith("Run over")
       );
-      const h2 = document.querySelector("h2");
+      const h2 = document.querySelector("[data-testid=quiz-question]");
       return blocked || (h2 && h2.textContent.trim() !== prev);
     },
     before,
@@ -95,30 +95,43 @@ check("3 free strikes then paywall appears", sawNeedsCredits);
 await page.screenshot({ path: `${SHOTS}/quiz-paywall.png`, fullPage: true });
 
 await page.getByRole("button", { name: /Buy 4 Strikes/ }).click();
-await page.locator("h2").waitFor({ timeout: 15000 });
+await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 15000 });
 const afterBuy = await prisma.user.findUnique({ where: { email: EMAIL } });
 check("dev credit purchase grants strikes and resumes run", afterBuy.credits >= 3);
 
-let won = false;
-for (let i = 0; i < 40; i++) {
-  if (await page.getByText("Heat Check Passed").isVisible().catch(() => false)) {
-    won = true;
-    break;
+async function winRun() {
+  for (let i = 0; i < 40; i++) {
+    if (await page.getByText("Heat Check Passed").isVisible().catch(() => false)) return true;
+    const q = await currentQuestion();
+    if (!q) return false;
+    await clickOption(q.answerIndex);
   }
-  const q = await currentQuestion();
-  if (!q) break;
-  await clickOption(q.answerIndex);
+  return page.getByText("Heat Check Passed").isVisible().catch(() => false);
 }
-if (!won) won = await page.getByText("Heat Check Passed").isVisible().catch(() => false);
-check("answering 12 correct passes the heat check", won);
 
-const entry = await prisma.giveawayEntry.findFirst({ where: { userId: dbUser.id } });
-check("heat check win creates giveaway entry", Boolean(entry));
+check("answering 12 correct passes the heat check", await winRun());
+
+// Sweepstakes guard: this run consumed purchased strikes, so it must
+// count for the leaderboard but NOT create a giveaway entry.
+const paidEntry = await prisma.giveawayEntry.findFirst({ where: { userId: dbUser.id } });
+check("paid-strike win does NOT create a giveaway entry", !paidEntry);
+check("win screen explains leaderboard-only result", await page.getByText("leaderboard win").isVisible());
+
+// A fresh run with zero wrong answers (no strikes at all) earns the entry.
+await page.getByRole("button", { name: "Run It Again" }).click();
+await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 15000 });
+check("flawless free run passes the heat check", await winRun());
+const freeEntry = await prisma.giveawayEntry.findFirst({ where: { userId: dbUser.id } });
+check("free-strike win creates the giveaway entry", Boolean(freeEntry));
+
+// Leaderboard shows the player
+await page.goto(`${BASE}/quiz`, { waitUntil: "networkidle" });
+check("leaderboard lists the player", await page.getByText("E2E Tester").first().isVisible());
 
 // ---------- Giveaway page ----------
 await page.goto(`${BASE}/giveaway`, { waitUntil: "networkidle" });
 check("giveaway page shows your entries", await page.getByText(/You have 1 entr/).isVisible());
-check("no-purchase-necessary language present", await page.getByText("No purchase necessary").first().isVisible());
+check("purchases-never-affect-odds language present", await page.getByText(/purchases never affect your odds/i).first().isVisible());
 
 // ---------- Sign out → voting gated ----------
 await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });

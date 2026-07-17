@@ -26,6 +26,10 @@ model Submission {
   battlesAsB Battle[] @relation("battleSubB")
   battlesWon Battle[] @relation("battleWinner")
   votes      Vote[]
+
+  tournamentsWon Tournament[]      @relation("tournamentChampion")
+  matchesAsA     TournamentMatch[] @relation("matchSubA")
+  matchesAsB     TournamentMatch[] @relation("matchSubB")
 }
 
 model ArtistProfile {
@@ -71,6 +75,43 @@ model Battle {
   winner   Submission? @relation("battleWinner", fields: [winnerId], references: [id])
 
   votes Vote[]
+  tournamentMatch TournamentMatch?
+}
+
+model Tournament {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  size      Int // 4 | 8 | 16 entrants, single elimination
+  status    String   @default("ACTIVE") // ACTIVE | COMPLETED
+  prize     String?
+  roundDays Int      @default(3)
+  createdAt DateTime @default(now())
+
+  championId String?
+  champion   Submission? @relation("tournamentChampion", fields: [championId], references: [id])
+
+  matches TournamentMatch[]
+}
+
+model TournamentMatch {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  round        Int // 1-based; final round = log2(size)
+  position     Int // 0-based slot within the round
+
+  battleId String? @unique
+  battle   Battle? @relation(fields: [battleId], references: [id])
+
+  subAId String?
+  subA   Submission? @relation("matchSubA", fields: [subAId], references: [id])
+  subBId String?
+  subB   Submission? @relation("matchSubB", fields: [subBId], references: [id])
+
+  winnerId String?
+
+  @@unique([tournamentId, round, position])
 }
 
 model Vote {
@@ -186,7 +227,11 @@ model QuizRun {
   currentIndex Int       @default(0)
   correctCount Int       @default(0)
   wrongCount   Int       @default(0)
-  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | WON | ABANDONED
+  // True once any purchased strike is spent in this run. Paid runs
+  // count for the leaderboard but NEVER earn giveaway entries — paying
+  // must not affect prize odds (sweepstakes law).
+  usedPaidStrikes Boolean @default(false)
+  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | WON | ABANDONED | OUT_OF_QUESTIONS
   startedAt    DateTime  @default(now())
   completedAt  DateTime?
 }

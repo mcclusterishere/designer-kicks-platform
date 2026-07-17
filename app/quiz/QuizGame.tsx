@@ -80,8 +80,18 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
           {state.correctCount}/{state.target} correct
           {feedback?.earnedEntry
             ? " — your giveaway entry is locked in."
-            : "."}
+            : state.usedPaidStrikes
+              ? " — leaderboard win!"
+              : "."}
         </p>
+        {state.usedPaidStrikes && !feedback?.earnedEntry && (
+          <p className="mx-auto mt-2 max-w-md text-sm text-smoke">
+            This run used purchased strikes, so it counts for the
+            leaderboard but not the giveaway — entries only come from
+            free-strike runs. Run it back tomorrow on free strikes for an
+            entry.
+          </p>
+        )}
         <div className="mt-5 flex justify-center gap-3">
           <button
             onClick={() => run(() => abandonRun(state.runId))}
@@ -126,6 +136,12 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
         <p className="mt-2 text-smoke">
           You&apos;re {state.correctCount}/{state.target} deep — don&apos;t lose the run.
           Grab a credit pack and keep climbing.
+        </p>
+        <p className="mx-auto mt-3 max-w-md rounded border border-edge bg-panel p-3 text-xs text-smoke">
+          Heads up: buying strikes keeps this run alive for the{" "}
+          <strong className="text-white">leaderboard</strong>. Giveaway
+          entries only come from runs completed on free strikes — purchases
+          never affect your odds of winning.
         </p>
         <BuyPanel
           pending={pending}
@@ -179,6 +195,9 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
           ))}
         </div>
         <p className="tag text-smoke">
+          {state.usedPaidStrikes && (
+            <span className="mr-2 rounded bg-heat/20 px-1.5 py-0.5 text-heat">Leaderboard run</span>
+          )}
           <span className="text-white">{state.correctCount}</span>/{state.target} ·{" "}
           <span className={strikesLeft <= 1 ? "text-heat" : "text-white"}>
             {state.strikes.freeLeft} free + {state.strikes.credits} credits
@@ -190,7 +209,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
         <p className="tag text-smoke">
           {q.category} · {DIFFICULTY[q.difficulty] ?? "?"}
         </p>
-        <h2 className="mt-2 text-xl font-bold text-white">{q.question}</h2>
+        <h2 data-testid="quiz-question" className="mt-2 text-xl font-bold text-white">{q.question}</h2>
 
         <div className="mt-5 space-y-3">
           {q.options.map((opt, i) => (

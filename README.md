@@ -15,6 +15,7 @@ monetizes it.
 | `/submit` | Artists upload a photo of their custom + their story (goes to a review queue) |
 | `/battles` | Live vote battles with countdowns + past battle results |
 | `/battles/[id]` | Head-to-head page — sign in to vote, one vote per member, live percentages |
+| `/tournaments` `/tournaments/[slug]` | Seeded single-elimination championship brackets — every match is a live vote battle |
 | `/artists` `/artists/[slug]` | The League — artists ranked by career W-L records, with profile pages and followers |
 | `/heat-list` | Every approved custom, ranked by battle wins then total votes |
 | `/news` | Drop Report — SEO-driven articles on upcoming releases (dates, prices, raffle links) |
@@ -83,6 +84,18 @@ login attempts are rate-limited.
 4. When the clock runs out the battle finalizes itself and the winner
    takes a `W` on the Heat List. Wins rank first, total votes break ties.
 
+## Tournaments (championship brackets)
+
+- Admin launches a bracket (4/8/16 customs) from approved submissions;
+  seeding is automatic by heat score, and round-1 battles go live
+  immediately.
+- Every match is an ordinary vote battle. When a round's battles
+  finalize (cron or page load), winners advance automatically and
+  next-round battles spin up; tied votes advance the higher seed.
+- The final crowns a champion shown on the bracket, the tournaments
+  page, and the homepage banner. "End round now" in admin fast-forwards
+  a round.
+
 ## The Heat Check (quiz game)
 
 - A run climbs toward **12 correct answers** from a shuffled queue of
@@ -90,10 +103,12 @@ login attempts are rate-limited.
 - A wrong answer costs a **strike** and skips to the next question (no
   brute-forcing answers by retrying).
 - Everyone gets **3 free strikes a day** (resets midnight UTC). Out of
-  strikes mid-run? **$1 buys a pack of 4** — the run pauses and resumes
-  after purchase. Unused strikes roll over.
-- Passing the Heat Check earns an **entry into the active giveaway**.
-  Run it as many times as you like.
+  strikes mid-run? **$1 buys a pack of 4** — resuming the stalled run
+  charges the pending strike. Unused strikes roll over.
+- **Giveaway entries come only from runs completed on free strikes.**
+  Purchased strikes keep a run alive for the all-time **leaderboard and
+  badges** — they never produce an entry or affect giveaway odds
+  (sweepstakes-law separation between payment and prize).
 - Tune the economy in `lib/quiz.ts` (`FREE_STRIKES_PER_DAY`,
   `HEAT_CHECK_TARGET`, `PACK_SIZE`, `PACK_PRICE_CENTS`).
 - Answers are validated server-side and never sent to the browser.
@@ -166,8 +181,9 @@ npx prisma db push --force-reset   # wipe everything
 ## Tests
 
 Browser end-to-end suites live in `e2e/` and cover accounts, gated
-voting, the full quiz/credits/giveaway loop, the artist league, and the
-newsroom's SEO surface (38 checks).
+voting, the full quiz/credits loop (including the paid-run/giveaway
+separation), tournament advancement, the artist league, and the
+newsroom's SEO surface (53 checks).
 
 ```bash
 npm run build && npm start     # in one terminal, against a seeded DB

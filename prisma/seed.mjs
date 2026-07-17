@@ -339,6 +339,7 @@ function loadQuestions() {
 async function main() {
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
+  await prisma.tournament.deleteMany();
   await prisma.vote.deleteMany({ where: { userId: null } });
   await prisma.battle.deleteMany();
   await prisma.submission.deleteMany();
@@ -434,6 +435,54 @@ async function main() {
         difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
         category: q.category || "history",
         explanation: q.explanation || null,
+      },
+    });
+  }
+
+  // Demo tournament: 4-custom bracket, semifinals decided, final live.
+  // Seeds (by heat): 1 gold, 2 bred, 3 venom, 4 toxic → semis (1v4, 2v3).
+  const tournament = await prisma.tournament.create({
+    data: {
+      name: "Summer Heat Championship",
+      slug: "summer-heat-championship",
+      size: 4,
+      prize: "Winner takes the crown + featured on the Designer Kicks page",
+      roundDays: 3,
+    },
+  });
+
+  const demoBracket = [
+    { round: 1, position: 0, a: "gold", b: "toxic", aVotes: 19, bVotes: 14, done: true },
+    { round: 1, position: 1, a: "bred", b: "venom", aVotes: 23, bVotes: 20, done: true },
+    { round: 2, position: 0, a: "gold", b: "bred", aVotes: 8, bVotes: 11, done: false },
+  ];
+
+  for (const m of demoBracket) {
+    const subA = subs[m.a];
+    const subB = subs[m.b];
+    const battle = await prisma.battle.create({
+      data: {
+        title: `${m.round === 1 ? "Semifinals" : "Final"} — Summer Heat Championship`,
+        subAId: subA.id,
+        subBId: subB.id,
+        endsAt: m.done ? new Date(now - 1 * DAY) : new Date(now + 3 * DAY),
+        status: m.done ? "COMPLETED" : "ACTIVE",
+        winnerId: m.done ? (m.aVotes >= m.bVotes ? subA.id : subB.id) : null,
+      },
+    });
+    const votes = [];
+    for (let i = 0; i < m.aVotes; i++) votes.push({ battleId: battle.id, submissionId: subA.id, voterKey: `seed-voter-${voterSeq++}` });
+    for (let i = 0; i < m.bVotes; i++) votes.push({ battleId: battle.id, submissionId: subB.id, voterKey: `seed-voter-${voterSeq++}` });
+    await prisma.vote.createMany({ data: votes });
+    await prisma.tournamentMatch.create({
+      data: {
+        tournamentId: tournament.id,
+        round: m.round,
+        position: m.position,
+        battleId: battle.id,
+        subAId: subA.id,
+        subBId: subB.id,
+        winnerId: m.done ? (m.aVotes >= m.bVotes ? subA.id : subB.id) : null,
       },
     });
   }

@@ -1,9 +1,12 @@
 import { prisma } from "./db";
+import { advanceTournaments } from "./tournaments";
 
 /**
  * Completes any ACTIVE battle whose clock has run out, crowning the
- * submission with more votes. A tie leaves winnerId null.
- * Called lazily from pages that show battle state — no cron needed.
+ * submission with more votes. A tie leaves winnerId null (tournament
+ * matches resolve ties in favor of the higher seed). Also advances any
+ * tournaments whose rounds just completed. Called lazily from pages
+ * that show battle state, plus the cron endpoint.
  */
 export async function finalizeExpiredBattles() {
   const expired = await prisma.battle.findMany({
@@ -27,6 +30,8 @@ export async function finalizeExpiredBattles() {
       data: { status: "COMPLETED", winnerId },
     });
   }
+
+  await advanceTournaments();
 }
 
 export type HeatEntry = {

@@ -91,10 +91,11 @@ export default async function GiveawayPage() {
         <p className="tag text-volt">Official rules (summary)</p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
-            <strong>No purchase necessary.</strong> Every player receives free
-            daily strikes sufficient to pass the Heat Check and earn entries
-            without paying. Buying credit packs does not increase your odds
-            beyond the additional entries earned through gameplay.
+            <strong>No purchase necessary, and purchases never affect your
+            odds.</strong> Giveaway entries are earned exclusively by passing
+            the Heat Check using free daily strikes. Purchased strike packs
+            apply only to leaderboard play and can never produce an entry or
+            change your chance of winning.
           </li>
           <li>Open to legal residents 18 years or older. Void where prohibited.</li>
           <li>One winner drawn at random from all entries after the end date.</li>
