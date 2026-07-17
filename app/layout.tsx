@@ -136,11 +136,17 @@ export default async function RootLayout({
                 <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>
+                <Link href="/drops" className="hover:text-white">Drop Calendar</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>
               </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-4 text-xs">
+              <Link href="/terms" className="hover:text-white">Terms</Link>
+              <Link href="/privacy" className="hover:text-white">Privacy</Link>
+              <Link href="/rules" className="hover:text-white">Giveaway Rules</Link>
             </div>
             <p className="mt-6 border-t border-edge pt-4 text-xs">
               Affiliate disclosure: some links on this site are affiliate links.

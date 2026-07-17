@@ -29,9 +29,11 @@ model Submission {
   // Market: what kind of piece, and the owner's open ask (display-only
   // until on-platform checkout exists).
   category         String @default("sneakers") // sneakers | apparel | accessories
+  size             String? // e.g. "US 10.5", "L", "7 3/8" — buyers need this
   askingPriceCents Int?
 
-  sales Sale[]
+  sales  Sale[]
+  offers Offer[]
 
   battlesAsA Battle[] @relation("battleSubA")
   battlesAsB Battle[] @relation("battleSubB")
@@ -188,6 +190,27 @@ model User {
 
   salesSold   Sale[] @relation("salesSold")
   salesBought Sale[] @relation("salesBought")
+  offers      Offer[]
+}
+
+// A buyer's standing offer on a piece — the demand side of the price
+// index. No money moves on-platform: accepting an offer creates a
+// PENDING Sale to the buyer's email, and the existing claim flow
+// (buyer confirms from their own account) completes the hand-off.
+model Offer {
+  id           String     @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  buyerId String
+  buyer   User   @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  amountCents Int
+  status      String   @default("OPEN") // OPEN | ACCEPTED | DECLINED | WITHDRAWN
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([submissionId, status])
 }
 
 // Off-platform sale record (no payment rails involved). Created by the
@@ -333,6 +356,10 @@ model Article {
   tags        String? // comma-separated
   status      String    @default("DRAFT") // DRAFT | PUBLISHED
   publishedAt DateTime?
+  // Drop calendar (free, no paywall): when the release drops and where
+  // to enter its raffle. Articles with dropAt appear on /drops.
+  dropAt      DateTime?
+  raffleUrl   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }

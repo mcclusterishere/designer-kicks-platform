@@ -104,9 +104,9 @@ export default async function GiveawayPage() {
           <li>Odds depend on the total number of entries received.</li>
         </ul>
         <p className="mt-3 border-t border-edge pt-3">
-          These are placeholder rules. Before running a paid-entry promotion,
-          have complete official rules reviewed by a lawyer — sweepstakes law
-          varies by state and country.
+          Full details:{" "}
+          <Link href="/rules" className="text-volt underline">Official Rules</Link>.
+          (Drafted for attorney review before the first winner is drawn.)
         </p>
       </section>
     </div>
