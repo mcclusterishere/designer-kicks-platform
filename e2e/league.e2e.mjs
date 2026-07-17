@@ -60,7 +60,10 @@ await page.screenshot({ path: `${SHOTS}/league.png`, fullPage: true });
 // Artist page: record, portfolio, follow
 await page.goto(`${BASE}/artists/solefire-studio`, { waitUntil: "networkidle" });
 check("artist page shows W-L record", await page.locator("text=/\\dW–\\dL/").first().isVisible());
-check("artist portfolio renders", (await page.locator("img[alt*='custom']").count()) >= 2);
+check("closet renders the collection", await page.getByText("The Closet").isVisible());
+check("closet shows shoes", (await page.locator("img[alt*='custom']").count()) >= 2);
+check("closet shows live heat ranks", (await page.locator("text=/#\\d+ Heat/").count()) >= 2);
+check("trophy shelf section present", await page.getByText("Trophy Shelf").isVisible());
 
 await page.getByRole("button", { name: "+ Follow" }).click();
 await page.getByRole("button", { name: /Following/ }).waitFor({ timeout: 10000 });
