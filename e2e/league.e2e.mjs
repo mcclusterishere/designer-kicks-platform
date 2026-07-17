@@ -1,6 +1,7 @@
 // Artist league + fan/artist split: fan signup, artist application,
-// admin approval, gated submission, closet with heat ranks, ownership
-// transfer to a fan's public collector closet.
+// admin approval, gated submission, closet with heat ranks, and the
+// retroactive sale flow — record → pending sticker → buyer claims on
+// their own account → verified badge, ownership transfer, market board.
 import { PrismaClient } from "@prisma/client";
 import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
 
@@ -93,29 +94,90 @@ await page.getByRole("button", { name: /Following/ }).waitFor({ timeout: 10000 }
 const me = await prisma.user.findUnique({ where: { email: EMAIL } });
 check("follow persists to database", Boolean(await prisma.artistFollow.findFirst({ where: { userId: me.id } })));
 
-// ---- Ownership: artist sells the piece to a fan ----
-await prisma.user.create({ data: { name: "Collector Fan", email: BUYER_EMAIL } });
+// ---- Retroactive sale: seller records it, buyer claims on their own account ----
+await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });
+check("artist sees record-sale control on own page", await page.getByText("Sold it? Record the sale").isVisible());
+await page.getByText("Sold it? Record the sale").click();
+await page.fill("input[name='buyerEmail']", BUYER_EMAIL);
+await page.fill("input[name='price']", "450");
+await page.setInputFiles("input[name='evidence']", { name: "receipt.png", mimeType: "image/png", buffer: PNG_1x1 });
+await page.getByRole("button", { name: "Record Sale (buyer claims it)" }).click();
+// recordSale revalidates this page, so the fresh render's pending sticker
+// (not the client form's success state) is the reliable signal.
+await page.getByText("Sale Pending").waitFor({ timeout: 15000 });
+
+const pendingSale = await prisma.sale.findFirst({ where: { submission: { email: EMAIL } } });
+check(
+  "sale stored PENDING with price + evidence",
+  pendingSale?.status === "PENDING" && pendingSale?.priceCents === 45000 && Boolean(pendingSale?.evidenceUrl)
+);
 
 await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });
-check("artist sees transfer control on own page", await page.getByText("Sold it? Transfer to buyer").isVisible());
-await page.getByText("Sold it? Transfer to buyer").click();
-await page.fill("input[name='buyerEmail']", BUYER_EMAIL);
-await page.getByRole("button", { name: "Confirm Transfer" }).click();
-await page.getByText("Transferred ✓").waitFor({ timeout: 10000 });
+check("pending sticker on the artist closet", await page.getByText("Sale Pending").isVisible());
+check("record-sale hidden while a claim is pending", !(await page.getByText("Sold it? Record the sale").isVisible()));
+
+// Unclaimed sales must not price the market board
+const marketBefore = await (await fetch(`${BASE}/market`)).text();
+check("pending sale not on the market board", !marketBefore.includes("League Test Custom"));
+
+// Buyer claims from their own account (fresh browser context = another device)
+const buyerCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const buyerPage = await buyerCtx.newPage();
+await buyerPage.goto(`${BASE}/register`, { waitUntil: "networkidle" });
+await buyerPage.fill("#name", "Collector Fan");
+await buyerPage.fill("#email", BUYER_EMAIL);
+await buyerPage.fill("#password", "supersecret2");
+await buyerPage.getByRole("button", { name: "Create Account" }).click();
+await buyerPage.waitForURL("**/profile", { timeout: 15000 });
+
+check("pending claim surfaces on buyer profile", await buyerPage.getByRole("heading", { name: "Pending Claims" }).isVisible());
+check("claim card names the piece", await buyerPage.getByText("League Test Custom").isVisible());
+check("evidence noted on the claim card", await buyerPage.getByText("evidence attached ✓").isVisible());
+await buyerPage.getByRole("button", { name: "Claim This Piece" }).click();
+// claimSale revalidates /profile — the claim section unmounts on success.
+await buyerPage.getByRole("heading", { name: "Pending Claims" }).waitFor({ state: "hidden", timeout: 15000 });
+check("claimed piece lands in My Closet", await buyerPage.getByRole("heading", { name: "My Closet" }).isVisible());
 
 const buyer = await prisma.user.findUnique({
   where: { email: BUYER_EMAIL },
   include: { ownedPieces: true },
 });
+const confirmedSale = await prisma.sale.findUnique({ where: { id: pendingSale.id } });
+check(
+  "claim confirms the sale + evidence auto-verifies",
+  confirmedSale?.status === "CONFIRMED" &&
+    confirmedSale?.verified === true &&
+    confirmedSale?.verifiedBy === "evidence" &&
+    confirmedSale?.buyerId === buyer?.id
+);
 check("ownership recorded on the piece", buyer?.ownedPieces?.[0]?.title === "League Test Custom");
 check("collector slug minted", Boolean(buyer?.collectorSlug));
 
 // Public fan closet
-await page.goto(`${BASE}/collectors/${buyer.collectorSlug}`, { waitUntil: "networkidle" });
-check("fan closet page renders", await page.getByText("Collector Fan's Closet").isVisible());
-check("owned piece in fan closet", await page.getByText("League Test Custom").isVisible());
-check("fan closet shows heat rank", (await page.locator("text=/#\\d+ Heat/").count()) >= 1);
-await page.screenshot({ path: `${SHOTS}/fan-closet.png`, fullPage: true });
+await buyerPage.goto(`${BASE}/collectors/${buyer.collectorSlug}`, { waitUntil: "networkidle" });
+check("fan closet page renders", await buyerPage.getByText("Collector Fan's Closet").isVisible());
+check("owned piece in fan closet", await buyerPage.getByText("League Test Custom").isVisible());
+check("fan closet shows heat rank", (await buyerPage.locator("text=/#\\d+ Heat/").count()) >= 1);
+check("verified sale chip in fan closet", await buyerPage.getByText("✓ verified sale").isVisible());
+await buyerPage.screenshot({ path: `${SHOTS}/fan-closet.png`, fullPage: true });
+
+// New owner lists an ask; the market board picks up sale + ask
+await buyerPage.fill("input[name='price']", "600");
+await buyerPage.getByRole("button", { name: "Set Ask" }).click();
+await buyerPage.waitForTimeout(1500);
+const listed = await prisma.submission.findFirst({ where: { email: EMAIL } });
+check("owner's ask persists", listed?.askingPriceCents === 60000);
+
+await buyerPage.goto(`${BASE}/market`, { waitUntil: "networkidle" });
+check("market lists the piece after the claim", await buyerPage.getByText("League Test Custom").isVisible());
+check("market shows the verified last sale", await buyerPage.getByText("$450").first().isVisible());
+check("market shows the open ask", await buyerPage.getByText("$600").first().isVisible());
+await buyerPage.screenshot({ path: `${SHOTS}/market.png`, fullPage: true });
+await buyerCtx.close();
+
+// Admin sales ledger shows the evidence-verified sale
+await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+check("sale in admin ledger, evidence-verified", await page.getByText("✓ verified (evidence)").first().isVisible());
 
 // Provenance shown on the artist page
 await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });

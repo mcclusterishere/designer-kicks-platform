@@ -1,4 +1,4 @@
-# Affiliate Program Playbook — Designer Kicks
+# Affiliate Program Playbook — The Heat Chart
 
 This is your signup roadmap for monetizing the Shop page. The shop is
 pre-stocked with products pointing at **plain merchant links**. As each

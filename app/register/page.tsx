@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import RegisterForm from "./RegisterForm";
 
-export const metadata = { title: "Create Account — Designer Kicks" };
+export const metadata = { title: "Create Account — The Heat Chart" };
 
 export default async function RegisterPage() {
   const session = await auth();

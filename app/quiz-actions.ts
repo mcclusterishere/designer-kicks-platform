@@ -273,7 +273,7 @@ export async function buyCreditPack(packs: number): Promise<{ ok: false; error: 
           unit_amount: PACK_PRICE_CENTS,
           product_data: {
             name: `Quiz Credit Pack (${PACK_SIZE} extra strikes)`,
-            description: "Extra wrong-answer strikes for the Designer Kicks Heat Check trivia game.",
+            description: "Extra wrong-answer strikes for the Heat Check trivia game on The Heat Chart.",
           },
         },
       },

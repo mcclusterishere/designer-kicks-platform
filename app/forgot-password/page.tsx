@@ -1,6 +1,6 @@
 import ForgotForm from "./ForgotForm";
 
-export const metadata = { title: "Reset Password — Designer Kicks" };
+export const metadata = { title: "Reset Password — The Heat Chart" };
 
 export default function ForgotPasswordPage() {
   return (

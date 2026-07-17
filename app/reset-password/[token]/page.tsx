@@ -1,6 +1,6 @@
 import ResetForm from "./ResetForm";
 
-export const metadata = { title: "Choose New Password — Designer Kicks" };
+export const metadata = { title: "Choose New Password — The Heat Chart" };
 
 export default async function ResetPasswordPage({
   params,

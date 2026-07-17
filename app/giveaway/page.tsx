@@ -5,7 +5,7 @@ import { getActiveGiveaway } from "@/lib/quiz";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
-  title: "Rare Shoe Giveaway — Designer Kicks",
+  title: "Rare Shoe Giveaway — The Heat Chart",
   description:
     "Win rare kicks by passing the Jordan trivia Heat Check. No purchase necessary — free entries available daily.",
 };

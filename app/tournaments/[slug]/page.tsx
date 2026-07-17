@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props) {
   const t = await getTournamentBySlug(slug);
   if (!t) return { title: "Tournament not found" };
   return {
-    title: `${t.name} — Custom Sneaker Tournament Bracket | Designer Kicks`,
+    title: `${t.name} — Custom Sneaker Tournament Bracket | The Heat Chart`,
     description: `Follow the ${t.name}: ${t.size} custom sneakers, single-elimination vote battles, one champion.`,
   };
 }

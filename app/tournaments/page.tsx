@@ -3,7 +3,7 @@ import { finalizeExpiredBattles } from "@/lib/battles";
 import { listTournaments, totalRounds } from "@/lib/tournaments";
 
 export const metadata = {
-  title: "Tournaments — Custom Sneaker Championships | Designer Kicks",
+  title: "Tournaments — Custom Sneaker Championships | The Heat Chart",
   description:
     "Bracket championships for custom sneaker artists. Follow live rounds, vote in matchups, and see who takes the crown.",
 };
