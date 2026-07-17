@@ -48,7 +48,7 @@ check("Profile tab routes to account area", true);
 
 // PWA manifest
 const manifest = await (await fetch(`${BASE}/manifest.webmanifest`)).json();
-check("PWA manifest serves with standalone display", manifest.display === "standalone" && manifest.name === "Designer Kicks");
+check("PWA manifest serves with standalone display", manifest.display === "standalone" && manifest.name === "The Heat Chart");
 const icon = await fetch(`${BASE}/icons/icon-192.png`);
 check("PWA icon serves", icon.ok && icon.headers.get("content-type")?.includes("png") === true);
 const manifestLinked = await page.locator("link[rel='manifest']").count();

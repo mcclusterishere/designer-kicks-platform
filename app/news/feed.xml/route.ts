@@ -29,9 +29,9 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>Designer Kicks — Drop Report</title>
+    <title>The Heat Chart — Drop Report</title>
     <link>${base}/news</link>
-    <description>Sneaker release dates, raffle intel, and drop news from Designer Kicks.</description>
+    <description>Sneaker release dates, raffle intel, and drop news from The Heat Chart.</description>
     <language>en-us</language>
 ${items}
   </channel>

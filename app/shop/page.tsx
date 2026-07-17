@@ -51,7 +51,7 @@ export default async function ShopPage() {
       })}
 
       <p className="mt-12 rounded-xl border border-edge bg-surface p-4 text-xs text-smoke">
-        Disclosure: links on this page are affiliate links. Designer Kicks may
+        Disclosure: links on this page are affiliate links. The Heat Chart may
         earn a commission on qualifying purchases, at no additional cost to
         you. Prices shown are approximate and set by the merchant.
       </p>

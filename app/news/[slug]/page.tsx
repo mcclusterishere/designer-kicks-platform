@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const url = `${siteUrl()}/news/${article.slug}`;
   return {
-    title: `${article.title} — Designer Kicks`,
+    title: `${article.title} — The Heat Chart`,
     description: article.excerpt,
     keywords: articleTags(article),
     alternates: { canonical: url },
@@ -59,8 +59,8 @@ export default async function ArticlePage({ params }: Props) {
     image: article.coverImage ? [`${siteUrl()}${article.coverImage}`] : undefined,
     datePublished: article.publishedAt?.toISOString(),
     dateModified: article.updatedAt.toISOString(),
-    author: { "@type": "Organization", name: "Designer Kicks", url: siteUrl() },
-    publisher: { "@type": "Organization", name: "Designer Kicks", url: siteUrl() },
+    author: { "@type": "Organization", name: "The Heat Chart", url: siteUrl() },
+    publisher: { "@type": "Organization", name: "The Heat Chart", url: siteUrl() },
     mainEntityOfPage: `${siteUrl()}/news/${article.slug}`,
   };
 

@@ -1,6 +1,7 @@
-# Designer Kicks — Custom Sneaker Battle Platform
+# The Heat Chart — Custom Sneaker Battle Platform
 
-The website behind the **Designer Kicks** Facebook page: custom sneaker
+Live at [theheatchart.com](https://theheatchart.com). The relaunch of the
+**Designer Kicks** Facebook page as a full platform: custom sneaker
 artists submit their work, go head-to-head in community vote battles,
 and climb **The Heat List**. Member accounts power voting, the Jordan
 Heat Check trivia game, and rare-shoe giveaway entries — and build your

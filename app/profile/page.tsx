@@ -8,7 +8,7 @@ import { formatUsd } from "@/lib/market";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 
-export const metadata = { title: "Your Profile — Designer Kicks" };
+export const metadata = { title: "Your Profile — The Heat Chart" };
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {

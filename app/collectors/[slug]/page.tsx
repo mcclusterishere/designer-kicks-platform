@@ -17,8 +17,8 @@ export async function generateMetadata({ params }: Props) {
   const user = await prisma.user.findUnique({ where: { collectorSlug: slug } });
   if (!user) return { title: "Collector not found" };
   return {
-    title: `${user.name ?? "Collector"}'s Closet — Designer Kicks`,
-    description: `One-of-one customs owned by ${user.name ?? "a collector"} on Designer Kicks.`,
+    title: `${user.name ?? "Collector"}'s Closet — The Heat Chart`,
+    description: `One-of-one customs owned by ${user.name ?? "a collector"} on The Heat Chart.`,
   };
 }
 

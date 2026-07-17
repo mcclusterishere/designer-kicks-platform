@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth, signIn, oauthProviders } from "@/auth";
 import LoginForm from "./LoginForm";
 
-export const metadata = { title: "Sign In — Designer Kicks" };
+export const metadata = { title: "Sign In — The Heat Chart" };
 
 export default async function SignInPage() {
   const session = await auth();

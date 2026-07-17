@@ -3,7 +3,7 @@ import { finalizeExpiredBattles } from "@/lib/battles";
 import { getArtistRankings } from "@/lib/artists";
 
 export const metadata = {
-  title: "The League — Custom Sneaker Artist Rankings | Designer Kicks",
+  title: "The League — Custom Sneaker Artist Rankings | The Heat Chart",
   description:
     "Every custom sneaker artist in the arena, ranked by battle wins and votes. Follow your favorites and watch the league table move.",
 };
