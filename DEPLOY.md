@@ -1,5 +1,22 @@
 # Launch Checklist — Designer Kicks
 
+## What it costs (budget path: ~$17 first month, ~$5–7/month after)
+
+| Service | Plan | Cost |
+|---|---|---|
+| Railway (hosts the app + Postgres) | Hobby | ~$5/month |
+| Cloudflare R2 (photo storage) | Free tier (10 GB) | $0 |
+| Resend (password-reset emails) | Free tier (3k/month) | $0 |
+| Stripe | No monthly fee | 2.9% + 30¢ per sale |
+| Google/Facebook sign-in | — | $0 |
+| Domain (e.g. Cloudflare or Porkbun) | yearly | ~$10–12/year |
+
+> **Why not Vercel free?** Vercel's Hobby tier prohibits commercial use —
+> affiliate links and paid quiz credits make this site commercial, so
+> Vercel means Pro at $20/month. Railway (Path B below) is the
+> budget-correct host: one service runs the app and the database with a
+> persistent disk, and `data/uploads` even works without R2 to start.
+
 Follow this top to bottom and you go from repo → live site. Two solid
 paths; pick one:
 
