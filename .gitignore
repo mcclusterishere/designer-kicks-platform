@@ -47,3 +47,6 @@ next-env.d.ts
 
 # allow the env template
 !.env.example
+
+# e2e artifacts
+/e2e/.artifacts/

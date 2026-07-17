@@ -163,6 +163,21 @@ use actual uploaded photos (stored in `data/uploads/`, served via
 npx prisma db push --force-reset   # wipe everything
 ```
 
+## Tests
+
+Browser end-to-end suites live in `e2e/` and cover accounts, gated
+voting, the full quiz/credits/giveaway loop, the artist league, and the
+newsroom's SEO surface (38 checks).
+
+```bash
+npm run build && npm start     # in one terminal, against a seeded DB
+npm run test:e2e               # in another
+```
+
+Optional env: `E2E_BASE_URL`, `CHROMIUM_PATH`, `ADMIN_PASSWORD`, and
+`SERVER_LOG` (path to the server's stdout log — enables the
+password-reset delivery check). Suites clean up their own test data.
+
 ## Going live
 
 - **Stack**: Next.js 16 (App Router) · TypeScript · Tailwind v4 ·
