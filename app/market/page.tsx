@@ -3,7 +3,7 @@ import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, formatUsd } from "@/lib/market";
 
 export const metadata = {
-  title: "The Custom Market — One-of-One Sneakers & Apparel | Designer Kicks",
+  title: "The Custom Market — One-of-One Sneakers & Apparel | The Heat Chart",
   description:
     "Live pricing index for one-of-one custom sneakers and apparel: last sale prices, verified sales, and open asks from the arena's artists and collectors.",
 };

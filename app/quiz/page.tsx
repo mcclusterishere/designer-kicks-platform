@@ -18,7 +18,7 @@ import QuizGame from "./QuizGame";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
-  title: "The Heat Check: Jordan Trivia — Win Rare Shoe Giveaways | Designer Kicks",
+  title: "The Heat Check: Jordan Trivia — Win Rare Shoe Giveaways | The Heat Chart",
   description:
     "Answer 12 Jordan history questions to earn an entry into our rare shoe giveaway. 3 free strikes a day — how deep is your sneaker knowledge?",
 };

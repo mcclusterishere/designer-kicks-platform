@@ -5,7 +5,7 @@ import ArticleCard from "@/components/ArticleCard";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Sneaker Drop News & Release Dates — Designer Kicks",
+  title: "Sneaker Drop News & Release Dates — The Heat Chart",
   description:
     "Upcoming sneaker release dates, raffle links, and drop intel — Jordan retros, Dunks, collabs, and the customs community's take on every major release.",
   alternates: {
@@ -13,9 +13,9 @@ export const metadata: Metadata = {
     types: { "application/rss+xml": `${siteUrl()}/news/feed.xml` },
   },
   openGraph: {
-    title: "Sneaker Drop News & Release Dates — Designer Kicks",
+    title: "Sneaker Drop News & Release Dates — The Heat Chart",
     description:
-      "Upcoming sneaker release dates, raffle links, and drop intel from the Designer Kicks newsroom.",
+      "Upcoming sneaker release dates, raffle links, and drop intel from The Heat Chart newsroom.",
     url: `${siteUrl()}/news`,
     type: "website",
   },

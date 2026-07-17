@@ -104,8 +104,8 @@ export async function requestPasswordReset(
   const link = `${base}/reset-password/${token}`;
   const { delivered } = await sendMail({
     to: email,
-    subject: "Reset your Designer Kicks password",
-    text: `Someone (hopefully you) asked to reset your Designer Kicks password.\n\nReset it here (link valid for 2 hours):\n${link}\n\nIf this wasn't you, ignore this email.`,
+    subject: "Reset your Heat Chart password",
+    text: `Someone (hopefully you) asked to reset your Heat Chart password.\n\nReset it here (link valid for 2 hours):\n${link}\n\nIf this wasn't you, ignore this email.`,
   });
 
   // No email service configured (local/dev): hand the link back so the

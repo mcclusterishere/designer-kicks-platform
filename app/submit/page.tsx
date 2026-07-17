@@ -5,7 +5,7 @@ import SubmitForm from "./SubmitForm";
 import ApplyForm from "./ApplyForm";
 
 export const metadata = {
-  title: "Submit Your Customs — Designer Kicks",
+  title: "Submit Your Customs — The Heat Chart",
 };
 export const dynamic = "force-dynamic";
 

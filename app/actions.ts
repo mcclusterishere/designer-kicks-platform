@@ -247,7 +247,7 @@ export async function preloadArtist(
   const artistUrl = `${base}/artists/${artist.slug}`;
   const claimUrl = `${base}/reset-password/${token}`;
   const inviteText =
-    `Yo ${artistName} — your customs are officially in the arena on Designer Kicks 🔥\n\n` +
+    `Yo ${artistName} — your customs are officially in the arena on The Heat Chart 🔥\n\n` +
     `The culture votes on head-to-head custom battles, and "${shoeTitle}" is already live on your artist page:\n${artistUrl}\n\n` +
     `Claim your account here (sets your password, takes 30 seconds):\n${claimUrl}\n\n` +
     `Every battle builds your W–L record on the league table, fans can follow you, and when you sell a pair you can transfer it to the buyer's collector closet. Come defend your heat.`;
@@ -256,7 +256,7 @@ export async function preloadArtist(
   if (process.env.RESEND_API_KEY) {
     const { delivered } = await sendMail({
       to: email,
-      subject: `${artistName} — your customs are live on Designer Kicks 🔥`,
+      subject: `${artistName} — your customs are live on The Heat Chart 🔥`,
       text: inviteText,
     });
     emailSent = delivered;
