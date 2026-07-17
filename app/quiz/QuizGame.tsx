@@ -57,14 +57,14 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             Payment received — your strikes are loaded. 🔥
           </p>
         )}
-        <p className="display text-2xl text-white">Ready to run the gauntlet?</p>
+        <p className="display text-2xl text-white">Think you know Jordans?</p>
         <p className="mt-2 text-sm text-smoke">{questionCount} questions in the bank. No repeats within a run.</p>
         <button
           onClick={() => run(startQuizRun)}
           disabled={pending}
           className="mt-5 rounded-lg bg-heat px-8 py-3.5 tag font-bold text-white glow-heat disabled:opacity-50"
         >
-          {pending ? "Loading…" : "Start The Gauntlet"}
+          {pending ? "Loading…" : "Start The Heat Check"}
         </button>
         {error && <p className="mt-3 text-sm text-heat">{error}</p>}
       </div>
@@ -75,7 +75,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
   if (state.status === "WON") {
     return (
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
-        <p className="display text-4xl text-volt">Gauntlet Complete 🏆</p>
+        <p className="display text-4xl text-volt">Heat Check Passed 🏆</p>
         <p className="mt-3 text-white">
           {state.correctCount}/{state.target} correct
           {feedback?.earnedEntry

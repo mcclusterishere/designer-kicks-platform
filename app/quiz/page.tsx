@@ -7,7 +7,7 @@ import {
   getCurrentQuestion,
   getStrikeState,
   FREE_STRIKES_PER_DAY,
-  GAUNTLET_TARGET,
+  HEAT_CHECK_TARGET,
   PACK_SIZE,
 } from "@/lib/quiz";
 import { verifyCheckoutSession } from "@/app/quiz-actions";
@@ -16,7 +16,7 @@ import QuizGame from "./QuizGame";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
-  title: "Jordan Trivia Gauntlet — Win Rare Shoe Giveaways | Designer Kicks",
+  title: "The Heat Check: Jordan Trivia — Win Rare Shoe Giveaways | Designer Kicks",
   description:
     "Answer 12 Jordan history questions to earn an entry into our rare shoe giveaway. 3 free strikes a day — how deep is your sneaker knowledge?",
 };
@@ -71,7 +71,7 @@ export default async function QuizPage({
         status: run.status as QuizState["status"],
         correctCount: run.correctCount,
         wrongCount: run.wrongCount,
-        target: GAUNTLET_TARGET,
+        target: HEAT_CHECK_TARGET,
         strikes,
         question,
       }
@@ -114,12 +114,12 @@ export default async function QuizPage({
 function Hero({ giveawayTitle }: { giveawayTitle: string | null }) {
   return (
     <div>
-      <p className="tag text-heat">The mini game</p>
+      <p className="tag text-heat">Jordan trivia</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Jordan Trivia <span className="text-heat">Gauntlet</span>
+        The Heat <span className="text-heat">Check</span>
       </h1>
       <p className="mt-3 text-smoke">
-        {GAUNTLET_TARGET} correct answers on Jordan history and release details
+        {HEAT_CHECK_TARGET} correct answers on Jordan history and release details
         wins you an entry into the{" "}
         {giveawayTitle ? (
           <span className="text-white">{giveawayTitle}</span>
@@ -138,11 +138,11 @@ function Rules() {
     <div className="mt-10 rounded-xl border border-edge bg-surface p-5 text-sm text-smoke">
       <p className="tag text-volt">How it works</p>
       <ul className="mt-2 list-disc space-y-1 pl-5">
-        <li>Hit {GAUNTLET_TARGET} correct answers in a run to earn a giveaway entry.</li>
+        <li>Hit {HEAT_CHECK_TARGET} correct answers in a run to earn a giveaway entry.</li>
         <li>Wrong answers cost a strike and skip to the next question.</li>
         <li>{FREE_STRIKES_PER_DAY} free strikes every day — resets at midnight UTC.</li>
         <li>Need more strikes? $1 gets you a pack of {PACK_SIZE}. Unused ones roll over.</li>
-        <li>Multiple entries allowed — every completed gauntlet counts.</li>
+        <li>Multiple entries allowed — every passed heat check counts.</li>
       </ul>
       <p className="mt-4 border-t border-edge pt-3 text-xs">
         <strong>No purchase necessary to enter.</strong> Free daily strikes

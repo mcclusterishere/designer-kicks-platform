@@ -2,7 +2,7 @@ import { prisma } from "./db";
 
 // Game economy — tune these to taste.
 export const FREE_STRIKES_PER_DAY = 3; // free wrong answers per day
-export const GAUNTLET_TARGET = 12; // correct answers needed to win an entry
+export const HEAT_CHECK_TARGET = 12; // correct answers needed to win an entry
 export const RUN_QUEUE_SIZE = 30; // questions queued per run (no repeats within a run)
 export const PACK_SIZE = 4; // strikes per credit pack
 export const PACK_PRICE_CENTS = 100; // $1

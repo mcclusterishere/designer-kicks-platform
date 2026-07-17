@@ -10,7 +10,7 @@ import {
   getStrikeState,
   grantCredits,
   toPublicQuestion,
-  GAUNTLET_TARGET,
+  HEAT_CHECK_TARGET,
   RUN_QUEUE_SIZE,
   PACK_SIZE,
   PACK_PRICE_CENTS,
@@ -73,7 +73,7 @@ async function buildState(
     status: run.status as QuizState["status"],
     correctCount: run.correctCount,
     wrongCount: run.wrongCount,
-    target: GAUNTLET_TARGET,
+    target: HEAT_CHECK_TARGET,
     strikes,
     question,
   };
@@ -92,7 +92,7 @@ export async function startQuizRun(): Promise<QuizActionResult> {
     where: { active: true },
     select: { id: true },
   });
-  if (questions.length < GAUNTLET_TARGET) {
+  if (questions.length < HEAT_CHECK_TARGET) {
     return { ok: false, error: "The question bank is still being loaded — check back soon." };
   }
 
@@ -135,7 +135,7 @@ export async function answerQuestion(
 
   if (correct) {
     const newCorrect = run.correctCount + 1;
-    const won = newCorrect >= GAUNTLET_TARGET;
+    const won = newCorrect >= HEAT_CHECK_TARGET;
     const updated = await prisma.quizRun.update({
       where: { id: run.id },
       data: {
@@ -254,7 +254,7 @@ export async function buyCreditPack(packs: number): Promise<{ ok: false; error: 
           unit_amount: PACK_PRICE_CENTS,
           product_data: {
             name: `Quiz Credit Pack (${PACK_SIZE} extra strikes)`,
-            description: "Extra wrong-answer strikes for the Designer Kicks trivia gauntlet.",
+            description: "Extra wrong-answer strikes for the Designer Kicks Heat Check trivia game.",
           },
         },
       },

@@ -3,7 +3,7 @@
 The website behind the **Designer Kicks** Facebook page: custom sneaker
 artists submit their work, go head-to-head in community vote battles,
 and climb **The Heat List**. Member accounts power voting, the Jordan
-trivia gauntlet, and rare-shoe giveaway entries — and build your
+Heat Check trivia game, and rare-shoe giveaway entries — and build your
 contact list. A newsroom pulls in search traffic; an affiliate shop
 monetizes it.
 
@@ -17,7 +17,7 @@ monetizes it.
 | `/battles/[id]` | Head-to-head page — sign in to vote, one vote per member, live percentages |
 | `/heat-list` | Every approved custom, ranked by battle wins then total votes |
 | `/news` | Drop Report — SEO-driven articles on upcoming releases (dates, prices, raffle links) |
-| `/quiz` | Jordan Trivia Gauntlet — 12 correct answers earns a giveaway entry |
+| `/quiz` | The Heat Check — Jordan trivia; 12 correct answers earns a giveaway entry |
 | `/giveaway` | Current rare-shoe giveaway, entry counts, past winners, rules |
 | `/signin` `/register` `/profile` | Member accounts — email/password + optional Google/Facebook, password recovery, contact-info profile |
 | `/shop` | Affiliate marketplace — marketplaces, releases, customizer paints, cleaning, accessories |
@@ -61,7 +61,7 @@ setting `ADMIN_PASSWORD` in `.env` (copy `.env.example` to `.env`).
 4. When the clock runs out the battle finalizes itself and the winner
    takes a `W` on the Heat List. Wins rank first, total votes break ties.
 
-## The Trivia Gauntlet (quiz game)
+## The Heat Check (quiz game)
 
 - A run climbs toward **12 correct answers** from a shuffled queue of
   the 60-question Jordan bank (no repeats within a run).
@@ -70,10 +70,10 @@ setting `ADMIN_PASSWORD` in `.env` (copy `.env.example` to `.env`).
 - Everyone gets **3 free strikes a day** (resets midnight UTC). Out of
   strikes mid-run? **$1 buys a pack of 4** — the run pauses and resumes
   after purchase. Unused strikes roll over.
-- Completing the gauntlet earns an **entry into the active giveaway**.
+- Passing the Heat Check earns an **entry into the active giveaway**.
   Run it as many times as you like.
 - Tune the economy in `lib/quiz.ts` (`FREE_STRIKES_PER_DAY`,
-  `GAUNTLET_TARGET`, `PACK_SIZE`, `PACK_PRICE_CENTS`).
+  `HEAT_CHECK_TARGET`, `PACK_SIZE`, `PACK_PRICE_CENTS`).
 - Answers are validated server-side and never sent to the browser.
 
 **Payments**: set `STRIPE_SECRET_KEY` to enable real $1 Stripe Checkout
@@ -93,7 +93,7 @@ summary on `/giveaway` is a placeholder, not legal advice.
 ## Giveaways
 
 Create giveaways in the admin panel (prize, description, end date).
-Gauntlet winners auto-enter the active giveaway. After it ends, hit
+Heat Check winners auto-enter the active giveaway. After it ends, hit
 "Draw winner" — a random entry wins and the winner's name/email shows
 in the admin list; past winners appear on `/giveaway`.
 
