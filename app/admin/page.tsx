@@ -6,10 +6,12 @@ import {
   setSubmissionStatus,
   endBattleNow,
   deleteProduct,
+  deleteArticle,
 } from "@/app/actions";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
 import ProductForm from "./ProductForm";
+import ArticleForm from "./ArticleForm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; editArticle?: string }>;
 }) {
   if (!(await isAdmin())) {
     return (
@@ -29,9 +31,9 @@ export default async function AdminPage({
   }
 
   await finalizeExpiredBattles();
-  const { edit } = await searchParams;
+  const { edit, editArticle } = await searchParams;
 
-  const [pending, approved, battles, products, editProduct] = await Promise.all([
+  const [pending, approved, battles, products, editProduct, articles, editArticleRow] = await Promise.all([
     prisma.submission.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -47,6 +49,8 @@ export default async function AdminPage({
     }),
     prisma.product.findMany({ orderBy: [{ category: "asc" }, { sortOrder: "asc" }] }),
     edit ? prisma.product.findUnique({ where: { id: edit } }) : null,
+    prisma.article.findMany({ orderBy: { createdAt: "desc" } }),
+    editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
   ]);
 
   return (
@@ -146,6 +150,75 @@ export default async function AdminPage({
             </div>
           ))}
           {battles.length === 0 && <p className="text-sm text-smoke">No battles yet.</p>}
+        </div>
+      </section>
+
+      {/* Newsroom */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Newsroom <span className="text-smoke">({articles.length})</span>
+        </h2>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <p className="tag text-volt">{editArticleRow ? "Edit article" : "Write article"}</p>
+          {editArticleRow && (
+            <p className="mt-1 text-xs text-smoke">
+              Editing “{editArticleRow.title}” —{" "}
+              <Link href="/admin" className="text-volt underline">cancel</Link>
+            </p>
+          )}
+          <div className="mt-3">
+            <ArticleForm
+              defaults={
+                editArticleRow
+                  ? {
+                      id: editArticleRow.id,
+                      title: editArticleRow.title,
+                      slug: editArticleRow.slug,
+                      excerpt: editArticleRow.excerpt,
+                      content: editArticleRow.content,
+                      coverImage: editArticleRow.coverImage,
+                      tags: editArticleRow.tags,
+                      status: editArticleRow.status,
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          {articles.map((a) => (
+            <div
+              key={a.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-2.5 text-sm"
+            >
+              <div className="min-w-0">
+                <Link
+                  href={`/news/${a.slug}`}
+                  className="font-bold text-white hover:text-volt"
+                >
+                  {a.title}
+                </Link>{" "}
+                <span className={a.status === "PUBLISHED" ? "text-volt" : "text-heat"}>
+                  · {a.status.toLowerCase()}
+                </span>
+                <p className="truncate text-xs text-smoke">/news/{a.slug}</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Link
+                  href={`/admin?editArticle=${a.id}`}
+                  className="rounded border border-edge px-3 py-1.5 tag text-white hover:border-volt"
+                >
+                  Edit
+                </Link>
+                <form action={deleteArticle.bind(null, a.id)}>
+                  <button className="rounded border border-heat px-3 py-1.5 tag text-heat">
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+          {articles.length === 0 && <p className="text-sm text-smoke">No articles yet.</p>}
         </div>
       </section>
 

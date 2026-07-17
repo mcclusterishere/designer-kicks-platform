@@ -57,6 +57,20 @@ model Vote {
   @@index([battleId, submissionId])
 }
 
+model Article {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  excerpt     String // doubles as the meta description — keep under ~160 chars
+  content     String // markdown
+  coverImage  String?
+  tags        String? // comma-separated
+  status      String    @default("DRAFT") // DRAFT | PUBLISHED
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 model Product {
   id           String  @id @default(cuid())
   name         String

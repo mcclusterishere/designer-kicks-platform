@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
+import { getPublishedArticles } from "@/lib/articles";
 import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
+import ArticleCard from "@/components/ArticleCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   await finalizeExpiredBattles();
 
-  const [battles, heat, products] = await Promise.all([
+  const [battles, heat, products, articles] = await Promise.all([
     prisma.battle.findMany({
       where: { status: "ACTIVE" },
       orderBy: { endsAt: "asc" },
@@ -22,6 +24,7 @@ export default async function HomePage() {
       orderBy: { sortOrder: "asc" },
       take: 4,
     }),
+    getPublishedArticles(3),
   ]);
 
   const top3 = heat.slice(0, 3);
@@ -137,6 +140,25 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Drop report preview */}
+      {articles.length > 0 && (
+        <section className="mx-auto max-w-6xl px-4 py-12">
+          <div className="flex items-end justify-between">
+            <h2 className="display text-3xl text-white">
+              Drop <span className="text-volt">Report</span>
+            </h2>
+            <Link href="/news" className="tag text-smoke hover:text-white">
+              All news →
+            </Link>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {articles.map((a) => (
+              <ArticleCard key={a.slug} article={a} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Shop preview */}
       <section className="mx-auto max-w-6xl px-4 py-12">
