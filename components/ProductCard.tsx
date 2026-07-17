@@ -30,13 +30,13 @@ export default function ProductCard({ product }: Props) {
         product.featured ? "border-volt/50" : "border-edge hover:border-volt/40"
       }`}
     >
-      <div className="relative aspect-[4/3] w-full bg-panel">
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-panel">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">

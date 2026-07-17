@@ -19,7 +19,7 @@ export default async function TournamentsPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-heat">Championships</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Tournament <span className="text-heat">Brackets</span>
+        Tournament <span className="text-gradient-heat">Brackets</span>
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Seeded single-elimination brackets. Every round is a live vote

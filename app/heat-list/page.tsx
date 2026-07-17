@@ -11,7 +11,7 @@ export default async function HeatListPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-volt">Rankings</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        The <span className="text-volt">Heat List</span>
+        The <span className="text-gradient-volt">Heat List</span>
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Every approved custom, ranked by battle wins first and total votes

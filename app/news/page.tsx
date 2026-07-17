@@ -29,7 +29,7 @@ export default async function NewsPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-volt">The newsroom</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Drop <span className="text-volt">Report</span>
+        Drop <span className="text-gradient-volt">Report</span>
       </h1>
       <p className="mt-3 max-w-2xl text-smoke">
         Release dates, raffle intel, and the story behind every drop that
