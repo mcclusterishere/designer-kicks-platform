@@ -1,8 +1,14 @@
-// Seeds demo submissions, battles, votes, and the affiliate shop.
-// Run with: npm run db:seed  (safe to re-run — it wipes and reseeds demo data)
+// Seeds demo submissions, battles, votes, the affiliate shop, the
+// trivia question bank (prisma/questions.json), and a demo giveaway.
+// Run with: npm run db:seed  (safe to re-run — it wipes and reseeds
+// demo content; it does NOT touch user accounts)
 import { PrismaClient } from "@prisma/client";
+import { readFileSync } from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const prisma = new PrismaClient();
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -312,13 +318,33 @@ const articles = [
   },
 ];
 
+function loadQuestions() {
+  try {
+    const raw = readFileSync(path.join(here, "questions.json"), "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed.filter(
+      (q) =>
+        typeof q.question === "string" &&
+        Array.isArray(q.options) &&
+        q.options.length === 4 &&
+        Number.isInteger(q.answerIndex) &&
+        q.answerIndex >= 0 &&
+        q.answerIndex <= 3
+    );
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   // Wipe in dependency order so reseeding is idempotent.
-  await prisma.vote.deleteMany();
+  // User accounts, quiz runs, credits, and giveaway entries are kept.
+  await prisma.vote.deleteMany({ where: { userId: null } });
   await prisma.battle.deleteMany();
   await prisma.submission.deleteMany();
   await prisma.product.deleteMany();
   await prisma.article.deleteMany();
+  await prisma.quizQuestion.deleteMany();
 
   const subs = {};
   for (const { key, ...data } of submissions) {
@@ -370,8 +396,38 @@ async function main() {
     });
   }
 
+  const questions = loadQuestions();
+  for (const q of questions) {
+    await prisma.quizQuestion.create({
+      data: {
+        question: q.question,
+        options: JSON.stringify(q.options),
+        answerIndex: q.answerIndex,
+        difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
+        category: q.category || "history",
+        explanation: q.explanation || null,
+      },
+    });
+  }
+
+  // Keep any giveaway that's already running; otherwise start the demo one.
+  const activeGiveaway = await prisma.giveaway.findFirst({
+    where: { status: "ACTIVE", endsAt: { gt: new Date() } },
+  });
+  if (!activeGiveaway) {
+    await prisma.giveaway.create({
+      data: {
+        title: "Launch Giveaway",
+        prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+        description:
+          "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+        endsAt: new Date(now + 30 * DAY),
+      },
+    });
+  }
+
   console.log(
-    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles.`
+    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles, ${questions.length} quiz questions.`
   );
 }
 

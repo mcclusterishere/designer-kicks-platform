@@ -50,11 +50,148 @@ model Vote {
   battle       Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
   submissionId String
   submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  voterKey     String
+  voterKey     String // the voting user's id (or a seed key for demo votes)
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   @@unique([battleId, voterKey])
   @@index([battleId, submissionId])
+}
+
+// ---------- Accounts & auth (NextAuth models + profile fields) ----------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // null for OAuth-only accounts
+
+  // Profile / contact info
+  phone              String?
+  city               String?
+  shoeSize           String?
+  favoriteSilhouette String?
+  instagram          String?
+  marketingOptIn     Boolean @default(false)
+
+  // Quiz economy
+  credits         Int     @default(0) // purchased strikes
+  freeStrikesDate String? // YYYY-MM-DD the free-strike counter applies to
+  freeStrikesUsed Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  accounts       Account[]
+  sessions       Session[]
+  votes          Vote[]
+  quizRuns       QuizRun[]
+  creditTxns     CreditTransaction[]
+  giveawayEntries GiveawayEntry[]
+  giveawaysWon   Giveaway[]          @relation("giveawayWinner")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @id
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model PasswordResetToken {
+  token     String   @id
+  userId    String
+  expires   DateTime
+  createdAt DateTime @default(now())
+}
+
+// ---------- Quiz game & giveaway ----------
+
+model QuizQuestion {
+  id          String  @id @default(cuid())
+  question    String
+  options     String // JSON array of 4 strings
+  answerIndex Int
+  difficulty  Int     @default(1) // 1 easy, 2 medium, 3 hard
+  category    String  @default("history")
+  explanation String?
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model QuizRun {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionIds  String // JSON array, server-chosen order
+  currentIndex Int       @default(0)
+  correctCount Int       @default(0)
+  wrongCount   Int       @default(0)
+  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | WON | ABANDONED
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+}
+
+model CreditTransaction {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta           Int
+  reason          String // purchase | strike | admin
+  stripeSessionId String?  @unique
+  createdAt       DateTime @default(now())
+}
+
+model Giveaway {
+  id          String   @id @default(cuid())
+  title       String
+  prize       String
+  description String?
+  endsAt      DateTime
+  status      String   @default("ACTIVE") // ACTIVE | DRAWN | CLOSED
+  winnerId    String?
+  winner      User?    @relation("giveawayWinner", fields: [winnerId], references: [id])
+  createdAt   DateTime @default(now())
+
+  entries GiveawayEntry[]
+}
+
+model GiveawayEntry {
+  id         String   @id @default(cuid())
+  giveawayId String
+  giveaway   Giveaway @relation(fields: [giveawayId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source     String   @default("quiz") // quiz | manual
+  createdAt  DateTime @default(now())
 }
 
 model Article {

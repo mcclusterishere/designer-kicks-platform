@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import "./globals.css";
 
@@ -23,17 +24,19 @@ export const metadata: Metadata = {
 
 const navLinks = [
   { href: "/battles", label: "Battles" },
-  { href: "/heat-list", label: "Heat List" },
   { href: "/news", label: "News" },
+  { href: "/quiz", label: "Quiz" },
+  { href: "/heat-list", label: "Heat List" },
   { href: "/shop", label: "Shop" },
   { href: "/submit", label: "Submit" },
 ];
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
   return (
     <html
       lang="en"
@@ -59,6 +62,12 @@ export default function RootLayout({
                   {l.label}
                 </Link>
               ))}
+              <Link
+                href={session?.user ? "/profile" : "/signin"}
+                className="tag rounded border border-edge px-2 py-2 text-white transition hover:border-volt sm:px-3"
+              >
+                {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+              </Link>
             </nav>
           </div>
         </header>

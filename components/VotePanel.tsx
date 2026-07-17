@@ -18,11 +18,12 @@ type Props = {
   a: Side;
   b: Side;
   active: boolean;
+  isAuthed: boolean;
   yourVote: string | null; // submissionId you voted for, if any
   winnerId: string | null;
 };
 
-export default function VotePanel({ battleId, a, b, active, yourVote, winnerId }: Props) {
+export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, winnerId }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [localVote, setLocalVote] = useState<string | null>(yourVote);
@@ -99,7 +100,7 @@ export default function VotePanel({ battleId, a, b, active, yourVote, winnerId }
                       <p className="tag mt-2 text-volt">Your vote</p>
                     )}
                   </div>
-                ) : (
+                ) : isAuthed ? (
                   <button
                     onClick={() => vote(side.submissionId)}
                     disabled={pending}
@@ -107,6 +108,13 @@ export default function VotePanel({ battleId, a, b, active, yourVote, winnerId }
                   >
                     {pending ? "Counting…" : "Vote This Shoe"}
                   </button>
+                ) : (
+                  <a
+                    href="/signin"
+                    className="mt-4 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:bg-volt hover:text-ink"
+                  >
+                    Sign In To Vote
+                  </a>
                 )}
               </div>
             </div>
