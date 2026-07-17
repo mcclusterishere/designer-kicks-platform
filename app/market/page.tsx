@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, formatUsd } from "@/lib/market";
+import OfferForm from "@/components/OfferForm";
 
 export const metadata = {
   title: "The Custom Market — One-of-One Sneakers & Apparel | The Heat Chart",
@@ -16,17 +18,39 @@ const CATEGORIES = [
   { key: "accessories", label: "🧢 Accessories" },
 ];
 
+const SORTS = [
+  { key: "hot", label: "🔥 Hottest" },
+  { key: "price-high", label: "Price ↓" },
+  { key: "price-low", label: "Price ↑" },
+] as const;
+
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; q?: string; sort?: string }>;
 }) {
   await finalizeExpiredBattles();
-  const { category = "all" } = await searchParams;
-  const [{ items, stats }, heat] = await Promise.all([getMarketBoard(), getHeatList()]);
+  const { category = "all", q = "", sort = "hot" } = await searchParams;
+  const [session, { items, stats }, heat] = await Promise.all([
+    auth(),
+    getMarketBoard(),
+    getHeatList(),
+  ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
 
-  const filtered = category === "all" ? items : items.filter((i) => i.category === category);
+  const needle = q.trim().toLowerCase();
+  const price = (i: (typeof items)[number]) =>
+    i.lastSaleCents ?? i.askCents ?? i.topOfferCents ?? 0;
+  const filtered = items
+    .filter((i) => category === "all" || i.category === category)
+    .filter(
+      (i) =>
+        !needle ||
+        [i.title, i.artistName, i.baseShoe].some((s) => s.toLowerCase().includes(needle))
+    )
+    .sort((a, b) =>
+      sort === "price-high" ? price(b) - price(a) : sort === "price-low" ? price(a) - price(b) : 0
+    );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -37,9 +61,18 @@ export default async function MarketPage({
       <p className="mt-3 max-w-2xl text-smoke">
         Real sale prices for one-of-one customs — sneakers, apparel, and
         accessories from independent artists. ✓ means the sale was
-        substantiated with evidence; asks are what current owners want.
-        Buying and selling settles directly with the artist or owner for now.
+        substantiated with evidence; asks are what owners want, offers are
+        what buyers are ready to pay. Deals settle directly between you two.
       </p>
+
+      {/* The fee gauntlet: undercut every marketplace taking 8-13% */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-volt/40 bg-volt/5 px-4 py-3">
+        <p className="display text-lg text-volt">Seller fee here: 1%</p>
+        <p className="text-xs text-smoke">
+          when on-platform checkout opens (plus card processing). Recording
+          sales, asks, and offers is free forever. Elsewhere: 8–13%.
+        </p>
+      </div>
 
       {/* Index stats */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -56,7 +89,7 @@ export default async function MarketPage({
         ))}
       </div>
 
-      {/* Category filter */}
+      {/* Category filter + search + sort */}
       <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
         {CATEGORIES.map((c) => (
           <Link
@@ -72,6 +105,29 @@ export default async function MarketPage({
           </Link>
         ))}
       </div>
+      <form method="GET" action="/market" className="mt-3 flex flex-wrap gap-2">
+        {category !== "all" && <input type="hidden" name="category" value={category} />}
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Search pieces, artists, silhouettes…"
+          className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+        />
+        <select
+          name="sort"
+          defaultValue={sort}
+          className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white"
+          aria-label="Sort the board"
+        >
+          {SORTS.map((s) => (
+            <option key={s.key} value={s.key}>{s.label}</option>
+          ))}
+        </select>
+        <button type="submit" className="tag rounded-lg border border-edge px-4 py-2 text-white transition hover:border-volt">
+          Go
+        </button>
+      </form>
 
       {filtered.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-edge bg-surface p-8 text-center text-smoke">
@@ -103,6 +159,7 @@ export default async function MarketPage({
                 <div className="p-4">
                   <p className="tag text-smoke">
                     {item.baseShoe} · {item.category}
+                    {item.size && <span className="text-white"> · {item.size}</span>}
                   </p>
                   <p className="mt-1 font-bold text-white">{item.title}</p>
                   <p className="mt-0.5 text-sm text-smoke">
@@ -123,21 +180,27 @@ export default async function MarketPage({
                       </>
                     )}
                   </p>
-                  <div className="mt-3 flex items-center justify-between border-t border-edge pt-3">
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-edge pt-3">
                     <div>
                       <p className="tag text-smoke">Last sale</p>
                       {item.lastSaleCents ? (
-                        <p className="display text-xl text-white">
-                          {formatUsd(item.lastSaleCents)}{" "}
+                        <>
+                          <p className="display text-xl text-white">{formatUsd(item.lastSaleCents)}</p>
                           {item.lastSaleVerified ? (
                             <span className="tag text-volt" title="Substantiated with evidence or admin-verified">✓ verified</span>
                           ) : (
                             <span className="tag text-smoke">unverified</span>
                           )}
-                        </p>
+                        </>
                       ) : (
                         <p className="display text-xl text-smoke">—</p>
                       )}
+                    </div>
+                    <div className="text-center">
+                      <p className="tag text-smoke">Top offer</p>
+                      <p className={`display text-xl ${item.topOfferCents ? "text-volt" : "text-smoke"}`}>
+                        {item.topOfferCents ? formatUsd(item.topOfferCents) : "—"}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="tag text-smoke">Ask</p>
@@ -146,6 +209,7 @@ export default async function MarketPage({
                       </p>
                     </div>
                   </div>
+                  <OfferForm submissionId={item.id} signedIn={Boolean(session?.user)} />
                 </div>
               </div>
             );

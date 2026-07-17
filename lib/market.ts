@@ -5,6 +5,7 @@ export type MarketItem = {
   title: string;
   baseShoe: string;
   category: string;
+  size: string | null;
   imageUrl: string;
   artistName: string;
   artistSlug: string | null;
@@ -14,6 +15,7 @@ export type MarketItem = {
   lastSaleVerified: boolean;
   lastSaleAt: Date | null;
   askCents: number | null;
+  topOfferCents: number | null;
 };
 
 export type MarketStats = {
@@ -40,7 +42,11 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
     prisma.submission.findMany({
       where: {
         status: "APPROVED",
-        OR: [{ askingPriceCents: { not: null } }, { sales: { some: { status: "CONFIRMED" } } }],
+        OR: [
+          { askingPriceCents: { not: null } },
+          { sales: { some: { status: "CONFIRMED" } } },
+          { offers: { some: { status: "OPEN" } } },
+        ],
       },
       include: {
         artist: { select: { slug: true, displayName: true, status: true } },
@@ -48,6 +54,11 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         sales: {
           where: { status: "CONFIRMED" },
           orderBy: { soldAt: "desc" },
+          take: 1,
+        },
+        offers: {
+          where: { status: "OPEN" },
+          orderBy: { amountCents: "desc" },
           take: 1,
         },
       },
@@ -63,6 +74,7 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         title: p.title,
         baseShoe: p.baseShoe,
         category: p.category,
+        size: p.size,
         imageUrl: p.imageUrl,
         artistName: p.artist?.displayName ?? p.artistName,
         artistSlug: p.artist?.status === "APPROVED" ? p.artist.slug : null,
@@ -72,11 +84,13 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         lastSaleVerified: last?.verified ?? false,
         lastSaleAt: last?.soldAt ?? null,
         askCents: p.askingPriceCents,
+        topOfferCents: p.offers[0]?.amountCents ?? null,
       };
     })
     .sort(
       (a, b) =>
-        (b.lastSaleCents ?? b.askCents ?? 0) - (a.lastSaleCents ?? a.askCents ?? 0)
+        (b.lastSaleCents ?? b.askCents ?? b.topOfferCents ?? 0) -
+        (a.lastSaleCents ?? a.askCents ?? a.topOfferCents ?? 0)
     );
 
   const volumeCents = confirmed.reduce((sum, s) => sum + s.priceCents, 0);

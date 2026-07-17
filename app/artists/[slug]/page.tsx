@@ -86,11 +86,23 @@ export default async function ArtistPage({ params }: Props) {
           </p>
           {artist.bio && <p className="mt-3 max-w-xl text-smoke">{artist.bio}</p>}
         </div>
-        <FollowButton
-          artistId={artist.id}
-          initialFollowing={following}
-          isAuthed={Boolean(session?.user)}
-        />
+        <div className="flex flex-col items-end gap-2">
+          <FollowButton
+            artistId={artist.id}
+            initialFollowing={following}
+            isAuthed={Boolean(session?.user)}
+          />
+          {artist.instagram && !isOwnPage && (
+            <a
+              href={`https://instagram.com/${artist.instagram}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tag rounded-lg bg-heat px-4 py-2.5 font-bold text-white glow-heat transition hover:opacity-90"
+            >
+              📩 Book a Commission
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -189,7 +201,7 @@ export default async function ArtistPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{s.baseShoe}</p>
+                  <p className="tag text-smoke">{s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     {s._count.battlesWon}W–{shoeBattles - s._count.battlesWon}L ·{" "}

@@ -53,6 +53,9 @@ await page.fill("#a-slug", TEST_SLUG);
 await page.fill("#a-excerpt", "An end-to-end test article about a fake drop for testing purposes.");
 await page.fill("#a-content", "## The drop\n\nThis is **test** content.\n\n- Date: soon\n- Price: $999");
 await page.fill("#a-tags", "Test, E2E");
+const dropDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+await page.fill("#a-drop", dropDate);
+await page.fill("#a-raffle", "https://www.nike.com/launch");
 await page.check('input[name="publish"]');
 await page.getByRole("button", { name: "Save Article" }).click();
 await page.getByText("Saved.").waitFor({ timeout: 10000 });
@@ -61,6 +64,13 @@ check("admin can publish an article", true);
 await page.goto(`${BASE}/news/${TEST_SLUG}`, { waitUntil: "networkidle" });
 check("published article live at slug", await page.getByText("E2E News Suite Article").first().isVisible());
 check("markdown bold renders", (await page.locator("article strong").count()) > 0);
+
+// --- Free drop calendar ---
+await page.goto(`${BASE}/drops`, { waitUntil: "networkidle" });
+check("drop calendar renders free positioning", await page.getByText("Free forever").isVisible());
+check("dated article on the calendar", await page.getByText("E2E News Suite Article").isVisible());
+check("raffle link on the calendar", (await page.locator("a[href='https://www.nike.com/launch']").count()) >= 1);
+check("news page links the calendar", (await (await fetch(`${BASE}/news`)).text()).includes("/drops"));
 
 // Cleanup
 await prisma.article.deleteMany({ where: { slug: TEST_SLUG } });
