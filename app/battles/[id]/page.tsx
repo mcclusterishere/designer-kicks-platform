@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
 import { finalizeExpiredBattles, getBattleWithVotes } from "@/lib/battles";
-import { getVoterKey } from "@/lib/voter";
 import VotePanel from "@/components/VotePanel";
 import Countdown from "@/components/Countdown";
 
@@ -20,11 +20,13 @@ export default async function BattlePage({
   if (!result) notFound();
   const { battle, aVotes, bVotes } = result;
 
-  const voterKey = await getVoterKey();
-  const yourVote = voterKey
+  const session = await auth();
+  const yourVote = session?.user?.id
     ? (
         await prisma.vote.findUnique({
-          where: { battleId_voterKey: { battleId: battle.id, voterKey } },
+          where: {
+            battleId_voterKey: { battleId: battle.id, voterKey: session.user.id },
+          },
         })
       )?.submissionId ?? null
     : null;
@@ -56,6 +58,7 @@ export default async function BattlePage({
         <VotePanel
           battleId={battle.id}
           active={active}
+          isAuthed={Boolean(session?.user)}
           yourVote={yourVote}
           winnerId={battle.winnerId}
           a={{

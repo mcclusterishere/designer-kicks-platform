@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getPublishedArticles } from "@/lib/articles";
+import { getActiveGiveaway } from "@/lib/quiz";
 import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
@@ -26,6 +27,7 @@ export default async function HomePage() {
     }),
     getPublishedArticles(3),
   ]);
+  const giveaway = await getActiveGiveaway();
 
   const top3 = heat.slice(0, 3);
 
@@ -65,6 +67,29 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Giveaway / quiz banner */}
+      {giveaway && (
+        <section className="border-b border-edge bg-surface">
+          <Link
+            href="/quiz"
+            className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 transition hover:opacity-90"
+          >
+            <div className="flex items-center gap-4">
+              <span className="display text-3xl">🏆</span>
+              <div>
+                <p className="tag text-heat">Live giveaway — play trivia to enter</p>
+                <p className="display text-xl text-white sm:text-2xl">
+                  Win: <span className="text-volt">{giveaway.prize}</span>
+                </p>
+              </div>
+            </div>
+            <span className="rounded-lg bg-heat px-6 py-3 tag font-bold text-white glow-heat">
+              Play The Gauntlet →
+            </span>
+          </Link>
+        </section>
+      )}
 
       {/* Live battles */}
       <section className="mx-auto max-w-6xl px-4 py-12">

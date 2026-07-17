@@ -2,42 +2,100 @@
 
 The website behind the **Designer Kicks** Facebook page: custom sneaker
 artists submit their work, go head-to-head in community vote battles,
-and climb **The Heat List**. An affiliate shop monetizes the traffic.
+and climb **The Heat List**. Member accounts power voting, the Jordan
+trivia gauntlet, and rare-shoe giveaway entries — and build your
+contact list. A newsroom pulls in search traffic; an affiliate shop
+monetizes it.
 
 ## What's on the site
 
 | Page | What it does |
 |---|---|
-| `/` | Hype homepage — live battles, Heat List top 3, featured shop picks |
+| `/` | Hype homepage — giveaway banner, live battles, Heat List, Drop Report, shop picks |
 | `/submit` | Artists upload a photo of their custom + their story (goes to a review queue) |
 | `/battles` | Live vote battles with countdowns + past battle results |
-| `/battles/[id]` | Head-to-head page — one vote per person, live percentages |
+| `/battles/[id]` | Head-to-head page — sign in to vote, one vote per member, live percentages |
 | `/heat-list` | Every approved custom, ranked by battle wins then total votes |
 | `/news` | Drop Report — SEO-driven articles on upcoming releases (dates, prices, raffle links) |
+| `/quiz` | Jordan Trivia Gauntlet — 12 correct answers earns a giveaway entry |
+| `/giveaway` | Current rare-shoe giveaway, entry counts, past winners, rules |
+| `/signin` `/register` `/profile` | Member accounts — email/password + optional Google/Facebook, password recovery, contact-info profile |
 | `/shop` | Affiliate marketplace — marketplaces, releases, customizer paints, cleaning, accessories |
-| `/admin` | Your dashboard — approve/reject submissions, start/end battles, write news articles, manage shop products |
+| `/admin` | Your dashboard — submissions, battles, giveaways, quiz questions, members (+ CSV export), articles, products |
 
 ## Run it locally
 
 ```bash
 npm install          # also runs prisma generate
 npm run db:push      # creates prisma/dev.db (SQLite)
-npm run db:seed      # loads demo battles + the starter shop
+npm run db:seed      # loads demo battles, 60 trivia questions, shop, articles
 npm run dev          # http://localhost:3000
 ```
 
 Admin panel: go to `/admin`, password is `heatcheck` — **change it** by
 setting `ADMIN_PASSWORD` in `.env` (copy `.env.example` to `.env`).
 
+## Accounts
+
+- Email/password sign-up with bcrypt hashing, password recovery via
+  emailed reset links (2-hour expiry).
+- **Google / Facebook sign-in**: create OAuth apps and set
+  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and/or
+  `FACEBOOK_CLIENT_ID`/`FACEBOOK_CLIENT_SECRET` in `.env` — buttons
+  appear automatically. Redirect URI:
+  `https://yourdomain.com/api/auth/callback/google` (or `/facebook`).
+- **Reset emails**: set `RESEND_API_KEY` (resend.com) + `EMAIL_FROM`.
+  Without it, reset links print to the server console (and show
+  on-screen in `npm run dev` only — never in production).
+- Profiles collect phone, city, shoe size, favorite silhouette,
+  Instagram, and a marketing opt-in. View/export everything from the
+  admin Members table (CSV button).
+
 ## How the battles work
 
 1. Artist submits at `/submit` → lands in the `/admin` review queue.
 2. You approve it, then pair any two approved customs into a battle
    (1–30 days) from the admin panel.
-3. Visitors get one vote per battle (anonymous cookie + a unique
-   constraint in the database — no login needed).
+3. Members get one vote per battle (signed-in only — every voter is a
+   contact in your list).
 4. When the clock runs out the battle finalizes itself and the winner
    takes a `W` on the Heat List. Wins rank first, total votes break ties.
+
+## The Trivia Gauntlet (quiz game)
+
+- A run climbs toward **12 correct answers** from a shuffled queue of
+  the 60-question Jordan bank (no repeats within a run).
+- A wrong answer costs a **strike** and skips to the next question (no
+  brute-forcing answers by retrying).
+- Everyone gets **3 free strikes a day** (resets midnight UTC). Out of
+  strikes mid-run? **$1 buys a pack of 4** — the run pauses and resumes
+  after purchase. Unused strikes roll over.
+- Completing the gauntlet earns an **entry into the active giveaway**.
+  Run it as many times as you like.
+- Tune the economy in `lib/quiz.ts` (`FREE_STRIKES_PER_DAY`,
+  `GAUNTLET_TARGET`, `PACK_SIZE`, `PACK_PRICE_CENTS`).
+- Answers are validated server-side and never sent to the browser.
+
+**Payments**: set `STRIPE_SECRET_KEY` to enable real $1 Stripe Checkout
+purchases (add `STRIPE_WEBHOOK_SECRET` and point a webhook at
+`/api/stripe/webhook`; the success redirect also credits idempotently,
+so purchases work even before the webhook is configured). Without a
+key, a clearly-labeled dev-mode purchase grants credits instantly for
+testing.
+
+**⚠️ Legal — read before launching the paid giveaway**: a promotion
+combining a prize, chance, and payment is a lottery in most US states.
+The free daily strikes exist as the free entry path ("no purchase
+necessary") and the site carries that language, but **have a lawyer
+review your official rules before charging real money**. The rules
+summary on `/giveaway` is a placeholder, not legal advice.
+
+## Giveaways
+
+Create giveaways in the admin panel (prize, description, end date).
+Gauntlet winners auto-enter the active giveaway. After it ends, hit
+"Draw winner" — a random entry wins and the winner's name/email shows
+in the admin list; past winners appear on `/giveaway`.
 
 ## The newsroom (SEO engine)
 

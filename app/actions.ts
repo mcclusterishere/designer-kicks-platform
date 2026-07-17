@@ -1,13 +1,13 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { getOrCreateVoterKey } from "@/lib/voter";
+import { auth } from "@/auth";
 import { checkPassword, setAdminSession, clearAdminSession, isAdmin } from "@/lib/admin";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
@@ -69,6 +69,11 @@ export async function createSubmission(
 // ---------- Voting ----------
 
 export async function castVote(battleId: string, submissionId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, error: "Sign in to vote — it takes 10 seconds and your vote counts." };
+  }
+
   await finalizeExpiredBattles();
 
   const battle = await prisma.battle.findUnique({ where: { id: battleId } });
@@ -78,9 +83,11 @@ export async function castVote(battleId: string, submissionId: string): Promise<
     return { ok: false, error: "That shoe isn't in this battle." };
   }
 
-  const voterKey = await getOrCreateVoterKey();
+  const voterKey = session.user.id;
   try {
-    await prisma.vote.create({ data: { battleId, submissionId, voterKey } });
+    await prisma.vote.create({
+      data: { battleId, submissionId, voterKey, userId: session.user.id },
+    });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
       return { ok: false, error: "You already voted in this battle." };
@@ -283,5 +290,104 @@ export async function deleteArticle(id: string) {
   await requireAdmin();
   await prisma.article.delete({ where: { id } });
   revalidatePath("/news");
+  revalidatePath("/admin");
+}
+
+// ---------- Giveaways ----------
+
+export async function createGiveaway(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const title = String(formData.get("title") ?? "").trim();
+  const prize = String(formData.get("prize") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const days = Number(formData.get("days") ?? 14);
+
+  if (!title || !prize) return { ok: false, error: "Title and prize are required." };
+  if (!Number.isFinite(days) || days < 1 || days > 90) return { ok: false, error: "Length must be 1–90 days." };
+
+  await prisma.giveaway.create({
+    data: {
+      title,
+      prize,
+      description: description || null,
+      endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  revalidatePath("/giveaway");
+  revalidatePath("/quiz");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function drawGiveawayWinner(giveawayId: string) {
+  await requireAdmin();
+  const entries = await prisma.giveawayEntry.findMany({
+    where: { giveawayId },
+    select: { userId: true },
+  });
+  if (entries.length === 0) {
+    await prisma.giveaway.update({ where: { id: giveawayId }, data: { status: "CLOSED" } });
+  } else {
+    const winner = entries[randomInt(entries.length)];
+    await prisma.giveaway.update({
+      where: { id: giveawayId },
+      data: { status: "DRAWN", winnerId: winner.userId },
+    });
+  }
+  revalidatePath("/giveaway");
+  revalidatePath("/admin");
+}
+
+// ---------- Quiz questions ----------
+
+export async function saveQuestion(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const question = String(formData.get("question") ?? "").trim();
+  const options = [0, 1, 2, 3].map((i) => String(formData.get(`option${i}`) ?? "").trim());
+  const answerIndex = Number(formData.get("answerIndex"));
+  const difficulty = Number(formData.get("difficulty") ?? 1);
+  const category = String(formData.get("category") ?? "history").trim();
+  const explanation = String(formData.get("explanation") ?? "").trim();
+
+  if (!question) return { ok: false, error: "Question text is required." };
+  if (options.some((o) => !o)) return { ok: false, error: "All four options are required." };
+  if (!Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex > 3) {
+    return { ok: false, error: "Pick which option is correct." };
+  }
+
+  await prisma.quizQuestion.create({
+    data: {
+      question,
+      options: JSON.stringify(options),
+      answerIndex,
+      difficulty: [1, 2, 3].includes(difficulty) ? difficulty : 1,
+      category: category || "history",
+      explanation: explanation || null,
+    },
+  });
+
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function toggleQuestion(id: string) {
+  await requireAdmin();
+  const q = await prisma.quizQuestion.findUnique({ where: { id } });
+  if (q) {
+    await prisma.quizQuestion.update({ where: { id }, data: { active: !q.active } });
+  }
+  revalidatePath("/admin");
+}
+
+export async function deleteQuestion(id: string) {
+  await requireAdmin();
+  await prisma.quizQuestion.delete({ where: { id } });
   revalidatePath("/admin");
 }
