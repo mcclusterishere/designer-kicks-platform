@@ -11,7 +11,10 @@ import {
   toggleQuestion,
   deleteQuestion,
   forceAdvanceTournament,
+  setArtistStatus,
+  setSaleVerified,
 } from "@/app/actions";
+import { formatUsd } from "@/lib/market";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
 import ProductForm from "./ProductForm";
@@ -19,6 +22,7 @@ import ArticleForm from "./ArticleForm";
 import GiveawayForm from "./GiveawayForm";
 import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
+import PreloadArtistForm from "./PreloadArtistForm";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +84,22 @@ export default async function AdminPage({
     }),
   ]);
 
+  const artistApplications = await prisma.artistProfile.findMany({
+    where: { status: "PENDING" },
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
+  const sales = await prisma.sale.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      submission: { select: { title: true } },
+      seller: { select: { name: true, email: true } },
+      buyer: { select: { name: true } },
+    },
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex items-center justify-between">
@@ -123,6 +143,72 @@ export default async function AdminPage({
                     </form>
                     <form action={setSubmissionStatus.bind(null, s.id, "REJECTED")} className="flex-1">
                       <button className="w-full rounded border border-heat py-2 tag text-heat">
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Pre-load artist (onboarding accelerator) */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">Pre-load An Artist</h2>
+        <p className="mt-1 text-sm text-smoke">
+          Create an artist&apos;s page and first shoe on their behalf (with
+          permission). You get a 14-day claim link and a ready-to-send DM —
+          and the invite emails itself when Resend is configured.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <PreloadArtistForm />
+        </div>
+      </section>
+
+      {/* Artist applications */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Artist Applications{" "}
+          <span className={artistApplications.length ? "text-heat" : "text-smoke"}>
+            ({artistApplications.length})
+          </span>
+        </h2>
+        {artistApplications.length === 0 ? (
+          <p className="mt-3 text-sm text-smoke">No pending applications.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {artistApplications.map((a) => (
+              <div key={a.id} className="rounded-xl border border-edge bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-white">{a.displayName}</p>
+                    <p className="text-sm text-smoke">
+                      {a.user.name} · {a.user.email}
+                      {a.instagram && <span className="text-volt"> · @{a.instagram}</span>}
+                      {a.city && ` · ${a.city}`}
+                    </p>
+                    {a.portfolioUrl && (
+                      <a
+                        href={a.portfolioUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-volt underline"
+                      >
+                        {a.portfolioUrl}
+                      </a>
+                    )}
+                    {a.bio && <p className="mt-1 text-sm text-smoke">{a.bio}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <form action={setArtistStatus.bind(null, a.id, "APPROVED")}>
+                      <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                        Approve
+                      </button>
+                    </form>
+                    <form action={setArtistStatus.bind(null, a.id, "REJECTED")}>
+                      <button className="rounded border border-heat px-4 py-2 tag text-heat">
                         Reject
                       </button>
                     </form>
@@ -357,6 +443,60 @@ export default async function AdminPage({
               )}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Sales ledger */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Sales Ledger <span className="text-smoke">({sales.length})</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Off-platform sales recorded by sellers. ✓ verification requires
+          evidence + buyer claim — or your override here.
+        </p>
+        <div className="mt-4 space-y-2">
+          {sales.map((s) => (
+            <div
+              key={s.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+            >
+              <div className="min-w-0">
+                <span className="font-bold text-white">{s.submission.title}</span>{" "}
+                <span className="text-white">{formatUsd(s.priceCents)}</span>{" "}
+                <span className={s.status === "PENDING" ? "text-heat" : "text-volt"}>
+                  · {s.status === "PENDING" ? "pending claim" : "confirmed"}
+                </span>
+                {s.verified ? (
+                  <span className="text-volt"> · ✓ verified ({s.verifiedBy})</span>
+                ) : (
+                  <span className="text-smoke"> · unverified</span>
+                )}
+                <p className="text-xs text-smoke">
+                  {s.seller.name ?? s.seller.email} → {s.buyer?.name ?? s.buyerEmail} ·{" "}
+                  {s.soldAt.toISOString().slice(0, 10)}
+                  {s.evidenceUrl && (
+                    <>
+                      {" · "}
+                      <a href={s.evidenceUrl} target="_blank" rel="noopener noreferrer" className="text-volt underline">
+                        view evidence
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
+              <form action={setSaleVerified.bind(null, s.id, !s.verified)}>
+                <button
+                  className={`rounded border px-3 py-1.5 tag ${
+                    s.verified ? "border-heat text-heat" : "border-volt text-volt"
+                  }`}
+                >
+                  {s.verified ? "Remove ✓" : "Verify ✓"}
+                </button>
+              </form>
+            </div>
+          ))}
+          {sales.length === 0 && <p className="text-sm text-smoke">No sales recorded yet.</p>}
         </div>
       </section>
 

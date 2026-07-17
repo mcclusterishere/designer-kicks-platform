@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Anton } from "next/font/google";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
+import MobileTabBar from "@/components/MobileTabBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,11 +16,35 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Condensed poster face for the hype display type.
+const anton = Anton({
+  weight: "400",
+  variable: "--font-display",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   title: "Designer Kicks — Custom Sneaker Battles & The Heat List",
   description:
     "Submit your customized kicks, battle other artists in head-to-head vote-offs, and climb the Heat List. Plus the hottest releases and customization gear.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Designer Kicks",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
+};
+
+export const viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
 };
 
 const navLinks = [
@@ -27,6 +52,7 @@ const navLinks = [
   { href: "/news", label: "News" },
   { href: "/quiz", label: "Quiz" },
   { href: "/artists", label: "League" },
+  { href: "/market", label: "Market" },
   { href: "/heat-list", label: "Heat List" },
   { href: "/submit", label: "Submit" },
 ];
@@ -40,7 +66,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} h-full antialiased`}
     >
       {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
         <head>
@@ -57,7 +83,7 @@ export default async function RootLayout({
             <Link href="/" className="display text-xl text-white">
               Designer<span className="text-volt">Kicks</span>
             </Link>
-            <nav className="flex items-center gap-1 sm:gap-2">
+            <nav className="hidden items-center gap-1 sm:gap-2 md:flex">
               {navLinks.map((l) => (
                 <Link
                   key={l.href}
@@ -78,10 +104,17 @@ export default async function RootLayout({
                 {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
               </Link>
             </nav>
+            {/* Mobile: tab bar handles navigation; header keeps just the account chip */}
+            <Link
+              href={session?.user ? "/profile" : "/signin"}
+              className="tag rounded border border-edge px-3 py-2 text-white md:hidden"
+            >
+              {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+            </Link>
           </div>
         </header>
 
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-24 md:pb-0">{children}</main>
 
         <footer className="border-t border-edge bg-surface">
           <div className="h-1.5 stripes opacity-60" />
@@ -101,6 +134,7 @@ export default async function RootLayout({
                 <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>
+                <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>
@@ -115,6 +149,7 @@ export default async function RootLayout({
             </p>
           </div>
         </footer>
+        <MobileTabBar />
       </body>
     </html>
   );

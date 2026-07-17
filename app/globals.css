@@ -18,11 +18,23 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Big hype display type */
+/* Film-grain overlay for depth — sits above everything, never intercepts taps */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Big hype display type — condensed poster face */
 .display {
-  font-weight: 900;
+  font-family: var(--font-display), "Arial Black", sans-serif;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: -0.03em;
+  letter-spacing: 0.02em;
   line-height: 0.95;
 }
 
@@ -31,6 +43,21 @@ body {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.2em;
+}
+
+/* Gradient ink for hero keywords */
+.text-gradient-volt {
+  background: linear-gradient(100deg, var(--color-volt) 20%, #6aff5e 60%, #00e5a0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-heat {
+  background: linear-gradient(100deg, #ff8a00 0%, var(--color-heat) 55%, #ff2222 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Volt glow for CTAs */
@@ -57,4 +84,81 @@ body {
 
 .bar-animate {
   animation: bar-grow 0.8s ease-out;
+}
+
+/* Hype ticker */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker 28s linear infinite;
+}
+
+/* Page entrance */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+main {
+  animation: page-in 0.35s ease-out;
+}
+
+/* Flame pulse for loaders and the tab-bar center button */
+@keyframes flame-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.12); opacity: 0.85; }
+}
+
+.flame-pulse {
+  animation: flame-pulse 1.4s ease-in-out infinite;
+}
+
+/* Micro-interactions */
+button {
+  transition: transform 0.1s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* Premium details */
+::selection {
+  background: var(--color-volt);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+html {
+  scrollbar-color: var(--color-edge) var(--color-ink);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-edge);
+  border-radius: 8px;
+  border: 2px solid var(--color-ink);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Countdown + stat digits shouldn't jitter as they tick */
+time, .tabular {
+  font-variant-numeric: tabular-nums;
 }

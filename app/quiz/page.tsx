@@ -109,6 +109,11 @@ export default async function QuizPage({
           initialState={initialState}
           purchaseResult={purchase ?? null}
           stripeConfigured={Boolean(process.env.STRIPE_SECRET_KEY)}
+          purchasesEnabled={
+            Boolean(process.env.STRIPE_SECRET_KEY) ||
+            process.env.NODE_ENV !== "production" ||
+            process.env.PAYMENTS_DEV_MODE === "true"
+          }
           questionCount={questionCount}
         />
       </div>
@@ -168,7 +173,7 @@ function Hero({ giveawayTitle }: { giveawayTitle: string | null }) {
     <div>
       <p className="tag text-heat">Jordan trivia</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        The Heat <span className="text-heat">Check</span>
+        The Heat <span className="text-gradient-heat">Check</span>
       </h1>
       <p className="mt-3 text-smoke">
         {HEAT_CHECK_TARGET} correct answers on Jordan history and release details

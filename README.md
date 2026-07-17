@@ -61,18 +61,39 @@ login attempts are rate-limited.
   Instagram, and a marketing opt-in. View/export everything from the
   admin Members table (CSV button).
 
+## Fans vs artists (two account tiers)
+
+- **Fan accounts are instant** — register and you can vote, play the
+  Heat Check, enter giveaways, follow artists, and own pieces.
+- **Artist accounts are applied for and reviewed** (`/submit` shows the
+  application to fans). Admin approves/rejects in the Artist
+  Applications queue; only APPROVED artists can submit customs. This is
+  the vetting layer the future payout rails (Stripe Connect) will sit on.
+- Rejected applicants can update their info and reapply.
+
 ## The League (artist profiles)
 
-- Submitting requires an account. The first submission creates the
-  artist's league profile (display name, Instagram, unique URL slug);
-  every later submission posts under that same identity — no more
-  "KickGod" vs "@kickgod" fragmentation.
+- Approved artists have league profiles (display name, Instagram,
+  unique URL slug); every submission posts under that identity — no
+  more "KickGod" vs "@kickgod" fragmentation.
 - Artist pages (`/artists/[slug]`) show a career record (W–L, win rate,
-  total votes), follower count, and the full portfolio with per-shoe
-  records. Members can follow artists.
+  total votes), follower count, a Trophy Shelf of championship titles,
+  and The Closet — every shoe with its live Heat List rank. Members can
+  follow artists.
 - `/artists` is the league table: every artist with an approved shoe,
-  ranked by career wins then total votes. The Heat List still ranks
-  individual shoes; artist names link across both.
+  ranked by career wins then total votes.
+
+## Ownership & fan closets
+
+- One-of-ones have provenance: when an artist sells a piece (on or off
+  platform), they hit "Sold it? Transfer to buyer" on their own page and
+  enter the buyer's account email (admins can also transfer).
+- The buyer gets a public **collector closet** at `/collectors/[slug]`
+  (minted on first piece): their owned customs with live heat ranks,
+  plus their fan stats and quiz badges. Their private profile shows
+  "My Closet" with a link to the public page.
+- The artist's closet shows provenance ("🔑 In [name]'s closet") linking
+  to the collector.
 
 ## How the battles work
 
@@ -178,12 +199,23 @@ use actual uploaded photos (stored in `data/uploads/`, served via
 npx prisma db push --force-reset   # wipe everything
 ```
 
+## Mobile app shell
+
+On phones the site behaves like an app: a fixed bottom tab bar
+(**Home · Arena · 🔥 Heat Check · Drops · Profile**) replaces the top
+nav, with the quiz in the raised center slot. The Arena tab is the
+competitive hub (battles, brackets, league, Heat List via pill links).
+The site is an installable **PWA** (`manifest.webmanifest` + icons):
+"Add to Home Screen" gives a full-screen, home-icon app experience with
+no app store — which also keeps quiz credit purchases on Stripe instead
+of Apple's 30% in-app-purchase cut. Desktop keeps the top nav.
+
 ## Tests
 
 Browser end-to-end suites live in `e2e/` and cover accounts, gated
 voting, the full quiz/credits loop (including the paid-run/giveaway
 separation), tournament advancement, the artist league, and the
-newsroom's SEO surface (53 checks).
+newsroom's SEO surface, the mobile tab-bar/PWA shell, and the full fan-to-artist-to-collector journey (80 checks).
 
 ```bash
 npm run build && npm start     # in one terminal, against a seeded DB

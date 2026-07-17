@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { finalizeExpiredBattles } from "@/lib/battles";
-import { getArtistBySlug } from "@/lib/artists";
+import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
+import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
+import RecordSaleForm from "@/components/RecordSaleForm";
+import { formatUsd } from "@/lib/market";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +30,21 @@ export default async function ArtistPage({ params }: Props) {
   if (!artist) notFound();
 
   const session = await auth();
-  const following = session?.user?.id
-    ? Boolean(
-        await prisma.artistFollow.findUnique({
-          where: { artistId_userId: { artistId: artist.id, userId: session.user.id } },
-        })
-      )
-    : false;
+  const [following, trophies, heat] = await Promise.all([
+    session?.user?.id
+      ? prisma.artistFollow
+          .findUnique({
+            where: { artistId_userId: { artistId: artist.id, userId: session.user.id } },
+          })
+          .then(Boolean)
+      : false,
+    getArtistTrophies(artist.id),
+    getHeatList(),
+  ]);
+  // Every shoe's live position on the Heat List
+  const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
+  // The artist managing their own page can record sales/transfers.
+  const isOwnPage = session?.user?.id === artist.userId;
 
   let wins = 0;
   let battles = 0;
@@ -97,7 +107,44 @@ export default async function ArtistPage({ params }: Props) {
         ))}
       </div>
 
-      <h2 className="display mt-10 text-2xl text-white">The Portfolio</h2>
+      {/* Trophy Shelf — championship hardware */}
+      <h2 className="display mt-10 text-2xl text-white">
+        Trophy <span className="text-gradient-volt">Shelf</span>
+      </h2>
+      {trophies.length === 0 ? (
+        <p className="mt-3 rounded-xl border border-dashed border-edge bg-surface p-5 text-sm text-smoke">
+          The shelf is waiting. Win a championship bracket and the trophy
+          lives here forever.
+        </p>
+      ) : (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {trophies.map((t) => (
+            <Link
+              key={t.id}
+              href={`/tournaments/${t.slug}`}
+              className="flex items-center gap-4 rounded-xl border border-volt/60 bg-surface p-4 glow-volt transition hover:border-volt"
+            >
+              <span className="text-4xl">🏆</span>
+              <div className="min-w-0">
+                <p className="truncate font-bold text-white">{t.name}</p>
+                <p className="truncate text-sm text-smoke">
+                  Champion with{" "}
+                  <span className="text-volt">{t.champion?.title}</span>
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* The Closet — every one-of-one, with its live heat rank */}
+      <h2 className="display mt-10 text-2xl text-white">
+        The <span className="text-gradient-heat">Closet</span>
+      </h2>
+      <p className="mt-1 text-sm text-smoke">
+        Every one-of-one in the collection, ranked live on the{" "}
+        <Link href="/heat-list" className="text-volt underline">Heat List</Link>.
+      </p>
       {artist.submissions.length === 0 ? (
         <p className="mt-4 text-smoke">No approved customs yet.</p>
       ) : (
@@ -106,21 +153,77 @@ export default async function ArtistPage({ params }: Props) {
             const shoeBattles =
               s.battlesAsA.filter((b) => b.status === "COMPLETED").length +
               s.battlesAsB.filter((b) => b.status === "COMPLETED").length;
+            const rank = heatRank.get(s.id);
+            const pendingSale = s.sales.find((sale) => sale.status === "PENDING");
+            const lastSale = s.sales.find((sale) => sale.status === "CONFIRMED");
             return (
-              <div key={s.id} className="overflow-hidden rounded-xl border border-edge bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={s.imageUrl}
-                  alt={`${s.title} — custom ${s.baseShoe}`}
-                  className="aspect-square w-full object-cover"
-                />
+              <div key={s.id} className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50">
+                <div className="relative overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={s.imageUrl}
+                    alt={`${s.title} — custom ${s.baseShoe}`}
+                    className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                  />
+                  {rank && (
+                    <span
+                      className={`tag absolute left-2 top-2 rounded px-2 py-1 font-bold ${
+                        rank <= 3 ? "bg-volt text-ink" : "bg-ink/85 text-volt"
+                      }`}
+                    >
+                      #{rank} Heat
+                    </span>
+                  )}
+                  {s.tournamentsWon.length > 0 && (
+                    <span
+                      className="absolute right-2 top-2 rounded bg-ink/85 px-2 py-1 text-sm"
+                      title={s.tournamentsWon.map((t) => t.name).join(", ")}
+                    >
+                      {"🏆".repeat(Math.min(s.tournamentsWon.length, 3))}
+                    </span>
+                  )}
+                  {pendingSale && (
+                    <span className="tag absolute bottom-2 left-2 rounded bg-heat px-2 py-1 font-bold text-white">
+                      ⏳ Sale Pending
+                    </span>
+                  )}
+                </div>
                 <div className="p-4">
                   <p className="tag text-smoke">{s.baseShoe}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     {s._count.battlesWon}W–{shoeBattles - s._count.battlesWon}L ·{" "}
                     {s._count.votes} votes
+                    {s.tournamentsWon.length > 0 && (
+                      <span className="text-volt"> · champion</span>
+                    )}
                   </p>
+                  {lastSale && (
+                    <p className="mt-1 text-sm">
+                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      {lastSale.verified ? (
+                        <span className="tag text-volt" title="Sale substantiated with evidence or admin-verified">✓ verified sale</span>
+                      ) : (
+                        <span className="tag text-smoke">unverified sale</span>
+                      )}
+                    </p>
+                  )}
+                  {s.owner && (
+                    <p className="mt-1.5 text-sm text-smoke">
+                      🔑 In{" "}
+                      {s.owner.collectorSlug ? (
+                        <Link
+                          href={`/collectors/${s.owner.collectorSlug}`}
+                          className="text-volt underline"
+                        >
+                          {s.owner.name ?? "a collector"}&apos;s closet
+                        </Link>
+                      ) : (
+                        <span className="text-white">{s.owner.name ?? "a collector"}&apos;s closet</span>
+                      )}
+                    </p>
+                  )}
+                  {isOwnPage && !pendingSale && !s.owner && <RecordSaleForm submissionId={s.id} />}
                 </div>
               </div>
             );

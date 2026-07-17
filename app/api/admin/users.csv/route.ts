@@ -19,7 +19,7 @@ export async function GET() {
     },
   });
 
-  const header = "name,email,phone,city,shoe_size,favorite_silhouette,instagram,marketing_opt_in,credits,votes,giveaway_entries,quiz_runs,joined";
+  const header = "name,email,phone,city,shoe_size,favorite_silhouette,favorite_brands,style_interests,instagram,marketing_opt_in,credits,votes,giveaway_entries,quiz_runs,joined";
   const rows = users.map((u) =>
     [
       csvCell(u.name),
@@ -28,6 +28,8 @@ export async function GET() {
       csvCell(u.city),
       csvCell(u.shoeSize),
       csvCell(u.favoriteSilhouette),
+      csvCell(u.favoriteBrands),
+      csvCell(u.styleInterests),
       csvCell(u.instagram),
       u.marketingOptIn ? "yes" : "no",
       String(u.credits),
