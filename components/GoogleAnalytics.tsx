@@ -13,6 +13,13 @@ import { OPT_OUT_KEY } from "@/components/TrackPageview";
 // affiliate program applications (StockX/GOAT via Impact ask for them).
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
+// The theheatchart.com GA4 property. Loads automatically on the live
+// domain with no env config; localhost, e2e, and preview hosts stay
+// silent so test traffic never pollutes the numbers. NEXT_PUBLIC_GA_ID
+// still overrides for a different property.
+const LIVE_ID = "G-SN0FRY5FY3";
+const LIVE_HOSTS = /(^|\.)theheatchart\.com$/;
+
 declare global {
   interface Window {
     dataLayer?: unknown[];
@@ -33,15 +40,17 @@ function gtagSafe(...args: unknown[]) {
 
 export default function GoogleAnalytics() {
   const pathname = usePathname();
-  const [enabled, setEnabled] = useState(false);
+  const [gaId, setGaId] = useState<string | null>(null);
+  const enabled = gaId !== null;
 
   useEffect(() => {
-    if (!GA_ID) return;
+    const id = GA_ID || (LIVE_HOSTS.test(location.hostname) ? LIVE_ID : null);
+    if (!id) return;
     if (navigator.doNotTrack === "1") return;
     try {
       if (localStorage.getItem(OPT_OUT_KEY) === "1") return;
     } catch {}
-    setEnabled(true);
+    setGaId(id);
   }, []);
 
   // Route-change pageviews (send_page_view is off in config — this
@@ -70,18 +79,18 @@ export default function GoogleAnalytics() {
     return () => document.removeEventListener("click", onClick, true);
   }, [enabled]);
 
-  if (!GA_ID || !enabled) return null;
+  if (!gaId) return null;
   return (
     <>
       <Script
-        src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+        src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
         strategy="afterInteractive"
       />
       <Script id="ga-init" strategy="afterInteractive">
         {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', '${GA_ID}', { send_page_view: false, anonymize_ip: true });`}
+gtag('config', '${gaId}', { send_page_view: false, anonymize_ip: true });`}
       </Script>
     </>
   );
