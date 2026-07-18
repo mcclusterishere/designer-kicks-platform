@@ -588,6 +588,34 @@ const preloadArtists = [
     ],
   },
   {
+    // Facebook-only customizer (facebook.com/sean.downing.62073) —
+    // airbrush + vinyl-stencil work, themed pairs with matching pressed
+    // tees. No site, no shop, no IG found: the exact artist this
+    // platform exists for. email:null = claimable placeholder account;
+    // outreach runs through his FB DMs until he claims.
+    slug: "sean-downing",
+    email: null,
+    displayName: "Sean Downing",
+    instagram: null,
+    city: null,
+    bio: "Airbrush-and-stencil customizer who builds the whole set — the pair and the matching pressed tee. Psycho Bunny Forces, a Dunkin'-themed kicks series, and a full paint-wall bench behind every piece.",
+    pieces: [
+      {
+        title: "Psycho Bunny AF1",
+        matchTitle: "psycho bunny",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "University-gold re-dye over a white Air Force 1 — royal-blue swoosh, laces, and heel tab, with hand-cut Psycho Bunny logo art and the skull-and-crossbones bunny on the lateral. Comes with a matching custom-pressed tee; painted at a full airbrush bench and finished with vinyl-cut stenciling.",
+        imageUrl: "/seed/sd-pb-1.webp",
+        extraImages: ["/seed/sd-pb-2.webp", "/seed/sd-pb-3.webp", "/seed/sd-pb-4.webp", "/seed/sd-pb-5.webp"],
+      },
+    ],
+  },
+  {
     // Already created on the live site from the admin panel — email:null
     // means the seed NEVER touches this page's ownership or claim link,
     // it only guarantees the pieces and their photos survive deploys.
@@ -717,6 +745,7 @@ async function main() {
             displayName: pa.displayName,
             instagram: pa.instagram,
             city: pa.city,
+            bio: pa.bio ?? null,
             status: "APPROVED",
           },
         });
@@ -742,6 +771,12 @@ async function main() {
             });
           }
         }
+      }
+      if (pa.bio && !profile.bio) {
+        profile = await prisma.artistProfile.update({
+          where: { id: profile.id },
+          data: { bio: pa.bio },
+        });
       }
       let newPieces = 0;
       let repaired = 0;
