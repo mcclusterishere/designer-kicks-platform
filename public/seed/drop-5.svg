@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101a2c"/>
+      <stop offset="1" stop-color="#080a0f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g opacity="0.05" fill="none" stroke="#d9b96a" stroke-width="3">
+    <line x1="-60" y1="630" x2="260" y2="0"/>
+    <line x1="40" y1="630" x2="360" y2="0"/>
+    <line x1="140" y1="630" x2="460" y2="0"/>
+    <line x1="240" y1="630" x2="560" y2="0"/>
+    <line x1="340" y1="630" x2="660" y2="0"/>
+    <line x1="440" y1="630" x2="760" y2="0"/>
+    <line x1="540" y1="630" x2="860" y2="0"/>
+    <line x1="640" y1="630" x2="960" y2="0"/>
+    <line x1="740" y1="630" x2="1060" y2="0"/>
+    <line x1="840" y1="630" x2="1160" y2="0"/>
+    <line x1="940" y1="630" x2="1260" y2="0"/>
+    <line x1="1040" y1="630" x2="1360" y2="0"/>
+    <line x1="1140" y1="630" x2="1460" y2="0"/>
+    <line x1="1240" y1="630" x2="1560" y2="0"/>
+  </g>
+  <rect x="0" y="0" width="1200" height="4" fill="#d9b96a"/>
+  <rect x="0" y="626" width="1200" height="4" fill="#d9b96a"/>
+  <text x="60" y="110" font-family="monospace" font-size="26" letter-spacing="8" fill="#d9b96a" opacity="0.9">THE HEAT CHART — DROP REPORT</text>
+  <text x="60" y="250" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="76" fill="#ece5d3" letter-spacing="1">KOBE 5 PROTRO</text>
+  <text x="60" y="350" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="76" fill="#d9b96a" letter-spacing="1">DODGERS</text>
+  <text x="60" y="560" font-family="monospace" font-size="26" fill="#d9b96a" opacity="0.85">08.15.2026 — $190 — MAMBA IN DODGER BLUE</text>
+  <text x="60" y="595" font-family="monospace" font-size="18" fill="#ece5d3" opacity="0.45">FULL STORY + RAFFLE LINKS — THEHEATCHART.COM</text>
+  
+  <g transform="translate(640,150) scale(0.92)">
+    <path d="M10 310 L 530 310 Q 555 310 555 335 Q 555 362 525 362 L 40 362 Q 5 362 5 335 Q 5 310 10 310 Z"
+          fill="#e8e8e8" stroke="#080a0f" stroke-width="4"/>
+    <path d="M25 310 C 25 260, 60 215, 120 205 C 175 195, 210 175, 245 130 C 268 100, 300 88, 330 100
+             L 352 109 C 372 117, 392 117, 412 112 L 472 97 C 512 87, 540 112, 545 152 L 552 275
+             C 554 295, 542 310, 522 310 Z"
+          fill="#2457c5" stroke="#080a0f" stroke-width="4"/>
+    <path d="M120 275 C 220 268, 350 230, 470 160 C 480 200, 420 262, 320 285 C 250 300, 160 295, 120 275 Z"
+          fill="#b8bfc9" opacity="0.95"/>
+    <g stroke="#d0342c" stroke-width="6" stroke-linecap="round" opacity="0.9">
+      <line x1="268" y1="128" x2="330" y2="152"/>
+      <line x1="288" y1="108" x2="352" y2="132"/>
+      <line x1="310" y1="94"  x2="374" y2="116"/>
+      <line x1="334" y1="86"  x2="396" y2="104"/>
+    </g>
+  </g>
+</svg>

@@ -322,6 +322,177 @@ const articles = [
       "*Dates from Nike/retailer calendars as of mid-July 2026; they shift often. Bookmark this page — we keep it current.*",
     ].join("\n"),
   },
+  {
+    slug: "air-jordan-4-birds-of-paradise-release-date",
+    title: "Air Jordan 4 'Birds of Paradise' Drops July 23 — The Summer's Prettiest 4",
+    excerpt:
+      "The women's Air Jordan 4 'Birds of Paradise' releases July 23, 2026 for $220 — Coconut Milk, Bright Mango, and Muslin. Release info and where to enter.",
+    tags: "Jordan, Release Dates, Womens",
+    coverImage: "/seed/drop-1.svg",
+    dropAt: new Date("2026-07-23T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## The drop",
+      "",
+      "The **Air Jordan 4 'Birds of Paradise'** lands **Wednesday, July 23, 2026** for **$220** as a women's exclusive. The blocking is Coconut Milk leather over Bright Mango hits with a Muslin midsole — the rare 4 that reads soft instead of loud, and it photographs beautifully.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS** at 10 AM ET — set the notification now.",
+      "2. **Retailer raffles** — women's-exclusive 4s often sit a touch longer than the men's hype pairs, so in-store lists are a real path.",
+      "3. Sizing note: women's sizing — men, convert down 1.5 and hunt the larger end of the run.",
+      "",
+      "## The customizer angle",
+      "",
+      "That cream-and-mango canvas is begging for hand-painted detail work. If you flip a pair, [get it on The Heat Chart](/submit) — summer pastel customs are undefeated on the timeline.",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
+  {
+    slug: "air-jordan-8-bin-23-release-date",
+    title: "Air Jordan 8 'BIN 23' Drops July 24 at $350 — The Premium Series Is Back",
+    excerpt:
+      "The Air Jordan 8 'BIN 23' releases July 24, 2026 for $350 in Legion Pine and red — the luxury BIN series returns with full-grain leather and numbered pairs.",
+    tags: "Jordan, Release Dates, Grails",
+    coverImage: "/seed/drop-2.svg",
+    dropAt: new Date("2026-07-24T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## The drop",
+      "",
+      "**BIN 23 is back.** The premium line that gave grails the luxury treatment returns on the **Air Jordan 8**, dropping **Thursday, July 24, 2026** at **$350**. Legion Pine nubuck, deep red accents, upgraded materials throughout — this is the 8 built like a dress shoe.",
+      "",
+      "## Why it matters",
+      "",
+      "BIN pairs are produced in tighter numbers than general releases and historically hold resale value better than almost any non-collab retro. If you're buying one pair this month as an investment piece, this is the conversation.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS** — expect an exclusive-access wave to eat some stock.",
+      "2. Boutique accounts (the premium tier usually hits select doors, not every mall retailer).",
+      "",
+      "## The collector angle",
+      "",
+      "A $350 retail with limited numbers is exactly the kind of piece our [Market](/market) exists for — record the sale with a receipt and the ✓ travels with the shoe forever.",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
+  {
+    slug: "air-jordan-4-comic-release-date",
+    title: "Air Jordan 4 'Comic' Release Date: July 25 for $230 — Fire Pink Ink Lines",
+    excerpt:
+      "The Air Jordan 4 'Comic' drops July 25, 2026 for $230 — Off White leather with Anthracite and Fire Pink comic-book detailing. Full release info inside.",
+    tags: "Jordan, Release Dates, SNKRS",
+    coverImage: "/seed/drop-3.svg",
+    dropAt: new Date("2026-07-25T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## The drop",
+      "",
+      "The **Air Jordan 4 'Comic'** hits **Saturday, July 25, 2026** for **$230** — Off White base, Anthracite structure, and Fire Pink hits with comic-book ink detailing on the panels. It's the loudest 4 of the summer and the one your feed will not shut up about.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS**, Saturday 10 AM ET — Saturday drops move fast.",
+      "2. **Retailer raffles** open midweek at most accounts — enter every one.",
+      "3. Miss it? It'll be on the marketplaces above retail within the hour — check the [Shop](/shop) for the ones we trust.",
+      "",
+      "## The customizer angle",
+      "",
+      "A shoe that already looks drawn-on is an open invitation. Custom ink work over the Comic panels is a wave waiting for a first mover — [claim it in the arena](/submit).",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
+  {
+    slug: "august-1-flint-13-love-letter-1-double-release",
+    title: "August 1 Double-Up: Flint 13s and Jordan 1 'Love Letter' Drop the Same Morning",
+    excerpt:
+      "August 1, 2026 is a two-grail morning: the Air Jordan 13 'Flint' ($215) and Air Jordan 1 High OG 'Love Letter' ($185) drop together. Game plan inside.",
+    tags: "Jordan, Release Dates, SNKRS",
+    coverImage: "/seed/drop-4.svg",
+    dropAt: new Date("2026-08-01T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## Two grails, one morning",
+      "",
+      "**Saturday, August 1, 2026** is the deepest morning of the summer: the **Air Jordan 13 'Flint'** returns in Navy/Flint Grey/University Blue at **$215**, and the **Air Jordan 1 High OG 'Love Letter'** drops in Shadow Brown and Team Red at **$185**.",
+      "",
+      "## The game plan",
+      "",
+      "1. You get one SNKRS entry per drop — enter **both**, prioritize the pair you'd actually wear.",
+      "2. The Flint 13 is the nostalgia pick (first retro in years); the Love Letter 1 is the fit-versatility pick.",
+      "3. Retailer raffles run separately from SNKRS — that's a second and third bite at each.",
+      "",
+      "## Our call",
+      "",
+      "Flint 13s sell out slower but hold value steadier; Love Letter 1s evaporate at 10:01. If you can only camp one, camp the 1.",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
+  {
+    slug: "nike-kobe-5-protro-dodgers-release-date",
+    title: "Kobe 5 Protro 'Dodgers' Drops August 15 — Mamba in Dodger Blue",
+    excerpt:
+      "The Nike Kobe 5 Protro 'Dodgers' releases August 15, 2026 for $190 — Rush Blue, Wolf Grey, and Comet Red. Release details and how to actually get a pair.",
+    tags: "Kobe, Release Dates, SNKRS",
+    coverImage: "/seed/drop-5.svg",
+    dropAt: new Date("2026-08-15T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## The drop",
+      "",
+      "The **Nike Kobe 5 Protro 'Dodgers'** releases **Saturday, August 15, 2026** for **$190** — Rush Blue upper, Wolf Grey accents, Comet Red hits. August is quietly a Kobe month (the 8 'Mambacurial' lands Aug 8 and the 10 'Halo' follows Aug 23), and this is the crown jewel of the three.",
+      "",
+      "## Why it will be brutal to get",
+      "",
+      "Kobe Protros are the most-camped drops on SNKRS right now, hoops kids and collectors both want them, and LA energy on a Dodgers colorway adds a whole city to the queue.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS**, 10 AM ET — no exclusives expected, pure draw.",
+      "2. **House of Hoops / Foot Locker app raffles** typically run the week prior.",
+      "3. Backup: the 8 'Mambacurial' on Aug 8 cools off faster if you just want Mamba energy on foot.",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
+  {
+    slug: "air-jordan-9-og-space-jam-release-date",
+    title: "Air Jordan 9 OG 'Space Jam' Gets Its First-Ever Retro August 29",
+    excerpt:
+      "The Air Jordan 9 OG 'Space Jam' releases August 29, 2026 for $215 — the first retro ever of the shoe from the movie set. White, True Red, and Black.",
+    tags: "Jordan, Release Dates, Grails",
+    coverImage: "/seed/drop-6.svg",
+    dropAt: new Date("2026-08-29T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    content: [
+      "## The drop",
+      "",
+      "The **Air Jordan 9 OG 'Space Jam'** finally retros on **Saturday, August 29, 2026** at **$215** in White/True Red/Black. This is the 9 MJ laced on the Space Jam set during the baseball year — and it has **never** been retroed in this form. First-time-ever retros are the safest cop of any month.",
+      "",
+      "## How to cop",
+      "",
+      "1. **SNKRS**, Saturday 10 AM ET.",
+      "2. Full-family sizing is expected — if you've got kids, this is the twinning drop of the summer.",
+      "3. Retailer raffles open the week prior; enter everything.",
+      "",
+      "## The collector angle",
+      "",
+      "First retros are provenance moments. If you grab pairs and move one later, [record the sale on the Market](/market) with a receipt — the ✓ badge is the difference between a story and a fact.",
+      "",
+      "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
+    ].join("\n"),
+  },
 ];
 
 function loadQuestions() {
@@ -358,41 +529,46 @@ async function main() {
     await prisma.product.deleteMany();
     await prisma.article.deleteMany();
     await prisma.quizQuestion.deleteMany();
-  } else {
-    // Launch mode runs on EVERY deploy via the start command, so it must
-    // never wipe — the admin's live edits (articles, products, quiz
-    // questions) have to survive releases. Seed only into empty tables.
-    const [articleCount, productCount, questionCount] = await Promise.all([
-      prisma.article.count(),
-      prisma.product.count(),
-      prisma.quizQuestion.count(),
-    ]);
-    if (articleCount + productCount + questionCount > 0) {
-      console.log("Live content already present — seed skipped, nothing wiped.");
-      return;
-    }
   }
 
   if (!includeDemo) {
-    for (const p of products) {
-      await prisma.product.create({ data: p });
+    // Launch mode runs on EVERY deploy via the start command, so it must
+    // never wipe and never overwrite the admin's live edits. Products and
+    // the quiz bank seed only into empty tables; articles TOP UP by slug,
+    // so fresh drop coverage ships with each release while edited or
+    // admin-written articles are left alone.
+    const [productCount, questionCount] = await Promise.all([
+      prisma.product.count(),
+      prisma.quizQuestion.count(),
+    ]);
+    if (productCount === 0) {
+      for (const p of products) {
+        await prisma.product.create({ data: p });
+      }
     }
+    let newArticles = 0;
     for (const { daysAgo, ...a } of articles) {
+      const exists = await prisma.article.findUnique({ where: { slug: a.slug } });
+      if (exists) continue;
       await prisma.article.create({
         data: { ...a, status: "PUBLISHED", publishedAt: new Date(Date.now() - daysAgo * DAY) },
       });
+      newArticles++;
     }
-    for (const q of loadQuestions()) {
-      await prisma.quizQuestion.create({
-        data: {
-          question: q.question,
-          options: JSON.stringify(q.options),
-          answerIndex: q.answerIndex,
-          difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
-          category: q.category || "history",
-          explanation: q.explanation || null,
-        },
-      });
+    console.log(`Articles topped up: ${newArticles} new, existing left untouched.`);
+    if (questionCount === 0) {
+      for (const q of loadQuestions()) {
+        await prisma.quizQuestion.create({
+          data: {
+            question: q.question,
+            options: JSON.stringify(q.options),
+            answerIndex: q.answerIndex,
+            difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
+            category: q.category || "history",
+            explanation: q.explanation || null,
+          },
+        });
+      }
     }
     const activeGiveaway = await prisma.giveaway.findFirst({
       where: { status: "ACTIVE", endsAt: { gt: new Date() } },
