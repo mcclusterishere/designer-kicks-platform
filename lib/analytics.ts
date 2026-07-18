@@ -3,6 +3,24 @@ import { pieceTaxonomy } from "./taxonomy";
 
 const DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * A piece's public Heat Score from the Rate game — Bayesian-smoothed
+ * toward 3.5 so a lone 5.0 can't outrank a 4.6 with volume (same
+ * formula as the admin Top Rated board). Purely a taste stat: battles
+ * and tournaments are decided by votes alone, never by this.
+ */
+export function heatScore(
+  stars: number[]
+): { avg: number; score: number; count: number } | null {
+  if (stars.length === 0) return null;
+  const avg = stars.reduce((a, b) => a + b, 0) / stars.length;
+  return {
+    avg: Math.round(avg * 10) / 10,
+    score: Math.round(((avg * stars.length + 3.5 * 3) / (stars.length + 3)) * 10) / 10,
+    count: stars.length,
+  };
+}
+
 /** Bucket timestamps into the last `days` calendar days (UTC), oldest first. */
 export function dailySeries(dates: Date[], days: number): { day: string; count: number }[] {
   const out: { day: string; count: number }[] = [];

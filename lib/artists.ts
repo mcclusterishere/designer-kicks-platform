@@ -124,6 +124,7 @@ export async function getArtistBySlug(slug: string) {
           tournamentsWon: { select: { id: true, name: true } },
           owner: { select: { name: true, collectorSlug: true } },
           sales: { orderBy: { soldAt: "desc" } },
+          ratings: { select: { stars: true } },
         },
       },
     },

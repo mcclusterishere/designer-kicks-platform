@@ -10,8 +10,10 @@ export type DayDrop = {
   slug: string;
   name: string;
   excerpt: string;
-  raffleHref: string | null;
   cover: string | null;
+  // Raffle first (if any), then the merchants that pay commission —
+  // every href already routed through /go for tagging + click receipts.
+  links: { label: string; href: string }[];
 };
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -135,26 +137,38 @@ export function DropCalendar({
                       </p>
                     </div>
                   </div>
-                  <div className="mt-2.5 flex items-center gap-5">
+                  <div className="mt-2.5">
                     <Link
                       href={`/news/${dp.slug}`}
                       className="tag text-volt underline underline-offset-4"
                     >
                       The story + history →
                     </Link>
-                    {dp.raffleHref && (
-                      <a
-                        href={dp.raffleHref}
-                        target="_blank"
-                        rel="noopener noreferrer nofollow"
-                        className="tag text-heat underline underline-offset-4"
-                      >
-                        Raffle ↗
-                      </a>
-                    )}
                   </div>
+                  {dp.links.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {dp.links.map((l, i) => (
+                        <a
+                          key={l.label}
+                          href={l.href}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow sponsored"
+                          className={`tag rounded-full border px-2.5 py-1 transition ${
+                            i === 0
+                              ? "border-heat/60 text-heat hover:border-heat"
+                              : "border-edge text-smoke hover:border-volt hover:text-white"
+                          }`}
+                        >
+                          {l.label} ↗
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
+              <p className="tag border-t border-edge/60 py-3 text-smoke/60">
+                Some buy links pay the league a commission — never costs you extra.
+              </p>
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ import ClaimProfileForm from "@/components/ClaimProfileForm";
 import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
 import { categoryLabel } from "@/lib/categories";
+import HeatScore from "@/components/HeatScore";
 
 export const dynamic = "force-dynamic";
 
@@ -237,6 +238,7 @@ export default async function ArtistPage({ params }: Props) {
                       <span className="text-volt"> · champion</span>
                     )}
                   </p>
+                  <HeatScore stars={s.ratings.map((r) => r.stars)} />
                   {lastSale && (
                     <p className="mt-1 text-sm">
                       <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}

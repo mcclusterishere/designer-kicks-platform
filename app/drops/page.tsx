@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { goHref } from "@/lib/affiliates";
+import { buyLinks, goHref } from "@/lib/affiliates";
 import { DropCalendar, type DayDrop } from "@/components/DropCalendar";
 
 export const metadata = {
@@ -58,8 +58,8 @@ export default async function DropsPage({
       slug: a.slug,
       name: dropName(a.title),
       excerpt: a.excerpt,
-      raffleHref: a.raffleUrl ? goHref(a.raffleUrl, "drops") : null,
       cover: a.coverImage ?? null,
+      links: buyLinks(dropName(a.title), a.raffleUrl, "drops"),
     });
   }
 
