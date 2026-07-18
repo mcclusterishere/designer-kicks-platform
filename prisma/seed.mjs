@@ -588,6 +588,34 @@ const preloadArtists = [
     ],
   },
   {
+    // Miami artist + curator (FB: Dr. Funkenstein Acrylics; IG
+    // @drfunkenstein_acrylics; shop drfunkensteinacrylics.bigcartel.com).
+    // Runs the monthly Rooftop Fam gallery — a scene node, not just a
+    // customizer. Contact channel is DMs; claimable placeholder until
+    // he takes the page over.
+    slug: "dr-funkenstein",
+    email: null,
+    displayName: "Dr. Funkenstein Acrylics",
+    instagram: "drfunkenstein_acrylics",
+    city: "Miami, FL",
+    portfolioUrl: "https://drfunkensteinacrylics.bigcartel.com",
+    bio: "Miami-based artist and curator with Richmond, VA roots — original acrylic work, murals, events, and custom sneakers. Runs Rooftop Fam, Miami's original rooftop art-gallery experience, 20+ editions deep, curating live-art activations from creatives up and down the East Coast.",
+    pieces: [
+      {
+        title: "P-Funk Chucks",
+        matchTitle: "funk",
+        baseShoe: "Converse Chuck Taylor All-Star Hi",
+        brand: "Converse",
+        silhouette: "Chuck Taylor All-Star Hi",
+        category: "sneakers",
+        description:
+          "A commission straight out of P-Funk mythology — painted for Michael “Clipadelic” Payne, leader of the 420 Funk Mob, to hit the stage at Essence Fest in New Orleans. Mismatched by design: one Chuck in molten orange tiger stripe, the other in electric teal-and-green, both over a glittering blacked-out canvas, delivered in a fully hand-painted Converse box signed “By Dr. Funkenstein.” First of a four-pair run — a Timberland and two Nikes follow.",
+        imageUrl: "/seed/df-pf-1.webp",
+        extraImages: ["/seed/df-pf-2.webp", "/seed/df-pf-3.webp", "/seed/df-pf-4.webp"],
+      },
+    ],
+  },
+  {
     // Facebook-only customizer (facebook.com/sean.downing.62073) —
     // airbrush + vinyl-stencil work, themed pairs with matching pressed
     // tees. No site, no shop, no IG found: the exact artist this
@@ -746,6 +774,7 @@ async function main() {
             instagram: pa.instagram,
             city: pa.city,
             bio: pa.bio ?? null,
+            portfolioUrl: pa.portfolioUrl ?? null,
             status: "APPROVED",
           },
         });
@@ -772,10 +801,13 @@ async function main() {
           }
         }
       }
-      if (pa.bio && !profile.bio) {
+      const profileFill = {};
+      if (pa.bio && !profile.bio) profileFill.bio = pa.bio;
+      if (pa.portfolioUrl && !profile.portfolioUrl) profileFill.portfolioUrl = pa.portfolioUrl;
+      if (Object.keys(profileFill).length) {
         profile = await prisma.artistProfile.update({
           where: { id: profile.id },
-          data: { bio: pa.bio },
+          data: profileFill,
         });
       }
       let newPieces = 0;
