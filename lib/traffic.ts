@@ -81,7 +81,7 @@ export async function getTrafficPulse() {
   const since14 = new Date(now - 14 * DAY);
   const todayStart = new Date(new Date().toISOString().slice(0, 10));
 
-  const [recent, pageviews7, uniques7, uniquesToday, sources, campaigns, paths, devices] =
+  const [recent, pageviews7, uniques7, uniquesToday, sources, campaigns, paths, devices, outbound7, outboundMerchants] =
     await Promise.all([
       prisma.pageView.findMany({
         where: { createdAt: { gte: since14 } },
@@ -124,6 +124,14 @@ export async function getTrafficPulse() {
         where: { createdAt: { gte: since7 } },
         _count: true,
       }),
+      prisma.outboundClick.count({ where: { createdAt: { gte: since7 } } }),
+      prisma.outboundClick.groupBy({
+        by: ["merchant"],
+        where: { createdAt: { gte: since7 } },
+        _count: true,
+        orderBy: { _count: { merchant: "desc" } },
+        take: 6,
+      }),
     ]);
 
   const deviceCount = (d: string) => devices.find((x) => x.device === d)?._count ?? 0;
@@ -136,5 +144,7 @@ export async function getTrafficPulse() {
     campaigns: campaigns.map((c) => ({ name: c.campaign ?? "—", count: c._count })),
     paths: paths.map((p) => ({ name: p.path, count: p._count })),
     devices: { mobile: deviceCount("mobile"), desktop: deviceCount("desktop") },
+    outbound7,
+    outboundMerchants: outboundMerchants.map((m) => ({ name: m.merchant, count: m._count })),
   };
 }

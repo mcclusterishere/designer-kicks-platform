@@ -101,6 +101,50 @@ await legal.goto(`${BASE}/rules`, { waitUntil: "networkidle" });
 check("giveaway rules carry the Meta release", await legal.getByText(/release Meta from any and all/).isVisible());
 check("no-purchase-necessary stays loud", await legal.getByText("NO PURCHASE NECESSARY", { exact: false }).isVisible());
 
+// ---------- /go affiliate redirect layer ----------
+await prisma.outboundClick.deleteMany({ where: { ref: "e2e-go" } });
+const go = async (u, ref = "e2e-go") => {
+  const res = await fetch(
+    `${BASE}/go?u=${encodeURIComponent(u)}&ref=${encodeURIComponent(ref)}`,
+    { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (e2e test browser)" } }
+  );
+  return { status: res.status, location: res.headers.get("location") };
+};
+
+const known = await go("https://stockx.com/search?s=kobe%206%20dodgers");
+check("known merchant 302s to target", known.status === 302 && known.location.startsWith("https://stockx.com/search"));
+const clickRow = await (async () => {
+  for (let i = 0; i < 20; i++) {
+    const r = await prisma.outboundClick.findFirst({ where: { ref: "e2e-go", merchant: "stockx" } });
+    if (r) return r;
+    await new Promise((res) => setTimeout(res, 300));
+  }
+  return null;
+})();
+check("outbound click logged with merchant + hash", Boolean(clickRow?.visitorHash));
+
+const evil = await go("https://evil-phisher.example/steal");
+check("unknown host refused — no open redirect", evil.status === 302 && new URL(evil.location, BASE).pathname === "/");
+
+const botGo = await fetch(`${BASE}/go?u=${encodeURIComponent("https://www.goat.com/search?query=x")}&ref=e2e-go`, {
+  redirect: "manual",
+  headers: { "user-agent": "facebookexternalhit/1.1" },
+});
+check("bot clicks still redirect", botGo.status === 302);
+await new Promise((r) => setTimeout(r, 800));
+check("bot clicks not counted", (await prisma.outboundClick.count({ where: { ref: "e2e-go", merchant: "goat" } })) === 0);
+
+// Where-to-buy strip on a drop article routes through /go
+const dropArticle = await prisma.article.findFirst({ where: { status: "PUBLISHED", dropAt: { not: null } } });
+if (dropArticle) {
+  const html = await (await fetch(`${BASE}/news/${dropArticle.slug}`)).text();
+  check("article buy strip routes through /go", html.includes("/go?u="));
+  check("buy strip includes paying merchants", html.includes("StockX") && html.includes("GOAT"));
+  check("affiliate disclosure near the links", html.includes("affiliate links"));
+} else {
+  check("article buy strip routes through /go", false, "no drop article found");
+}
+
 await browser.close();
 await prisma.$disconnect();
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { goHref } from "@/lib/affiliates";
 
 export const metadata = {
   title: "Sneaker Drop Calendar — Release Dates & Raffle Links, Free | The Heat Chart",
@@ -139,7 +140,7 @@ export default async function DropsPage({
               </Link>
               {a.raffleUrl && (
                 <a
-                  href={a.raffleUrl}
+                  href={goHref(a.raffleUrl, "drops")}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
                   className="tag shrink-0 text-volt underline underline-offset-4"
@@ -174,7 +175,7 @@ export default async function DropsPage({
                 </Link>
                 {a.raffleUrl && (
                   <a
-                    href={a.raffleUrl}
+                    href={goHref(a.raffleUrl, "drops")}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
                     className="tag shrink-0 text-volt underline underline-offset-4"

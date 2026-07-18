@@ -402,6 +402,7 @@ export default async function AdminPage({
                   ? `${Math.round((traffic.devices.mobile / (traffic.devices.mobile + traffic.devices.desktop)) * 100)}%`
                   : "—",
             },
+            { label: "Buy clicks (7d)", value: traffic.outbound7 },
           ].map((s) => (
             <div key={s.label} className="rounded-xl border border-edge bg-surface p-3 text-center">
               <p className="display text-lg text-heat">{s.value}</p>
@@ -471,6 +472,21 @@ export default async function AdminPage({
             )}
           </div>
         </div>
+        {traffic.outboundMerchants.length > 0 && (
+          <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">
+              Buy clicks by merchant (7d) — your affiliate receipts
+            </p>
+            <ol className="mt-2 space-y-1 text-sm">
+              {traffic.outboundMerchants.map((m) => (
+                <li key={m.name} className="flex justify-between gap-3">
+                  <span className="text-white">{m.name}</span>
+                  <span className="shrink-0 text-volt">{m.count}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </section>
 
       <section className="mt-12">

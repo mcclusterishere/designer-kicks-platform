@@ -1,3 +1,5 @@
+import { goHref } from "@/lib/affiliates";
+
 const CATEGORY_LABELS: Record<string, string> = {
   marketplace: "Marketplace",
   retail: "Retail",
@@ -23,7 +25,7 @@ type Props = {
 export default function ProductCard({ product }: Props) {
   return (
     <a
-      href={product.affiliateUrl}
+      href={goHref(product.affiliateUrl, "shop")}
       target="_blank"
       rel="noopener noreferrer sponsored"
       className={`card-lift group flex flex-col overflow-hidden rounded-xl border bg-surface ${

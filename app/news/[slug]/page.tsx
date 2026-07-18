@@ -10,6 +10,7 @@ import {
   siteUrl,
 } from "@/lib/articles";
 import ArticleCard from "@/components/ArticleCard";
+import { buyLinks } from "@/lib/affiliates";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,34 @@ export default async function ArticlePage({ params }: Props) {
       >
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content}</ReactMarkdown>
       </article>
+
+      {(article.dropAt || article.raffleUrl) && (
+        <div className="mt-10 rounded-xl border border-edge bg-surface p-5">
+          <p className="display text-xl text-white">Where To Buy</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {buyLinks(
+              article.title.split(/[—:|(]/)[0].trim(),
+              article.raffleUrl,
+              article.slug
+            ).map((l) => (
+              <a
+                key={l.label}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                className="tag rounded-lg border border-volt/40 px-4 py-2.5 text-white transition hover:border-volt hover:bg-volt/10"
+              >
+                {l.label} ↗
+              </a>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-smoke/70">
+            Some links are affiliate links — buying through them supports
+            the league at no extra cost to you. Launch-day raffles run on
+            the retailer&apos;s site.
+          </p>
+        </div>
+      )}
 
       <div className="mt-10 rounded-xl border border-volt/40 bg-surface p-5 text-center">
         <p className="display text-xl text-white">

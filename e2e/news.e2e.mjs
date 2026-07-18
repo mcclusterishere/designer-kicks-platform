@@ -73,7 +73,7 @@ check("uploaded cover photo stored and served", Boolean(saved?.coverImage) && (a
 await page.goto(`${BASE}/drops`, { waitUntil: "networkidle" });
 check("drop calendar renders free positioning", await page.getByText("Free forever").isVisible());
 check("dated article on the calendar", await page.getByText("E2E News Suite Article").first().isVisible());
-check("raffle link on the calendar", (await page.locator("a[href='https://www.nike.com/launch']").count()) >= 1);
+check("raffle link on the calendar", (await page.locator("a[href*='/go?u=https%3A%2F%2Fwww.nike.com']").count()) >= 1);
 check("news page links the calendar", (await (await fetch(`${BASE}/news`)).text()).includes("/drops"));
 
 // Cleanup

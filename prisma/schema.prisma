@@ -113,6 +113,21 @@ model StoreLead {
   @@index([zip])
 }
 
+// Every outbound purchase click, logged before the 302 — the receipts
+// behind affiliate revenue and retailer negotiations. Same privacy
+// posture as PageView: bot-filtered, daily-rotating visitor hash.
+model OutboundClick {
+  id          String   @id @default(cuid())
+  merchant    String // stockx | goat | ebay | nike | ...
+  url         String // final URL after tagging
+  ref         String? // where on-site it came from: article slug, "drops", "shop"
+  visitorHash String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([merchant, createdAt])
+}
+
 // First-party, cookieless traffic analytics. One row per pageview.
 // visitorHash is an HMAC of (ip, user-agent, UTC day) — it rotates
 // daily and the raw IP is never stored, so uniques can be counted
