@@ -596,8 +596,21 @@ const preloadArtists = [
     displayName: "Crown City Kicks",
     instagram: null,
     city: null,
-    bio: "Hand-built one pair at a time with the Crown City touch — velvet wraps, luxury-inspired detail, and a strict house rule: no duplicates, ever. The kind of pair that turns heads from the grocery store to the car show. Commissions run through the DMs. Built Different.",
+    bio: "Hand-built one pair at a time with the Crown City touch — from luxury velvet wraps to full movie-tribute story builds where every panel, lace tag, and insole carries a reference. Strict house rule: no duplicates, ever. Turns heads from the grocery store to the car show. Commissions run through the DMs. Built Different.",
     pieces: [
+      {
+        title: "The Sandlot AF1",
+        matchTitle: "sandlot",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "A whole movie on an Air Force 1. Baseball stitching across the toes under a hand-scripted Babe Ruth signature, FOR-EV-ER spelled down the lace tags, The Beast's paw prints at the collar, the Lifeguard cross for the pool scene, the crew walking the midsole in silhouette, Benny's No. 30, sandlot-grass green ringing the outsole — and the quotes inside: \"You're killin' me, Smalls!\" on one insole, \"We play baseball, not like girls!\" on the other. Finished with the Crown City hang tag.",
+        imageUrl: "/seed/cc-sl-1.webp",
+        extraImages: ["/seed/cc-sl-2.webp", "/seed/cc-sl-3.webp", "/seed/cc-sl-4.webp", "/seed/cc-sl-5.webp"],
+      },
       {
         title: "Blue Velvet AF1",
         matchTitle: "velvet",
