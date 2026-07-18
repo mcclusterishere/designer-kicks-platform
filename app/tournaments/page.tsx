@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { finalizeExpiredBattles } from "@/lib/battles";
-import { listTournaments, totalRounds } from "@/lib/tournaments";
+import { DIVISIONS, listTournaments, totalRounds } from "@/lib/tournaments";
 
 export const metadata = {
   title: "Tournaments — Custom Sneaker Championships | The Heat Chart",
@@ -43,6 +43,8 @@ export default async function TournamentsPage() {
                 <div>
                   <p className="display text-2xl text-white">{t.name}</p>
                   <p className="mt-1 text-sm text-smoke">
+                    <span className="text-volt">{DIVISIONS[t.division]?.label ?? t.division}</span>
+                    {" · "}
                     {t.size} customs · {totalRounds(t.size)} rounds
                     {t.prize && (
                       <span className="text-volt"> · Prize: {t.prize}</span>

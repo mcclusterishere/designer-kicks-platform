@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono, Bodoni_Moda } from "next/font/google";
 import Link from "next/link";
 import TrackPageview from "@/components/TrackPageview";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import HeaderNav from "@/components/HeaderNav";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
@@ -73,6 +74,7 @@ export default async function RootLayout({
         <Suspense fallback={null}>
           <TrackPageview />
         </Suspense>
+        <GoogleAnalytics />
         <a
           href="#main"
           className="sr-only z-[100] rounded bg-volt px-4 py-2 tag font-bold text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"

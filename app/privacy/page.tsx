@@ -79,10 +79,12 @@ export default function PrivacyPage() {
         <section>
           <h2 className="display text-xl text-white">Cookies</h2>
           <p className="mt-2">
-            We use only the cookies needed to keep you signed in. No
-            third-party ad trackers, no advertising cookies, no cross-site
-            tracking. That&apos;s why you don&apos;t see a cookie banner here —
-            there&apos;s nothing to consent to.
+            We use the cookies needed to keep you signed in, and — when
+            our independent traffic measurement is enabled — Google
+            Analytics measurement cookies. Analytics only: no ad
+            trackers, no advertising cookies, no cross-site ad tracking,
+            ever. The analytics opt-out below switches Google Analytics
+            off too.
           </p>
         </section>
         <section>
@@ -100,6 +102,13 @@ export default function PrivacyPage() {
             analytics off for this browser right here:
           </p>
           <AnalyticsOptOut />
+          <p className="mt-3">
+            Alongside our own counter we may run Google Analytics, so
+            partners can independently verify our traffic. It runs with
+            IP anonymization and no advertising features, and it follows
+            the same rules — Do&nbsp;Not&nbsp;Track or the switch above
+            turns it off completely.
+          </p>
         </section>
         <p className="border-t border-edge pt-4 text-xs">
           Draft policy pending attorney review. We&apos;ll announce material

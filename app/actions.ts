@@ -16,6 +16,7 @@ import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { slugify } from "@/lib/articles";
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
+import { heatScore } from "@/lib/analytics";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt, randomBytes } from "crypto";
@@ -1449,19 +1450,35 @@ export async function createTournamentAction(
     return { ok: false, error: `Pick exactly ${size} shoes (you picked ${participants.length}).` };
   }
 
+  const division = String(formData.get("division") ?? "OPEN");
+  if (!["OPEN", "RISING", "ELITE"].includes(division)) {
+    return { ok: false, error: "Pick a real division." };
+  }
+
   const subs = await prisma.submission.findMany({
     where: { id: { in: participants }, status: "APPROVED" },
+    include: { ratings: { select: { stars: true } } },
   });
   if (subs.length !== size) return { ok: false, error: "All entrants must be approved submissions." };
 
-  // Seed by current heat: better-performing shoes get the higher seeds.
+  // Seed by Heat Score (the Rate-game taste stat, smoothed) so even
+  // battle-fresh pieces earn a real seed; Heat List rank breaks ties
+  // and covers unrated pieces. Score never decides matches — votes do.
   const heat = await getHeatList();
   const heatRank = new Map(heat.map((h, i) => [h.id, i]));
-  const seeded = [...participants].sort(
-    (a, b) => (heatRank.get(a) ?? Infinity) - (heatRank.get(b) ?? Infinity)
+  const scoreById = new Map(
+    subs.map((s) => [s.id, heatScore(s.ratings.map((r) => r.stars))?.score ?? null])
   );
+  const seeded = [...participants].sort((a, b) => {
+    const sa = scoreById.get(a) ?? null;
+    const sb = scoreById.get(b) ?? null;
+    if (sa !== null && sb !== null && sa !== sb) return sb - sa;
+    if (sa !== null && sb === null) return -1;
+    if (sa === null && sb !== null) return 1;
+    return (heatRank.get(a) ?? Infinity) - (heatRank.get(b) ?? Infinity);
+  });
 
-  await createTournament({ name, prize, size, roundDays, seededSubmissionIds: seeded });
+  await createTournament({ name, prize, size, roundDays, division, seededSubmissionIds: seeded });
 
   revalidatePath("/tournaments");
   revalidatePath("/battles");

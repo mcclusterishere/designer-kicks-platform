@@ -284,6 +284,9 @@ model Tournament {
   slug      String   @unique
   size      Int // 4 | 8 | 16 entrants, single elimination
   status    String   @default("ACTIVE") // ACTIVE | COMPLETED
+  // Talent level, like rec-league divisions: OPEN (anyone) |
+  // RISING (up-and-comers) | ELITE (invitational heavyweights).
+  division  String   @default("OPEN")
   prize     String?
   roundDays Int      @default(3)
   createdAt DateTime @default(now())
@@ -300,6 +303,9 @@ model TournamentMatch {
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   round        Int // 1-based; final round = log2(size)
   position     Int // 0-based slot within the round
+  // Round-1 seed numbers (1 = top seed), shown on the bracket.
+  seedA        Int?
+  seedB        Int?
 
   battleId String? @unique
   battle   Battle? @relation(fields: [battleId], references: [id])

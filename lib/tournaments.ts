@@ -3,6 +3,13 @@ import { slugify } from "./articles";
 
 export const TOURNAMENT_SIZES = [4, 8, 16] as const;
 
+// Talent levels, like rec-league divisions. Labels are the public face.
+export const DIVISIONS: Record<string, { label: string; blurb: string }> = {
+  OPEN: { label: "Open Division", blurb: "Anyone can be matched in — all talent levels." },
+  RISING: { label: "Rising Division", blurb: "Up-and-comers only — new names building a record." },
+  ELITE: { label: "Elite Division", blurb: "Invitational — proven heavyweights only." },
+};
+
 export function totalRounds(size: number): number {
   return Math.log2(size);
 }
@@ -43,9 +50,10 @@ export async function createTournament(opts: {
   prize?: string | null;
   size: number;
   roundDays: number;
+  division?: string;
   seededSubmissionIds: string[];
 }) {
-  const { name, prize, size, roundDays, seededSubmissionIds } = opts;
+  const { name, prize, size, roundDays, division = "OPEN", seededSubmissionIds } = opts;
 
   const base = slugify(name) || "tournament";
   let slug = base;
@@ -56,7 +64,7 @@ export async function createTournament(opts: {
   }
 
   const tournament = await prisma.tournament.create({
-    data: { name, slug, size, prize: prize || null, roundDays },
+    data: { name, slug, size, prize: prize || null, roundDays, division },
   });
 
   const rounds = totalRounds(size);
@@ -82,6 +90,8 @@ export async function createTournament(opts: {
         battleId: battle.id,
         subAId,
         subBId,
+        seedA,
+        seedB,
       },
     });
   }

@@ -53,12 +53,20 @@ export default function TournamentForm({ options }: { options: Option[] }) {
           <label className="tag text-smoke" htmlFor="t-days">Days per round</label>
           <input id="t-days" name="roundDays" type="number" min={1} max={14} defaultValue={3} className={inputClass} />
         </div>
+        <div>
+          <label className="tag text-smoke" htmlFor="t-division">Division</label>
+          <select id="t-division" name="division" defaultValue="OPEN" className={inputClass}>
+            <option value="OPEN">Open — all talent</option>
+            <option value="RISING">Rising — up-and-comers</option>
+            <option value="ELITE">Elite — invitational</option>
+          </select>
+        </div>
       </div>
 
       <div>
         <p className="tag text-smoke">
           Entrants — pick exactly {size} ({checked.size} selected). Seeding is
-          automatic by current heat score.
+          automatic: Heat Score first, Heat List rank for unrated pieces.
         </p>
         <div className="mt-2 grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-edge bg-surface p-3 sm:grid-cols-2">
           {options.map((o) => (

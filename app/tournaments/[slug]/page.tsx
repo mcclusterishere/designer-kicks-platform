@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { finalizeExpiredBattles } from "@/lib/battles";
-import { getTournamentBySlug, roundName, totalRounds } from "@/lib/tournaments";
+import { DIVISIONS, getTournamentBySlug, roundName, totalRounds } from "@/lib/tournaments";
 import Countdown from "@/components/Countdown";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,17 @@ export default async function TournamentPage({ params }: Props) {
       </Link>
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="tag text-heat">
-            {t.status === "COMPLETED" ? "Final results" : "Live bracket"}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="tag text-heat">
+              {t.status === "COMPLETED" ? "Final results" : "Live bracket"}
+            </p>
+            <span
+              className="tag rounded-full border border-volt/50 px-2.5 py-0.5 text-volt"
+              title={DIVISIONS[t.division]?.blurb}
+            >
+              {DIVISIONS[t.division]?.label ?? t.division}
+            </span>
+          </div>
           <h1 className="display mt-1 text-4xl text-white sm:text-5xl">{t.name}</h1>
           {t.prize && (
             <p className="mt-2 text-sm text-smoke">
@@ -98,9 +106,9 @@ export default async function TournamentPage({ params }: Props) {
                     }`}
                   >
                     {[
-                      { sub: m.subA, votes: aVotes },
-                      { sub: m.subB, votes: bVotes },
-                    ].map(({ sub, votes }, side) => (
+                      { sub: m.subA, votes: aVotes, seed: m.seedA },
+                      { sub: m.subB, votes: bVotes, seed: m.seedB },
+                    ].map(({ sub, votes, seed }, side) => (
                       <div
                         key={side}
                         className={`flex items-center gap-2 py-1.5 ${
@@ -109,6 +117,11 @@ export default async function TournamentPage({ params }: Props) {
                       >
                         {sub ? (
                           <>
+                            {seed && (
+                              <span className="tag w-6 shrink-0 text-center text-volt/80">
+                                {seed}
+                              </span>
+                            )}
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={sub.imageUrl}
