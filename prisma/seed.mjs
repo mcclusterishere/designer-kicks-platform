@@ -467,28 +467,49 @@ const articles = [
   },
   {
     slug: "air-jordan-9-og-space-jam-release-date",
-    title: "Air Jordan 9 OG 'Space Jam' Gets Its First-Ever Retro August 29",
+    title: "Air Jordan 9 OG 'Space Jam' Returns August 29 — Anniversary Box, Full Details",
     excerpt:
-      "The Air Jordan 9 OG 'Space Jam' releases August 29, 2026 for $215 — the first retro ever of the shoe from the movie set. White, True Red, and Black.",
-    tags: "Jordan, Release Dates, Grails",
-    coverImage: "/seed/drop-6.svg",
+      "The Air Jordan 9 OG 'Space Jam' (HV4794-106) drops August 29, 2026 for $215 with 30th-anniversary packaging and 1993-accurate shaping. The complete story inside.",
+    tags: "Jordan, Release Dates, Grails, Space Jam",
+    coverImage: "/seed/spacejam9-pack.jpg",
     dropAt: new Date("2026-08-29T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
     content: [
       "## The drop",
       "",
-      "The **Air Jordan 9 OG 'Space Jam'** finally retros on **Saturday, August 29, 2026** at **$215** in White/True Red/Black. This is the 9 MJ laced on the Space Jam set during the baseball year — and it has **never** been retroed in this form. First-time-ever retros are the safest cop of any month.",
+      "The **Air Jordan 9 OG 'Space Jam'** releases **Saturday, August 29, 2026** for **$215** under style code **HV4794-106**. The blocking is the one the culture knows by heart: white leather base, black nubuck mudguard sweeping up into the collar, True Red hits on the tongue branding, the heel's globe emblem, and red Jumpmans under the outsole. The **OG** tag is earned — this pair returns with **shaping corrected to the 1993 original**, part of Jordan Brand's push for historical accuracy.",
+      "",
+      "![Air Jordan 9 OG Space Jam — pair](/seed/spacejam9-pair.jpg)",
+      "",
+      "## The anniversary box",
+      "",
+      "This isn't a standard-box release. **Space Jam hit theaters November 15, 1996** — thirty years ago this fall — and the 9 comes wrapped for the occasion: a **Tune Squad-styled lid**, a **galaxy-print interior**, and a hardwood-court insert telling the story of the film that united Michael Jordan and Bugs Bunny, with both the AJ9 and AJ11 featured on screen. Collectors: the box is part of the grail this time. Keep it clean.",
+      "",
+      "![The 30th-anniversary Space Jam packaging](/seed/spacejam9-box.jpg)",
+      "",
+      "## The history — the Jordan MJ never wore in an NBA game",
+      "",
+      "Tinker Hatfield designed the 9 for a season that never happened. It released in **November 1993 at $125** — weeks after MJ walked away from basketball to play minor-league baseball — making it the only numbered Air Jordan of his career that he never laced up in an NBA game as an active player. Hatfield leaned into the moment: a minimalist upper, a one-pull lacing system, the lightest Jordan yet, and an outsole ringed with words in **Japanese, Swahili, Russian and more** — 'dedicated,' 'intense,' 'freedom' — a map of how far past basketball the man's reach had grown.",
+      "",
+      "And when Chicago raised **'The Spirit'** — the Jordan statue outside the United Center — on November 1, 1994, Hatfield put the 9 on its feet. It has stood in this shoe for three decades.",
+      "",
+      "## The retro record",
+      "",
+      "The White/Black-True Red 9 came back in **2002**, in **2010**, and for the film's 20th anniversary in **November 2016**, when it first took the 'Space Jam' name alongside the 11. The 2026 release is its **first return in OG trim** — and the first with the anniversary packaging.",
+      "",
+      "![On foot](/seed/spacejam9-onfoot.jpg)",
       "",
       "## How to cop",
       "",
-      "1. **SNKRS**, Saturday 10 AM ET.",
-      "2. Full-family sizing is expected — if you've got kids, this is the twinning drop of the summer.",
-      "3. Retailer raffles open the week prior; enter everything.",
+      "1. **SNKRS**, Saturday, August 29 at 10 AM ET.",
+      "2. **Select Jordan retailers** — raffles typically open the week prior; enter every one, because special-packaging stock at boutiques runs thinner than the SNKRS allocation.",
+      "3. **Full family sizing is expected** — the twinning drop of the summer if you've got kids.",
+      "4. Miss it? The 2016 pair has traded above retail for years, and the anniversary box adds collector premium this time — check the [Shop](/shop) for the marketplaces we trust.",
       "",
-      "## The collector angle",
+      "## The customizer angle",
       "",
-      "First retros are provenance moments. If you grab pairs and move one later, [record the sale on the Market](/market) with a receipt — the ✓ badge is the difference between a story and a fact.",
+      "White leather over black nubuck is the friendliest canvas in the entire Jordan line, and a Space Jam theme is begging for galaxy fades and Tune Squad linework. If you take a pair somewhere Jordan Brand never would, [put it in the arena](/submit) — the culture will tell you what it's worth.",
       "",
       "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
     ].join("\n"),
@@ -547,15 +568,32 @@ async function main() {
       }
     }
     let newArticles = 0;
+    let refreshed = 0;
     for (const { daysAgo, ...a } of articles) {
       const exists = await prisma.article.findUnique({ where: { slug: a.slug } });
-      if (exists) continue;
-      await prisma.article.create({
-        data: { ...a, status: "PUBLISHED", publishedAt: new Date(Date.now() - daysAgo * DAY) },
-      });
-      newArticles++;
+      if (!exists) {
+        await prisma.article.create({
+          data: { ...a, status: "PUBLISHED", publishedAt: new Date(Date.now() - daysAgo * DAY) },
+        });
+        newArticles++;
+        continue;
+      }
+      // Refresh seed-managed articles the admin has never touched — any
+      // admin edit bumps updatedAt past createdAt and wins forever.
+      // Seed refreshes pin updatedAt back so they stay refreshable.
+      const untouched =
+        Math.abs(exists.updatedAt.getTime() - exists.createdAt.getTime()) < 5000;
+      if (untouched) {
+        await prisma.article.update({
+          where: { id: exists.id },
+          data: { ...a, publishedAt: exists.publishedAt, updatedAt: exists.createdAt },
+        });
+        refreshed++;
+      }
     }
-    console.log(`Articles topped up: ${newArticles} new, existing left untouched.`);
+    console.log(
+      `Articles topped up: ${newArticles} new, ${refreshed} refreshed, admin-edited left untouched.`
+    );
     if (questionCount === 0) {
       for (const q of loadQuestions()) {
         await prisma.quizQuestion.create({
