@@ -123,6 +123,47 @@ export default function SubmitForm({ artistDefaults }: Props) {
         </div>
       </div>
 
+      {/* Taxonomy — optional, but it feeds the taste engine and gets
+          the piece in front of the fans who vote for exactly this. */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div>
+          <label htmlFor="brand" className="tag text-smoke">
+            Brand
+          </label>
+          <input
+            id="brand"
+            name="brand"
+            maxLength={40}
+            placeholder="Jordan / Nike / adidas…"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="silhouette" className="tag text-smoke">
+            Silhouette
+          </label>
+          <input
+            id="silhouette"
+            name="silhouette"
+            maxLength={40}
+            placeholder="e.g. Air Jordan 11, Dunk Low"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="baseColorway" className="tag text-smoke">
+            Original colorway
+          </label>
+          <input
+            id="baseColorway"
+            name="baseColorway"
+            maxLength={40}
+            placeholder='what it was before — "Triple White"'
+            className={inputClass}
+          />
+        </div>
+      </div>
+
       <div>
         <label htmlFor="description" className="tag text-smoke">
           The story (technique, materials, inspiration)

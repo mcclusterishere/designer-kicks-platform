@@ -14,6 +14,12 @@ model Submission {
   socialHandle String?
   email        String
   baseShoe     String
+  // Taxonomy under the custom — powers the taste engine. brand is the
+  // maker (Jordan, Nike), silhouette the model (Air Jordan 11), and
+  // baseColorway what the donor pair looked like before the work.
+  brand        String?
+  silhouette   String?
+  baseColorway String?
   description  String?
   imageUrl     String
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
@@ -38,6 +44,7 @@ model Submission {
   sales       Sale[]
   offers      Offer[]
   outfitItems OutfitItem[]
+  ratings     DesignRating[]
 
   battlesAsA Battle[] @relation("battleSubA")
   battlesAsB Battle[] @relation("battleSubB")
@@ -74,9 +81,25 @@ model ArtistProfile {
   claims      ArtistClaim[]
 }
 
+// The Rate game: one design, one score out of five flames. Feeds each
+// fan's taste profile and every piece's community rating.
+model DesignRating {
+  id           String     @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stars        Int // 1–5 flames
+  createdAt    DateTime   @default(now())
+
+  @@unique([submissionId, userId])
+  @@index([submissionId])
+}
+
 // A look assembled from pieces. HOUSE outfits are admin-curated from
 // the league's best; FAN outfits are built by members from pieces they
-// actually own. Each kind battles within its own league.
+// actually own. One open league — house fits and fan fits battle in
+// the same pool; kind only labels provenance on the card.
 model Outfit {
   id        String   @id @default(cuid())
   name      String
@@ -280,6 +303,7 @@ model User {
   offers      Offer[]
   outfits     Outfit[]
   outfitVotes OutfitVote[]
+  designRatings DesignRating[]
 }
 
 // A buyer's standing offer on a piece — the demand side of the price

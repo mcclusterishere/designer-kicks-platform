@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { logoutUser } from "@/app/account-actions";
 import { computeBadges } from "@/lib/quiz";
+import { getTasteProfile } from "@/lib/taste";
 import { formatUsd } from "@/lib/market";
 import { categoryEmoji } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
@@ -32,7 +33,7 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/signin");
 
-  const [wonRuns, quizAgg, pendingClaims, incomingOffers, myOffers] = await Promise.all([
+  const [wonRuns, quizAgg, pendingClaims, incomingOffers, myOffers, taste] = await Promise.all([
     prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
     prisma.quizRun.aggregate({
       where: { userId: user.id },
@@ -68,6 +69,7 @@ export default async function ProfilePage() {
       where: { buyerId: user.id, status: "OPEN" },
       include: { submission: { select: { title: true } } },
     }),
+    getTasteProfile(user.id),
   ]);
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
@@ -153,6 +155,107 @@ export default async function ProfilePage() {
             </Link>
             .
           </p>
+        )}
+      </div>
+
+      {/* Taste profile — what this fan's votes, ratings, and closet say */}
+      <div id="taste" className="mt-10 scroll-mt-24">
+        <h2 className="display text-2xl text-white">
+          Your <span className="text-gradient-volt">Taste</span>
+        </h2>
+        {!taste ? (
+          <div className="mt-3 rounded-2xl border border-dashed border-edge bg-surface p-6 text-center">
+            <p className="text-3xl">🔥</p>
+            <p className="mt-2 text-sm text-smoke">
+              The chart hasn&apos;t learned your taste yet. Vote in battles or
+              play a round of Rate the Heat and this becomes your style
+              fingerprint.
+            </p>
+            <Link href="/rate" className="btn-hard mt-4 inline-block rounded-xl px-6 py-3 tag font-bold">
+              Rate The Heat →
+            </Link>
+          </div>
+        ) : (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-volt/30 bg-surface shadow-2xl">
+            {/* Archetype masthead */}
+            <div className="flex items-center gap-4 border-b border-edge bg-gradient-to-r from-volt/10 via-transparent to-heat/10 p-5">
+              <span className="text-4xl">{taste.archetype.emoji}</span>
+              <div>
+                <p className="display text-2xl text-white">{taste.archetype.title}</p>
+                <p className="mt-0.5 text-sm text-smoke">{taste.archetype.blurb}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
+              {taste.brands.length > 0 && (
+                <div>
+                  <p className="tag text-smoke">Brand DNA</p>
+                  <div className="mt-2 space-y-2">
+                    {taste.brands.slice(0, 4).map((b) => (
+                      <div key={b.name}>
+                        <div className="flex items-baseline justify-between text-sm">
+                          <span className="text-white">{b.name}</span>
+                          <span className="tabular text-xs text-volt">{b.share}%</span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                          <div
+                            className="bar-animate h-full rounded-full bg-gradient-to-r from-volt to-heat"
+                            style={{ width: `${b.share}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="space-y-4">
+                {taste.silhouettes.length > 0 && (
+                  <div>
+                    <p className="tag text-smoke">Go-To Silhouettes</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {taste.silhouettes.slice(0, 4).map((s) => (
+                        <span key={s.name} className="rounded-full border border-volt/40 bg-volt/5 px-3 py-1 text-xs text-white">
+                          {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {taste.artists.length > 0 && (
+                  <div>
+                    <p className="tag text-smoke">Artists You Back</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {taste.artists.slice(0, 3).map((a) => (
+                        <span key={a.name} className="rounded-full border border-edge bg-panel px-3 py-1 text-xs text-smoke">
+                          🎨 {a.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {taste.colorways.length > 0 && (
+                  <div>
+                    <p className="tag text-smoke">Colorway Roots</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {taste.colorways.slice(0, 3).map((c) => (
+                        <span key={c.name} className="rounded-full border border-edge bg-panel px-3 py-1 text-xs text-smoke">
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-edge px-5 py-3">
+              <p className="tag text-smoke">
+                Built from {taste.signalCount} signal{taste.signalCount === 1 ? "" : "s"} —
+                votes, ratings, closet, offers
+              </p>
+              <Link href="/rate" className="tag text-volt underline">
+                Sharpen it → Rate the Heat
+              </Link>
+            </div>
+          </div>
         )}
       </div>
 
@@ -306,7 +409,7 @@ export default async function ProfilePage() {
         </div>
       )}
 
-      {/* Build a Fit — enter the fan league with owned pieces */}
+      {/* Build a Fit — enter the fit battles with owned pieces */}
       {user.ownedPieces.length >= 2 && (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
@@ -315,9 +418,10 @@ export default async function ProfilePage() {
           <p className="mt-1 text-sm text-smoke">
             Style 2–5 pieces from your closet into a full look and enter the{" "}
             <Link href="/outfits" className="text-volt underline">
-              Fan League
+              Fit Battles
             </Link>{" "}
-            — fan fits battle head-to-head, decided by the culture&apos;s votes.
+            — your fit can face other fans or the house itself, decided by
+            the culture&apos;s votes.
           </p>
           <FitBuilder
             pieces={user.ownedPieces.map((s) => ({

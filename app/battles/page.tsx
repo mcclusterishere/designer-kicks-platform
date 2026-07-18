@@ -42,6 +42,7 @@ export default async function BattlesPage() {
         {[
           { href: "/battles", label: "⚔️ Battles", current: true },
           { href: "/outfits", label: "🧥 Fit Battles" },
+          { href: "/rate", label: "🔥 Rate" },
           { href: "/tournaments", label: "🏆 Brackets" },
           { href: "/artists", label: "🥇 League" },
           { href: "/heat-list", label: "🔥 Heat List" },

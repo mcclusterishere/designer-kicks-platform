@@ -55,7 +55,7 @@ await page.fill("#fit-name", "E2E Fan Fit");
 for (const s of closetPieces) {
   await page.locator(`label:has(input[name="pieces"][value="${s.id}"])`).click();
 }
-await page.getByRole("button", { name: "Enter The Fan League" }).click();
+await page.getByRole("button", { name: "Enter The Fit Battles" }).click();
 await page.getByText("Fit submitted 🔥").waitFor({ timeout: 15000 });
 const fanFit = await prisma.outfit.findFirst({
   where: { name: "E2E Fan Fit" },
@@ -122,15 +122,18 @@ await admin.getByText("E2E House Alpha vs E2E House Bravo").waitFor({ timeout: 1
 const battle = await prisma.outfitBattle.findFirst({
   where: { outfitAId: alpha.id, outfitBId: bravo.id },
 });
-check("house battle live in HOUSE league", battle?.status === "ACTIVE" && battle?.league === "HOUSE");
+check("house battle live in the open league", battle?.status === "ACTIVE" && battle?.league === "OPEN");
 await admin.screenshot({ path: `${SHOTS}/outfits-admin-studio.png`, fullPage: false });
 
-// Guard: mixed-league matchup is refused
+// One league: a fan fit can face the house head-on
 await admin.selectOption("#outfitAId", alpha.id);
 await admin.selectOption("#outfitBId", fanFit.id);
 await admin.getByRole("button", { name: "Start Fit Battle" }).click();
-await admin.getByText("House fits battle house fits").waitFor({ timeout: 15000 });
-check("house vs fan matchup refused", true);
+await admin.getByText("E2E House Alpha vs E2E Fan Fit").waitFor({ timeout: 15000 });
+const crossover = await prisma.outfitBattle.findFirst({
+  where: { outfitAId: alpha.id, outfitBId: fanFit.id },
+});
+check("house vs fan crossover allowed", crossover?.status === "ACTIVE" && crossover?.league === "OPEN");
 
 // ---------- Public page renders, fan votes ----------
 await page.goto(`${BASE}/outfits`, { waitUntil: "networkidle" });
@@ -138,9 +141,11 @@ check("fit battles page shows the matchup title", await page.getByText("E2E Fit 
 check("collages render for both sides", (await page.locator("[data-testid=fit-collage]").count()) >= 2);
 await page.screenshot({ path: `${SHOTS}/outfits-public.png`, fullPage: true });
 
+// Both live battles run Alpha as side A, so the first vote button is
+// always an Alpha vote regardless of listing order.
 await page.getByRole("button", { name: "Vote This Fit" }).first().click();
 await page.getByText("Your vote").waitFor({ timeout: 15000 });
-const vote = await prisma.outfitVote.findFirst({ where: { battleId: battle.id, userId: fan.id } });
+const vote = await prisma.outfitVote.findFirst({ where: { userId: fan.id } });
 check("outfit vote recorded", vote?.outfitId === alpha.id);
 check("results bars show after voting", await page.getByText(/\d+%/).first().isVisible());
 

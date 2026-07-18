@@ -48,6 +48,7 @@ export const viewport = {
 
 const navLinks = [
   { href: "/battles", label: "Battles" },
+  { href: "/rate", label: "Rate" },
   { href: "/news", label: "News" },
   { href: "/quiz", label: "Quiz" },
   { href: "/artists", label: "League" },
@@ -83,21 +84,21 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <header className="sticky top-0 z-50 border-b border-edge bg-ink/90 backdrop-blur">
+        <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="display text-xl text-white">
               The<span className="text-heat">Heat</span>
               <span className="text-volt">Chart</span>
             </Link>
-            <nav className="hidden items-center gap-1 sm:gap-2 md:flex">
+            <nav className="hidden items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1 md:flex">
               {navLinks.map((l) => (
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`tag rounded px-2 py-2 transition sm:px-3 ${
+                  className={`tag rounded-full px-2.5 py-2 transition lg:px-3.5 ${
                     l.href === "/submit"
-                      ? "bg-volt font-bold text-ink hover:opacity-90"
-                      : "text-smoke hover:text-white"
+                      ? "btn-hard font-bold"
+                      : "text-smoke hover:bg-white/5 hover:text-white"
                   }`}
                 >
                   {l.label}
@@ -105,7 +106,7 @@ export default async function RootLayout({
               ))}
               <Link
                 href={session?.user ? "/profile" : "/signin"}
-                className="tag rounded border border-edge px-2 py-2 text-white transition hover:border-volt sm:px-3"
+                className="tag rounded-full border border-volt/40 px-2.5 py-2 text-white transition hover:border-volt hover:bg-volt/10 lg:px-3.5"
               >
                 {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
               </Link>
@@ -113,7 +114,7 @@ export default async function RootLayout({
             {/* Mobile: tab bar handles navigation; header keeps just the account chip */}
             <Link
               href={session?.user ? "/profile" : "/signin"}
-              className="tag rounded border border-edge px-3 py-2 text-white md:hidden"
+              className="tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
             >
               {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
             </Link>
@@ -139,6 +140,7 @@ export default async function RootLayout({
               <div className="flex flex-wrap gap-6">
                 <Link href="/battles" className="hover:text-white">Battles</Link>
                 <Link href="/outfits" className="hover:text-white">Fit Battles</Link>
+                <Link href="/rate" className="hover:text-white">Rate the Heat</Link>
                 <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>

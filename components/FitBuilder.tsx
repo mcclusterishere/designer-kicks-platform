@@ -19,8 +19,9 @@ export default function FitBuilder({ pieces }: { pieces: Piece[] }) {
       <div className="mt-4 rounded-xl border border-volt/50 bg-volt/5 p-5 text-center">
         <p className="display text-xl text-volt">Fit submitted 🔥</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-smoke">
-          It&apos;s in the fan-league pool — the league office matches fits
-          into battles. Winners get bragging rights the whole site can see.
+          It&apos;s in the fit-battle pool — the league office matches fits
+          into battles, and fan fits can face the house head-on. Winners
+          get bragging rights the whole site can see.
         </p>
       </div>
     );
@@ -61,7 +62,7 @@ export default function FitBuilder({ pieces }: { pieces: Piece[] }) {
         disabled={pending}
         className="btn-hard w-full rounded-lg py-3 tag font-bold disabled:opacity-50"
       >
-        {pending ? "Submitting…" : "Enter The Fan League"}
+        {pending ? "Submitting…" : "Enter The Fit Battles"}
       </button>
     </form>
   );

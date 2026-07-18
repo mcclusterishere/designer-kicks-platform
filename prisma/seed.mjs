@@ -20,6 +20,9 @@ const submissions = [
     socialHandle: "krylonkelz",
     email: "demo+kelz@theheatchart.example",
     baseShoe: "Nike Air Force 1",
+    brand: "Nike",
+    silhouette: "Air Force 1",
+    baseColorway: "Triple White",
     description:
       "Angelus neon set over a blacked-out base, drip effect done freehand, finished with matte acrylic sealer.",
     imageUrl: "/seed/custom-1.svg",
@@ -31,6 +34,9 @@ const submissions = [
     socialHandle: "solefirestudio",
     email: "demo+solefire@theheatchart.example",
     baseShoe: "Nike Dunk Low",
+    brand: "Nike",
+    silhouette: "Nike Dunk",
+    baseColorway: "Panda",
     description:
       "Heat-map fade from the sole up, hand-painted crackle texture, custom red laces with brass aglets.",
     imageUrl: "/seed/custom-2.svg",
@@ -42,6 +48,9 @@ const submissions = [
     socialHandle: "iceboxcustoms",
     email: "demo+icebox@theheatchart.example",
     baseShoe: "New Balance 990v6",
+    brand: "New Balance",
+    silhouette: "990v6",
+    baseColorway: "Castlerock Grey",
     description: "Icy translucent midsole swap, arctic gradient suede dye, reflective stitching.",
     imageUrl: "/seed/custom-3.svg",
   },
@@ -52,6 +61,9 @@ const submissions = [
     socialHandle: "riotgrrlkicks",
     email: "demo+riot@theheatchart.example",
     baseShoe: "Air Jordan 1 High",
+    brand: "Jordan",
+    silhouette: "Air Jordan 1",
+    baseColorway: "White/Black",
     description: "UV-reactive pink panels, hand-cut stencil graffiti, glow-in-the-dark outsole.",
     imageUrl: "/seed/custom-4.svg",
   },
@@ -62,6 +74,9 @@ const submissions = [
     socialHandle: "midastouchcustoms",
     email: "demo+midas@theheatchart.example",
     baseShoe: "Air Jordan 4",
+    brand: "Jordan",
+    silhouette: "Air Jordan 4",
+    baseColorway: "White Cement",
     description: "Gold-leaf wings, tonal cream base, aged lace tips for the vintage grail look.",
     imageUrl: "/seed/custom-5.svg",
   },
@@ -72,6 +87,9 @@ const submissions = [
     socialHandle: "nebulalab",
     email: "demo+nebula@theheatchart.example",
     baseShoe: "Yeezy Foam Runner",
+    brand: "adidas",
+    silhouette: "Yeezy Foam Runner",
+    baseColorway: "Ararat",
     description: "Hydro-dipped nebula wash, airbrushed star field, pearlescent top coat.",
     imageUrl: "/seed/custom-6.svg",
   },
@@ -82,6 +100,9 @@ const submissions = [
     socialHandle: "krylonkelz",
     email: "demo+kelz@theheatchart.example",
     baseShoe: "Nike SB Dunk",
+    brand: "Nike",
+    silhouette: "Nike SB Dunk",
+    baseColorway: "Blackout",
     description: "Scale texture carved into the leather, venom-green fade, custom snake-eye dubraes.",
     imageUrl: "/seed/custom-7.svg",
   },
@@ -92,6 +113,9 @@ const submissions = [
     socialHandle: "solefirestudio",
     email: "demo+solefire@theheatchart.example",
     baseShoe: "Air Jordan 11",
+    brand: "Jordan",
+    silhouette: "Air Jordan 11",
+    baseColorway: "Bred",
     description: "Patent leather re-dye, ember airbrush on the mudguard, red translucent sole swap.",
     imageUrl: "/seed/custom-8.svg",
   },
@@ -531,6 +555,8 @@ const preloadArtists = [
       {
         title: "Cotton Candy 11s",
         baseShoe: "Air Jordan 11",
+        brand: "Jordan",
+        silhouette: "Air Jordan 11",
         category: "sneakers",
         description:
           "Blacked-out patent and mesh with a cotton-candy melt — pink-to-blue gradient sole, liner, and lace loops.",
@@ -540,6 +566,8 @@ const preloadArtists = [
       {
         title: "Pineapple Under the Sea",
         baseShoe: "Air Jordan 11",
+        brand: "Jordan",
+        silhouette: "Air Jordan 11",
         category: "sneakers",
         description:
           "White knit upper over a pineapple-yellow patent mudguard, icy blue outsole — summer under the sea on a Jordan 11.",
@@ -549,6 +577,8 @@ const preloadArtists = [
       {
         title: "Patriot 1s",
         baseShoe: "Air Jordan 1 Mid",
+        brand: "Jordan",
+        silhouette: "Air Jordan 1 Mid",
         category: "sneakers",
         description:
           "Stars-and-stripes blocking over red, white, and navy panels — hand-detailed star fields on the toe and collar, finished with a gold USA lace charm.",
@@ -681,7 +711,18 @@ async function main() {
         const dup = await prisma.submission.findFirst({
           where: { artistId: profile.id, title: p.title },
         });
-        if (dup) continue;
+        if (dup) {
+          // Taxonomy top-up for pieces seeded before the columns existed —
+          // only fills blanks, never overwrites artist/admin edits.
+          const fill = {};
+          if (!dup.brand && p.brand) fill.brand = p.brand;
+          if (!dup.silhouette && p.silhouette) fill.silhouette = p.silhouette;
+          if (!dup.baseColorway && p.baseColorway) fill.baseColorway = p.baseColorway;
+          if (Object.keys(fill).length) {
+            await prisma.submission.update({ where: { id: dup.id }, data: fill });
+          }
+          continue;
+        }
         await prisma.submission.create({
           data: {
             ...p,

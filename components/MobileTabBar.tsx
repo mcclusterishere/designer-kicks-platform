@@ -38,7 +38,7 @@ const TABS: Tab[] = [
   {
     href: "/battles",
     label: "Arena",
-    match: ["/battles", "/tournaments", "/artists", "/heat-list"],
+    match: ["/battles", "/tournaments", "/artists", "/heat-list", "/outfits", "/rate"],
     icon: <Icon d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2Z" />,
   },
   {
@@ -74,7 +74,7 @@ export default function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-edge bg-ink/95 backdrop-blur md:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-50 border-t border-white/5 md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="mx-auto flex max-w-lg items-end justify-around px-2">

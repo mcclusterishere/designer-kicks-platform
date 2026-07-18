@@ -108,6 +108,20 @@ export default function PreloadArtistForm() {
           <input id="pl-size" name="size" maxLength={20} placeholder="US 10.5 / L" className={inputClass} />
         </div>
       </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div>
+          <label className="tag text-smoke" htmlFor="pl-brand">Brand</label>
+          <input id="pl-brand" name="brand" maxLength={40} placeholder="Jordan" className={inputClass} />
+        </div>
+        <div>
+          <label className="tag text-smoke" htmlFor="pl-sil">Silhouette</label>
+          <input id="pl-sil" name="silhouette" maxLength={40} placeholder="Air Jordan 11" className={inputClass} />
+        </div>
+        <div>
+          <label className="tag text-smoke" htmlFor="pl-cw">Original colorway</label>
+          <input id="pl-cw" name="baseColorway" maxLength={40} placeholder='"Bred"' className={inputClass} />
+        </div>
+      </div>
       <div>
         <label className="tag text-smoke" htmlFor="pl-desc">The story (optional)</label>
         <input id="pl-desc" name="description" maxLength={600} placeholder="Technique, materials, inspiration" className={inputClass} />

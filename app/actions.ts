@@ -47,6 +47,7 @@ export async function createSubmission(
   const artistName = String(formData.get("artistName") ?? "").trim();
   const socialHandle = String(formData.get("socialHandle") ?? "").trim().replace(/^@/, "");
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
+  const taxonomy = taxonomyFields(formData);
   const category = String(formData.get("category") ?? "sneakers");
   const size = String(formData.get("size") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -100,6 +101,7 @@ export async function createSubmission(
       socialHandle: artist.instagram ?? (socialHandle || null),
       email: user.email,
       baseShoe,
+      ...taxonomy,
       category,
       size: size || null,
       description: description || null,
@@ -116,6 +118,16 @@ export async function createSubmission(
 
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/** Optional shoe taxonomy from a submission form — powers the taste engine. */
+function taxonomyFields(formData: FormData) {
+  const clean = (k: string) => String(formData.get(k) ?? "").trim().slice(0, 40) || null;
+  return {
+    brand: clean("brand"),
+    silhouette: clean("silhouette"),
+    baseColorway: clean("baseColorway"),
+  };
 }
 
 async function clientIp(): Promise<string> {
@@ -238,6 +250,7 @@ export async function preloadArtist(
   const city = String(formData.get("city") ?? "").trim();
   const shoeTitle = String(formData.get("shoeTitle") ?? "").trim();
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
+  const plTaxonomy = taxonomyFields(formData);
   const plCategory = String(formData.get("category") ?? "sneakers");
   const plSize = String(formData.get("size") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -290,6 +303,7 @@ export async function preloadArtist(
       socialHandle: artist.instagram,
       email,
       baseShoe,
+      ...plTaxonomy,
       category: ["sneakers", "apparel", "accessories"].includes(plCategory) ? plCategory : "sneakers",
       size: plSize || null,
       description: description || null,
@@ -640,14 +654,13 @@ export async function createOutfitBattleAction(
     prisma.outfit.findUnique({ where: { id: outfitBId } }),
   ]);
   if (!a || !b) return { ok: false, error: "Fit not found." };
-  if (a.kind !== b.kind) {
-    return { ok: false, error: "House fits battle house fits; fan fits battle fan fits." };
-  }
 
+  // One open league: house fits and fan fits share the same arena —
+  // a fan look beating a house look IS the content.
   await prisma.outfitBattle.create({
     data: {
       title: title || null,
-      league: a.kind,
+      league: "OPEN",
       outfitAId,
       outfitBId,
       endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
@@ -679,6 +692,48 @@ export async function castOutfitVote(battleId: string, outfitId: string): Promis
     return { ok: false, error: "You already voted in this battle." };
   }
   return { ok: true };
+}
+
+// ---------- The Rate game (design ratings out of five flames) ----------
+
+export type RateResult = ActionResult & { avg?: number; count?: number };
+
+/**
+ * One design, one score. Upsert so a fan can change their mind; the
+ * response carries the community line so the deck can show "the
+ * culture says 4.2" the moment they weigh in.
+ */
+export async function rateDesign(submissionId: string, stars: number): Promise<RateResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to rate designs." };
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+    return { ok: false, error: "Ratings run 1 to 5." };
+  }
+  if (!allowAttempt("rate", session.user.id, 60, 60 * 1000)) {
+    return { ok: false, error: "Whoa — let the flames cool for a second." };
+  }
+  const piece = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    select: { status: true },
+  });
+  if (!piece || piece.status !== "APPROVED") return { ok: false, error: "That design isn't rateable." };
+
+  await prisma.designRating.upsert({
+    where: { submissionId_userId: { submissionId, userId: session.user.id } },
+    update: { stars },
+    create: { submissionId, userId: session.user.id, stars },
+  });
+  const agg = await prisma.designRating.aggregate({
+    where: { submissionId },
+    _avg: { stars: true },
+    _count: true,
+  });
+  // No revalidatePath: the deck is a client-driven flow.
+  return {
+    ok: true,
+    avg: Math.round((agg._avg.stars ?? stars) * 10) / 10,
+    count: agg._count,
+  };
 }
 
 // ---------- Outreach (cold leads with unclaimed pages) ----------

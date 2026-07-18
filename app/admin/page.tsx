@@ -248,6 +248,14 @@ export default async function AdminPage({
             { label: "Open offers", value: pulse.tiles.openOffers },
             { label: "Live battles", value: pulse.tiles.activeBattles },
             { label: "Artists in league", value: pulse.tiles.approvedArtists },
+            {
+              label: "Design ratings",
+              value: `${pulse.ratingsPulse.ratingsTotal} (+${pulse.ratingsPulse.ratings7} this wk)`,
+            },
+            {
+              label: "Avg heat score",
+              value: pulse.ratingsPulse.avgStars !== null ? `${pulse.ratingsPulse.avgStars} / 5` : "—",
+            },
           ].map((s) => (
             <div key={s.label} className="rounded-xl border border-edge bg-surface p-3 text-center">
               <p className="display text-lg text-volt">{s.value}</p>
@@ -275,6 +283,60 @@ export default async function AdminPage({
                     {i + 1}. {tp.title} <span className="text-smoke">— {tp.artistName}</span>
                   </span>
                   <span className="shrink-0 text-volt">{tp.votes} votes</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {/* Taste Pulse: the taxonomy under every vote and rating */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[
+            { title: "Brand Heat", rows: pulse.brandHeat },
+            { title: "Silhouette Heat", rows: pulse.silhouetteHeat },
+          ].map((board) => (
+            <div key={board.title} className="rounded-xl border border-edge bg-surface p-4">
+              <p className="tag text-smoke">{board.title} — votes + ratings</p>
+              {board.rows.length === 0 ? (
+                <p className="mt-2 text-sm text-smoke">No taxonomy data yet.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {board.rows.map((r) => {
+                    const max = board.rows[0].total || 1;
+                    return (
+                      <div key={r.name}>
+                        <div className="flex items-baseline justify-between text-sm">
+                          <span className="text-white">{r.name}</span>
+                          <span className="tabular text-xs text-volt">
+                            {r.votes}v · {r.ratings}r
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-volt to-heat"
+                            style={{ width: `${Math.round((r.total / max) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        {pulse.topRated.length > 0 && (
+          <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Top rated in the Rate game</p>
+            <ol className="mt-2 space-y-1 text-sm">
+              {pulse.topRated.map((tr, i) => (
+                <li key={tr.id} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate text-white">
+                    {i + 1}. {tr.title} <span className="text-smoke">— {tr.artistName}</span>
+                  </span>
+                  <span className="shrink-0 text-volt">
+                    {tr.avg} 🔥 ({tr.count})
+                  </span>
                 </li>
               ))}
             </ol>

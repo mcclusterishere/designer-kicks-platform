@@ -37,6 +37,10 @@ export default async function StudioPage() {
     { label: "Followers", value: stats.followers },
     { label: "Profile views", value: stats.views },
     { label: "Best heat rank", value: Number.isFinite(bestRank) ? `#${bestRank}` : "—" },
+    {
+      label: "Rate-game score",
+      value: stats.avgRating !== null ? `${stats.avgRating} 🔥 (${stats.ratingsCount})` : "—",
+    },
     { label: "Revenue (verified-track)", value: formatUsd(stats.revenueCents) },
     {
       label: "Open offers",
@@ -129,6 +133,7 @@ export default async function StudioPage() {
               <th className="px-3 py-3">Votes</th>
               <th className="px-3 py-3">Record</th>
               <th className="px-3 py-3">Heat rank</th>
+              <th className="px-3 py-3">Rating</th>
               <th className="px-3 py-3">Last sale</th>
               <th className="px-3 py-3">Ask</th>
               <th className="px-3 py-3">Offers</th>
@@ -155,6 +160,11 @@ export default async function StudioPage() {
                     {s._count.battlesWon}W–{battles - s._count.battlesWon}L
                   </td>
                   <td className="px-3 py-3 text-volt">{rank ? `#${rank}` : "—"}</td>
+                  <td className="px-3 py-3 text-smoke">
+                    {s.ratings.length > 0
+                      ? `${Math.round((s.ratings.reduce((sum, r) => sum + r.stars, 0) / s.ratings.length) * 10) / 10} 🔥 (${s.ratings.length})`
+                      : "—"}
+                  </td>
                   <td className="px-3 py-3 text-smoke">
                     {lastSale ? formatUsd(lastSale.priceCents) : "—"}
                   </td>

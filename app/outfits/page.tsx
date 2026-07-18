@@ -7,7 +7,7 @@ import OutfitVotePanel from "@/components/OutfitVotePanel";
 export const metadata = {
   title: "Fit Battles — Outfit vs Outfit | The Heat Chart",
   description:
-    "Full looks built from one-of-one customs go head-to-head: house-curated fits and the fan league, decided by your votes.",
+    "Full looks built from one-of-one customs go head-to-head in one open league — house-curated fits vs fan-built fits, decided by your votes.",
 };
 export const dynamic = "force-dynamic";
 
@@ -45,10 +45,6 @@ export default async function OutfitsPage() {
 
   const active = battles.filter((b) => b.status === "ACTIVE");
   const completed = battles.filter((b) => b.status === "COMPLETED");
-  const leagues = [
-    { key: "HOUSE", label: "House League", blurb: "The best pieces on the chart, styled into full looks by the league office." },
-    { key: "FAN", label: "Fan League", blurb: "Collectors styling pieces they actually own. Own it, style it, defend it." },
-  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -69,6 +65,7 @@ export default async function OutfitsPage() {
         {[
           { href: "/battles", label: "⚔️ Battles" },
           { href: "/outfits", label: "🧥 Fit Battles", current: true },
+          { href: "/rate", label: "🔥 Rate" },
           { href: "/tournaments", label: "🏆 Brackets" },
           { href: "/artists", label: "🥇 League" },
           { href: "/heat-list", label: "🔥 Heat List" },
@@ -87,39 +84,38 @@ export default async function OutfitsPage() {
         ))}
       </div>
 
-      {leagues.map((league) => {
-        const rows = active.filter((b) => b.league === league.key);
-        return (
-          <section key={league.key} className="mt-10">
-            <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
-            <h2 className="display mt-2 text-2xl text-white sm:text-3xl">{league.label}</h2>
-            <p className="mt-1 text-sm text-smoke">{league.blurb}</p>
-            {rows.length === 0 ? (
-              <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-6 text-center text-smoke">
-                No live {league.label.toLowerCase()} battles right now — new
-                matchups drop as fits come in.
-              </p>
-            ) : (
-              <div className="mt-5 space-y-8">
-                {rows.map((b) => (
-                  <div key={b.id}>
-                    {b.title && <p className="tag mb-2 text-volt">{b.title}</p>}
-                    <OutfitVotePanel
-                      battleId={b.id}
-                      a={toSide(b, "A")}
-                      b={toSide(b, "B")}
-                      active
-                      isAuthed={Boolean(session?.user)}
-                      yourVote={voteMap.get(b.id) ?? null}
-                      winnerId={b.winnerId}
-                    />
-                  </div>
-                ))}
+      {/* One open league: house-curated looks and fan fits share the
+          arena — provenance rides on each card, votes settle the rest. */}
+      <section className="mt-10">
+        <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+        <h2 className="display mt-2 text-2xl text-white sm:text-3xl">Live Fit Battles</h2>
+        <p className="mt-1 text-sm text-smoke">
+          League-office looks and fan-built fits, one arena. A fan fit
+          taking down a house fit is exactly the kind of upset we live for.
+        </p>
+        {active.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-6 text-center text-smoke">
+            No live fit battles right now — new matchups drop as fits come in.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-8">
+            {active.map((b) => (
+              <div key={b.id}>
+                {b.title && <p className="tag mb-2 text-volt">{b.title}</p>}
+                <OutfitVotePanel
+                  battleId={b.id}
+                  a={toSide(b, "A")}
+                  b={toSide(b, "B")}
+                  active
+                  isAuthed={Boolean(session?.user)}
+                  yourVote={voteMap.get(b.id) ?? null}
+                  winnerId={b.winnerId}
+                />
               </div>
-            )}
-          </section>
-        );
-      })}
+            ))}
+          </div>
+        )}
+      </section>
 
       {completed.length > 0 && (
         <section className="mt-12">
