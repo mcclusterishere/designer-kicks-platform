@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { isAdmin } from "@/lib/admin";
+import { isAdmin, adminAccountOk } from "@/lib/admin";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import {
   adminLogout,
@@ -37,9 +37,17 @@ export default async function AdminPage({
   searchParams: Promise<{ edit?: string; editArticle?: string }>;
 }) {
   if (!(await isAdmin())) {
+    const accountOk = await adminAccountOk();
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="display text-4xl text-white">Admin</h1>
+        {!accountOk && (
+          <p className="mt-4 rounded-lg border border-heat/50 bg-heat/10 p-3 text-sm text-heat">
+            This panel is locked to the owner&apos;s member account.{" "}
+            <Link href="/signin" className="underline">Sign in to the site</Link>{" "}
+            with that account first — then the password box below works.
+          </p>
+        )}
         <LoginForm />
       </div>
     );

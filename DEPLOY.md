@@ -82,6 +82,7 @@ Supabase Storage, and Backblaze B2 all work with the same variables.)
 | `DATABASE_URL` | Neon connection string |
 | `AUTH_SECRET` | run `openssl rand -base64 32` — do NOT reuse the dev one |
 | `ADMIN_PASSWORD` | a strong password — **admin login stays disabled until set** |
+| `ADMIN_EMAILS` | your own login email — locks /admin to your signed-in account **plus** the password (second factor) |
 | `NEXT_PUBLIC_SITE_URL` | `https://yourdomain.com` |
 | `CRON_SECRET` | random string — protects the battle-finalizer cron |
 | `S3_*` | the five storage vars from step 2 |
@@ -135,7 +136,7 @@ Buttons appear automatically once the vars exist.
 
 ## 7. Before you post the link
 
-- [ ] `ADMIN_PASSWORD` set (strong), `AUTH_SECRET` fresh, `CRON_SECRET` set
+- [ ] `ADMIN_PASSWORD` set (strong), `ADMIN_EMAILS` set to your account, `AUTH_SECRET` fresh, `CRON_SECRET` set
 - [ ] Register a real account, vote, play the quiz, buy a $1 pack (live Stripe)
 - [ ] Submit a real custom with a real photo — confirm it lands in R2 and the admin queue
 - [ ] Replace demo giveaway with your real prize; delete demo content when ready

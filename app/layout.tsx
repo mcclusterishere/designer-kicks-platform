@@ -146,7 +146,6 @@ export default async function RootLayout({
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
                 <Link href="/story" className="hover:text-white">Our Story</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
-                <Link href="/admin" className="hover:text-white">Admin</Link>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-4 text-xs">

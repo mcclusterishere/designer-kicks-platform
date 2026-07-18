@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { auth } from "@/auth";
 
 const ADMIN_COOKIE = "dk_admin";
 const SESSION_HOURS = 12;
@@ -32,6 +33,27 @@ function sign(expiry: number, pw: string): string {
   return createHmac("sha256", secret())
     .update(`dk-admin:${expiry}:${sha256(pw).toString("hex")}`)
     .digest("hex");
+}
+
+/**
+ * Second lock: when ADMIN_EMAILS is set (comma-separated), the admin
+ * panel additionally requires being signed in as one of those member
+ * accounts. A leaked password alone is then useless. Unset = legacy
+ * password-only mode (local dev / tests).
+ */
+export function adminAllowlist(): string[] {
+  return (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export async function adminAccountOk(): Promise<boolean> {
+  const list = adminAllowlist();
+  if (list.length === 0) return true;
+  const session = await auth();
+  const email = session?.user?.email?.toLowerCase();
+  return Boolean(email && list.includes(email));
 }
 
 export function checkPassword(password: string): boolean {
@@ -94,5 +116,9 @@ export async function isAdmin(): Promise<boolean> {
 
   const expected = sign(expiry, pw);
   if (sig.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+
+  // Both locks: valid password session AND (when configured) the
+  // owner's signed-in account. Cookie replay without the account fails.
+  return adminAccountOk();
 }

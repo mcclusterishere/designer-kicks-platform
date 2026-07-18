@@ -7,6 +7,7 @@ import {
   setAdminSession,
   clearAdminSession,
   isAdmin,
+  adminAccountOk,
   adminLoginAvailable,
   registerLoginAttempt,
 } from "@/lib/admin";
@@ -937,8 +938,22 @@ export async function adminLogin(
     return { ok: false, error: "Too many attempts — try again in 15 minutes." };
   }
 
+  if (!(await adminAccountOk())) {
+    return {
+      ok: false,
+      error:
+        "This panel is locked to the owner's member account — sign in to the site with that account first, then enter the admin password.",
+    };
+  }
+
   const password = String(formData.get("password") ?? "");
-  if (!checkPassword(password)) return { ok: false, error: "Wrong password." };
+  if (!checkPassword(password)) {
+    notifyAdmin(
+      "Failed admin login attempt",
+      `Wrong admin password entered from IP ${ip} at ${new Date().toISOString()}. If this wasn't you, consider rotating ADMIN_PASSWORD in Railway.`
+    );
+    return { ok: false, error: "Wrong password." };
+  }
   await setAdminSession();
   revalidatePath("/admin");
   return { ok: true };
