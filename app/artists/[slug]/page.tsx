@@ -100,7 +100,7 @@ export default async function ArtistPage({ params }: Props) {
               rel="noopener noreferrer"
               className="tag rounded-lg bg-heat px-4 py-2.5 font-bold text-white glow-heat transition hover:opacity-90"
             >
-              📩 Book a Commission
+              Book a Commission
             </a>
           )}
         </div>

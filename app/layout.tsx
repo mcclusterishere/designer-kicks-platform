@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Anton } from "next/font/google";
+import { Geist, Geist_Mono, Bodoni_Moda } from "next/font/google";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
@@ -16,9 +16,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Condensed poster face for the hype display type.
-const anton = Anton({
-  weight: "400",
+// Fashion-magazine serif for the display type — Vogue-cover energy.
+const bodoni = Bodoni_Moda({
   variable: "--font-display",
   subsets: ["latin"],
 });
@@ -66,7 +65,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} h-full antialiased`}
     >
       {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
         <head>
