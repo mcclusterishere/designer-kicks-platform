@@ -669,7 +669,7 @@ const preloadArtists = [
     displayName: "Gunnar Esquivel",
     instagram: "Da_sneaker_customz_god",
     city: "Pueblo, CO",
-    bio: "Pueblo, Colorado's Gunnar Esquivel — @Da_sneaker_customz_god — is a 24-year-old one-man shop with a fashion-house eye. The lane is material builds: luxury-monogram jacquard deconstructions strung with chunky rope laces and piercing hardware, streetwear-camo panel work, Americana print wraps, and player-exclusive Jordan 1 cleats. 'I make custom shoes.' The pairs say the rest.",
+    bio: "Pueblo, Colorado's Gunnar Esquivel — @Da_sneaker_customz_god — is a 24-year-old one-man shop with a fashion-house eye. The lane is material builds: luxury-monogram jacquard deconstructions strung with chunky rope laces and piercing hardware, streetwear-camo panel work, and player-exclusive Jordan 1 cleats. 'I make custom shoes.' The pairs say the rest.",
     pieces: [
       {
         title: "Bam Bam #42 Cleats",
@@ -708,19 +708,6 @@ const preloadArtists = [
           "BAPE-style blue ABC ape-head camo wrapped over the toe box, eyestay, and Swoosh, with a camo strip dropped under the Nike Air heel tab and chunky two-tone blue rope laces up top. Streetwear-grail fabric, panel-matched and stitched clean into a triple-white Force.",
         imageUrl: "/seed/ge-bp-2.webp",
         extraImages: ["/seed/ge-bp-3.webp", "/seed/ge-bp-4.webp", "/seed/ge-bp-1.webp"],
-      },
-      {
-        title: "We The People Forces",
-        matchTitle: "we the people",
-        baseShoe: "Nike Air Force 1",
-        brand: "Nike",
-        silhouette: "Air Force 1",
-        baseColorway: "Triple White",
-        category: "sneakers",
-        description:
-          "The Declaration of Independence, corner to corner — aged-parchment script print across the upper, distressed stars-and-stripes at the collar and tongue, an engraved silver lace charm, and a crisp white Swoosh and sole holding it all together. Fourth-of-July Americana on the Air Force 1.",
-        imageUrl: "/seed/ge-us-1.webp",
-        extraImages: ["/seed/ge-us-2.webp"],
       },
     ],
   },
@@ -805,6 +792,9 @@ const preloadArtists = [
   {
     // Facebook-only customizer, car-show scene — no site, no findable
     // IG/shop, DM-to-order. Bio built from their own brand language.
+    // Self-published business phone from their promo posts:
+    // 607-280-0362 (607 = south-central NY; "Crown City" is Cortland,
+    // NY's nickname). Commissions from $250, 3–4 week turnaround.
     // Claimable placeholder until they take the page over.
     slug: "crown-city-kicks",
     email: null,
@@ -838,6 +828,19 @@ const preloadArtists = [
           "Royal-blue monogram-embossed velvet wrapped over a Triple White Air Force 1 — crisp white swoosh, laces, and midsole set against a pile that shifts with the sunlight, staged on its own matching monogram cloth. Hand-built, one of one, with the Crown City rule attached: no duplicates.",
         imageUrl: "/seed/cc-bv-1.webp",
         extraImages: ["/seed/cc-bv-2.webp", "/seed/cc-bv-3.webp", "/seed/cc-bv-4.webp"],
+      },
+      {
+        title: "We The People Forces",
+        matchTitle: "we the people",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "The Declaration of Independence, corner to corner — aged-parchment script print across the upper, distressed stars-and-stripes at the collar and tongue, an engraved silver lace charm, and a crisp white Swoosh and sole holding it all together. Vintage We The People energy, hand-built one of one under the Crown City rule: no duplicates, ever.",
+        imageUrl: "/seed/cc-us-1.webp",
+        extraImages: ["/seed/cc-us-2.webp"],
       },
     ],
   },
