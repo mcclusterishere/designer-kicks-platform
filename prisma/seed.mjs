@@ -632,6 +632,56 @@ const preloadArtists = [
     ],
   },
   {
+    // San Diego triple threat — tattoos, sneaker customs, hand-tufted
+    // rugs (IG @paint_the_skyred, ~2.8K). Matt has already reached
+    // out; claimable placeholder until he takes the page.
+    slug: "paint-the-skyred",
+    email: null,
+    displayName: "Paint The Sky Red",
+    instagram: "paint_the_skyred",
+    city: "San Diego, CA",
+    bio: "San Diego creative working three canvases — tattoos, sneaker customs, and hand-tufted rugs. Energy flows where attention goes. Anime builds are the signature lane: One Piece Dunks, My Hero Academia Forces, and Afro Samurai Jordans, painted with a tattoo artist's linework.",
+    pieces: [
+      {
+        title: "Afro Samurai Resurrection 1s",
+        matchTitle: "afro samurai",
+        baseShoe: "Air Jordan 1 Low",
+        brand: "Jordan",
+        silhouette: "Air Jordan 1 Low",
+        category: "sneakers",
+        description:
+          "A hand-painted Afro Samurai: Resurrection build across black-patent Jordan 1 Lows. Afro stands in silhouette inside the crimson sun on one heel with his masked rival across the other, brushed kanji and AFRO SAMURAI lettering cut through the panels, blood-spatter rides the white leather and midsoles, and an icy translucent outsole closes it out. Comic panels on one shoe, title card on the other — a two-shoe episode.",
+        imageUrl: "/seed/ps-as-1.webp",
+        extraImages: ["/seed/ps-as-2.webp", "/seed/ps-as-3.webp", "/seed/ps-as-4.webp"],
+      },
+    ],
+  },
+  {
+    // Atlanta concept artist — verified FB (4.8K), IG @dekota_customz,
+    // commissions open. FB DMs are closed; IG is the channel.
+    slug: "justin-dekota",
+    email: null,
+    displayName: "Justin Dekota",
+    instagram: "dekota_customz",
+    city: "Atlanta, GA",
+    bio: "Atlanta sneaker artist bringing concepts to life — story builds with a message under the paint. KAWS-style characters, hand-lettered narratives, heels that read like panels. Commissions open.",
+    pieces: [
+      {
+        title: "Treacherous Waters",
+        matchTitle: "treacherous",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "A KAWS-inspired plunge on the Air Force 1: purple fades into a teal undertow full of fish, bubbles, and circling sharks. XX marks over the toes, “Sink or Swim?” and “No Life Boat” hand-lettered along the midsoles, gloved KAWS hands and a Trap House scene at the heels, thrashed vintage tongues up top. Concept art with a current running underneath it.",
+        imageUrl: "/seed/jd-tw-1.webp",
+        extraImages: ["/seed/jd-tw-2.webp", "/seed/jd-tw-3.webp"],
+      },
+    ],
+  },
+  {
     // Verified heavyweight — 740K-follower FB page, IG @parksart,
     // YouTube/X/Threads/Etsy, Big Cartel shop. Self-listed in
     // Christiansburg, VA. Claimable placeholder; commissions run
