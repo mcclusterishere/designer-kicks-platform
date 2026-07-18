@@ -588,6 +588,32 @@ const preloadArtists = [
     ],
   },
   {
+    // Facebook-only customizer, car-show scene — no site, no findable
+    // IG/shop, DM-to-order. Bio built from their own brand language.
+    // Claimable placeholder until they take the page over.
+    slug: "crown-city-kicks",
+    email: null,
+    displayName: "Crown City Kicks",
+    instagram: null,
+    city: null,
+    bio: "Hand-built one pair at a time with the Crown City touch — velvet wraps, luxury-inspired detail, and a strict house rule: no duplicates, ever. The kind of pair that turns heads from the grocery store to the car show. Commissions run through the DMs. Built Different.",
+    pieces: [
+      {
+        title: "Blue Velvet AF1",
+        matchTitle: "velvet",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "Royal-blue monogram-embossed velvet wrapped over a Triple White Air Force 1 — crisp white swoosh, laces, and midsole set against a pile that shifts with the sunlight, staged on its own matching monogram cloth. Hand-built, one of one, with the Crown City rule attached: no duplicates.",
+        imageUrl: "/seed/cc-bv-1.webp",
+        extraImages: ["/seed/cc-bv-2.webp", "/seed/cc-bv-3.webp", "/seed/cc-bv-4.webp"],
+      },
+    ],
+  },
+  {
     // Chicago heavyweight — Dillon DeJesus / DCF (IG
     // @dejesuscustomfootwear ~94K, dejesusinc.com, studio on W 35th
     // St). Tutorials, tool line, and the DCF Experience workshop.
