@@ -529,6 +529,8 @@ export default async function AdminPage({
                 defaultEmail={lead.user.email}
                 invitedAgo={lead.invitedAt ? humanizeAgo(lead.invitedAt) : null}
                 pageSlug={lead.slug}
+                stage={lead.outreachStage}
+                notes={lead.outreachNotes}
               />
             ))}
           </div>

@@ -632,6 +632,34 @@ const preloadArtists = [
     ],
   },
   {
+    // Miami — Javornie "JSB" Brathwaite (jsbthecreator.com, IG
+    // @jsbthecreator, business email self-published on his contact
+    // page). Slack corporate customs, a D-Wade retirement tribute,
+    // and the Grails Miami x Mache Runner Art Basel commission. The
+    // real email is set so his claimable account is already his.
+    slug: "jsb-the-creator",
+    email: "jsbthecreator@gmail.com",
+    displayName: "JSB The Creator",
+    instagram: "jsbthecreator",
+    city: "Miami, FL",
+    portfolioUrl: "https://jsbthecreator.com",
+    bio: "Miami's Javornie 'JSB' Brathwaite — one-of-one wearable art across sneakers, jackets, canvas, and pants. The résumé runs from corporate one-offs for Slack to X-Men Jordan 3s, a Dwyane Wade retirement tribute, and an Art Basel commission from Grails Miami painted on Mache's own signature runner — approved by the legend himself.",
+    pieces: [
+      {
+        title: "Welcome to Dade County",
+        matchTitle: "dade",
+        baseShoe: "Mache Runner",
+        brand: "Mache",
+        silhouette: "Mache Runner",
+        category: "sneakers",
+        description:
+          "Commissioned by Grails, Miami's sneaker-themed sports bar, for an Art Basel event — painted on the Mache Runner, the signature shoe of customizing legend Mache, who saw the pair in person. The city rides every panel: Vice City-style artwork under a neon skyline, the Welcome to Dade County sign, Miami script across the heel, palm-tree charms and spiked studs over snakeskin texture, an “ART” midsole callout, and an orange drip outsole. One city, one shoe, one of one.",
+        imageUrl: "/seed/jsb-dc-1.webp",
+        extraImages: ["/seed/jsb-dc-2.webp", "/seed/jsb-dc-3.webp", "/seed/jsb-dc-4.webp"],
+      },
+    ],
+  },
+  {
     // San Diego triple threat — tattoos, sneaker customs, hand-tufted
     // rugs (IG @paint_the_skyred, ~2.8K). Matt has already reached
     // out; claimable placeholder until he takes the page.

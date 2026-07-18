@@ -815,7 +815,10 @@ export async function outreachInvite(
     });
     emailSent = delivered;
   }
-  await prisma.artistProfile.update({ where: { id: profile.id }, data: { invitedAt: new Date() } });
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: { invitedAt: new Date(), outreachStage: "INVITED" },
+  });
 
   revalidatePath("/admin");
   return { ok: true, emailSent, claimUrl };
@@ -1758,4 +1761,34 @@ export async function sendStoreInvite(
   // copy-paste pitch before the admin can grab it. The board reflects
   // the new status on the next load.
   return { ok: true, emailSent, emailText: pitch };
+}
+
+// ---------- Artist outreach pipeline (recruiting tracker) ----------
+
+/** Move a pre-loaded artist through the recruiting pipeline. */
+export async function setArtistStage(artistId: string, stage: string): Promise<void> {
+  await requireAdmin();
+  if (!["NEW", "CONTACTED", "IN_TALKS", "INVITED"].includes(stage)) return;
+  await prisma.artistProfile
+    .update({ where: { id: artistId }, data: { outreachStage: stage } })
+    .catch(() => {});
+  revalidatePath("/admin");
+}
+
+/** Save the admin's working notes on a lead ("DM'd 7/18, replied 🔥"). */
+export async function saveArtistNotes(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const artistId = String(formData.get("artistId") ?? "");
+  const notes = String(formData.get("notes") ?? "").trim().slice(0, 1000);
+  const lead = await prisma.artistProfile.findUnique({ where: { id: artistId } });
+  if (!lead) return { ok: false, error: "Lead not found." };
+  await prisma.artistProfile.update({
+    where: { id: artistId },
+    data: { outreachNotes: notes || null },
+  });
+  // No revalidatePath: keep the client "Saved" state mounted.
+  return { ok: true };
 }

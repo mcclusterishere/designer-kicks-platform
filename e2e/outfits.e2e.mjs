@@ -166,6 +166,18 @@ await admin.reload({ waitUntil: "networkidle" });
 await admin.getByText("Outreach", { exact: false }).first().waitFor({ timeout: 10000 });
 const leadRow = admin.locator("div.rounded-xl", { hasText: "Outreach Test Lead" }).first();
 check("cold lead listed as never invited", await leadRow.getByText("Never invited").isVisible());
+
+// Pipeline tracker: stage chips + notes
+check("lead starts in NEW stage", await leadRow.getByText("New", { exact: true }).isVisible());
+await leadRow.getByRole("button", { name: "→ Contacted" }).click();
+await leadRow.getByText("Contacted", { exact: true }).waitFor({ timeout: 15000 });
+const staged = await prisma.artistProfile.findUnique({ where: { slug: LEAD_SLUG } });
+check("stage advances to CONTACTED", staged?.outreachStage === "CONTACTED");
+await leadRow.locator('input[name="notes"]').fill("DM'd on FB, replied interested");
+await leadRow.getByRole("button", { name: "save" }).click();
+await leadRow.getByText("saved ✓").waitFor({ timeout: 15000 });
+const noted = await prisma.artistProfile.findUnique({ where: { slug: LEAD_SLUG } });
+check("notes persist on the lead", noted?.outreachNotes === "DM'd on FB, replied interested");
 await leadRow.locator('input[name="email"]').fill(LEAD_EMAIL);
 await leadRow.getByRole("button", { name: "Send Invite" }).click();
 // RESEND_API_KEY is unset locally → manual-DM branch with the claim link.
@@ -178,6 +190,7 @@ const relinked = await prisma.artistProfile.findUnique({
 });
 check("profile relinked to the lead's real email", relinked?.user.email === LEAD_EMAIL);
 check("invitedAt stamped", Boolean(relinked?.invitedAt));
+check("invite auto-advances pipeline to INVITED", relinked?.outreachStage === "INVITED");
 const leadAccount = await prisma.user.findUnique({ where: { email: LEAD_EMAIL } });
 const token = await prisma.passwordResetToken.findFirst({
   where: { userId: leadAccount?.id ?? "", expires: { gt: new Date() } },

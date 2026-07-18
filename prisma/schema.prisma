@@ -74,6 +74,11 @@ model ArtistProfile {
   plan      String @default("FREE") // FREE | PRO
   viewCount Int    @default(0) // raw public page views (own visits excluded)
   invitedAt DateTime? // last outreach email sent from the admin panel
+  // Recruiting pipeline for pre-loaded pages: NEW (never touched) →
+  // CONTACTED (comment/DM sent) → IN_TALKS (they replied) → INVITED
+  // (claim link sent). Claimed pages leave the board entirely.
+  outreachStage String  @default("NEW")
+  outreachNotes String?
   createdAt   DateTime @default(now())
 
   submissions Submission[]

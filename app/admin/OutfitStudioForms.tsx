@@ -5,6 +5,8 @@ import {
   createHouseOutfit,
   createOutfitBattleAction,
   outreachInvite,
+  setArtistStage,
+  saveArtistNotes,
   type ActionResult,
   type OutreachResult,
 } from "@/app/actions";
@@ -112,21 +114,43 @@ export function OutfitBattleForm({ outfits }: { outfits: OutfitOption[] }) {
   );
 }
 
+const STAGES: { key: string; label: string }[] = [
+  { key: "NEW", label: "New" },
+  { key: "CONTACTED", label: "Contacted" },
+  { key: "IN_TALKS", label: "In talks" },
+  { key: "INVITED", label: "Invited" },
+];
+
+const STAGE_CHIP: Record<string, string> = {
+  NEW: "border-edge text-smoke",
+  CONTACTED: "border-heat/60 text-heat",
+  IN_TALKS: "border-volt/60 text-volt",
+  INVITED: "border-volt text-volt",
+};
+
 export function OutreachRow({
   artistId,
   displayName,
   defaultEmail,
   invitedAgo,
   pageSlug,
+  stage,
+  notes,
 }: {
   artistId: string;
   displayName: string;
   defaultEmail: string;
   invitedAgo: string | null;
   pageSlug: string;
+  stage: string;
+  notes: string | null;
 }) {
   const [state, formAction, pending] = useActionState<OutreachResult | null, FormData>(
     outreachInvite,
+    null
+  );
+  const [notesState, notesAction, notesPending] = useActionState<ActionResult | null, FormData>(
+    saveArtistNotes,
     null
   );
   return (
@@ -136,9 +160,37 @@ export function OutreachRow({
           {displayName}{" "}
           <a href={`/artists/${pageSlug}`} className="tag text-volt underline">page →</a>
         </p>
-        <p className="tag text-smoke">
-          {invitedAgo ? `Invited ${invitedAgo}` : "Never invited"}
-        </p>
+        <div className="flex items-center gap-2">
+          <span className={`tag rounded-full border px-2.5 py-1 ${STAGE_CHIP[stage] ?? STAGE_CHIP.NEW}`}>
+            {STAGES.find((s) => s.key === stage)?.label ?? stage}
+          </span>
+          <p className="tag text-smoke">
+            {invitedAgo ? `Invited ${invitedAgo}` : "Never invited"}
+          </p>
+        </div>
+      </div>
+
+      {/* Pipeline: where is this lead right now? */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {STAGES.filter((s) => s.key !== stage && s.key !== "INVITED").map((s) => (
+          <form key={s.key} action={setArtistStage.bind(null, artistId, s.key)}>
+            <button className="tag rounded border border-edge px-2.5 py-1 text-smoke transition hover:border-volt hover:text-white">
+              → {s.label}
+            </button>
+          </form>
+        ))}
+        <form action={notesAction} className="flex min-w-0 flex-1 items-center gap-1.5">
+          <input type="hidden" name="artistId" value={artistId} />
+          <input
+            name="notes"
+            defaultValue={notes ?? ""}
+            placeholder="notes — where it stands, what they said…"
+            className="min-w-0 flex-1 rounded border border-edge bg-panel px-2.5 py-1 text-xs text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+          />
+          <button disabled={notesPending} className="tag shrink-0 text-volt underline disabled:opacity-50">
+            {notesState?.ok ? "saved ✓" : "save"}
+          </button>
+        </form>
       </div>
       {state?.ok ? (
         <div className="mt-2 space-y-1">
