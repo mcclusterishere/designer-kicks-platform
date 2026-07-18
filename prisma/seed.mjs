@@ -588,6 +588,34 @@ const preloadArtists = [
     ],
   },
   {
+    // Verified heavyweight — 740K-follower FB page, IG @parksart,
+    // YouTube/X/Threads/Etsy, Big Cartel shop. Self-listed in
+    // Christiansburg, VA. Claimable placeholder; commissions run
+    // through his DMs ("DM CUSTOMS").
+    slug: "parksart",
+    email: null,
+    displayName: "Parksart Customs",
+    instagram: "parksart",
+    city: "Christiansburg, VA",
+    portfolioUrl: "https://parksartcustoms.bigcartel.com",
+    bio: "Hand-painted one-of-ones from a verified page 740K deep — custom sneakers, canvas work, and build content across every platform. The house style is layered airbrush color, abstract linework, and signature detailing. Commission books open monthly and fill fast: DM “CUSTOMS” to start a pair.",
+    pieces: [
+      {
+        title: "Sunblush Levi's Jordan 4",
+        matchTitle: "sunblush",
+        baseShoe: "Air Jordan 4 x Levi's",
+        brand: "Jordan",
+        silhouette: "Air Jordan 4",
+        baseColorway: "Levi's Denim",
+        category: "sneakers",
+        description:
+          "Inspired by the friends-and-family Futura Sunblush Dunks, rebuilt to stand as its own piece — layered airbrush color washes over the Levi's denim Jordan 4, abstract orbit linework and signature scripts, a JG monogram at the heel, the red Levi's tab and Levi Strauss & Co. patch left untouched, paper-brown Jumpman tongue and gum sole closing it out. A grail donor turned wearable canvas.",
+        imageUrl: "/seed/pa-sb-1.webp",
+        extraImages: ["/seed/pa-sb-2.webp", "/seed/pa-sb-3.webp", "/seed/pa-sb-4.webp"],
+      },
+    ],
+  },
+  {
     // Facebook-only customizer, car-show scene — no site, no findable
     // IG/shop, DM-to-order. Bio built from their own brand language.
     // Claimable placeholder until they take the page over.
