@@ -598,8 +598,20 @@ const preloadArtists = [
     instagram: "dejesuscustomfootwear",
     city: "Chicago, IL",
     portfolioUrl: "https://www.dejesusinc.com",
-    bio: "Chicago's DCF — founded by Dillon DeJesus, a decade-plus deep in customs with work on the feet of pro athletes and celebrities. Every shoe has a story: one-of-one commissions, full YouTube build tutorials, their own tool-and-stencil line, and the DCF Experience, a hands-on customization workshop taught from the 35th Street studio.",
+    bio: "Chicago's DCF — founded by Dillon DeJesus, painting customs since 2010 after trading architecture school for Angelus and an airbrush. Work on the feet of pro athletes and celebrities, a YouTube channel named a Creator on the Rise with a Shorty Awards breakout nod, full build tutorials, their own tool-and-stencil line, and the DCF Experience — a hands-on workshop taught from the 35th Street studio. Every shoe has a story.",
     pieces: [
+      {
+        title: "New York Yankees Air Max 90",
+        matchTitle: "yankees",
+        baseShoe: "Nike Air Max 90",
+        brand: "Nike",
+        silhouette: "Air Max 90",
+        category: "sneakers",
+        description:
+          "A full team-identity build on the Air Max 90: home-jersey pinstripe panels over navy shadow-camo mesh, a swoosh finished as bat-barrel wood grain — knot and all — the top-hat Yankees crest on the lateral heel, the interlocking NY at the collar, and NEW YORK across the tongue tags. Shot on the diamond and released with its own DCF promo card.",
+        imageUrl: "/seed/dj-ny-1.webp",
+        extraImages: ["/seed/dj-ny-2.webp", "/seed/dj-ny-3.webp", "/seed/dj-ny-4.webp", "/seed/dj-ny-5.webp"],
+      },
       {
         title: "Charizard Jordan 1s",
         matchTitle: "charizard",
