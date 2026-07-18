@@ -22,6 +22,7 @@ import { randomUUID, randomInt, randomBytes } from "crypto";
 import { saveUpload } from "@/lib/storage";
 import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
+import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 
 export type ActionResult = { ok: boolean; error?: string };
 
@@ -1582,4 +1583,179 @@ export async function deleteQuestion(id: string) {
   await requireAdmin();
   await prisma.quizQuestion.delete({ where: { id } });
   revalidatePath("/admin");
+}
+
+// ---------- Store Scout (BETA — admin-only prospecting) ----------
+
+export type ScoutResult = ActionResult & { found?: number; added?: number; noSite?: number };
+
+/**
+ * Scan the stores around a zip through Google Places. New finds land
+ * on the board as SCOUTED; rescans refresh contact facts (website,
+ * rating, phone) but never touch research or pipeline status.
+ */
+export async function scoutStores(
+  _prev: ScoutResult | null,
+  formData: FormData
+): Promise<ScoutResult> {
+  await requireAdmin();
+  const zip = String(formData.get("zip") ?? "").trim();
+  const keyword = String(formData.get("keyword") ?? "").trim() || "sneaker store";
+  if (!/^\d{5}$/.test(zip)) return { ok: false, error: "Enter a 5-digit US zip code." };
+
+  let places;
+  try {
+    places = await searchPlaces(`${keyword} near ${zip}`);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Places search failed." };
+  }
+
+  let added = 0;
+  for (const p of places) {
+    const existing = await prisma.storeLead.findUnique({ where: { placeId: p.placeId } });
+    if (existing) {
+      await prisma.storeLead.update({
+        where: { id: existing.id },
+        data: {
+          website: p.website,
+          rating: p.rating,
+          reviewCount: p.reviewCount,
+          phone: existing.phone ?? p.phone,
+          mapsUrl: p.mapsUrl,
+        },
+      });
+    } else {
+      await prisma.storeLead.create({
+        data: { ...p, zip: zipFromAddress(p.address) ?? zip },
+      });
+      added++;
+    }
+  }
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    found: places.length,
+    added,
+    noSite: places.filter((p) => !p.website).length,
+  };
+}
+
+/** Manual add — for spots found on foot, IG, or word of mouth. */
+export async function addStoreLead(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const zip = String(formData.get("zip") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const website = String(formData.get("website") ?? "").trim();
+  if (!name || name.length > 80) return { ok: false, error: "Store name is required." };
+  if (zip && !/^\d{5}$/.test(zip)) return { ok: false, error: "Zip should be 5 digits." };
+
+  const dup = await prisma.storeLead.findFirst({
+    where: { name: { equals: name, mode: "insensitive" }, zip: zip || undefined },
+  });
+  if (dup) return { ok: false, error: "That store is already on the board." };
+
+  await prisma.storeLead.create({
+    data: {
+      name,
+      address: address || null,
+      zip: zip || null,
+      phone: phone || null,
+      website: website || null,
+    },
+  });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Brand research → a populated profile. A found email qualifies the lead. */
+export async function updateStoreLead(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  const specialty = String(formData.get("specialty") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "That email doesn't look right." };
+  }
+  const lead = await prisma.storeLead.findUnique({ where: { id } });
+  if (!lead) return { ok: false, error: "Lead not found." };
+
+  await prisma.storeLead.update({
+    where: { id },
+    data: {
+      email: email || null,
+      instagram: instagram || null,
+      specialty: specialty.slice(0, 80) || null,
+      notes: notes.slice(0, 1000) || null,
+      // Research with a live email = ready to pitch. Never demote a
+      // lead that's already been invited or joined.
+      status: lead.status === "SCOUTED" && email ? "QUALIFIED" : lead.status,
+    },
+  });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function setStoreStatus(id: string, status: string): Promise<void> {
+  await requireAdmin();
+  if (!(STORE_STATUSES as readonly string[]).includes(status)) return;
+  await prisma.storeLead.update({ where: { id }, data: { status } }).catch(() => {});
+  revalidatePath("/admin");
+}
+
+export type StoreInviteResult = ActionResult & { emailSent?: boolean; emailText?: string };
+
+/** The pitch: no website? The Heat Chart becomes your storefront. */
+export async function sendStoreInvite(
+  _prev: StoreInviteResult | null,
+  formData: FormData
+): Promise<StoreInviteResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const lead = await prisma.storeLead.findUnique({ where: { id } });
+  if (!lead) return { ok: false, error: "Lead not found." };
+  if (!lead.email) return { ok: false, error: "Add their email in the research panel first." };
+
+  const cred =
+    lead.rating && lead.reviewCount
+      ? `${lead.rating}★ across ${lead.reviewCount} Google reviews and no website listed`
+      : "a real following and no website listed";
+  const pitch =
+    `Yo ${lead.name} team — Matt here, from The Heat Chart (formerly the Designer Kicks page).\n\n` +
+    `I was mapping the best sneaker spots around ${lead.zip ?? "your area"} and your shop stood out: ${cred}. That's exactly who we built this program for.\n\n` +
+    `We're hand-picking a founding class of local shops to become HEAT CHART VERIFIED STORES:\n` +
+    `• A free verified storefront page — your story, your specialty, your heat, one clean link for your Google panel and IG bio\n` +
+    `• Your inventory in front of a national audience that votes on sneaker heat every day\n` +
+    `• Collectors place real offers through the platform — and when on-platform checkout opens, the seller fee is 1%. The big marketplaces take 10.\n` +
+    `• Verified badge, priority placement in our drops calendar, and first access to the league's battles\n\n` +
+    `It costs nothing — founding stores keep free access permanently. You don't need a website; that's the point. We're it.\n\n` +
+    `Reply to this email${lead.instagram ? ` or DM us from @${lead.instagram}` : ""} and I'll build your storefront personally this week.\n\n` +
+    `— Matt\nThe Heat Chart · theheatchart.com`;
+
+  let emailSent = false;
+  if (process.env.RESEND_API_KEY) {
+    const { delivered } = await sendMail({
+      to: lead.email,
+      subject: `${lead.name} — Heat Chart Verified Store (free storefront, founding class)`,
+      text: pitch,
+    });
+    emailSent = delivered;
+  }
+  await prisma.storeLead.update({
+    where: { id },
+    data: { status: "INVITED", invitedAt: new Date() },
+  });
+  // No revalidatePath: it would re-group the row and unmount the
+  // copy-paste pitch before the admin can grab it. The board reflects
+  // the new status on the next load.
+  return { ok: true, emailSent, emailText: pitch };
 }

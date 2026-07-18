@@ -30,6 +30,8 @@ import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
+import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
+import { placesConfigured } from "@/lib/stores";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -180,6 +182,38 @@ export default async function AdminPage({
     const days = Math.floor((Date.now() - d.getTime()) / 86400000);
     return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
   };
+
+  // Store Scout (beta): the prospecting board, grouped by pipeline stage.
+  const storeLeads = await prisma.storeLead.findMany({
+    orderBy: [{ createdAt: "desc" }],
+    take: 150,
+  });
+  const leadRow = (l: (typeof storeLeads)[number]) => ({
+    id: l.id,
+    name: l.name,
+    address: l.address,
+    zip: l.zip,
+    phone: l.phone,
+    mapsUrl: l.mapsUrl,
+    website: l.website,
+    rating: l.rating,
+    reviewCount: l.reviewCount,
+    email: l.email,
+    instagram: l.instagram,
+    specialty: l.specialty,
+    notes: l.notes,
+    status: l.status,
+    invitedAgo: l.invitedAt ? humanizeAgo(l.invitedAt) : null,
+  });
+  const storeTargets = storeLeads.filter(
+    (l) => !l.website && ["SCOUTED", "QUALIFIED"].includes(l.status)
+  );
+  const storeInvited = storeLeads.filter((l) => l.status === "INVITED");
+  const storeJoined = storeLeads.filter((l) => l.status === "JOINED");
+  const storeRest = storeLeads.filter(
+    (l) =>
+      !storeTargets.includes(l) && !storeInvited.includes(l) && !storeJoined.includes(l)
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -483,6 +517,83 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+
+      {/* Store Scout (beta): verified-store prospecting by zip code */}
+      <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Store <span className="text-gradient-heat">Scout</span>{" "}
+          <span className="sticker px-2 py-0.5 text-xs align-middle">Beta</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Find real shoe stores around a zip code and check their Google
+          panel for a website. The ones without one are the play: research
+          the brand, populate their profile, and pitch them a free{" "}
+          <span className="text-white">Heat Chart Verified Store</span>{" "}
+          page. Admin-only for now — public store pages come when the
+          first class is signed.
+        </p>
+
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+          <ScoutForm placesReady={placesConfigured()} />
+        </div>
+
+        {storeTargets.length > 0 && (
+          <div className="mt-5">
+            <h3 className="tag text-white">
+              🎯 Targets — no website ({storeTargets.length})
+            </h3>
+            <div className="mt-2 space-y-3">
+              {storeTargets.map((l) => (
+                <StoreLeadRow key={l.id} lead={leadRow(l)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {storeInvited.length > 0 && (
+          <div className="mt-5">
+            <h3 className="tag text-heat">✉️ Invited ({storeInvited.length})</h3>
+            <div className="mt-2 space-y-3">
+              {storeInvited.map((l) => (
+                <StoreLeadRow key={l.id} lead={leadRow(l)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {storeJoined.length > 0 && (
+          <div className="mt-5">
+            <h3 className="tag text-volt">✓ Verified stores ({storeJoined.length})</h3>
+            <div className="mt-2 space-y-3">
+              {storeJoined.map((l) => (
+                <StoreLeadRow key={l.id} lead={leadRow(l)} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {storeRest.length > 0 && (
+          <details className="mt-5">
+            <summary className="tag cursor-pointer text-smoke">
+              Everything else — has a site or passed ({storeRest.length})
+            </summary>
+            <div className="mt-2 space-y-3">
+              {storeRest.map((l) => (
+                <StoreLeadRow key={l.id} lead={leadRow(l)} />
+              ))}
+            </div>
+          </details>
+        )}
+
+        <details className="mt-5">
+          <summary className="tag cursor-pointer text-smoke">
+            Add a store by hand (found on foot / IG / word of mouth)
+          </summary>
+          <div className="mt-3 rounded-xl border border-edge bg-surface p-4">
+            <ManualStoreForm />
+          </div>
+        </details>
       </section>
 
       {/* Artist applications */}

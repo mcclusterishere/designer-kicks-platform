@@ -81,6 +81,38 @@ model ArtistProfile {
   claims      ArtistClaim[]
 }
 
+// BETA (admin-only): Store Scout. Local shoe stores prospected by zip
+// code — the targets are stores with NO website, pitched a free
+// "Heat Chart Verified Store" page. Pipeline: SCOUTED (found) →
+// QUALIFIED (researched + email found) → INVITED → JOINED | PASSED.
+// Nothing here is public yet; the model carries what a public store
+// page will need when this graduates from beta.
+model StoreLead {
+  id          String  @id @default(cuid())
+  placeId     String? @unique // Google Place id — dedupes rescans
+  name        String
+  address     String?
+  zip         String?
+  phone       String?
+  mapsUrl     String?
+  website     String? // null = the whole point
+  rating      Float?
+  reviewCount Int?
+
+  // Brand research, filled in by hand before the invite goes out
+  email      String?
+  instagram  String?
+  specialty  String? // e.g. "consignment + customs", "kids exclusives"
+  notes      String?
+
+  status    String    @default("SCOUTED") // SCOUTED | QUALIFIED | INVITED | JOINED | PASSED
+  invitedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([zip])
+}
+
 // First-party, cookieless traffic analytics. One row per pageview.
 // visitorHash is an HMAC of (ip, user-agent, UTC day) — it rotates
 // daily and the raw IP is never stored, so uniques can be counted
