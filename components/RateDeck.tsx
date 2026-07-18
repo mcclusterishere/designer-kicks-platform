@@ -3,13 +3,14 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { rateDesign } from "@/app/actions";
+import SwipeGallery from "@/components/SwipeGallery";
 
 export type RateCard = {
   id: string;
   title: string;
   artistName: string;
   artistSlug: string | null;
-  imageUrl: string;
+  images: string[]; // cover first, then every extra angle — swipeable
   chips: string[];
 };
 
@@ -116,11 +117,12 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
             leaving ? "rate-card-exit" : "rate-card-enter"
           }`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={card.imageUrl}
+          {/* keyed per card so the gallery rewinds to photo 1 on deal */}
+          <SwipeGallery
+            key={card.id}
+            testId="rate-gallery"
+            images={card.images}
             alt={`${card.title} by ${card.artistName}`}
-            className="aspect-square w-full object-cover"
           />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent" />
 

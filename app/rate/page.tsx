@@ -72,7 +72,7 @@ export default async function RatePage() {
       title: s.title,
       artistName: s.artist?.displayName ?? s.artistName,
       artistSlug: s.artist?.slug ?? null,
-      imageUrl: s.imageUrl,
+      images: [s.imageUrl, ...s.extraImages],
       chips,
     };
   });

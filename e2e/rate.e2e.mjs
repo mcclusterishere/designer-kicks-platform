@@ -34,6 +34,29 @@ await page.locator("[data-testid=rate-card]").waitFor({ timeout: 10000 });
 check("deck deals a card", true);
 await page.screenshot({ path: `${SHOTS}/rate-deck.png`, fullPage: false });
 
+// ---------- Swipe gallery on the card ----------
+check("card renders a swipe gallery", (await page.locator("[data-testid=rate-gallery]").count()) === 1);
+// Deck is shuffled — pass until a multi-angle card is on top.
+let galleryImgs = 0;
+for (let i = 0; i < 8; i++) {
+  galleryImgs = await page.locator("[data-testid=rate-gallery] img").count();
+  if (galleryImgs > 1) break;
+  const t = await page.locator("[data-testid=rate-card] h2").innerText();
+  await page.getByRole("button", { name: /Pass — show me another/ }).click();
+  await cardSettled(t);
+}
+check("deck deals a multi-photo card", galleryImgs > 1);
+check(
+  "photo counter starts at 1",
+  await page.locator("[data-testid=rate-card]").getByText(`1/${galleryImgs}`).isVisible()
+);
+await page
+  .locator("[data-testid=rate-gallery]")
+  .evaluate((el) => el.scrollBy({ left: el.clientWidth }));
+await page.locator("[data-testid=rate-card]").getByText(`2/${galleryImgs}`).waitFor({ timeout: 5000 });
+check("swiping advances to the next photo", true);
+await page.screenshot({ path: `${SHOTS}/rate-gallery-swipe.png`, fullPage: false });
+
 const firstTitle = await page.locator("[data-testid=rate-card] h2").innerText();
 await page.getByRole("button", { name: "4 flames" }).click();
 await page.locator("[data-testid=rate-reveal]").waitFor({ timeout: 10000 });
