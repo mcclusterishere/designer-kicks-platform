@@ -226,9 +226,19 @@ const secondSale = await prisma.sale.findUnique({ where: { id: offerSale.id } })
 check("buy-back transfers ownership to the artist", bounced?.ownerId === artistUser?.id);
 check("offer sale confirms unverified (no evidence)", secondSale?.status === "CONFIRMED" && secondSale?.verified === false);
 
-// Admin sales ledger shows the evidence-verified sale
+// Admin sales ledger shows the evidence-verified sale + Site Pulse analytics
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 check("sale in admin ledger, evidence-verified", await page.getByText("✓ verified (evidence)").first().isVisible());
+check("site pulse renders for admin", await page.getByText("Site Pulse").isVisible());
+check("pulse tracks sales volume", await page.getByText("Sales volume").isVisible());
+check("pulse charts the last 14 days", (await page.locator("svg[aria-label*='Last 14 days']").count()) >= 2);
+
+// Artist Studio: the artist's own analytics dashboard
+await page.goto(`${BASE}/studio`, { waitUntil: "networkidle" });
+check("studio dashboard renders", await page.getByText("Artist Studio").isVisible());
+check("studio revenue reflects verified-track sales", await page.getByText("$450").first().isVisible());
+check("studio lists the piece with stats", await page.getByText("League Test Custom").isVisible());
+check("founding-artist plan shown, pro tier primed", await page.getByText("founding artist").first().isVisible());
 
 // Provenance shown on the artist page
 await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });

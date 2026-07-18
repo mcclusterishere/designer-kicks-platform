@@ -1,0 +1,220 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+import { getStudioData } from "@/lib/analytics";
+import { getHeatList } from "@/lib/battles";
+import { formatUsd } from "@/lib/market";
+import { categoryEmoji } from "@/lib/categories";
+import MiniBars from "@/components/MiniBars";
+
+export const metadata = { title: "Artist Studio — The Heat Chart" };
+export const dynamic = "force-dynamic";
+
+export default async function StudioPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/signin");
+
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, status: true },
+  });
+  if (!profile || profile.status !== "APPROVED") redirect("/submit");
+
+  const [data, heat] = await Promise.all([getStudioData(profile.id), getHeatList()]);
+  if (!data) redirect("/submit");
+  const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
+  const { artist, stats, votesSeries, followsLast14, soldSales } = data;
+
+  const bestRank = Math.min(
+    ...artist.submissions.map((s) => heatRank.get(s.id) ?? Infinity)
+  );
+
+  const tiles = [
+    { label: "Total votes", value: stats.totalVotes },
+    { label: "Record", value: `${stats.wins}W–${stats.losses}L` },
+    { label: "Win rate", value: stats.winRate === null ? "—" : `${stats.winRate}%` },
+    { label: "Followers", value: stats.followers },
+    { label: "Profile views", value: stats.views },
+    { label: "Best heat rank", value: Number.isFinite(bestRank) ? `#${bestRank}` : "—" },
+    { label: "Revenue (verified-track)", value: formatUsd(stats.revenueCents) },
+    {
+      label: "Open offers",
+      value: stats.openOffers > 0
+        ? `${stats.openOffers} · top ${formatUsd(stats.topOfferCents)}`
+        : "0",
+    },
+  ];
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-12">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="tag text-volt">Artist Studio</p>
+          <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
+            {artist.displayName}
+          </h1>
+          <p className="mt-1 text-sm text-smoke">
+            Plan: <span className="text-volt">{artist.plan === "PRO" ? "Pro" : "Free — founding artist"}</span>
+          </p>
+        </div>
+        <Link
+          href={`/artists/${artist.slug}`}
+          className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-volt hover:text-white"
+        >
+          Public page →
+        </Link>
+      </div>
+
+      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-xl border border-edge bg-surface p-4 text-center">
+            <p className="display text-xl text-volt sm:text-2xl">{t.value}</p>
+            <p className="tag mt-1 text-smoke">{t.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Momentum */}
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-edge bg-surface p-5">
+          <div className="flex items-baseline justify-between">
+            <h2 className="display text-lg text-white">Votes — last 14 days</h2>
+            <span className="tag text-smoke">
+              {votesSeries.reduce((s, d) => s + d.count, 0)} total
+            </span>
+          </div>
+          <div className="mt-4">
+            <MiniBars series={votesSeries} />
+          </div>
+        </div>
+        <div className="rounded-xl border border-edge bg-surface p-5">
+          <h2 className="display text-lg text-white">Last 14 days</h2>
+          <ul className="mt-3 space-y-2 text-sm text-smoke">
+            <li>
+              <span className="text-white">{followsLast14}</span> new follower
+              {followsLast14 === 1 ? "" : "s"}
+            </li>
+            <li>
+              <span className="text-white">{stats.openOffers}</span> open offer
+              {stats.openOffers === 1 ? "" : "s"} waiting on you
+              {stats.openOffers > 0 && (
+                <>
+                  {" — "}
+                  <Link href="/profile" className="text-volt underline">
+                    respond →
+                  </Link>
+                </>
+              )}
+            </li>
+            <li>
+              Battles put your work in front of voters —{" "}
+              <Link href="/battles" className="text-volt underline">
+                see the arena
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Per-piece breakdown */}
+      <h2 className="display mt-10 text-2xl text-white">
+        Your <span className="text-gradient-heat">Pieces</span>
+      </h2>
+      <div className="mt-4 overflow-x-auto rounded-xl border border-edge">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="bg-panel">
+            <tr className="tag text-smoke">
+              <th className="px-4 py-3">Piece</th>
+              <th className="px-3 py-3">Votes</th>
+              <th className="px-3 py-3">Record</th>
+              <th className="px-3 py-3">Heat rank</th>
+              <th className="px-3 py-3">Last sale</th>
+              <th className="px-3 py-3">Ask</th>
+              <th className="px-3 py-3">Offers</th>
+            </tr>
+          </thead>
+          <tbody>
+            {artist.submissions.map((s) => {
+              const battles =
+                s.battlesAsA.filter((b) => b.status === "COMPLETED").length +
+                s.battlesAsB.filter((b) => b.status === "COMPLETED").length;
+              const rank = heatRank.get(s.id);
+              const lastSale = s.sales.find((x) => x.status === "CONFIRMED");
+              const pending = s.sales.some((x) => x.status === "PENDING");
+              return (
+                <tr key={s.id} className="border-t border-edge bg-surface">
+                  <td className="px-4 py-3">
+                    <span className="font-bold text-white">
+                      {categoryEmoji(s.category)} {s.title}
+                    </span>
+                    {pending && <span className="tag text-heat"> · sale pending</span>}
+                  </td>
+                  <td className="px-3 py-3 text-white">{s._count.votes}</td>
+                  <td className="px-3 py-3 text-smoke">
+                    {s._count.battlesWon}W–{battles - s._count.battlesWon}L
+                  </td>
+                  <td className="px-3 py-3 text-volt">{rank ? `#${rank}` : "—"}</td>
+                  <td className="px-3 py-3 text-smoke">
+                    {lastSale ? formatUsd(lastSale.priceCents) : "—"}
+                  </td>
+                  <td className="px-3 py-3 text-smoke">
+                    {s.askingPriceCents ? formatUsd(s.askingPriceCents) : "—"}
+                  </td>
+                  <td className="px-3 py-3 text-smoke">
+                    {s.offers.length > 0 ? (
+                      <span className="text-volt">
+                        {s.offers.length} · top {formatUsd(s.offers[0].amountCents)}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Sales ledger */}
+      {soldSales.length > 0 && (
+        <>
+          <h2 className="display mt-10 text-2xl text-white">
+            Sales <span className="text-gradient-volt">Ledger</span>
+          </h2>
+          <div className="mt-4 space-y-2">
+            {soldSales.map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+              >
+                <span className="text-smoke">
+                  {s.soldAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+                <span className="font-bold text-white">{formatUsd(s.priceCents)}</span>
+                {s.verified ? (
+                  <span className="tag text-volt">✓ verified</span>
+                ) : (
+                  <span className="tag text-smoke">unverified</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* The future paid tier, primed honestly */}
+      <div className="mt-12 rounded-xl border border-volt/40 bg-surface p-6">
+        <p className="display text-xl text-white">
+          Heat Chart <span className="text-gradient-volt">Pro</span> is coming
+        </p>
+        <p className="mt-2 max-w-2xl text-sm text-smoke">
+          Deeper analytics, produced video ads for your pieces, priority
+          battle placement, and storefront tools. Founding artists — everyone
+          reading this — keep free access to everything on this page forever.
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -180,7 +180,7 @@ if (process.env.SERVER_LOG) {
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
-await page.getByText("Members").waitFor({ timeout: 10000 });
+await page.getByRole("heading", { name: /Members/ }).waitFor({ timeout: 10000 });
 check("admin members table lists user + phone", await page.getByText("+1 555 010 2030").isVisible());
 
 const csvResp = await ctx.request.get(`${BASE}/api/admin/users.csv`);

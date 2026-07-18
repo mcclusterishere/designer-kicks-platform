@@ -16,6 +16,8 @@ import {
   setSaleVerified,
 } from "@/app/actions";
 import { formatUsd } from "@/lib/market";
+import { getSiteAnalytics } from "@/lib/analytics";
+import MiniBars from "@/components/MiniBars";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
 import ProductForm from "./ProductForm";
@@ -85,6 +87,8 @@ export default async function AdminPage({
       include: { champion: true },
     }),
   ]);
+
+  const pulse = await getSiteAnalytics();
 
   const artistApplications = await prisma.artistProfile.findMany({
     where: { status: "PENDING" },
@@ -175,6 +179,54 @@ export default async function AdminPage({
       </section>
 
       {/* Pre-load artist (onboarding accelerator) */}
+      <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Site <span className="text-gradient-volt">Pulse</span>
+        </h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Members", value: `${pulse.tiles.members} (+${pulse.tiles.members7} this wk)` },
+            { label: "Votes", value: `${pulse.tiles.votes} (+${pulse.tiles.votes7} this wk)` },
+            { label: "Quiz runs this wk", value: pulse.tiles.quizRuns7 },
+            { label: "Giveaway entries", value: pulse.tiles.entries },
+            { label: "Sales volume", value: `${formatUsd(pulse.tiles.salesVolumeCents)} (${pulse.tiles.salesCount})` },
+            { label: "Open offers", value: pulse.tiles.openOffers },
+            { label: "Live battles", value: pulse.tiles.activeBattles },
+            { label: "Artists in league", value: pulse.tiles.approvedArtists },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-edge bg-surface p-3 text-center">
+              <p className="display text-lg text-volt">{s.value}</p>
+              <p className="tag mt-1 text-smoke">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Votes — last 14 days</p>
+            <div className="mt-2"><MiniBars series={pulse.votesSeries} /></div>
+          </div>
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Signups — last 14 days</p>
+            <div className="mt-2"><MiniBars series={pulse.signupsSeries} accent="heat" /></div>
+          </div>
+        </div>
+        {pulse.topPieces.length > 0 && (
+          <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Most-voted pieces</p>
+            <ol className="mt-2 space-y-1 text-sm">
+              {pulse.topPieces.map((tp, i) => (
+                <li key={tp.id} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate text-white">
+                    {i + 1}. {tp.title} <span className="text-smoke">— {tp.artistName}</span>
+                  </span>
+                  <span className="shrink-0 text-volt">{tp.votes} votes</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </section>
+
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Pre-load An Artist</h2>
         <p className="mt-1 text-sm text-smoke">

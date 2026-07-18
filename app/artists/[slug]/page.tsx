@@ -54,6 +54,13 @@ export default async function ArtistPage({ params }: Props) {
   // Pre-loaded pages stay claimable until the artist sets a login.
   const claimable = !artist.user.passwordHash && artist.user._count.accounts === 0;
 
+  // Raw page-view counting for the Studio dashboard — own visits excluded.
+  if (!isOwnPage) {
+    await prisma.artistProfile
+      .update({ where: { id: artist.id }, data: { viewCount: { increment: 1 } } })
+      .catch(() => {});
+  }
+
   let wins = 0;
   let battles = 0;
   let totalVotes = 0;
@@ -95,6 +102,14 @@ export default async function ArtistPage({ params }: Props) {
           {artist.bio && <p className="mt-3 max-w-xl text-smoke">{artist.bio}</p>}
         </div>
         <div className="flex flex-col items-end gap-2">
+          {isOwnPage && (
+            <Link
+              href="/studio"
+              className="btn-hard rounded-lg px-4 py-2.5 tag font-bold"
+            >
+              Open Your Studio
+            </Link>
+          )}
           <FollowButton
             artistId={artist.id}
             initialFollowing={following}

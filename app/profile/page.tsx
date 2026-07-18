@@ -133,6 +133,10 @@ export default async function ProfilePage() {
             <Link href={`/artists/${user.artistProfile.slug}`} className="font-bold text-volt">
               {user.artistProfile.displayName}
             </Link>
+            {" · "}
+            <Link href="/studio" className="text-volt underline">
+              Studio →
+            </Link>
           </p>
         ) : user.artistProfile?.status === "PENDING" ? (
           <p className="text-smoke">

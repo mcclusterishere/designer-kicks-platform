@@ -62,6 +62,9 @@ model ArtistProfile {
   // rails later require vetted identities). Existing/seed artists
   // default APPROVED; applications are created PENDING.
   status      String   @default("APPROVED") // PENDING | APPROVED | REJECTED
+  // Subscription groundwork: everyone rides FREE until billing opens.
+  plan      String @default("FREE") // FREE | PRO
+  viewCount Int    @default(0) // raw public page views (own visits excluded)
   createdAt   DateTime @default(now())
 
   submissions Submission[]

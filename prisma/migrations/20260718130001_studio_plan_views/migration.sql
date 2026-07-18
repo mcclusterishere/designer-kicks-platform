@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "ArtistProfile" ADD COLUMN     "plan" TEXT NOT NULL DEFAULT 'FREE',
+ADD COLUMN     "viewCount" INTEGER NOT NULL DEFAULT 0;
+
