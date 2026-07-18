@@ -21,6 +21,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!article || article.status !== "PUBLISHED") return { title: "Not found" };
 
   const url = `${siteUrl()}/news/${article.slug}`;
+  const coverAbs = article.coverImage
+    ? article.coverImage.startsWith("http")
+      ? article.coverImage
+      : `${siteUrl()}${article.coverImage}`
+    : null;
   return {
     title: `${article.title} — The Heat Chart`,
     description: article.excerpt,
@@ -33,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "article",
       publishedTime: article.publishedAt?.toISOString(),
       modifiedTime: article.updatedAt.toISOString(),
-      images: article.coverImage ? [{ url: `${siteUrl()}${article.coverImage}` }] : undefined,
+      images: coverAbs ? [{ url: coverAbs }] : undefined,
     },
     twitter: {
       card: "summary_large_image",
@@ -56,7 +61,9 @@ export default async function ArticlePage({ params }: Props) {
     "@type": "NewsArticle",
     headline: article.title,
     description: article.excerpt,
-    image: article.coverImage ? [`${siteUrl()}${article.coverImage}`] : undefined,
+    image: article.coverImage
+      ? [article.coverImage.startsWith("http") ? article.coverImage : `${siteUrl()}${article.coverImage}`]
+      : undefined,
     datePublished: article.publishedAt?.toISOString(),
     dateModified: article.updatedAt.toISOString(),
     author: { "@type": "Organization", name: "The Heat Chart", url: siteUrl() },

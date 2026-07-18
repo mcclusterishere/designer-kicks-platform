@@ -61,6 +61,11 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
           <label className="tag text-smoke" htmlFor="a-cover">Cover image URL</label>
           <input id="a-cover" name="coverImage" defaultValue={defaults?.coverImage ?? ""}
             placeholder="/seed/news-1.svg or https://…" className={inputClass} />
+          <label className="tag mt-2 block text-smoke" htmlFor="a-cover-file">
+            …or upload a photo <span className="normal-case">(beats the URL — e.g. the official press shot)</span>
+          </label>
+          <input id="a-cover-file" name="cover" type="file" accept="image/jpeg,image/png,image/webp"
+            className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-2 text-xs text-smoke file:mr-2 file:rounded file:border-0 file:bg-volt file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-ink" />
         </div>
         <div>
           <label className="tag text-smoke" htmlFor="a-tags">Tags (comma-separated)</label>

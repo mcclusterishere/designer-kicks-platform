@@ -851,7 +851,8 @@ export async function saveArticle(
   const rawSlug = String(formData.get("slug") ?? "").trim();
   const excerpt = String(formData.get("excerpt") ?? "").trim();
   const content = String(formData.get("content") ?? "").trim();
-  const coverImage = String(formData.get("coverImage") ?? "").trim();
+  let coverImage = String(formData.get("coverImage") ?? "").trim();
+  const coverFile = formData.get("cover");
   const tags = String(formData.get("tags") ?? "").trim();
   const dropAtRaw = String(formData.get("dropAt") ?? "").trim();
   const raffleUrl = String(formData.get("raffleUrl") ?? "").trim();
@@ -866,6 +867,20 @@ export async function saveArticle(
   const dropAt = dropAtRaw ? new Date(`${dropAtRaw}T12:00:00Z`) : null;
   if (dropAt && Number.isNaN(dropAt.getTime())) {
     return { ok: false, error: "Drop date didn't parse — use the date picker." };
+  }
+
+  // An uploaded photo (e.g. the official press image saved to the admin's
+  // device) beats the URL field — no hotlink rot, and OG previews serve
+  // it from our own domain.
+  if (coverFile instanceof File && coverFile.size > 0) {
+    if (coverFile.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Cover photo must be under 6MB." };
+    const ext = ALLOWED_TYPES[coverFile.type];
+    if (!ext) return { ok: false, error: "Cover photo must be a JPG, PNG, or WebP." };
+    coverImage = await saveUpload(
+      Buffer.from(await coverFile.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      coverFile.type
+    );
   }
 
   const slug = slugify(rawSlug || title);

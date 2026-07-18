@@ -1,7 +1,7 @@
 // Newsroom: listing, article SEO tags (meta/OG/canonical/JSON-LD),
 // sitemap/robots/RSS, and the admin authoring flow.
 import { PrismaClient } from "@prisma/client";
-import { BASE, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -56,6 +56,8 @@ await page.fill("#a-tags", "Test, E2E");
 const dropDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 await page.fill("#a-drop", dropDate);
 await page.fill("#a-raffle", "https://www.nike.com/launch");
+// Real product photos enter through the upload field, not hotlinks
+await page.setInputFiles("#a-cover-file", { name: "press.png", mimeType: "image/png", buffer: PNG_1x1 });
 await page.check('input[name="publish"]');
 await page.getByRole("button", { name: "Save Article" }).click();
 await page.getByText("Saved.").waitFor({ timeout: 10000 });
@@ -64,6 +66,8 @@ check("admin can publish an article", true);
 await page.goto(`${BASE}/news/${TEST_SLUG}`, { waitUntil: "networkidle" });
 check("published article live at slug", await page.getByText("E2E News Suite Article").first().isVisible());
 check("markdown bold renders", (await page.locator("article strong").count()) > 0);
+const saved = await prisma.article.findUnique({ where: { slug: TEST_SLUG } });
+check("uploaded cover photo stored and served", Boolean(saved?.coverImage) && (await fetch(`${BASE}${saved.coverImage}`)).ok);
 
 // --- Free drop calendar ---
 await page.goto(`${BASE}/drops`, { waitUntil: "networkidle" });
