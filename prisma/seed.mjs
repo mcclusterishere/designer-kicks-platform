@@ -660,6 +660,71 @@ const preloadArtists = [
     ],
   },
   {
+    // Pueblo, CO — Gunnar Esquivel, 24 (FB 1.6K followers / 1.2K
+    // posts, IG @Da_sneaker_customz_god). True small shop: no site,
+    // no storefront, no public email anywhere — FB Messenger and IG
+    // DMs are the only channels. Matt reached out on both 7/18.
+    slug: "gunnar-esquivel",
+    email: null,
+    displayName: "Gunnar Esquivel",
+    instagram: "Da_sneaker_customz_god",
+    city: "Pueblo, CO",
+    bio: "Pueblo, Colorado's Gunnar Esquivel — @Da_sneaker_customz_god — is a 24-year-old one-man shop with a fashion-house eye. The lane is material builds: luxury-monogram jacquard deconstructions strung with chunky rope laces and piercing hardware, streetwear-camo panel work, Americana print wraps, and player-exclusive Jordan 1 cleats. 'I make custom shoes.' The pairs say the rest.",
+    pieces: [
+      {
+        title: "Bam Bam #42 Cleats",
+        matchTitle: "bam bam",
+        baseShoe: "Air Jordan 1 Cleat",
+        brand: "Jordan",
+        silhouette: "Air Jordan 1",
+        category: "sneakers",
+        description:
+          "A player-exclusive build on the Air Jordan 1 cleat for a slugger who answers to Bam Bam — Taxi-style black, white, and yellow blocking, the Wings logo inked across the collar, and BAM BAM over #42 hand-painted on the heels. Custom number cleats made for the diamond, finished like a retro.",
+        imageUrl: "/seed/ge-bb-3.webp",
+        extraImages: ["/seed/ge-bb-4.webp", "/seed/ge-bb-1.webp", "/seed/ge-bb-2.webp"],
+      },
+      {
+        title: "Pink Monogram Rope Forces",
+        matchTitle: "monogram",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "Dior-style oblique monogram jacquard in blush pink, cut and set into the Air Force 1's panels, then jewelry-finished — silver piercing rings and barbell hardware through the eyestays, chunky white rope laces over the top. Luxury-fashion materials rebuilt into a Force, with a body-mod edge.",
+        imageUrl: "/seed/ge-dr-1.webp",
+        extraImages: ["/seed/ge-dr-2.webp", "/seed/ge-dr-3.webp"],
+      },
+      {
+        title: "Blue ABC Camo Forces",
+        matchTitle: "abc camo",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "BAPE-style blue ABC ape-head camo wrapped over the toe box, eyestay, and Swoosh, with a camo strip dropped under the Nike Air heel tab and chunky two-tone blue rope laces up top. Streetwear-grail fabric, panel-matched and stitched clean into a triple-white Force.",
+        imageUrl: "/seed/ge-bp-2.webp",
+        extraImages: ["/seed/ge-bp-3.webp", "/seed/ge-bp-4.webp", "/seed/ge-bp-1.webp"],
+      },
+      {
+        title: "We The People Forces",
+        matchTitle: "we the people",
+        baseShoe: "Nike Air Force 1",
+        brand: "Nike",
+        silhouette: "Air Force 1",
+        baseColorway: "Triple White",
+        category: "sneakers",
+        description:
+          "The Declaration of Independence, corner to corner — aged-parchment script print across the upper, distressed stars-and-stripes at the collar and tongue, an engraved silver lace charm, and a crisp white Swoosh and sole holding it all together. Fourth-of-July Americana on the Air Force 1.",
+        imageUrl: "/seed/ge-us-1.webp",
+        extraImages: ["/seed/ge-us-2.webp"],
+      },
+    ],
+  },
+  {
     // San Diego triple threat — tattoos, sneaker customs, hand-tufted
     // rugs (IG @paint_the_skyred, ~2.8K). Matt has already reached
     // out; claimable placeholder until he takes the page.
