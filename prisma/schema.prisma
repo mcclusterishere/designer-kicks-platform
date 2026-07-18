@@ -81,6 +81,26 @@ model ArtistProfile {
   claims      ArtistClaim[]
 }
 
+// First-party, cookieless traffic analytics. One row per pageview.
+// visitorHash is an HMAC of (ip, user-agent, UTC day) — it rotates
+// daily and the raw IP is never stored, so uniques can be counted
+// without cookies, consent banners, or cross-site tracking.
+model PageView {
+  id           String   @id @default(cuid())
+  path         String
+  source       String   @default("direct") // utm_source, else mapped referrer, else "direct"
+  medium       String?
+  campaign     String?
+  referrerHost String?
+  device       String   @default("desktop") // mobile | desktop
+  visitorHash  String
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source, createdAt])
+  @@index([visitorHash, createdAt])
+}
+
 // The Rate game: one design, one score out of five flames. Feeds each
 // fan's taste profile and every piece's community rating.
 model DesignRating {

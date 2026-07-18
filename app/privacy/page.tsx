@@ -1,3 +1,5 @@
+import AnalyticsOptOut from "@/components/AnalyticsOptOut";
+
 export const metadata = {
   title: "Privacy Policy — The Heat Chart",
   description: "What The Heat Chart collects, why, and your choices.",
@@ -78,9 +80,26 @@ export default function PrivacyPage() {
           <h2 className="display text-xl text-white">Cookies</h2>
           <p className="mt-2">
             We use only the cookies needed to keep you signed in. No
-            third-party ad trackers. If we enable analytics it will be
-            privacy-friendly and cookie-free.
+            third-party ad trackers, no advertising cookies, no cross-site
+            tracking. That&apos;s why you don&apos;t see a cookie banner here —
+            there&apos;s nothing to consent to.
           </p>
+        </section>
+        <section>
+          <h2 className="display text-xl text-white">Analytics (cookie-free)</h2>
+          <p className="mt-2">
+            We measure traffic ourselves, on our own servers, without
+            cookies. For each pageview we record: the page URL, the
+            referring site (e.g. &quot;facebook&quot;), campaign tags in the
+            link, a device class (mobile/desktop), and an anonymous
+            visitor code. That code is a one-way hash that changes every
+            day, so it can&apos;t follow you over time or across sites. Your
+            IP address is used only to compute it and is never stored.
+            Traffic records are deleted after 180 days. We honor your
+            browser&apos;s Do&nbsp;Not&nbsp;Track setting, and you can switch
+            analytics off for this browser right here:
+          </p>
+          <AnalyticsOptOut />
         </section>
         <p className="border-t border-edge pt-4 text-xs">
           Draft policy pending attorney review. We&apos;ll announce material

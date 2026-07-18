@@ -18,6 +18,7 @@ import {
 } from "@/app/actions";
 import { formatUsd } from "@/lib/market";
 import { getSiteAnalytics } from "@/lib/analytics";
+import { getTrafficPulse } from "@/lib/traffic";
 import MiniBars from "@/components/MiniBars";
 import LoginForm from "./LoginForm";
 import CreateBattleForm from "./CreateBattleForm";
@@ -100,6 +101,7 @@ export default async function AdminPage({
   ]);
 
   const pulse = await getSiteAnalytics();
+  const traffic = await getTrafficPulse();
 
   const artistApplications = await prisma.artistProfile.findMany({
     where: { status: "PENDING" },
@@ -342,6 +344,99 @@ export default async function AdminPage({
             </ol>
           </div>
         )}
+      </section>
+
+      {/* Traffic: first-party, cookieless — did the post actually send people? */}
+      <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Traffic <span className="text-gradient-heat">Pulse</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          First-party and cookie-free. Post a link with{" "}
+          <span className="font-mono text-volt">?utm_source=facebook&amp;utm_campaign=your-post</span>{" "}
+          and watch the source and campaign light up here.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: "Visitors today", value: traffic.visitorsToday },
+            { label: "Visitors (7d)", value: traffic.visitors7 },
+            { label: "Pageviews (7d)", value: traffic.pageviews7 },
+            {
+              label: "Mobile share",
+              value:
+                traffic.devices.mobile + traffic.devices.desktop > 0
+                  ? `${Math.round((traffic.devices.mobile / (traffic.devices.mobile + traffic.devices.desktop)) * 100)}%`
+                  : "—",
+            },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-edge bg-surface p-3 text-center">
+              <p className="display text-lg text-heat">{s.value}</p>
+              <p className="tag mt-1 text-smoke">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+          <p className="tag text-smoke">Pageviews — last 14 days</p>
+          <div className="mt-2"><MiniBars series={traffic.series14} accent="heat" /></div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Top sources (7d)</p>
+            {traffic.sources.length === 0 ? (
+              <p className="mt-2 text-sm text-smoke">No traffic yet — post the link.</p>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {traffic.sources.map((s) => {
+                  const max = traffic.sources[0].count || 1;
+                  return (
+                    <div key={s.name}>
+                      <div className="flex items-baseline justify-between text-sm">
+                        <span className="text-white">{s.name}</span>
+                        <span className="tabular text-xs text-volt">{s.count}</span>
+                      </div>
+                      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-panel">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-heat to-volt"
+                          style={{ width: `${Math.round((s.count / max) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Campaigns (7d)</p>
+            {traffic.campaigns.length === 0 ? (
+              <p className="mt-2 text-sm text-smoke">Tag links with utm_campaign to segment posts.</p>
+            ) : (
+              <ol className="mt-2 space-y-1 text-sm">
+                {traffic.campaigns.map((c) => (
+                  <li key={c.name} className="flex justify-between gap-3">
+                    <span className="min-w-0 truncate text-white">{c.name}</span>
+                    <span className="shrink-0 text-volt">{c.count}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-smoke">Top pages (7d)</p>
+            {traffic.paths.length === 0 ? (
+              <p className="mt-2 text-sm text-smoke">Nothing yet.</p>
+            ) : (
+              <ol className="mt-2 space-y-1 text-sm">
+                {traffic.paths.map((p) => (
+                  <li key={p.name} className="flex justify-between gap-3">
+                    <span className="min-w-0 truncate text-white">{p.name}</span>
+                    <span className="shrink-0 text-volt">{p.count}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="mt-12">

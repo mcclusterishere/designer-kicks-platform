@@ -83,6 +83,19 @@ export default function RulesPage() {
             name may be displayed on the site&apos;s past-winners list.
           </p>
         </section>
+        <section>
+          <h2 className="display text-xl text-white">7. Social platforms (Meta release)</h2>
+          <p className="mt-2">
+            This promotion is in no way sponsored, endorsed, administered
+            by, or associated with Meta Platforms, Inc. (Facebook or
+            Instagram) or any other social platform. By entering, you
+            understand that you are providing your information to the
+            Sponsor and not to Meta, and you release Meta from any and all
+            liability related to this promotion. Entry happens only on
+            theheatchart.com — liking, sharing, or commenting on a social
+            post is never a method of entry and never affects odds.
+          </p>
+        </section>
         <p className="border-t border-edge pt-4 text-xs">
           Draft rules pending attorney review — sweepstakes law varies by
           state. A named winner list is available on request to{" "}
