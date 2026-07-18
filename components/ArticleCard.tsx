@@ -18,7 +18,7 @@ export default function ArticleCard({ article, large = false }: Props) {
   return (
     <Link
       href={`/news/${article.slug}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-edge bg-surface transition hover:-translate-y-0.5 hover:border-volt/50"
+      className="card-lift group flex flex-col overflow-hidden rounded-xl border border-edge bg-surface"
     >
       <div className={`w-full overflow-hidden bg-panel ${large ? "aspect-[2/1]" : "aspect-[16/9]"}`}>
         {article.coverImage ? (

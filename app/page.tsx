@@ -42,9 +42,17 @@ export default async function HomePage() {
       <section className="relative overflow-hidden border-b border-edge">
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-volt/10 blur-3xl" />
         <div className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-heat/10 blur-3xl" />
+        <span aria-hidden className="ghost-word right-[-2rem] top-6 hidden text-[16rem] md:block">
+          Heat
+        </span>
+        <span aria-hidden className="ghost-word bottom-[-3rem] left-[-1rem] hidden text-[11rem] lg:block">
+          1 of 1
+        </span>
         <div className="relative mx-auto max-w-6xl px-4 py-16 sm:py-24">
-          <p className="tag text-volt">Custom sneaker battles</p>
-          <h1 className="display mt-3 max-w-3xl text-6xl text-white sm:text-8xl">
+          <p className="tag inline-block -skew-x-6 border-l-4 border-volt bg-surface px-3 py-1.5 text-volt">
+            Custom sneaker battles · Est. on Facebook
+          </p>
+          <h1 className="display mt-5 max-w-3xl text-6xl text-white sm:text-8xl">
             Your customs.
             <br />
             Their votes.
@@ -56,20 +64,23 @@ export default async function HomePage() {
             with other artists in vote battles, and let the culture crown the
             winner.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-9 flex flex-wrap gap-5">
             <Link
               href="/submit"
-              className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink glow-volt transition hover:opacity-90"
+              className="btn-hard rounded-lg bg-volt px-7 py-3.5 tag font-bold text-ink"
             >
               Submit Your Customs
             </Link>
             <Link
               href="/battles"
-              className="rounded-lg border border-edge px-6 py-3 tag text-white transition hover:border-volt hover:text-volt"
+              className="btn-hard-volt rounded-lg border-2 border-white/90 bg-ink px-7 py-3.5 tag font-bold text-white"
             >
               Vote In Battles
             </Link>
           </div>
+          <p className="tag mt-8 text-smoke">
+            Free to vote · Free to play · 1% seller fee when checkout opens
+          </p>
         </div>
       </section>
 
@@ -115,21 +126,30 @@ export default async function HomePage() {
           </Link>
         )}
         <div className="flex items-end justify-between">
-          <h2 className="display text-3xl text-white">
-            Live <span className="text-heat">Battles</span>
-          </h2>
-          <Link href="/battles" className="tag text-smoke hover:text-white">
+          <div>
+            <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+            <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
+              Live <span className="text-heat">Battles</span>
+            </h2>
+          </div>
+          <Link
+            href="/battles"
+            className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
+          >
             All battles →
           </Link>
         </div>
         {battles.length === 0 ? (
-          <p className="mt-6 rounded-xl border border-edge bg-surface p-8 text-center text-smoke">
-            No live battles right now — check back soon or{" "}
-            <Link href="/submit" className="text-volt underline">
-              submit your customs
-            </Link>{" "}
-            to start one.
-          </p>
+          <div className="mt-6 rounded-xl border border-dashed border-edge bg-surface p-10 text-center">
+            <p className="display text-2xl text-white">The arena is warming up 🔥</p>
+            <p className="mx-auto mt-2 max-w-md text-smoke">
+              New matchups drop as artists enter.{" "}
+              <Link href="/submit" className="text-volt underline">
+                Submit your customs
+              </Link>{" "}
+              and be in the first wave.
+            </p>
+          </div>
         ) : (
           <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
             {battles.map((b) => (
@@ -148,10 +168,16 @@ export default async function HomePage() {
       <section className="border-y border-edge bg-surface">
         <div className="mx-auto max-w-6xl px-4 py-12">
           <div className="flex items-end justify-between">
-            <h2 className="display text-3xl text-white">
-              The <span className="text-volt">Heat List</span>
-            </h2>
-            <Link href="/heat-list" className="tag text-smoke hover:text-white">
+            <div>
+              <div className="h-1.5 w-16 -skew-x-12 bg-volt" />
+              <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
+                The <span className="text-volt">Heat List</span>
+              </h2>
+            </div>
+            <Link
+              href="/heat-list"
+              className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-volt hover:text-white"
+            >
               Full rankings →
             </Link>
           </div>
@@ -159,17 +185,19 @@ export default async function HomePage() {
             {top3.map((entry, i) => (
               <div
                 key={entry.id}
-                className="relative overflow-hidden rounded-xl border border-edge bg-ink"
+                className="card-lift group relative overflow-hidden rounded-xl border border-edge bg-ink"
               >
-                <span className="absolute left-3 top-3 z-10 display text-4xl text-volt">
+                <span className="sticker absolute left-3 top-3 z-10 px-2.5 py-1 text-2xl">
                   #{i + 1}
                 </span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={entry.imageUrl}
-                  alt={entry.title}
-                  className="aspect-square w-full object-cover"
-                />
+                <div className="overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={entry.imageUrl}
+                    alt={entry.title}
+                    className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                  />
+                </div>
                 <div className="p-4">
                   <p className="font-bold text-white">{entry.title}</p>
                   <p className="text-sm text-smoke">
@@ -179,8 +207,9 @@ export default async function HomePage() {
               </div>
             ))}
             {top3.length === 0 && (
-              <p className="col-span-full text-smoke">
-                The Heat List is empty — battles crown the first names here.
+              <p className="col-span-full rounded-xl border border-dashed border-edge bg-ink p-8 text-center text-smoke">
+                The chart is blank until the first battle ends — then names live
+                here forever. 🔥
               </p>
             )}
           </div>
@@ -191,10 +220,16 @@ export default async function HomePage() {
       {articles.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 py-12">
           <div className="flex items-end justify-between">
-            <h2 className="display text-3xl text-white">
-              Drop <span className="text-volt">Report</span>
-            </h2>
-            <Link href="/news" className="tag text-smoke hover:text-white">
+            <div>
+              <div className="h-1.5 w-16 -skew-x-12 bg-volt" />
+              <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
+                Drop <span className="text-volt">Report</span>
+              </h2>
+            </div>
+            <Link
+              href="/news"
+              className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-volt hover:text-white"
+            >
               All news →
             </Link>
           </div>
@@ -209,10 +244,16 @@ export default async function HomePage() {
       {/* Shop preview */}
       <section className="mx-auto max-w-6xl px-4 py-12">
         <div className="flex items-end justify-between">
-          <h2 className="display text-3xl text-white">
-            Gear <span className="text-heat">&amp; Heat</span>
-          </h2>
-          <Link href="/shop" className="tag text-smoke hover:text-white">
+          <div>
+            <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+            <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
+              Gear <span className="text-heat">&amp; Heat</span>
+            </h2>
+          </div>
+          <Link
+            href="/shop"
+            className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
+          >
             Full shop →
           </Link>
         </div>

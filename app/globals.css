@@ -18,6 +18,19 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Ambient light washes — every page gets depth instead of flat void */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 85% -10%, rgba(200, 255, 0, 0.06), transparent 60%),
+    radial-gradient(50rem 35rem at -10% 110%, rgba(255, 68, 0, 0.05), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 120%, rgba(0, 229, 160, 0.03), transparent 60%);
+}
+
 /* Film-grain overlay for depth — sits above everything, never intercepts taps */
 body::after {
   content: "";
@@ -69,6 +82,57 @@ body::after {
   box-shadow: 0 0 24px rgba(255, 68, 0, 0.3);
 }
 
+/* Giant outlined word floating behind heroes — pure attitude, no ink */
+.ghost-word {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--font-display), "Arial Black", sans-serif;
+  text-transform: uppercase;
+  line-height: 0.8;
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgba(245, 245, 245, 0.07);
+}
+
+/* Brutalist hard-shadow CTAs — the sticker-slap look */
+.btn-hard {
+  box-shadow: 5px 5px 0 0 var(--color-heat);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-hard:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 0 var(--color-heat);
+}
+.btn-hard-volt {
+  box-shadow: 5px 5px 0 0 var(--color-volt);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-hard-volt:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 0 var(--color-volt);
+}
+
+/* Cards that answer the cursor */
+.card-lift {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(200, 255, 0, 0.25);
+}
+
+/* Slapped-on sticker plate for ranks and badges */
+.sticker {
+  display: inline-block;
+  transform: rotate(-4deg);
+  font-family: var(--font-display), "Arial Black", sans-serif;
+  text-transform: uppercase;
+  background: var(--color-volt);
+  color: var(--color-ink);
+  border: 2px solid var(--color-ink);
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.6);
+}
+
 /* Diagonal hazard stripe divider */
 .stripes {
   background-image: repeating-linear-gradient(
@@ -96,6 +160,10 @@ body::after {
   display: flex;
   width: max-content;
   animation: ticker 28s linear infinite;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
 }
 
 /* Page entrance */
@@ -161,4 +229,26 @@ html {
 /* Countdown + stat digits shouldn't jitter as they tick */
 time, .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Respect users who turn motion off */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track,
+  .flame-pulse,
+  .bar-animate,
+  main {
+    animation: none;
+  }
+  button,
+  .btn-hard,
+  .btn-hard-volt,
+  .card-lift,
+  img {
+    transition: none !important;
+  }
+  .btn-hard:hover,
+  .btn-hard-volt:hover,
+  .card-lift:hover {
+    transform: none;
+  }
 }
