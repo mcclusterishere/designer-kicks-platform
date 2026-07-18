@@ -215,6 +215,16 @@ main {
   animation: flame-pulse 1.4s ease-in-out infinite;
 }
 
+/* Drop-calendar bottom sheet — slides up like a native app sheet */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Rate-game deck — cards deal in and fly out like an app, not a page */
 @keyframes card-enter {
   from { opacity: 0; transform: translateY(14px) scale(0.97); }

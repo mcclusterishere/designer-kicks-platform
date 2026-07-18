@@ -76,6 +76,22 @@ check("dated article on the calendar", await page.getByText("E2E News Suite Arti
 check("raffle link on the calendar", (await page.locator("a[href*='/go?u=https%3A%2F%2Fwww.nike.com']").count()) >= 1);
 check("news page links the calendar", (await (await fetch(`${BASE}/news`)).text()).includes("/drops"));
 
+// --- Tap-a-date sheet: a marked day opens that date's drop list ---
+const dropAt = saved.dropAt;
+const dropMonthParam = `${dropAt.getUTCFullYear()}-${String(dropAt.getUTCMonth() + 1).padStart(2, "0")}`;
+const dropMonthName = dropAt.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
+await page.goto(`${BASE}/drops?m=${dropMonthParam}`, { waitUntil: "networkidle" });
+await page
+  .getByRole("button", { name: new RegExp(`^${dropMonthName} ${dropAt.getUTCDate()} — `) })
+  .click();
+const sheet = page.getByRole("dialog");
+check("day sheet lists the drop", await sheet.getByText("E2E News Suite Article").first().isVisible());
+check("sheet links the story", (await sheet.locator(`a[href='/news/${TEST_SLUG}']`).count()) === 1);
+check("sheet links the raffle", (await sheet.locator("a[href*='/go?u=']").count()) >= 1);
+await page.keyboard.press("Escape");
+await sheet.waitFor({ state: "hidden", timeout: 5000 });
+check("sheet closes on Escape", true);
+
 // Cleanup
 await prisma.article.deleteMany({ where: { slug: TEST_SLUG } });
 

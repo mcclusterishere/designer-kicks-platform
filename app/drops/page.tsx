@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { goHref } from "@/lib/affiliates";
+import { DropCalendar, type DayDrop } from "@/components/DropCalendar";
 
 export const metadata = {
   title: "Sneaker Drop Calendar — Release Dates & Raffle Links, Free | The Heat Chart",
@@ -8,8 +9,6 @@ export const metadata = {
     "Every upcoming sneaker release date and raffle link in one free calendar. No subscription, no paywall — drop intel is free on The Heat Chart.",
 };
 export const dynamic = "force-dynamic";
-
-const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 /** "Air Jordan 9 OG 'Space Jam' — Release Date…" → "Air Jordan 9 OG 'Space Jam'" */
 function dropName(title: string): string {
@@ -51,16 +50,23 @@ export default async function DropsPage({
     }),
   ]);
 
-  const byDay = new Map<number, typeof monthDrops>();
+  // Day → tap-sheet payload for the interactive grid.
+  const dropDays: Record<number, DayDrop[]> = {};
   for (const a of monthDrops) {
     const d = a.dropAt!.getUTCDate();
-    byDay.set(d, [...(byDay.get(d) ?? []), a]);
+    (dropDays[d] ??= []).push({
+      slug: a.slug,
+      name: dropName(a.title),
+      excerpt: a.excerpt,
+      raffleHref: a.raffleUrl ? goHref(a.raffleUrl, "drops") : null,
+      cover: a.coverImage ?? null,
+    });
   }
 
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const leadingBlanks = monthStart.getUTCDay();
-  const isToday = (d: number) =>
-    year === now.getUTCFullYear() && month === now.getUTCMonth() && d === now.getUTCDate();
+  const todayDay =
+    year === now.getUTCFullYear() && month === now.getUTCMonth() ? now.getUTCDate() : null;
   const mParam = (dte: Date) =>
     `${dte.getUTCFullYear()}-${String(dte.getUTCMonth() + 1).padStart(2, "0")}`;
 
@@ -90,37 +96,14 @@ export default async function DropsPage({
         </Link>
       </div>
 
-      {/* The calendar */}
-      <div className="mt-5 grid grid-cols-7 text-center">
-        {WEEKDAYS.map((w, i) => (
-          <p key={`${w}${i}`} className="tag pb-2 text-smoke/70">
-            {w}
-          </p>
-        ))}
-        {Array.from({ length: leadingBlanks }, (_, i) => (
-          <div key={`b${i}`} />
-        ))}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const d = i + 1;
-          const drops = byDay.get(d);
-          return (
-            <div key={d} className="flex min-h-14 flex-col items-center gap-1 py-1.5">
-              <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-sm tabular ${
-                  isToday(d)
-                    ? "bg-volt font-bold text-ink"
-                    : drops
-                      ? "border border-volt/60 text-white"
-                      : "text-smoke/80"
-                }`}
-              >
-                {d}
-              </span>
-              {drops && <span className="h-1.5 w-1.5 rounded-full bg-heat" />}
-            </div>
-          );
-        })}
-      </div>
+      {/* The calendar — tap any marked day for that date's drop sheet */}
+      <DropCalendar
+        monthTitle={monthLabel(year, month)}
+        daysInMonth={daysInMonth}
+        leadingBlanks={leadingBlanks}
+        todayDay={todayDay}
+        dropDays={dropDays}
+      />
 
       {/* This month's drops — the readable half of the calendar */}
       <div className="mt-6 border-t border-edge">
