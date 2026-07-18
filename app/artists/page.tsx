@@ -21,7 +21,7 @@ export default async function ArtistsPage() {
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Career records across every battle. Wins move you up, votes break
-        ties — one artist, one record, no matter how many shoes they run.
+        ties — one artist, one record, no matter how many pieces they run.
       </p>
 
       {rankings.length === 0 ? (
@@ -62,7 +62,7 @@ export default async function ArtistsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold text-white">{a.displayName}</p>
                   <p className="truncate text-sm text-smoke">
-                    {a.shoeCount} shoe{a.shoeCount === 1 ? "" : "s"}
+                    {a.shoeCount} piece{a.shoeCount === 1 ? "" : "s"}
                     {a.instagram && <span className="text-volt"> · @{a.instagram}</span>}
                     {a.city && ` · ${a.city}`}
                   </p>
@@ -81,7 +81,7 @@ export default async function ArtistsPage() {
       )}
 
       <p className="mt-8 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">
-        Looking for individual shoes? The{" "}
+        Looking for individual pieces? The{" "}
         <Link href="/heat-list" className="text-volt underline">Heat List</Link>{" "}
         ranks every custom in the arena.
       </p>

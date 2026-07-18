@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { logoutUser } from "@/app/account-actions";
 import { computeBadges } from "@/lib/quiz";
 import { formatUsd } from "@/lib/market";
+import { categoryEmoji } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import { respondOffer, withdrawOffer } from "@/app/actions";
@@ -292,7 +293,7 @@ export default async function ProfilePage() {
               <div className="p-3">
                 <p className="truncate text-sm font-bold text-white">{s.title}</p>
                 <p className="truncate text-xs text-smoke">
-                  by {s.artist?.displayName ?? s.artistName}
+                  {categoryEmoji(s.category)} by {s.artist?.displayName ?? s.artistName}
                 </p>
               </div>
             </div>

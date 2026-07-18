@@ -20,6 +20,7 @@ import CreateBattleForm from "./CreateBattleForm";
 import ProductForm from "./ProductForm";
 import ArticleForm from "./ArticleForm";
 import GiveawayForm from "./GiveawayForm";
+import { categoryEmoji } from "@/lib/categories";
 import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
@@ -128,7 +129,7 @@ export default async function AdminPage({
                 <div className="p-3">
                   <p className="font-bold text-white">{s.title}</p>
                   <p className="text-sm text-smoke">
-                    {s.baseShoe} · {s.artistName}
+                    {categoryEmoji(s.category)} {s.baseShoe} · {s.artistName}
                     {s.socialHandle && ` · @${s.socialHandle}`}
                   </p>
                   <p className="text-xs text-smoke">{s.email}</p>
@@ -158,7 +159,7 @@ export default async function AdminPage({
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Pre-load An Artist</h2>
         <p className="mt-1 text-sm text-smoke">
-          Create an artist&apos;s page and first shoe on their behalf (with
+          Create an artist&apos;s page and first piece on their behalf (with
           permission). You get a 14-day claim link and a ready-to-send DM —
           and the invite emails itself when Resend is configured.
         </p>

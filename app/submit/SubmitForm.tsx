@@ -139,7 +139,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
 
       <div>
         <label htmlFor="image" className="tag text-smoke">
-          Photo of the shoe *
+          Photo of the piece *
         </label>
         <input
           id="image"

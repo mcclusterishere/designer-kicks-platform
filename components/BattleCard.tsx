@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Countdown from "./Countdown";
+import { categoryEmoji } from "@/lib/categories";
 
 type SubmissionLite = {
   id: string;
   title: string;
   artistName: string;
   baseShoe: string;
+  category: string;
   imageUrl: string;
 };
 
@@ -50,7 +52,7 @@ function SideThumb({
         </span>
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2 pt-8">
-        <p className="truncate text-sm font-bold text-white">{sub.title}</p>
+        <p className="truncate text-sm font-bold text-white">{categoryEmoji(sub.category)} {sub.title}</p>
         <p className="truncate text-xs text-smoke">
           {sub.artistName} · {votes} votes
         </p>

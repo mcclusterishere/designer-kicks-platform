@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, formatUsd } from "@/lib/market";
 import OfferForm from "@/components/OfferForm";
+import { categoryEmoji, categoryLabel } from "@/lib/categories";
 
 export const metadata = {
   title: "The Custom Market — One-of-One Sneakers & Apparel | The Heat Chart",
@@ -158,7 +159,7 @@ export default async function MarketPage({
                 </div>
                 <div className="p-4">
                   <p className="tag text-smoke">
-                    {item.baseShoe} · {item.category}
+                    {categoryEmoji(item.category)} {item.baseShoe} · {categoryLabel(item.category)}
                     {item.size && <span className="text-white"> · {item.size}</span>}
                   </p>
                   <p className="mt-1 font-bold text-white">{item.title}</p>

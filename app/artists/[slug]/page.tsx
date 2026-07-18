@@ -7,6 +7,7 @@ import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
 import RecordSaleForm from "@/components/RecordSaleForm";
 import { formatUsd } from "@/lib/market";
+import { categoryEmoji } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -201,7 +202,7 @@ export default async function ArtistPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
+                  <p className="tag text-smoke">{categoryEmoji(s.category)} {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     {s._count.battlesWon}W–{shoeBattles - s._count.battlesWon}L ·{" "}

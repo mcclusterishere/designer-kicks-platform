@@ -42,7 +42,7 @@ check("profile saves contact info", dbUser?.phone === "+1 555 010 2030" && dbUse
 await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
 await page.locator("a[href^='/battles/']").first().click();
 await page.waitForURL("**/battles/**");
-const voteBtns = page.getByRole("button", { name: "Vote This Shoe" });
+const voteBtns = page.getByRole("button", { name: "Vote This Piece" });
 if ((await voteBtns.count()) === 2) {
   await voteBtns.first().click();
   await page.getByText("Your vote").first().waitFor({ timeout: 10000 });

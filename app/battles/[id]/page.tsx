@@ -68,6 +68,7 @@ export default async function BattlePage({
             artistSlug: battle.subA.artist?.slug ?? null,
             socialHandle: battle.subA.socialHandle,
             baseShoe: battle.subA.baseShoe,
+            category: battle.subA.category,
             imageUrl: battle.subA.imageUrl,
             votes: aVotes,
           }}
@@ -78,6 +79,7 @@ export default async function BattlePage({
             artistSlug: battle.subB.artist?.slug ?? null,
             socialHandle: battle.subB.socialHandle,
             baseShoe: battle.subB.baseShoe,
+            category: battle.subB.category,
             imageUrl: battle.subB.imageUrl,
             votes: bVotes,
           }}

@@ -66,8 +66,9 @@ check("admin approval flips status", approved?.status === "APPROVED");
 await page.goto(`${BASE}/submit`, { waitUntil: "networkidle" });
 check("approved artist badge on submit page", await page.getByText("approved artist").isVisible());
 await page.fill("#title", "League Test Custom");
-await page.fill("#baseShoe", "Air Max 1");
-await page.fill("#size", "US 10");
+await page.fill("#baseShoe", "Denim trucker jacket");
+await page.selectOption("#category", "apparel");
+await page.fill("#size", "2XL");
 await page.setInputFiles("#image", { name: "c.png", mimeType: "image/png", buffer: PNG_1x1 });
 await page.getByRole("button", { name: "Submit To The Arena" }).click();
 await page.getByText("You're in.").waitFor({ timeout: 15000 });
@@ -88,6 +89,12 @@ check("artist page shows W-L record", await page.locator("text=/\\dW–\\dL/").f
 check("closet renders the collection", await page.getByText("The Closet").isVisible());
 check("closet shows live heat ranks", (await page.locator("text=/#\\d+ Heat/").count()) >= 2);
 check("trophy shelf section present", await page.getByText("Trophy Shelf").isVisible());
+
+// Category integrity: the apparel piece must not present as a shoe
+await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });
+check("apparel chip on own closet", await page.getByText("🧥").first().isVisible());
+const heatHtml = await (await fetch(`${BASE}/heat-list`)).text();
+check("heat list carries the apparel chip", heatHtml.includes("🧥"));
 
 // Follow flow
 await page.getByRole("button", { name: "+ Follow" }).click();
@@ -173,7 +180,8 @@ await buyerPage.goto(`${BASE}/market`, { waitUntil: "networkidle" });
 check("market lists the piece after the claim", await buyerPage.getByText("League Test Custom").isVisible());
 check("market shows the verified last sale", await buyerPage.getByText("$450").first().isVisible());
 check("market shows the open ask", await buyerPage.getByText("$600").first().isVisible());
-check("market shows the size", await buyerPage.getByText("US 10").first().isVisible());
+check("market shows the size", await buyerPage.getByText("2XL").first().isVisible());
+check("market shows apparel category, not shoe default", await buyerPage.getByText("🧥").first().isVisible());
 await buyerPage.screenshot({ path: `${SHOTS}/market.png`, fullPage: true });
 
 // ---- Offers: the artist bids to buy the piece back ----
