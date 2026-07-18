@@ -588,6 +588,33 @@ const preloadArtists = [
     ],
   },
   {
+    // Chicago heavyweight — Dillon DeJesus / DCF (IG
+    // @dejesuscustomfootwear ~94K, dejesusinc.com, studio on W 35th
+    // St). Tutorials, tool line, and the DCF Experience workshop.
+    // Claimable placeholder; outreach via DMs / their site.
+    slug: "dejesus",
+    email: null,
+    displayName: "DeJesus Custom Footwear",
+    instagram: "dejesuscustomfootwear",
+    city: "Chicago, IL",
+    portfolioUrl: "https://www.dejesusinc.com",
+    bio: "Chicago's DCF — founded by Dillon DeJesus, a decade-plus deep in customs with work on the feet of pro athletes and celebrities. Every shoe has a story: one-of-one commissions, full YouTube build tutorials, their own tool-and-stencil line, and the DCF Experience, a hands-on customization workshop taught from the 35th Street studio.",
+    pieces: [
+      {
+        title: "Charizard Jordan 1s",
+        matchTitle: "charizard",
+        baseShoe: "Air Jordan 1 High",
+        brand: "Jordan",
+        silhouette: "Air Jordan 1",
+        category: "sneakers",
+        description:
+          "Built for Dillon's brother to wear while vending at trading-card conventions — made to survive full convention days, not sit on a shelf. Charizard from heel to toe: flame-yellow base, wing-teal swoosh, lava-crackle and scale-textured overlays with red trim, crowned by a custom Charizard Wings crest holding a Pokéball. One of DCF's first full-system KixKote builds, with the entire process documented as an in-depth YouTube tutorial.",
+        imageUrl: "/seed/dj-cz-1.webp",
+        extraImages: ["/seed/dj-cz-2.webp"],
+      },
+    ],
+  },
+  {
     // Miami artist + curator (FB: Dr. Funkenstein Acrylics; IG
     // @drfunkenstein_acrylics; shop drfunkensteinacrylics.bigcartel.com).
     // Runs the monthly Rooftop Fam gallery — a scene node, not just a
