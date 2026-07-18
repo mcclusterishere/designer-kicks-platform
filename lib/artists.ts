@@ -111,6 +111,9 @@ export async function getArtistBySlug(slug: string) {
     where: { slug },
     include: {
       _count: { select: { followers: true } },
+      // Just enough to know whether the page is still unclaimed —
+      // booleans derived from this must never leak the hash itself.
+      user: { select: { passwordHash: true, _count: { select: { accounts: true } } } },
       submissions: {
         where: { status: "APPROVED" },
         orderBy: { createdAt: "desc" },

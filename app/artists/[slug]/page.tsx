@@ -7,6 +7,7 @@ import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
 import RecordSaleForm from "@/components/RecordSaleForm";
 import AddPhotosForm from "@/components/AddPhotosForm";
+import ClaimProfileForm from "@/components/ClaimProfileForm";
 import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
 import { categoryEmoji } from "@/lib/categories";
@@ -50,6 +51,8 @@ export default async function ArtistPage({ params }: Props) {
   // an admin can also curate galleries for pre-loaded artists.
   const isOwnPage = session?.user?.id === artist.userId;
   const admin = await isAdmin();
+  // Pre-loaded pages stay claimable until the artist sets a login.
+  const claimable = !artist.user.passwordHash && artist.user._count.accounts === 0;
 
   let wins = 0;
   let battles = 0;
@@ -123,6 +126,10 @@ export default async function ArtistPage({ params }: Props) {
           </div>
         ))}
       </div>
+
+      {claimable && (
+        <ClaimProfileForm artistId={artist.id} displayName={artist.displayName} />
+      )}
 
       {/* Trophy Shelf — championship hardware */}
       <h2 className="display mt-10 text-2xl text-white">

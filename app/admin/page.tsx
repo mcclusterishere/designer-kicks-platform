@@ -12,6 +12,7 @@ import {
   deleteQuestion,
   forceAdvanceTournament,
   setArtistStatus,
+  respondArtistClaim,
   setSaleVerified,
 } from "@/app/actions";
 import { formatUsd } from "@/lib/market";
@@ -90,6 +91,24 @@ export default async function AdminPage({
     orderBy: { createdAt: "asc" },
     include: { user: { select: { name: true, email: true, createdAt: true } } },
   });
+
+  // Profile claims: pending for review, plus recent approvals with their
+  // live claim links so the DM can be re-sent manually.
+  const profileClaims = await prisma.artistClaim.findMany({
+    where: { status: { in: ["PENDING", "APPROVED"] } },
+    orderBy: [{ status: "desc" }, { createdAt: "asc" }],
+    take: 20,
+    include: { artist: { select: { displayName: true, slug: true, userId: true } } },
+  });
+  const approvedClaimLinks = new Map();
+  for (const c of profileClaims.filter((c) => c.status === "APPROVED")) {
+    const u = await prisma.user.findUnique({ where: { email: c.email } });
+    if (!u) continue;
+    const tok = await prisma.passwordResetToken.findFirst({
+      where: { userId: u.id, expires: { gt: new Date() } },
+    });
+    if (tok) approvedClaimLinks.set(c.id, `/reset-password/${tok.token}`);
+  }
 
   const sales = await prisma.sale.findMany({
     orderBy: { createdAt: "desc" },
@@ -170,6 +189,61 @@ export default async function AdminPage({
 
       {/* Artist applications */}
       <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Profile Claims{" "}
+          <span className={profileClaims.some((c) => c.status === "PENDING") ? "text-heat" : "text-smoke"}>
+            ({profileClaims.filter((c) => c.status === "PENDING").length})
+          </span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Artists asserting ownership of pre-loaded pages. Approving relinks
+          the page to their email and sends the password link.
+        </p>
+        {profileClaims.length === 0 ? (
+          <p className="mt-3 text-sm text-smoke">No claims yet.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {profileClaims.map((c) => (
+              <div key={c.id} className="rounded-xl border border-edge bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-white">
+                      {c.artist.displayName}
+                      {c.status === "APPROVED" && <span className="tag text-volt"> · approved ✓</span>}
+                    </p>
+                    <p className="text-sm text-smoke">
+                      {c.name} · {c.email}
+                    </p>
+                    <p className="text-sm text-volt">Proof: {c.socialProof}</p>
+                    {c.message && <p className="mt-1 text-sm text-smoke">{c.message}</p>}
+                    {c.status === "APPROVED" && approvedClaimLinks.has(c.id) && (
+                      <p className="mt-1 break-all font-mono text-xs text-volt">
+                        Claim link: {approvedClaimLinks.get(c.id)}
+                      </p>
+                    )}
+                  </div>
+                  {c.status === "PENDING" && (
+                    <div className="flex shrink-0 gap-2">
+                      <form action={respondArtistClaim.bind(null, c.id, true)}>
+                        <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                          Verify &amp; Hand Over
+                        </button>
+                      </form>
+                      <form action={respondArtistClaim.bind(null, c.id, false)}>
+                        <button className="rounded border border-heat px-4 py-2 tag text-heat">
+                          Reject
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10 rounded-xl border border-edge bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Artist Applications{" "}
           <span className={artistApplications.length ? "text-heat" : "text-smoke"}>

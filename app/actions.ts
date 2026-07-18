@@ -117,6 +117,15 @@ export async function createSubmission(
   return { ok: true };
 }
 
+async function clientIp(): Promise<string> {
+  const h = await headers();
+  return (
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 /** Validate + store a batch of gallery photos; returns urls or an error. */
 async function saveImageList(
   files: FormDataEntryValue[],
@@ -546,6 +555,121 @@ export async function setAskingPrice(
   if (me?.collectorSlug) revalidatePath(`/collectors/${me.collectorSlug}`);
   revalidatePath("/market");
   return { ok: true };
+}
+
+// ---------- Artist page claims (pre-loaded roster handover) ----------
+
+/**
+ * A visitor asserts they're the artist behind an unclaimed pre-loaded
+ * page. Lands PENDING in the admin's Profile Claims queue.
+ */
+export async function submitArtistClaim(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artistId = String(formData.get("artistId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const socialProof = String(formData.get("socialProof") ?? "").trim();
+  const message = String(formData.get("message") ?? "").trim();
+
+  if (!name || name.length > 60) return { ok: false, error: "Your name is required." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "A valid email is required — it becomes your account." };
+  if (!socialProof || socialProof.length > 120) {
+    return { ok: false, error: "Drop your Instagram or shop link so we can verify it's you." };
+  }
+  if (message.length > 400) return { ok: false, error: "Message is too long (max 400 characters)." };
+
+  if (!allowAttempt("artistclaim", await clientIp(), 5, 60 * 60 * 1000)) {
+    return { ok: false, error: "Too many claim attempts — try again in an hour." };
+  }
+
+  const artist = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    include: { user: { select: { passwordHash: true, _count: { select: { accounts: true } } } } },
+  });
+  if (!artist) return { ok: false, error: "Page not found." };
+  if (artist.user.passwordHash || artist.user._count.accounts > 0) {
+    return { ok: false, error: "This page has already been claimed." };
+  }
+
+  const existing = await prisma.artistClaim.findFirst({
+    where: { artistId, email, status: "PENDING" },
+  });
+  if (existing) return { ok: false, error: "Your claim is already in — we review every one." };
+
+  await prisma.artistClaim.create({
+    data: { artistId, name, email, socialProof, message: message || null },
+  });
+
+  notifyAdmin(
+    `Profile claim: ${artist.displayName}`,
+    `${name} (${email}) says the ${artist.displayName} page is theirs.\nProof: ${socialProof}\nReview it at ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+  );
+
+  return { ok: true };
+}
+
+/**
+ * Admin verdict on a claim. Approving relinks the page to an account
+ * under the claimant's email, mints (or reuses) the password-setting
+ * claim link, emails it when Resend is wired, and closes out any other
+ * pending claims on the same page.
+ */
+export async function respondArtistClaim(claimId: string, approve: boolean): Promise<void> {
+  await requireAdmin();
+  const claim = await prisma.artistClaim.findUnique({
+    where: { id: claimId },
+    include: { artist: true },
+  });
+  if (!claim || claim.status !== "PENDING") return;
+
+  if (!approve) {
+    await prisma.artistClaim.update({ where: { id: claimId }, data: { status: "REJECTED" } });
+    revalidatePath("/admin");
+    return;
+  }
+
+  const user = await prisma.user.upsert({
+    where: { email: claim.email },
+    update: { name: claim.name },
+    create: { name: claim.name, email: claim.email },
+  });
+  await prisma.$transaction([
+    prisma.artistProfile.update({ where: { id: claim.artistId }, data: { userId: user.id } }),
+    prisma.submission.updateMany({ where: { artistId: claim.artistId }, data: { email: claim.email } }),
+    prisma.artistClaim.update({ where: { id: claimId }, data: { status: "APPROVED" } }),
+    prisma.artistClaim.updateMany({
+      where: { artistId: claim.artistId, status: "PENDING", id: { not: claimId } },
+      data: { status: "REJECTED" },
+    }),
+  ]);
+
+  // Claim link: reuse a live token, never rotate one out from under a DM.
+  let token = (
+    await prisma.passwordResetToken.findFirst({
+      where: { userId: user.id, expires: { gt: new Date() } },
+    })
+  )?.token;
+  if (!token) {
+    token = randomBytes(32).toString("hex");
+    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+    await prisma.passwordResetToken.create({
+      data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+    });
+  }
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  sendMail({
+    to: claim.email,
+    subject: `${claim.artist.displayName} — your Heat Chart page is verified ✓`,
+    text:
+      `Your claim on the ${claim.artist.displayName} page was approved.\n\n` +
+      `Set your password here (link valid 14 days):\n${base}/reset-password/${token}\n\n` +
+      `Your page: ${base}/artists/${claim.artist.slug}\n\nWelcome to the league.`,
+  }).catch(() => {});
+
+  revalidatePath("/admin");
+  revalidatePath(`/artists/${claim.artist.slug}`);
 }
 
 /**

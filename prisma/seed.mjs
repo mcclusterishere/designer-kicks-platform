@@ -661,10 +661,20 @@ async function main() {
           },
         });
       } else if (profile.userId !== user.id) {
-        profile = await prisma.artistProfile.update({
-          where: { id: profile.id },
-          data: { userId: user.id },
+        // Relink only while the page is unclaimed — once a real artist
+        // has a password or OAuth login, the page is theirs forever.
+        const owner = await prisma.user.findUnique({
+          where: { id: profile.userId },
+          include: { _count: { select: { accounts: true } } },
         });
+        const ownerClaimed =
+          Boolean(owner?.passwordHash) || (owner?._count.accounts ?? 0) > 0;
+        if (!ownerClaimed) {
+          profile = await prisma.artistProfile.update({
+            where: { id: profile.id },
+            data: { userId: user.id },
+          });
+        }
       }
       let newPieces = 0;
       for (const p of pa.pieces) {

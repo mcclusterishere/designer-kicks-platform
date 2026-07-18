@@ -66,6 +66,26 @@ model ArtistProfile {
 
   submissions Submission[]
   followers   ArtistFollow[]
+  claims      ArtistClaim[]
+}
+
+// A real-world artist asserting ownership of a pre-loaded page. Sits
+// PENDING in the admin queue; approving relinks the page to their
+// account and sends the password-setting claim link.
+model ArtistClaim {
+  id       String        @id @default(cuid())
+  artistId String
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  name        String
+  email       String
+  socialProof String? // IG handle / shop link that proves it's them
+  message     String?
+  status      String  @default("PENDING") // PENDING | APPROVED | REJECTED
+
+  createdAt DateTime @default(now())
+
+  @@index([artistId, status])
 }
 
 model ArtistFollow {

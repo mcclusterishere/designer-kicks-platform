@@ -51,6 +51,25 @@ check("shoe pre-approved", artist?.submissions?.[0]?.status === "APPROVED");
 await page.goto(`${BASE}/artists/${artist.slug}`, { waitUntil: "networkidle" });
 check("public artist page live", await page.getByText("Preload Test Custom").isVisible());
 
+// ---- Claim flow: the real artist asserts ownership, admin verifies ----
+check("unclaimed page invites a claim", await page.getByRole("button", { name: "Claim This Page" }).isVisible());
+await page.getByRole("button", { name: "Claim This Page" }).click();
+await page.fill("#cl-name", "Preload Test Artist");
+await page.fill("#cl-email", EMAIL);
+await page.fill("#cl-proof", "@preloadtest");
+await page.getByRole("button", { name: "Submit Claim For Verification" }).click();
+await page.getByText("Claim received ✓").waitFor({ timeout: 15000 });
+const claimRow = await prisma.artistClaim.findFirst({ where: { artistId: artist.id } });
+check("claim lands PENDING in the queue", claimRow?.status === "PENDING");
+
+await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.getByText("Profile Claims").waitFor({ timeout: 10000 });
+check("claim visible to admin", await page.getByText("@preloadtest").first().isVisible());
+await page.getByRole("button", { name: "Verify & Hand Over" }).click();
+await page.getByText("approved ✓").waitFor({ timeout: 15000 });
+const verdict = await prisma.artistClaim.findUnique({ where: { id: claimRow.id } });
+check("admin approval closes the claim", verdict?.status === "APPROVED");
+
 // Artist claims the account through the link
 const claimPath = new URL(claimUrl).pathname;
 await page.goto(`${BASE}${claimPath}`, { waitUntil: "networkidle" });
@@ -68,6 +87,10 @@ check("claimed artist can sign in", true);
 
 await page.goto(`${BASE}/submit`, { waitUntil: "networkidle" });
 check("claimed account is an approved artist", await page.getByText("approved artist").isVisible());
+
+// Once claimed, the page stops inviting claims
+await page.goto(`${BASE}/artists/${artist.slug}`, { waitUntil: "networkidle" });
+check("claim banner gone after handover", !(await page.getByRole("button", { name: "Claim This Page" }).isVisible()));
 
 // ---- Multi-piece preload: same email stacks pieces on one profile ----
 // (Run BEFORE claim it would reuse the same token; after claim it must
