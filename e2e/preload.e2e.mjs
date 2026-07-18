@@ -69,6 +69,30 @@ check("claimed artist can sign in", true);
 await page.goto(`${BASE}/submit`, { waitUntil: "networkidle" });
 check("claimed account is an approved artist", await page.getByText("approved artist").isVisible());
 
+// ---- Multi-piece preload: same email stacks pieces on one profile ----
+// (Run BEFORE claim it would reuse the same token; after claim it must
+// skip the claim link entirely and not break the account.)
+await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.getByText("Pre-load An Artist").waitFor({ timeout: 10000 });
+await page.fill("#pl-name", "Preload Test Artist");
+await page.fill("#pl-email", EMAIL);
+await page.fill("#pl-title", "Preload Second Piece");
+await page.fill("#pl-base", "Air Max 95");
+await page.fill("#pl-size", "US 11");
+await page.setInputFiles("#pl-img", { name: "p2.png", mimeType: "image/png", buffer: PNG_1x1 });
+await page.getByRole("button", { name: "Pre-load Artist + Piece" }).click();
+await page.getByText("New piece added").waitFor({ timeout: 15000 });
+check("second preload adds to the existing page", await page.getByText("already claimed their account").isVisible());
+
+const stacked = await prisma.artistProfile.findMany({
+  where: { user: { email: EMAIL } },
+  include: { submissions: true },
+});
+check("one profile, two pieces", stacked.length === 1 && stacked[0].submissions.length === 2);
+check("size stored on the stacked piece", stacked[0].submissions.some((s) => s.size === "US 11"));
+const claimedUser = await prisma.user.findUnique({ where: { email: EMAIL } });
+check("claimed password untouched by re-preload", Boolean(claimedUser?.passwordHash));
+
 // Cleanup
 await prisma.submission.deleteMany({ where: { email: EMAIL } });
 await prisma.user.deleteMany({ where: { email: EMAIL } });

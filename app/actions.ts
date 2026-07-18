@@ -180,9 +180,10 @@ export async function applyForArtist(
 
 export type PreloadResult = ActionResult & {
   artistSlug?: string;
-  claimUrl?: string;
+  claimUrl?: string | null; // null once the artist has claimed their account
   inviteText?: string;
   emailSent?: boolean;
+  alreadyClaimed?: boolean;
 };
 
 /**
@@ -205,6 +206,7 @@ export async function preloadArtist(
   const shoeTitle = String(formData.get("shoeTitle") ?? "").trim();
   const baseShoe = String(formData.get("baseShoe") ?? "").trim();
   const plCategory = String(formData.get("category") ?? "sneakers");
+  const plSize = String(formData.get("size") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const image = formData.get("image");
 
@@ -253,6 +255,7 @@ export async function preloadArtist(
       email,
       baseShoe,
       category: ["sneakers", "apparel", "accessories"].includes(plCategory) ? plCategory : "sneakers",
+      size: plSize || null,
       description: description || null,
       imageUrl,
       status: "APPROVED",
@@ -260,27 +263,46 @@ export async function preloadArtist(
     },
   });
 
-  // 14-day claim token (rides the password-reset flow).
-  const token = randomBytes(32).toString("hex");
-  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
-  await prisma.passwordResetToken.create({
-    data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
-  });
-
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
   const artistUrl = `${base}/artists/${artist.slug}`;
-  const claimUrl = `${base}/reset-password/${token}`;
-  const inviteText =
-    `Yo ${artistName} — your customs are officially in the arena on The Heat Chart 🔥\n\n` +
-    `The culture votes on head-to-head custom battles, and "${shoeTitle}" is already live on your artist page:\n${artistUrl}\n\n` +
-    `Claim your account here (sets your password, takes 30 seconds):\n${claimUrl}\n\n` +
-    `Every battle builds your W–L record on the league table, fans can follow you, and when you sell a pair you can transfer it to the buyer's collector closet. Come defend your heat.`;
+
+  // Claim link, only while the account is unclaimed. Re-preloading more
+  // pieces must NOT rotate the token — a claim link already sitting in
+  // the artist's DMs has to keep working.
+  const alreadyClaimed = Boolean(user.passwordHash);
+  let claimUrl: string | null = null;
+  if (!alreadyClaimed) {
+    let token = (
+      await prisma.passwordResetToken.findFirst({
+        where: { userId: user.id, expires: { gt: new Date() } },
+      })
+    )?.token;
+    if (!token) {
+      token = randomBytes(32).toString("hex");
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      await prisma.passwordResetToken.create({
+        data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      });
+    }
+    claimUrl = `${base}/reset-password/${token}`;
+  }
+
+  const inviteText = alreadyClaimed
+    ? `Yo ${artistName} — just added "${shoeTitle}" to your page on The Heat Chart 🔥\n\n` +
+      `${artistUrl}\n\n` +
+      `The culture's voting — come see where it lands.`
+    : `Yo ${artistName} — your customs are officially in the arena on The Heat Chart 🔥\n\n` +
+      `The culture votes on head-to-head custom battles, and "${shoeTitle}" is already live on your artist page:\n${artistUrl}\n\n` +
+      `Claim your account here (sets your password, takes 30 seconds):\n${claimUrl}\n\n` +
+      `Every battle builds your W–L record on the league table, fans can follow you, and when you sell a pair you can transfer it to the buyer's collector closet. Come defend your heat.`;
 
   let emailSent = false;
   if (process.env.RESEND_API_KEY) {
     const { delivered } = await sendMail({
       to: email,
-      subject: `${artistName} — your customs are live on The Heat Chart 🔥`,
+      subject: alreadyClaimed
+        ? `${artistName} — "${shoeTitle}" just went live on The Heat Chart 🔥`
+        : `${artistName} — your customs are live on The Heat Chart 🔥`,
       text: inviteText,
     });
     emailSent = delivered;
@@ -289,7 +311,7 @@ export async function preloadArtist(
   revalidatePath("/artists");
   revalidatePath(`/artists/${artist.slug}`);
   revalidatePath("/admin");
-  return { ok: true, artistSlug: artist.slug, claimUrl, inviteText, emailSent };
+  return { ok: true, artistSlug: artist.slug, claimUrl, inviteText, emailSent, alreadyClaimed };
 }
 
 export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED") {

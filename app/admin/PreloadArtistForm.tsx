@@ -17,22 +17,32 @@ export default function PreloadArtistForm() {
     return (
       <div className="space-y-4">
         <p className="rounded-lg border border-volt/50 bg-volt/10 p-3 text-sm text-volt">
-          Artist is live —{" "}
+          {state.alreadyClaimed ? "New piece added to their page" : "Artist is live"} —{" "}
           <Link href={`/artists/${state.artistSlug}`} className="underline">
             view their page
           </Link>
           . Their piece is approved and battle-ready.
-          {state.emailSent && " Invite email sent automatically. ✉️"}
+          {state.emailSent && " Notification email sent automatically. ✉️"}
         </p>
-        <div>
-          <p className="tag text-smoke">Claim link (valid 14 days — sets their password)</p>
-          <input
-            readOnly
-            value={state.claimUrl}
-            onFocus={(e) => e.target.select()}
-            className="mt-1 w-full rounded-lg border border-edge bg-panel px-3 py-2 font-mono text-xs text-volt"
-          />
-        </div>
+        {state.claimUrl ? (
+          <div>
+            <p className="tag text-smoke">Claim link (valid 14 days — sets their password)</p>
+            <input
+              readOnly
+              value={state.claimUrl}
+              onFocus={(e) => e.target.select()}
+              className="mt-1 w-full rounded-lg border border-edge bg-panel px-3 py-2 font-mono text-xs text-volt"
+            />
+            <p className="tag mt-1 text-smoke">
+              Loading more pieces for this artist keeps this same link working.
+            </p>
+          </div>
+        ) : (
+          <p className="rounded-lg border border-edge bg-panel p-3 text-sm text-smoke">
+            This artist already claimed their account — no claim link needed,
+            the piece is on their page now.
+          </p>
+        )}
         <div>
           <p className="tag text-smoke">
             Copy-paste outreach DM {state.emailSent ? "(email already sent — use this for IG)" : ""}
@@ -84,13 +94,19 @@ export default function PreloadArtistForm() {
           <input id="pl-base" name="baseShoe" required maxLength={60} placeholder="Air Force 1" className={inputClass} />
         </div>
       </div>
-      <div>
-        <label className="tag text-smoke" htmlFor="pl-cat">Category</label>
-        <select id="pl-cat" name="category" defaultValue="sneakers" className={inputClass}>
-          <option value="sneakers">👟 Sneakers</option>
-          <option value="apparel">🧥 Apparel</option>
-          <option value="accessories">🧢 Accessories</option>
-        </select>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="tag text-smoke" htmlFor="pl-cat">Category</label>
+          <select id="pl-cat" name="category" defaultValue="sneakers" className={inputClass}>
+            <option value="sneakers">👟 Sneakers</option>
+            <option value="apparel">🧥 Apparel</option>
+            <option value="accessories">🧢 Accessories</option>
+          </select>
+        </div>
+        <div>
+          <label className="tag text-smoke" htmlFor="pl-size">Size (if it&apos;s a sized piece)</label>
+          <input id="pl-size" name="size" maxLength={20} placeholder="US 10.5 / L" className={inputClass} />
+        </div>
       </div>
       <div>
         <label className="tag text-smoke" htmlFor="pl-desc">The story (optional)</label>
