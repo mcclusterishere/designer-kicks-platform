@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Geist, Geist_Mono, Bodoni_Moda } from "next/font/google";
 import Link from "next/link";
 import TrackPageview from "@/components/TrackPageview";
+import HeaderNav from "@/components/HeaderNav";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import MobileTabBar from "@/components/MobileTabBar";
@@ -48,17 +49,6 @@ export const viewport = {
   viewportFit: "cover" as const,
 };
 
-const navLinks = [
-  { href: "/battles", label: "Battles" },
-  { href: "/rate", label: "Rate" },
-  { href: "/news", label: "News" },
-  { href: "/quiz", label: "Quiz" },
-  { href: "/artists", label: "League" },
-  { href: "/market", label: "Market" },
-  { href: "/heat-list", label: "Heat List" },
-  { href: "/submit", label: "Submit" },
-];
-
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -95,27 +85,14 @@ export default async function RootLayout({
               The<span className="text-heat">Heat</span>
               <span className="text-volt">Chart</span>
             </Link>
-            <nav className="hidden items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] p-1 md:flex">
-              {navLinks.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={`tag rounded-full px-2.5 py-2 transition lg:px-3.5 ${
-                    l.href === "/submit"
-                      ? "btn-hard font-bold"
-                      : "text-smoke hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {l.label}
-                </Link>
-              ))}
-              <Link
-                href={session?.user ? "/profile" : "/signin"}
-                className="tag rounded-full border border-volt/40 px-2.5 py-2 text-white transition hover:border-volt hover:bg-volt/10 lg:px-3.5"
-              >
-                {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
-              </Link>
-            </nav>
+            <HeaderNav
+              account={{
+                href: session?.user ? "/profile" : "/signin",
+                label: session?.user
+                  ? session.user.name?.split(" ")[0] ?? "Account"
+                  : "Sign In",
+              }}
+            />
             {/* Mobile: tab bar handles navigation; header keeps just the account chip */}
             <Link
               href={session?.user ? "/profile" : "/signin"}
@@ -143,17 +120,12 @@ export default async function RootLayout({
                 </p>
               </div>
               <div className="flex flex-wrap gap-6">
-                <Link href="/battles" className="hover:text-white">Battles</Link>
-                <Link href="/outfits" className="hover:text-white">Fit Battles</Link>
-                <Link href="/rate" className="hover:text-white">Rate the Heat</Link>
-                <Link href="/artists" className="hover:text-white">League</Link>
-                <Link href="/heat-list" className="hover:text-white">Heat List</Link>
-                <Link href="/news" className="hover:text-white">News</Link>
-                <Link href="/drops" className="hover:text-white">Drop Calendar</Link>
+                <Link href="/battles" className="hover:text-white">Arena</Link>
+                <Link href="/drops" className="hover:text-white">Drops</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
-                <Link href="/story" className="hover:text-white">Our Story</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
+                <Link href="/story" className="hover:text-white">Our Story</Link>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-4 text-xs">

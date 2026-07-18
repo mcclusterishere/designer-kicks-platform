@@ -66,6 +66,7 @@ export default async function OutfitsPage() {
           { href: "/battles", label: "Battles" },
           { href: "/outfits", label: "Fit Battles", current: true },
           { href: "/rate", label: "Rate" },
+          { href: "/quiz", label: "Heat Check" },
           { href: "/tournaments", label: "Brackets" },
           { href: "/artists", label: "League" },
           { href: "/heat-list", label: "Heat List" },

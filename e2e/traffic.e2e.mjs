@@ -37,7 +37,7 @@ check("desktop device classed", fbHit?.device === "desktop");
 check("visitor hash present, no raw IP field", Boolean(fbHit?.visitorHash) && fbHit.visitorHash.length === 32);
 
 // SPA navigation fires a second pageview for the new route
-await page.getByRole("link", { name: "Battles", exact: true }).first().click();
+await page.getByRole("link", { name: "Arena", exact: true }).first().click();
 await page.waitForURL("**/battles", { timeout: 15000 });
 const spaHit = await waitForRow({ path: "/battles", visitorHash: fbHit.visitorHash });
 check("route change tracked as its own pageview", Boolean(spaHit));

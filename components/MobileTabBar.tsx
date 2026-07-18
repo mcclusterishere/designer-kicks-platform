@@ -48,9 +48,9 @@ const TABS: Tab[] = [
     icon: null, // center flame renders specially
   },
   {
-    href: "/news",
+    href: "/drops",
     label: "Drops",
-    match: ["/news"],
+    match: ["/drops", "/news"],
     icon: <Icon d="M4 4h13v16H6a2 2 0 0 1-2-2V4Zm13 4h3v10a2 2 0 0 1-2 2M7.5 8.5h6M7.5 12h6M7.5 15.5h6" />,
   },
   {

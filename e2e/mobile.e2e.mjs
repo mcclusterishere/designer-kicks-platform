@@ -39,8 +39,8 @@ check("center flame navigates to quiz", true);
 await page.screenshot({ path: `${SHOTS}/mobile-quiz.png` });
 
 await tabBar.getByText("Drops").click();
-await page.waitForURL("**/news", { timeout: 10000 });
-check("Drops tab navigates to news", true);
+await page.waitForURL("**/drops", { timeout: 10000 });
+check("Drops tab opens the calendar", true);
 
 await tabBar.getByText("Profile").click();
 await page.waitForURL(/\/(profile|signin)/, { timeout: 10000 });
@@ -61,7 +61,7 @@ const desktop = await browser.newContext({ viewport: { width: 1280, height: 900 
 const dpage = await desktop.newPage();
 await dpage.goto(BASE, { waitUntil: "networkidle" });
 check("tab bar hidden on desktop", !(await dpage.locator("nav[aria-label='Primary']").isVisible()));
-check("desktop top nav still present", await dpage.locator("header").getByText("Heat List").isVisible());
+check("desktop top nav still present", await dpage.locator("header").getByText("Arena").isVisible());
 await desktop.close();
 
 await browser.close();
