@@ -8,6 +8,7 @@ import { formatUsd } from "@/lib/market";
 import { categoryEmoji } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
+import FitBuilder from "@/components/FitBuilder";
 import { respondOffer, withdrawOffer } from "@/app/actions";
 
 export const metadata = { title: "Your Profile — The Heat Chart" };
@@ -302,6 +303,30 @@ export default async function ProfilePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Build a Fit — enter the fan league with owned pieces */}
+      {user.ownedPieces.length >= 2 && (
+        <div className="mt-10">
+          <h2 className="display text-2xl text-white">
+            Build a <span className="text-gradient-volt">Fit</span>
+          </h2>
+          <p className="mt-1 text-sm text-smoke">
+            Style 2–5 pieces from your closet into a full look and enter the{" "}
+            <Link href="/outfits" className="text-volt underline">
+              Fan League
+            </Link>{" "}
+            — fan fits battle head-to-head, decided by the culture&apos;s votes.
+          </p>
+          <FitBuilder
+            pieces={user.ownedPieces.map((s) => ({
+              id: s.id,
+              title: s.title,
+              imageUrl: s.imageUrl,
+              category: s.category,
+            }))}
+          />
         </div>
       )}
 

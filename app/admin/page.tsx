@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { isAdmin, adminAccountOk } from "@/lib/admin";
-import { finalizeExpiredBattles } from "@/lib/battles";
+import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
+import { finalizeExpiredOutfitBattles } from "@/lib/outfits";
 import {
   adminLogout,
   setSubmissionStatus,
@@ -27,6 +28,7 @@ import { categoryEmoji } from "@/lib/categories";
 import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
+import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +56,7 @@ export default async function AdminPage({
   }
 
   await finalizeExpiredBattles();
+  await finalizeExpiredOutfitBattles();
   const { edit, editArticle } = await searchParams;
 
   const [pending, approved, battles, products, editProduct, articles, editArticleRow] = await Promise.all([
@@ -131,6 +134,50 @@ export default async function AdminPage({
       buyer: { select: { name: true } },
     },
   });
+
+  // Outfit Studio: heat ranks per piece so the top of each category is
+  // obvious while assembling a house fit, plus the pool of built fits.
+  const heatRank = new Map((await getHeatList()).map((e, i) => [e.id, i + 1]));
+  const [outfits, outfitBattles] = await Promise.all([
+    prisma.outfit.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        _count: { select: { items: true } },
+        owner: { select: { name: true } },
+      },
+    }),
+    prisma.outfitBattle.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: {
+        outfitA: { select: { name: true } },
+        outfitB: { select: { name: true } },
+        _count: { select: { votes: true } },
+      },
+    }),
+  ]);
+  const categoryLeaders = ["sneakers", "apparel", "accessories"].map((cat) => ({
+    category: cat,
+    top: approved
+      .filter((s) => s.category === cat)
+      .sort((a, b) => (heatRank.get(a.id) ?? 9999) - (heatRank.get(b.id) ?? 9999))
+      .slice(0, 3),
+  }));
+
+  // Outreach: approved pages whose account has never been claimed — no
+  // password and no OAuth link means the artist has never logged in.
+  const outreachLeads = await prisma.artistProfile.findMany({
+    where: {
+      status: "APPROVED",
+      user: { passwordHash: null, accounts: { none: {} } },
+    },
+    orderBy: [{ invitedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+    include: { user: { select: { email: true } } },
+  });
+  const humanizeAgo = (d: Date) => {
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -245,6 +292,40 @@ export default async function AdminPage({
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
           <PreloadArtistForm />
         </div>
+      </section>
+
+      {/* Outreach: cold leads with pre-loaded pages who never claimed */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Outreach{" "}
+          <span className={outreachLeads.length ? "text-heat" : "text-smoke"}>
+            ({outreachLeads.length} unclaimed)
+          </span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Every pre-loaded page still waiting on its artist. Drop in their
+          real email and Send Invite — they get the pitch (page live, 1%
+          vs 10% fees, keep every sale) plus their personal claim link. No
+          Resend key set? You get the claim link to DM by hand instead.
+        </p>
+        {outreachLeads.length === 0 ? (
+          <p className="mt-3 text-sm text-smoke">
+            No cold leads — every artist page on the chart is claimed. 🔥
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {outreachLeads.map((lead) => (
+              <OutreachRow
+                key={lead.id}
+                artistId={lead.id}
+                displayName={lead.displayName}
+                defaultEmail={lead.user.email}
+                invitedAgo={lead.invitedAt ? humanizeAgo(lead.invitedAt) : null}
+                pageSlug={lead.slug}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Artist applications */}
@@ -399,6 +480,102 @@ export default async function AdminPage({
           ))}
           {battles.length === 0 && <p className="text-sm text-smoke">No battles yet.</p>}
         </div>
+      </section>
+
+      {/* Outfit Studio: assemble house fits, match fit battles */}
+      <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Outfit <span className="text-gradient-volt">Studio</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Style the chart&apos;s best pieces into full looks and put fit
+          against fit. Category leaders below are ranked straight off the
+          Heat List — pair the winners with looks that go together.
+        </p>
+
+        {/* Category leaders: the top three of each clothing type */}
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {categoryLeaders.map((g) => (
+            <div key={g.category} className="rounded-lg border border-edge bg-surface p-3">
+              <p className="tag text-volt">
+                {categoryEmoji(g.category)} Top {g.category}
+              </p>
+              {g.top.length === 0 ? (
+                <p className="mt-2 text-xs text-smoke">Nothing approved yet.</p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {g.top.map((s) => (
+                    <li key={s.id} className="flex items-center gap-2 text-sm text-smoke">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={s.imageUrl} alt={s.title} className="h-8 w-8 rounded object-cover" />
+                      <span className="min-w-0 truncate">
+                        <span className="text-volt">#{heatRank.get(s.id) ?? "—"}</span>{" "}
+                        <span className="text-white">{s.title}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <h3 className="tag mt-6 text-white">1 · Build a house fit</h3>
+        <div className="mt-2">
+          <HouseOutfitForm
+            pieces={approved.map((s) => ({
+              id: s.id,
+              title: s.title,
+              category: s.category,
+              artistName: s.artistName,
+              rank: heatRank.get(s.id) ?? null,
+            }))}
+          />
+        </div>
+
+        <h3 className="tag mt-6 text-white">2 · Match a fit battle</h3>
+        <p className="mt-1 text-xs text-smoke">
+          House vs house, fan vs fan, or crossover — fan fits come in from
+          members&apos; closets on their profile page.
+        </p>
+        <div className="mt-2">
+          {outfits.length < 2 ? (
+            <p className="text-sm text-smoke">
+              Need at least two fits in the pool ({outfits.length} so far).
+            </p>
+          ) : (
+            <OutfitBattleForm
+              outfits={outfits.map((o) => ({
+                id: o.id,
+                name: o.kind === "FAN" && o.owner?.name ? `${o.name} — ${o.owner.name}` : o.name,
+                kind: o.kind,
+                itemCount: o._count.items,
+              }))}
+            />
+          )}
+        </div>
+
+        {outfitBattles.length > 0 && (
+          <div className="mt-6 space-y-2">
+            <h3 className="tag text-white">Fit battles</h3>
+            {outfitBattles.map((b) => (
+              <div
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
+              >
+                <div>
+                  <Link href="/outfits" className="font-bold text-white hover:text-volt">
+                    {b.outfitA.name} vs {b.outfitB.name}
+                  </Link>
+                  <p className="text-xs text-smoke">
+                    {b.league} league · {b.status} · {b._count.votes} votes · ends{" "}
+                    {b.endsAt.toISOString().slice(0, 10)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Tournaments */}

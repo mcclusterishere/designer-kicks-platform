@@ -35,8 +35,9 @@ model Submission {
   size             String? // e.g. "US 10.5", "L", "7 3/8" — buyers need this
   askingPriceCents Int?
 
-  sales  Sale[]
-  offers Offer[]
+  sales       Sale[]
+  offers      Offer[]
+  outfitItems OutfitItem[]
 
   battlesAsA Battle[] @relation("battleSubA")
   battlesAsB Battle[] @relation("battleSubB")
@@ -65,11 +66,71 @@ model ArtistProfile {
   // Subscription groundwork: everyone rides FREE until billing opens.
   plan      String @default("FREE") // FREE | PRO
   viewCount Int    @default(0) // raw public page views (own visits excluded)
+  invitedAt DateTime? // last outreach email sent from the admin panel
   createdAt   DateTime @default(now())
 
   submissions Submission[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
+}
+
+// A look assembled from pieces. HOUSE outfits are admin-curated from
+// the league's best; FAN outfits are built by members from pieces they
+// actually own. Each kind battles within its own league.
+model Outfit {
+  id        String   @id @default(cuid())
+  name      String
+  kind      String   @default("HOUSE") // HOUSE | FAN
+  ownerId   String?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  items      OutfitItem[]
+  battlesAsA OutfitBattle[] @relation("obA")
+  battlesAsB OutfitBattle[] @relation("obB")
+  battlesWon OutfitBattle[] @relation("obWinner")
+}
+
+model OutfitItem {
+  id           String     @id @default(cuid())
+  outfitId     String
+  outfit       Outfit     @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([outfitId, submissionId])
+}
+
+model OutfitBattle {
+  id     String  @id @default(cuid())
+  title  String?
+  league String  @default("HOUSE") // HOUSE | FAN
+  status String  @default("ACTIVE") // ACTIVE | COMPLETED
+
+  outfitAId String
+  outfitA   Outfit @relation("obA", fields: [outfitAId], references: [id], onDelete: Cascade)
+  outfitBId String
+  outfitB   Outfit @relation("obB", fields: [outfitBId], references: [id], onDelete: Cascade)
+  winnerId  String?
+  winner    Outfit? @relation("obWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  votes OutfitVote[]
+}
+
+model OutfitVote {
+  id       String       @id @default(cuid())
+  battleId String
+  battle   OutfitBattle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  outfitId String
+  userId   String
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+
+  @@unique([battleId, userId])
+  @@index([battleId, outfitId])
 }
 
 // A real-world artist asserting ownership of a pre-loaded page. Sits
@@ -217,6 +278,8 @@ model User {
   salesSold   Sale[] @relation("salesSold")
   salesBought Sale[] @relation("salesBought")
   offers      Offer[]
+  outfits     Outfit[]
+  outfitVotes OutfitVote[]
 }
 
 // A buyer's standing offer on a piece — the demand side of the price

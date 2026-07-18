@@ -138,6 +138,7 @@ export default async function RootLayout({
               </div>
               <div className="flex flex-wrap gap-6">
                 <Link href="/battles" className="hover:text-white">Battles</Link>
+                <Link href="/outfits" className="hover:text-white">Fit Battles</Link>
                 <Link href="/artists" className="hover:text-white">League</Link>
                 <Link href="/heat-list" className="hover:text-white">Heat List</Link>
                 <Link href="/news" className="hover:text-white">News</Link>

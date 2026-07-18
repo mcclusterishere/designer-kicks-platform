@@ -41,6 +41,7 @@ export default async function BattlesPage() {
       <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
         {[
           { href: "/battles", label: "⚔️ Battles", current: true },
+          { href: "/outfits", label: "🧥 Fit Battles" },
           { href: "/tournaments", label: "🏆 Brackets" },
           { href: "/artists", label: "🥇 League" },
           { href: "/heat-list", label: "🔥 Heat List" },

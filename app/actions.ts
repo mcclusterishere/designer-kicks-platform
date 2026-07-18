@@ -558,6 +558,213 @@ export async function setAskingPrice(
   return { ok: true };
 }
 
+// ---------- Fit battles (outfits) ----------
+
+async function buildOutfit(
+  name: string,
+  submissionIds: string[],
+  kind: "HOUSE" | "FAN",
+  ownerId: string | null
+): Promise<ActionResult> {
+  if (!name || name.length > 60) return { ok: false, error: "Give the fit a name (max 60 characters)." };
+  const unique = [...new Set(submissionIds)];
+  if (unique.length < 2 || unique.length > 5) {
+    return { ok: false, error: "A fit is 2 to 5 pieces." };
+  }
+  const pieces = await prisma.submission.findMany({
+    where: { id: { in: unique }, status: "APPROVED" },
+  });
+  if (pieces.length !== unique.length) return { ok: false, error: "One of those pieces isn't available." };
+  if (kind === "FAN" && pieces.some((p) => p.ownerId !== ownerId)) {
+    return { ok: false, error: "Fan fits are built only from pieces you own." };
+  }
+
+  await prisma.outfit.create({
+    data: {
+      name,
+      kind,
+      ownerId,
+      items: { create: unique.map((submissionId) => ({ submissionId })) },
+    },
+  });
+  return { ok: true };
+}
+
+/** Admin curates a house fit from any approved pieces. */
+export async function createHouseOutfit(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const ids = formData.getAll("pieces").map(String);
+  const res = await buildOutfit(name, ids, "HOUSE", null);
+  if (res.ok) revalidatePath("/admin");
+  return res;
+}
+
+/** A fan assembles a fit from pieces in their own closet. */
+export async function createFanOutfit(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  if (!allowAttempt("fitbuild", session.user.id, 10, 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of fits — try again in an hour." };
+  }
+  const name = String(formData.get("name") ?? "").trim();
+  const ids = formData.getAll("pieces").map(String);
+  // No revalidatePath: the profile shows a client success card.
+  return buildOutfit(name, ids, "FAN", session.user.id);
+}
+
+/** Admin matches two fits of the same league into a battle. */
+export async function createOutfitBattleAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const outfitAId = String(formData.get("outfitAId") ?? "");
+  const outfitBId = String(formData.get("outfitBId") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const days = Number(formData.get("days") ?? 3);
+  if (!outfitAId || !outfitBId || outfitAId === outfitBId) {
+    return { ok: false, error: "Pick two different fits." };
+  }
+  if (!Number.isFinite(days) || days < 1 || days > 14) {
+    return { ok: false, error: "Battles run 1–14 days." };
+  }
+  const [a, b] = await Promise.all([
+    prisma.outfit.findUnique({ where: { id: outfitAId } }),
+    prisma.outfit.findUnique({ where: { id: outfitBId } }),
+  ]);
+  if (!a || !b) return { ok: false, error: "Fit not found." };
+  if (a.kind !== b.kind) {
+    return { ok: false, error: "House fits battle house fits; fan fits battle fan fits." };
+  }
+
+  await prisma.outfitBattle.create({
+    data: {
+      title: title || null,
+      league: a.kind,
+      outfitAId,
+      outfitBId,
+      endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    },
+  });
+  revalidatePath("/outfits");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function castOutfitVote(battleId: string, outfitId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to vote." };
+  if (!allowAttempt("vote", session.user.id, 30, 60 * 1000)) {
+    return { ok: false, error: "Slow down — too many votes at once." };
+  }
+  const battle = await prisma.outfitBattle.findUnique({ where: { id: battleId } });
+  if (!battle || battle.status !== "ACTIVE" || battle.endsAt < new Date()) {
+    return { ok: false, error: "This fit battle has ended." };
+  }
+  if (outfitId !== battle.outfitAId && outfitId !== battle.outfitBId) {
+    return { ok: false, error: "That fit isn't in this battle." };
+  }
+  try {
+    await prisma.outfitVote.create({
+      data: { battleId, outfitId, userId: session.user.id },
+    });
+  } catch {
+    return { ok: false, error: "You already voted in this battle." };
+  }
+  return { ok: true };
+}
+
+// ---------- Outreach (cold leads with unclaimed pages) ----------
+
+export type OutreachResult = ActionResult & { emailSent?: boolean; claimUrl?: string };
+
+/**
+ * One-tap recruiting from the admin panel: point an unclaimed page at
+ * the lead's real email, mint/reuse their claim link, and send the
+ * pitch. Falls back to showing the link for manual DMs when Resend
+ * isn't wired.
+ */
+export async function outreachInvite(
+  _prev: OutreachResult | null,
+  formData: FormData
+): Promise<OutreachResult> {
+  await requireAdmin();
+  const artistId = String(formData.get("artistId") ?? "");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "Enter the lead's real email." };
+  }
+
+  const profile = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    include: { user: { select: { id: true, passwordHash: true, _count: { select: { accounts: true } } } } },
+  });
+  if (!profile) return { ok: false, error: "Artist not found." };
+  if (profile.user.passwordHash || profile.user._count.accounts > 0) {
+    return { ok: false, error: "This page is already claimed — no outreach needed." };
+  }
+
+  const target = await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { name: profile.displayName, email },
+  });
+  if (target.passwordHash) {
+    // The lead already has a member account — link the page to it and
+    // let them claim via the banner instead of a password link.
+    return { ok: false, error: "That email already has an account — have them use Claim This Page on their artist page instead." };
+  }
+  if (profile.userId !== target.id) {
+    await prisma.artistProfile.update({ where: { id: profile.id }, data: { userId: target.id } });
+    await prisma.submission.updateMany({ where: { artistId: profile.id }, data: { email } });
+  }
+
+  let token = (
+    await prisma.passwordResetToken.findFirst({
+      where: { userId: target.id, expires: { gt: new Date() } },
+    })
+  )?.token;
+  if (!token) {
+    token = randomBytes(32).toString("hex");
+    await prisma.passwordResetToken.deleteMany({ where: { userId: target.id } });
+    await prisma.passwordResetToken.create({
+      data: { token, userId: target.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+    });
+  }
+
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const claimUrl = `${base}/reset-password/${token}`;
+  const pageUrl = `${base}/artists/${profile.slug}`;
+  const pitch =
+    `Yo ${profile.displayName} — your work is already live on The Heat Chart 🔥\n\n` +
+    `We built you an artist page in our customizer league: head-to-head vote battles, live rankings, a closet that tracks every sale of your work with receipts, and a market where buyers place offers.\n\n` +
+    `Your page (it's getting votes without you): ${pageUrl}\n\n` +
+    `Claim it here — takes 30 seconds, sets your password:\n${claimUrl}\n\n` +
+    `What it costs: nothing. When on-platform checkout opens, the seller fee is 1% — the other platforms take 10. Founding artists keep free access to the full artist dashboard forever.\n\n` +
+    `Come defend your heat.\n— Matt, The Heat Chart (formerly the Designer Kicks page)`;
+
+  let emailSent = false;
+  if (process.env.RESEND_API_KEY) {
+    const { delivered } = await sendMail({
+      to: email,
+      subject: `${profile.displayName} — your page on The Heat Chart is ready to claim 🔥`,
+      text: pitch,
+    });
+    emailSent = delivered;
+  }
+  await prisma.artistProfile.update({ where: { id: profile.id }, data: { invitedAt: new Date() } });
+
+  revalidatePath("/admin");
+  return { ok: true, emailSent, claimUrl };
+}
+
 // ---------- Artist page claims (pre-loaded roster handover) ----------
 
 /**
