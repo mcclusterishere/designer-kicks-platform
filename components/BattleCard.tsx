@@ -66,7 +66,7 @@ export default function BattleCard({ battle, aVotes, bVotes }: Props) {
   return (
     <Link
       href={`/battles/${battle.id}`}
-      className="group block overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/60"
+      className="card-lift group block overflow-hidden rounded-xl border border-edge bg-surface"
     >
       <div className="relative flex">
         <SideThumb

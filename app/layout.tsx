@@ -78,6 +78,12 @@ export default async function RootLayout({
         </head>
       )}
       <body className="min-h-full flex flex-col">
+        <a
+          href="#main"
+          className="sr-only z-[100] rounded bg-volt px-4 py-2 tag font-bold text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+        >
+          Skip to content
+        </a>
         <header className="sticky top-0 z-50 border-b border-edge bg-ink/90 backdrop-blur">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="display text-xl text-white">
@@ -115,7 +121,7 @@ export default async function RootLayout({
           </div>
         </header>
 
-        <main className="flex-1 pb-24 md:pb-0">{children}</main>
+        <main id="main" className="flex-1 pb-24 md:pb-0">{children}</main>
 
         <footer className="border-t border-edge bg-surface">
           <div className="h-1.5 stripes opacity-60" />

@@ -131,10 +131,13 @@ export default async function MarketPage({
       </form>
 
       {filtered.length === 0 ? (
-        <p className="mt-8 rounded-xl border border-dashed border-edge bg-surface p-8 text-center text-smoke">
-          No priced pieces here yet — sales recorded by artists and asks set
-          by owners show up automatically.
-        </p>
+        <div className="mt-8 rounded-xl border border-dashed border-edge bg-surface p-10 text-center">
+          <p className="display text-2xl text-white">The board opens with the first price 💸</p>
+          <p className="mx-auto mt-2 max-w-md text-smoke">
+            Sales recorded by artists, asks set by owners, and offers from
+            buyers all land here automatically. First mover writes the index.
+          </p>
+        </div>
       ) : (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((item) => {
