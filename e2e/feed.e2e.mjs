@@ -3,6 +3,7 @@
 // Broadcast composer posts into the feed (pinned to the top) with
 // per-channel status + paste-ready copy when socials are unconnected.
 import { PrismaClient } from "@prisma/client";
+import { hash } from "bcryptjs";
 import { BASE, SHOTS, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
@@ -11,9 +12,14 @@ const prisma = new PrismaClient();
 const results = [];
 const check = makeChecker(results);
 const POST_BODY = "E2E broadcast: Fit Check Friday goes live at noon.";
+const ARTIST_POST = "E2E artist post: new build on the bench, reveal Friday.";
+const ARTIST_EMAIL = "feed-artist@test.example";
+const FAN_EMAIL = "feed-fan@test.example";
 
 // Cleanup from prior runs
-await prisma.feedPost.deleteMany({ where: { body: { startsWith: "E2E broadcast" } } });
+await prisma.feedPost.deleteMany({ where: { body: { startsWith: "E2E " } } });
+await prisma.artistProfile.deleteMany({ where: { slug: "e2e-feed-artist" } });
+await prisma.user.deleteMany({ where: { email: { in: [ARTIST_EMAIL, FAN_EMAIL] } } });
 
 // ---------- The API serves a ranked, paged stream ----------
 const page1 = await (await fetch(`${BASE}/api/feed?offset=0&limit=8`)).json();
@@ -86,6 +92,72 @@ check(
   "delete removes the post",
   (await prisma.feedPost.count({ where: { body: POST_BODY } })) === 0
 );
+
+// ---------- An artist posts from their Studio ----------
+const artistUser = await prisma.user.create({
+  data: {
+    name: "Feed Artist",
+    email: ARTIST_EMAIL,
+    passwordHash: await hash("feedpass99", 10),
+    artistProfile: {
+      create: { slug: "e2e-feed-artist", displayName: "Feed Artist", status: "APPROVED" },
+    },
+  },
+});
+const artistPage = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+await artistPage.goto(`${BASE}/signin`, { waitUntil: "networkidle" });
+await artistPage.fill("#email", ARTIST_EMAIL);
+await artistPage.fill("#password", "feedpass99");
+await artistPage.getByRole("button", { name: "Sign In", exact: true }).click();
+await artistPage.waitForURL("**/profile", { timeout: 15000 });
+await artistPage.goto(`${BASE}/studio`, { waitUntil: "networkidle" });
+await artistPage.getByRole("heading", { name: "Your Mic" }).waitFor({ timeout: 10000 });
+check("artist sees Your Mic in the studio", true);
+await artistPage.fill("#sp-body", ARTIST_POST);
+await artistPage.getByRole("button", { name: "Post", exact: true }).click();
+await artistPage.getByText("live in The Feed").waitFor({ timeout: 15000 });
+const artistPost = await prisma.feedPost.findFirst({
+  where: { body: ARTIST_POST },
+  include: { artist: true },
+});
+check("artist post stored with the artist byline", artistPost?.artist?.slug === "e2e-feed-artist");
+
+// ---------- A fan reacts and talks ----------
+await prisma.user.create({
+  data: { name: "Feed Fan", email: FAN_EMAIL, passwordHash: await hash("fanpass99", 10) },
+});
+const fan = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+await fan.goto(`${BASE}/signin`, { waitUntil: "networkidle" });
+await fan.fill("#email", FAN_EMAIL);
+await fan.fill("#password", "fanpass99");
+await fan.getByRole("button", { name: "Sign In", exact: true }).click();
+await fan.waitForURL("**/profile", { timeout: 15000 });
+await fan.goto(BASE, { waitUntil: "networkidle" });
+const artistCard = fan.locator("[data-testid=feed-item]", { hasText: ARTIST_POST }).first();
+await artistCard.waitFor({ timeout: 15000 });
+check(
+  "artist byline links their page",
+  (await artistCard.locator("a[href='/artists/e2e-feed-artist']").count()) >= 1
+);
+await artistCard.locator("[data-testid=feed-react]").click();
+await fan.waitForTimeout(1200);
+check(
+  "fan flame stored",
+  (await prisma.feedReaction.count({ where: { postId: artistPost.id } })) === 1
+);
+await artistCard.locator("[data-testid=feed-talk]").click();
+await artistCard.getByPlaceholder("Say something…").fill("This one is a problem 🔥");
+await artistCard.getByRole("button", { name: "post" }).click();
+await fan.waitForTimeout(1200);
+const comment = await prisma.feedComment.findFirst({ where: { postId: artistPost.id } });
+check("fan comment stored", comment?.body === "This one is a problem 🔥");
+check("comment renders in the card", await artistCard.getByText("This one is a problem").isVisible());
+await fan.screenshot({ path: `${SHOTS}/feed-social.png`, fullPage: false });
+
+// Cleanup
+await prisma.feedPost.deleteMany({ where: { body: { startsWith: "E2E " } } });
+await prisma.artistProfile.deleteMany({ where: { slug: "e2e-feed-artist" } });
+await prisma.user.deleteMany({ where: { email: { in: [ARTIST_EMAIL, FAN_EMAIL] } } });
 
 await browser.close();
 await prisma.$disconnect();

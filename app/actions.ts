@@ -1889,8 +1889,112 @@ export async function broadcastPost(
 }
 
 export async function deleteFeedPost(id: string) {
-  await requireAdmin();
+  // The admin (password cookie, no NextAuth session) can delete
+  // anything; an artist can delete their own post.
+  if (!(await isAdmin())) {
+    const session = await auth();
+    if (!session?.user?.id) return;
+    const post = await prisma.feedPost.findUnique({
+      where: { id },
+      include: { artist: { select: { userId: true } } },
+    });
+    if (!post || post.artist?.userId !== session.user.id) return;
+  }
   await prisma.feedPost.delete({ where: { id } }).catch(() => {});
   revalidatePath("/");
   revalidatePath("/admin");
+}
+
+/** An approved artist posts to The Feed from their Studio. */
+export async function artistFeedPost(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Only approved artists can post to The Feed." };
+  }
+  if (!allowAttempt("feedpost", session.user.id, 10, 60 * 60 * 1000)) {
+    return { ok: false, error: "Easy — 10 posts an hour max." };
+  }
+
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body || body.length > 2200) return { ok: false, error: "Say something (2,200 characters max)." };
+  const linkUrl = String(formData.get("linkUrl") ?? "").trim() || null;
+  if (linkUrl && !/^(https?:\/\/|\/)/.test(linkUrl)) {
+    return { ok: false, error: "Link must be a full URL or a /path on the site." };
+  }
+
+  let imageUrl: string | null = null;
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
+    const ext = ALLOWED_TYPES[photo.type];
+    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
+    imageUrl = await saveUpload(
+      Buffer.from(await photo.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      photo.type
+    );
+  }
+
+  await prisma.feedPost.create({
+    data: { body, imageUrl, linkUrl, artistId: profile.id },
+  });
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Fan taps the flame on a feed post — one per fan, tap again to take it back. */
+export async function toggleFeedReaction(
+  postId: string
+): Promise<{ ok: boolean; count: number; mine: boolean }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, count: 0, mine: false };
+  const userId = session.user.id;
+  if (!allowAttempt("feedreact", userId, 120, 60 * 1000)) {
+    return { ok: false, count: 0, mine: false };
+  }
+  const existing = await prisma.feedReaction.findUnique({
+    where: { postId_userId: { postId, userId } },
+  });
+  if (existing) {
+    await prisma.feedReaction.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.feedReaction.create({ data: { postId, userId } }).catch(() => {});
+  }
+  const count = await prisma.feedReaction.count({ where: { postId } });
+  return { ok: true, count, mine: !existing };
+}
+
+export type FeedCommentResult =
+  | { ok: true; comment: { id: string; name: string; body: string } }
+  | { ok: false; error: string };
+
+/** Anyone signed in can talk under a post. */
+export async function addFeedComment(
+  postId: string,
+  bodyRaw: string
+): Promise<FeedCommentResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to comment." };
+  const body = bodyRaw.trim().slice(0, 500);
+  if (!body) return { ok: false, error: "Say something." };
+  if (!allowAttempt("feedcomment", session.user.id, 20, 60 * 1000)) {
+    return { ok: false, error: "Slow down a little." };
+  }
+  const post = await prisma.feedPost.findUnique({ where: { id: postId } });
+  if (!post) return { ok: false, error: "Post is gone." };
+  const comment = await prisma.feedComment.create({
+    data: { postId, userId: session.user.id, body },
+    include: { user: { select: { name: true } } },
+  });
+  return {
+    ok: true,
+    comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body },
+  };
 }

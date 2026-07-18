@@ -10,5 +10,8 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(20, Math.max(1, Number(req.nextUrl.searchParams.get("limit")) || 8));
   const session = await auth().catch(() => null);
   const feed = await getFeed(offset, limit, session?.user?.id ?? null);
-  return NextResponse.json(feed, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { ...feed, signedIn: Boolean(session?.user?.id) },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }

@@ -84,6 +84,7 @@ model ArtistProfile {
   submissions Submission[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
+  feedPosts   FeedPost[]
 }
 
 // BETA (admin-only): Store Scout. Local shoe stores prospected by zip
@@ -278,8 +279,9 @@ model Battle {
   tournamentMatch TournamentMatch?
 }
 
-// Admin posts into The Feed on the home page — announcements, drops,
-// callouts. Cross-posted to socials by the Broadcast composer.
+// Posts in The Feed on the home page. artistId null = the house
+// (admin Broadcast); set = an approved artist posting from their
+// Studio. Fans react, comment, and share — they don't post.
 model FeedPost {
   id        String   @id @default(cuid())
   body      String
@@ -287,6 +289,33 @@ model FeedPost {
   linkUrl   String?
   linkLabel String?
   pinned    Boolean  @default(false)
+  artistId  String?
+  artist    ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  reactions FeedReaction[]
+  comments  FeedComment[]
+}
+
+// One flame per fan per post.
+model FeedReaction {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model FeedComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body      String
   createdAt DateTime @default(now())
 }
 
@@ -394,6 +423,8 @@ model User {
   outfits     Outfit[]
   outfitVotes OutfitVote[]
   designRatings DesignRating[]
+  feedReactions FeedReaction[]
+  feedComments  FeedComment[]
 }
 
 // A buyer's standing offer on a piece — the demand side of the price

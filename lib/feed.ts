@@ -28,6 +28,13 @@ export type FeedItem =
       linkUrl: string | null;
       linkLabel: string | null;
       createdAt: string;
+      // Byline: null = the house; set = the artist who posted it.
+      artistName: string | null;
+      artistSlug: string | null;
+      reactions: number;
+      mine: boolean;
+      commentCount: number;
+      comments: { id: string; name: string; body: string }[];
     }
   | {
       type: "battle";
@@ -83,6 +90,16 @@ export async function getFeed(
       where: { OR: [{ pinned: true }, { createdAt: { gte: since } }] },
       orderBy: { createdAt: "desc" },
       take: 50,
+      include: {
+        artist: { select: { displayName: true, slug: true } },
+        _count: { select: { reactions: true, comments: true } },
+        reactions: userId ? { where: { userId }, select: { id: true } } : false,
+        comments: {
+          orderBy: { createdAt: "desc" },
+          take: 2,
+          include: { user: { select: { name: true } } },
+        },
+      },
     }),
     prisma.battle.findMany({
       where: { status: "ACTIVE" },
@@ -131,7 +148,12 @@ export async function getFeed(
 
   for (const p of posts) {
     scored.push({
-      score: (p.pinned ? 1000 : 60) + recency(p.createdAt, now),
+      score:
+        (p.pinned ? 1000 : 60) +
+        recency(p.createdAt, now) +
+        5 * Math.log1p(p._count.reactions) +
+        4 * Math.log1p(p._count.comments) +
+        (p.artistId && followed.has(p.artistId) ? 12 : 0),
       item: {
         type: "post",
         id: p.id,
@@ -140,6 +162,15 @@ export async function getFeed(
         linkUrl: p.linkUrl,
         linkLabel: p.linkLabel,
         createdAt: p.createdAt.toISOString(),
+        artistName: p.artist?.displayName ?? null,
+        artistSlug: p.artist?.slug ?? null,
+        reactions: p._count.reactions,
+        mine: Array.isArray(p.reactions) && p.reactions.length > 0,
+        commentCount: p._count.comments,
+        comments: p.comments
+          .slice()
+          .reverse()
+          .map((c) => ({ id: c.id, name: c.user.name ?? "A fan", body: c.body })),
       },
     });
   }
