@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { categoryEmoji } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 import { computeBadges } from "@/lib/quiz";
 import { formatUsd } from "@/lib/market";
 import AskForm from "@/components/AskForm";
@@ -65,7 +65,7 @@ export default async function CollectorPage({ params }: Props) {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-volt">Collector</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        {user.name ?? "Collector"}&apos;s <span className="text-gradient-volt">Closet</span>
+        {user.name ?? "Collector"}&apos;s Closet
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         One-of-one customs in the collection — every piece verified through
@@ -127,7 +127,7 @@ export default async function CollectorPage({ params }: Props) {
                       className="absolute right-2 top-2 rounded bg-ink/85 px-2 py-1 text-sm"
                       title={s.tournamentsWon.map((t) => t.name).join(", ")}
                     >
-                      {"🏆".repeat(Math.min(s.tournamentsWon.length, 3))}
+                      {s.tournamentsWon.length > 0 ? `Champion ×${s.tournamentsWon.length}` : ""}
                     </span>
                   )}
                   {s.askingPriceCents && (
@@ -142,7 +142,7 @@ export default async function CollectorPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{categoryEmoji(s.category)} {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
+                  <p className="tag text-smoke">{categoryLabel(s.category)} · {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     by{" "}

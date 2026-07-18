@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, formatUsd } from "@/lib/market";
 import OfferForm from "@/components/OfferForm";
-import { categoryEmoji, categoryLabel } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 
 export const metadata = {
   title: "The Custom Market — One-of-One Sneakers & Apparel | The Heat Chart",
@@ -14,13 +14,13 @@ export const dynamic = "force-dynamic";
 
 const CATEGORIES = [
   { key: "all", label: "All" },
-  { key: "sneakers", label: "👟 Sneakers" },
-  { key: "apparel", label: "🧥 Apparel" },
-  { key: "accessories", label: "🧢 Accessories" },
+  { key: "sneakers", label: "Sneakers" },
+  { key: "apparel", label: "Apparel" },
+  { key: "accessories", label: "Accessories" },
 ];
 
 const SORTS = [
-  { key: "hot", label: "🔥 Hottest" },
+  { key: "hot", label: "Hottest" },
   { key: "price-high", label: "Price ↓" },
   { key: "price-low", label: "Price ↑" },
 ] as const;
@@ -57,7 +57,7 @@ export default async function MarketPage({
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-volt">The pricing index</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        The Custom <span className="text-gradient-volt">Market</span>
+        The Custom Market
       </h1>
       <p className="mt-3 max-w-2xl text-smoke">
         Real sale prices for one-of-one customs — sneakers, apparel, and
@@ -132,7 +132,7 @@ export default async function MarketPage({
 
       {filtered.length === 0 ? (
         <div className="mt-8 rounded-xl border border-dashed border-edge bg-surface p-10 text-center">
-          <p className="display text-2xl text-white">The board opens with the first price 💸</p>
+          <p className="display text-2xl text-white">The board opens with the first price</p>
           <p className="mx-auto mt-2 max-w-md text-smoke">
             Sales recorded by artists, asks set by owners, and offers from
             buyers all land here automatically. First mover writes the index.
@@ -162,7 +162,7 @@ export default async function MarketPage({
                 </div>
                 <div className="p-4">
                   <p className="tag text-smoke">
-                    {categoryEmoji(item.category)} {item.baseShoe} · {categoryLabel(item.category)}
+                    {categoryLabel(item.category)} · {item.baseShoe}
                     {item.size && <span className="text-white"> · {item.size}</span>}
                   </p>
                   <p className="mt-1 font-bold text-white">{item.title}</p>

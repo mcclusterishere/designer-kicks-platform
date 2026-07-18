@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { castVote } from "@/app/actions";
-import { categoryEmoji } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 
 type Side = {
   submissionId: string;
@@ -146,7 +146,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                 alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
               />
               <div className="p-4">
-                <p className="tag text-smoke">{categoryEmoji(side.category)} {side.baseShoe}</p>
+                <p className="tag text-smoke">{categoryLabel(side.category)} · {side.baseShoe}</p>
                 <h3 className="display mt-1 text-xl text-white">{side.title}</h3>
                 <p className="mt-1 text-sm text-smoke">
                   by{" "}

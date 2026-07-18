@@ -7,7 +7,7 @@
   --color-ink: #0b0b0c;
   --color-surface: #131314;
   --color-panel: #19191b;
-  --color-edge: #2b2a27;
+  --color-edge: #232321;
   --color-volt: #d9b96a;
   --color-heat: #c65a2e;
   --color-smoke: #a3a096;
@@ -150,6 +150,13 @@ body::after {
   color: var(--color-ink);
   border: 1px solid rgba(11, 11, 12, 0.9);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Section rule — a quiet gold hairline that replaces the old skewed
+   stripe. One pixel of gold does what a shape used to shout. */
+.rule {
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-volt), rgba(217, 185, 106, 0.15));
 }
 
 /* Gilded hairline divider (was a hazard stripe — too loud for the tux) */

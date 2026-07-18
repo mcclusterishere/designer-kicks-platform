@@ -32,7 +32,7 @@ export default function OfferForm({
         href="/signin"
         className="tag mt-3 block rounded border border-edge px-3 py-2 text-center text-smoke transition hover:border-volt hover:text-white"
       >
-        💸 Sign in to make an offer
+        Sign in to make an offer
       </Link>
     );
   }
@@ -43,7 +43,7 @@ export default function OfferForm({
         onClick={() => setOpen(true)}
         className="tag mt-3 w-full rounded border border-edge px-3 py-2 text-smoke transition hover:border-volt hover:text-white"
       >
-        💸 Make an Offer
+        Make an Offer
       </button>
     );
   }

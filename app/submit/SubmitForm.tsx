@@ -21,7 +21,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
   if (state?.ok) {
     return (
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
-        <p className="display text-3xl text-volt">You&apos;re in. 🔥</p>
+        <p className="display text-3xl text-volt">You&apos;re in.</p>
         <p className="mt-3 text-smoke">
           Your custom is in the review queue. Once it&apos;s approved it can be
           drafted into a battle — watch the{" "}
@@ -104,9 +104,9 @@ export default function SubmitForm({ artistDefaults }: Props) {
             Category *
           </label>
           <select id="category" name="category" className={inputClass} defaultValue="sneakers">
-            <option value="sneakers">👟 Sneakers</option>
-            <option value="apparel">🧥 Apparel</option>
-            <option value="accessories">🧢 Accessories</option>
+            <option value="sneakers">Sneakers</option>
+            <option value="apparel">Apparel</option>
+            <option value="accessories">Accessories</option>
           </select>
         </div>
         <div>

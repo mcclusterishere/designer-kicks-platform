@@ -58,7 +58,7 @@ export default async function TournamentPage({ params }: Props) {
             className="h-24 w-24 rounded-xl object-cover"
           />
           <div>
-            <p className="tag text-volt">Champion 🏆</p>
+            <p className="tag text-volt">Champion</p>
             <p className="display text-3xl text-white">{t.champion.title}</p>
             <p className="text-sm text-smoke">
               by{" "}

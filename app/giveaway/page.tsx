@@ -33,7 +33,7 @@ export default async function GiveawayPage() {
     <div className="mx-auto max-w-2xl px-4 py-12">
       <p className="tag text-volt">The prize</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Rare Shoe <span className="text-gradient-volt">Giveaway</span>
+        Rare Shoe Giveaway
       </h1>
 
       {giveaway ? (

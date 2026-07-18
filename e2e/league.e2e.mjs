@@ -94,9 +94,9 @@ check("trophy shelf section present", await page.getByText("Trophy Shelf").isVis
 
 // Category integrity: the apparel piece must not present as a shoe
 await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle" });
-check("apparel chip on own closet", await page.getByText("🧥").first().isVisible());
+check("apparel label on own closet", await page.getByText("Apparel", { exact: false }).first().isVisible());
 const heatHtml = await (await fetch(`${BASE}/heat-list`)).text();
-check("heat list carries the apparel chip", heatHtml.includes("🧥"));
+check("heat list carries the apparel label", heatHtml.includes("Apparel"));
 
 // Follow flow
 await page.getByRole("button", { name: "+ Follow" }).click();
@@ -183,12 +183,12 @@ check("market lists the piece after the claim", await buyerPage.getByText("Leagu
 check("market shows the verified last sale", await buyerPage.getByText("$450").first().isVisible());
 check("market shows the open ask", await buyerPage.getByText("$600").first().isVisible());
 check("market shows the size", await buyerPage.getByText("2XL").first().isVisible());
-check("market shows apparel category, not shoe default", await buyerPage.getByText("🧥").first().isVisible());
+check("market shows apparel category, not shoe default", (await buyerPage.getByText("Apparel", { exact: false }).count()) >= 2);
 await buyerPage.screenshot({ path: `${SHOTS}/market.png`, fullPage: true });
 
 // ---- Offers: the artist bids to buy the piece back ----
 await page.goto(`${BASE}/market`, { waitUntil: "networkidle" });
-await page.getByRole("button", { name: "💸 Make an Offer" }).first().click();
+await page.getByRole("button", { name: "Make an Offer" }).first().click();
 await page.fill("input[name='amount']", "500");
 await page.getByRole("button", { name: "Offer", exact: true }).click();
 await page.getByText("Offer in ✓").waitFor({ timeout: 15000 });

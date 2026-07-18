@@ -17,7 +17,7 @@ export default async function ArtistsPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-volt">The league</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Artist <span className="text-gradient-volt">Rankings</span>
+        Artist Rankings
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Career records across every battle. Wins move you up, votes break

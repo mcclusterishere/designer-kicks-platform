@@ -39,7 +39,7 @@ export default async function DropsPage() {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <p className="tag text-heat">Release intel</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        The Drop <span className="text-gradient-heat">Calendar</span>
+        The Drop Calendar
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Every date and raffle link we&apos;re tracking, in one place.{" "}

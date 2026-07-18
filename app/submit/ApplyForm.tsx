@@ -24,7 +24,7 @@ export default function ApplyForm({ defaults }: { defaults?: Defaults }) {
   if (state?.ok) {
     return (
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
-        <p className="display text-3xl text-volt">Application In 🎨</p>
+        <p className="display text-3xl text-volt">Application In</p>
         <p className="mt-3 text-smoke">
           We review every artist by hand — you&apos;ll see your status here,
           and once you&apos;re approved you can submit customs and build your

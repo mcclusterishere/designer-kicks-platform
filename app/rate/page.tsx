@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { pieceTaxonomy } from "@/lib/taxonomy";
-import { categoryEmoji, categoryLabel } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 import RateDeck, { type RateCard } from "@/components/RateDeck";
 
 export const metadata = {
@@ -19,9 +19,8 @@ export default async function RatePage() {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12">
         <div className="rounded-3xl border border-edge bg-surface/80 p-8 text-center shadow-2xl">
-          <p className="text-5xl">🔥</p>
-          <h1 className="display mt-3 text-3xl text-white">
-            Rate The <span className="text-gradient-heat">Heat</span>
+          <h1 className="display text-3xl text-white">
+            Rate The Heat
           </h1>
           <p className="mx-auto mt-2 max-w-xs text-sm text-smoke">
             One design at a time. Five flames on the table. Score it,
@@ -67,7 +66,7 @@ export default async function RatePage() {
     if (tax.silhouette && tax.silhouette !== tax.brand) chips.push(tax.silhouette);
     else if (!tax.silhouette && s.baseShoe) chips.push(s.baseShoe);
     if (tax.colorway) chips.push(`was “${tax.colorway}”`);
-    if (s.category !== "sneakers") chips.push(`${categoryEmoji(s.category)} ${categoryLabel(s.category)}`);
+    if (s.category !== "sneakers") chips.push(categoryLabel(s.category));
     return {
       id: s.id,
       title: s.title,
@@ -82,7 +81,7 @@ export default async function RatePage() {
     <div className="mx-auto max-w-md px-4 py-8 sm:py-12">
       <div className="mb-5 text-center">
         <h1 className="display text-3xl text-white">
-          Rate The <span className="text-gradient-heat">Heat</span>
+          Rate The Heat
         </h1>
         <p className="mt-1 text-sm text-smoke">
           {ratedBefore > 0
@@ -93,8 +92,7 @@ export default async function RatePage() {
 
       {cards.length === 0 ? (
         <div className="rounded-3xl border border-volt/40 bg-surface/80 p-8 text-center shadow-2xl">
-          <p className="text-5xl">🏁</p>
-          <h2 className="display mt-3 text-2xl text-white">You&apos;ve Rated Everything</h2>
+          <h2 className="display text-2xl text-white">You&apos;ve Rated Everything</h2>
           <p className="mx-auto mt-2 max-w-xs text-sm text-smoke">
             Fresh designs land as artists submit — come back after the
             next drop, or go settle some battles.

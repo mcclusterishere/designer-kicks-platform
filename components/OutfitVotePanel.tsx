@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { castOutfitVote } from "@/app/actions";
-import { categoryEmoji } from "@/lib/categories";
 
 type Item = { id: string; title: string; imageUrl: string; category: string };
 type Side = {
@@ -87,7 +86,7 @@ export default function OutfitVotePanel({
                 <h3 className="display text-xl text-white">{side.name}</h3>
                 <p className="mt-0.5 text-sm text-smoke">{side.byLine}</p>
                 <p className="mt-1.5 text-xs text-smoke">
-                  {side.items.map((i) => `${categoryEmoji(i.category)} ${i.title}`).join(" · ")}
+                  {side.items.map((i) => i.title).join(" · ")}
                 </p>
 
                 {showResults ? (

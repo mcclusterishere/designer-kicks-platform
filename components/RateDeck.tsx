@@ -52,7 +52,7 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
   if (done) {
     return (
       <div className="rounded-3xl border border-volt/40 bg-surface/80 p-8 text-center shadow-2xl">
-        <p className="text-5xl">🔥</p>
+        <p className="display text-4xl text-volt">Done</p>
         <h2 className="display mt-3 text-3xl text-white">Deck Cleared</h2>
         <p className="mx-auto mt-2 max-w-xs text-sm text-smoke">
           You&apos;ve rated {ratedBefore + index} design{ratedBefore + index === 1 ? "" : "s"}. Every
@@ -81,7 +81,7 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
         <p className="tag text-smoke">
           {index + 1} / {cards.length}
         </p>
-        <p className="tag text-volt">🔥 Rate the heat</p>
+        <p className="tag text-volt">Rate the heat</p>
       </div>
       <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-panel">
         <div
@@ -163,7 +163,7 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
                       : "border-edge bg-panel hover:border-volt"
                   } disabled:opacity-80`}
                 >
-                  {reveal ? (reveal.stars >= n ? "🔥" : "▫️") : "🔥"}
+                  <span className={reveal && reveal.stars < n ? "opacity-25" : undefined}>🔥</span>
                   <span className="mt-0.5 block text-[10px] text-smoke">{n}</span>
                 </button>
               ))}

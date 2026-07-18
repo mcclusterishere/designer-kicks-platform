@@ -12,7 +12,7 @@ export default function StoryPage() {
       <p className="tag text-volt">Our story</p>
       <h1 className="display mt-3 text-5xl text-white sm:text-6xl">
         From a page<br />
-        to <span className="text-gradient-volt">the chart.</span>
+        to the chart.
       </h1>
 
       <div className="mt-10 space-y-10 text-lg leading-relaxed text-smoke">

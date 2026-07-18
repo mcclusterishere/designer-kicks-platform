@@ -30,8 +30,8 @@ export default async function SubmitPage() {
 
       <ul className="mt-6 space-y-1 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">
         <li>📸 One clean photo, good light, your work is the star (JPG/PNG/WebP, max 6MB)</li>
-        <li>🎨 Your own work only — no stock photos, no reposts</li>
-        <li>⚔️ We review every submission before it enters a battle</li>
+        <li>Your own work only — no stock photos, no reposts</li>
+        <li>We review every submission before it enters a battle</li>
       </ul>
 
       {!session?.user ? (

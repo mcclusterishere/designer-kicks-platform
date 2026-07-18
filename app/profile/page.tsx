@@ -6,7 +6,7 @@ import { logoutUser } from "@/app/account-actions";
 import { computeBadges } from "@/lib/quiz";
 import { getTasteProfile } from "@/lib/taste";
 import { formatUsd } from "@/lib/market";
-import { categoryEmoji } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
@@ -161,12 +161,11 @@ export default async function ProfilePage() {
       {/* Taste profile — what this fan's votes, ratings, and closet say */}
       <div id="taste" className="mt-10 scroll-mt-24">
         <h2 className="display text-2xl text-white">
-          Your <span className="text-gradient-volt">Taste</span>
+          Your Taste
         </h2>
         {!taste ? (
           <div className="mt-3 rounded-2xl border border-dashed border-edge bg-surface p-6 text-center">
-            <p className="text-3xl">🔥</p>
-            <p className="mt-2 text-sm text-smoke">
+            <p className="text-sm text-smoke">
               The chart hasn&apos;t learned your taste yet. Vote in battles or
               play a round of Rate the Heat and this becomes your style
               fingerprint.
@@ -226,7 +225,7 @@ export default async function ProfilePage() {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {taste.artists.slice(0, 3).map((a) => (
                         <span key={a.name} className="rounded-full border border-edge bg-panel px-3 py-1 text-xs text-smoke">
-                          🎨 {a.name}
+                          {a.name}
                         </span>
                       ))}
                     </div>
@@ -263,7 +262,7 @@ export default async function ProfilePage() {
       {pendingClaims.length > 0 && (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
-            Pending <span className="text-gradient-heat">Claims</span>
+            Pending Claims
           </h2>
           <p className="mt-1 text-sm text-smoke">
             A seller recorded a sale to your email. Claiming confirms the
@@ -304,7 +303,7 @@ export default async function ProfilePage() {
       {incomingOffers.length > 0 && (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
-            Offers On <span className="text-gradient-volt">Your Pieces</span>
+            Offers On Your Pieces
           </h2>
           <p className="mt-1 text-sm text-smoke">
             Accepting records the sale to the buyer — they confirm it from
@@ -351,7 +350,7 @@ export default async function ProfilePage() {
       {myOffers.length > 0 && (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
-            Your Open <span className="text-gradient-heat">Offers</span>
+            Your Open Offers
           </h2>
           <div className="mt-4 space-y-2">
             {myOffers.map((o) => (
@@ -375,7 +374,7 @@ export default async function ProfilePage() {
       {/* My Closet — pieces this member owns */}
       <div className="mt-10 flex items-end justify-between">
         <h2 className="display text-2xl text-white">
-          My <span className="text-gradient-heat">Closet</span>
+          My Closet
         </h2>
         {user.collectorSlug && (
           <Link href={`/collectors/${user.collectorSlug}`} className="tag text-volt underline">
@@ -401,7 +400,7 @@ export default async function ProfilePage() {
               <div className="p-3">
                 <p className="truncate text-sm font-bold text-white">{s.title}</p>
                 <p className="truncate text-xs text-smoke">
-                  {categoryEmoji(s.category)} by {s.artist?.displayName ?? s.artistName}
+                  {categoryLabel(s.category)} · {s.artist?.displayName ?? s.artistName}
                 </p>
               </div>
             </div>
@@ -413,7 +412,7 @@ export default async function ProfilePage() {
       {user.ownedPieces.length >= 2 && (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
-            Build a <span className="text-gradient-volt">Fit</span>
+            Build a Fit
           </h2>
           <p className="mt-1 text-sm text-smoke">
             Style 2–5 pieces from your closet into a full look and enter the{" "}

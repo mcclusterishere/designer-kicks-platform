@@ -27,7 +27,7 @@ export default async function BattlesPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-heat">Vote-offs</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Battle <span className="text-gradient-heat">Arena</span>
+        Battle Arena
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Two customs enter. The culture votes. Winners take a spot on the{" "}
@@ -38,23 +38,23 @@ export default async function BattlesPage() {
       </p>
 
       {/* Arena hub: quick jumps to the competitive surfaces */}
-      <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+      <div className="mt-7 flex gap-6 overflow-x-auto border-b border-edge pb-0">
         {[
-          { href: "/battles", label: "⚔️ Battles", current: true },
-          { href: "/outfits", label: "🧥 Fit Battles" },
-          { href: "/rate", label: "🔥 Rate" },
-          { href: "/tournaments", label: "🏆 Brackets" },
-          { href: "/artists", label: "🥇 League" },
-          { href: "/heat-list", label: "🔥 Heat List" },
-          { href: "/market", label: "💸 Market" },
+          { href: "/battles", label: "Battles", current: true },
+          { href: "/outfits", label: "Fit Battles" },
+          { href: "/rate", label: "Rate" },
+          { href: "/tournaments", label: "Brackets" },
+          { href: "/artists", label: "League" },
+          { href: "/heat-list", label: "Heat List" },
+          { href: "/market", label: "Market" },
         ].map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className={`tag shrink-0 rounded-full border px-4 py-2 transition ${
+            className={`tag shrink-0 border-b pb-1.5 transition ${
               l.current
-                ? "border-volt bg-volt/10 text-volt"
-                : "border-edge text-smoke hover:border-volt hover:text-white"
+                ? "border-volt text-white"
+                : "border-transparent text-smoke hover:text-white"
             }`}
           >
             {l.label}
@@ -71,7 +71,7 @@ export default async function BattlesPage() {
               className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heat/60 bg-surface p-4 transition hover:border-heat"
             >
               <div>
-                <p className="tag text-heat">🏆 Tournament in progress</p>
+                <p className="tag text-heat">Tournament in progress</p>
                 <p className="display text-xl text-white">{t.name}</p>
                 {t.prize && <p className="text-sm text-smoke">Prize: {t.prize}</p>}
               </div>

@@ -30,7 +30,7 @@ export default async function NewsPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-volt">The newsroom</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Drop <span className="text-gradient-volt">Report</span>
+        Drop Report
       </h1>
       <p className="mt-3 max-w-2xl text-smoke">
         Release dates, raffle intel, and the story behind every drop that
@@ -42,7 +42,7 @@ export default async function NewsPage() {
         className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-heat/50 bg-surface p-4 transition hover:border-heat"
       >
         <div>
-          <p className="tag text-heat">📅 The Drop Calendar</p>
+          <p className="tag text-heat">The Drop Calendar</p>
           <p className="text-sm text-smoke">
             Every date + raffle link we track — <span className="text-white">free forever</span>,
             no subscription.

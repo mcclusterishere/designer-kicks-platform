@@ -56,7 +56,7 @@ for (const s of closetPieces) {
   await page.locator(`label:has(input[name="pieces"][value="${s.id}"])`).click();
 }
 await page.getByRole("button", { name: "Enter The Fit Battles" }).click();
-await page.getByText("Fit submitted 🔥").waitFor({ timeout: 15000 });
+await page.getByText("Fit submitted").waitFor({ timeout: 15000 });
 const fanFit = await prisma.outfit.findFirst({
   where: { name: "E2E Fan Fit" },
   include: { _count: { select: { items: true } } },

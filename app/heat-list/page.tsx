@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { categoryEmoji } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default async function HeatListPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-volt">Rankings</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        The <span className="text-gradient-volt">Heat List</span>
+        The Heat List
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Every approved custom, ranked by battle wins first and total votes
@@ -56,7 +56,7 @@ export default async function HeatListPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold text-white">{entry.title}</p>
                 <p className="truncate text-sm text-smoke">
-                  {categoryEmoji(entry.category)} {entry.baseShoe} · by{" "}
+                  {categoryLabel(entry.category)} · {entry.baseShoe} · by{" "}
                   {entry.artistSlug ? (
                     <Link
                       href={`/artists/${entry.artistSlug}`}

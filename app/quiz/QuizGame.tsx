@@ -55,7 +55,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
       <div className="rounded-xl border border-edge bg-surface p-8 text-center">
         {purchaseResult === "success" && (
           <p className="mb-4 rounded border border-volt/40 bg-volt/10 p-3 text-sm text-volt">
-            Payment received — your strikes are loaded. 🔥
+            Payment received — your strikes are loaded.
           </p>
         )}
         <p className="display text-2xl text-white">Think you know Jordans?</p>
@@ -76,7 +76,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
   if (state.status === "WON") {
     return (
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
-        <p className="display text-4xl text-volt">Heat Check Passed 🏆</p>
+        <p className="display text-4xl text-volt">Heat Check Passed</p>
         <p className="mt-3 text-white">
           {state.correctCount}/{state.target} correct
           {feedback?.earnedEntry
@@ -249,7 +249,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             }`}
           >
             <p className="font-bold">
-              {feedback.correct ? "Correct. 🔥" : `Wrong — it was: ${feedback.correctAnswer}`}
+              {feedback.correct ? "Correct." : `Wrong — it was: ${feedback.correctAnswer}`}
             </p>
             {feedback.explanation && (
               <p className="mt-1 text-smoke">{feedback.explanation}</p>

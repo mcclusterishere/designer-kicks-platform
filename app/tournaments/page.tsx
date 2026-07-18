@@ -19,7 +19,7 @@ export default async function TournamentsPage() {
     <div className="mx-auto max-w-5xl px-4 py-12">
       <p className="tag text-heat">Championships</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Tournament <span className="text-gradient-heat">Brackets</span>
+        Tournament Brackets
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Seeded single-elimination brackets. Every round is a live vote
@@ -80,7 +80,7 @@ export default async function TournamentsPage() {
                   <p className="font-bold text-white">{t.name}</p>
                   {t.champion && (
                     <p className="text-sm text-smoke">
-                      🏆 Champion: <span className="text-volt">{t.champion.title}</span> by{" "}
+                      Champion: <span className="text-volt">{t.champion.title}</span> by{" "}
                       {t.champion.artistName}
                     </p>
                   )}

@@ -133,7 +133,7 @@ export default async function HomePage() {
             className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 transition hover:opacity-90"
           >
             <div className="flex items-center gap-4">
-              <span className="display text-3xl">🏆</span>
+              <span className="display text-3xl text-volt">No.1</span>
               <div>
                 <p className="tag text-heat">Live giveaway — play trivia to enter</p>
                 <p className="display text-xl text-white sm:text-2xl">
@@ -156,7 +156,7 @@ export default async function HomePage() {
             className="mb-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heat/60 bg-surface p-4 transition hover:border-heat"
           >
             <div>
-              <p className="tag text-heat">🏆 Championship bracket — live now</p>
+              <p className="tag text-heat">Championship bracket — live now</p>
               <p className="display text-xl text-white sm:text-2xl">{tournament.name}</p>
             </div>
             <span className="rounded-lg bg-heat px-5 py-2.5 tag font-bold text-white glow-heat">
@@ -166,7 +166,7 @@ export default async function HomePage() {
         )}
         <div className="flex items-end justify-between">
           <div>
-            <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+            <div className="rule w-16" />
             <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
               Live <span className="text-heat">Battles</span>
             </h2>
@@ -180,7 +180,7 @@ export default async function HomePage() {
         </div>
         {battles.length === 0 ? (
           <div className="mt-6 rounded-xl border border-dashed border-edge bg-surface p-10 text-center">
-            <p className="display text-2xl text-white">The arena is warming up 🔥</p>
+            <p className="display text-2xl text-white">The arena is warming up</p>
             <p className="mx-auto mt-2 max-w-md text-smoke">
               New matchups drop as artists enter.{" "}
               <Link href="/submit" className="text-volt underline">
@@ -270,7 +270,7 @@ export default async function HomePage() {
             {top3.length === 0 && (
               <p className="col-span-full rounded-xl border border-dashed border-edge bg-ink p-8 text-center text-smoke">
                 The chart is blank until the first battle ends — then names live
-                here forever. 🔥
+                here forever.
               </p>
             )}
           </div>
@@ -332,7 +332,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-12">
         <div className="flex items-end justify-between">
           <div>
-            <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+            <div className="rule w-16" />
             <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
               Gear <span className="text-heat">&amp; Heat</span>
             </h2>

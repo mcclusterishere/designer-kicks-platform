@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { getStudioData } from "@/lib/analytics";
 import { getHeatList } from "@/lib/battles";
 import { formatUsd } from "@/lib/market";
-import { categoryEmoji } from "@/lib/categories";
+
 import MiniBars from "@/components/MiniBars";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
@@ -39,7 +39,7 @@ export default async function StudioPage() {
     { label: "Best heat rank", value: Number.isFinite(bestRank) ? `#${bestRank}` : "—" },
     {
       label: "Rate-game score",
-      value: stats.avgRating !== null ? `${stats.avgRating} 🔥 (${stats.ratingsCount})` : "—",
+      value: stats.avgRating !== null ? `${stats.avgRating} / 5 (${stats.ratingsCount})` : "—",
     },
     { label: "Revenue (verified-track)", value: formatUsd(stats.revenueCents) },
     {
@@ -123,7 +123,7 @@ export default async function StudioPage() {
 
       {/* Per-piece breakdown */}
       <h2 className="display mt-10 text-2xl text-white">
-        Your <span className="text-gradient-heat">Pieces</span>
+        Your Pieces
       </h2>
       <div className="mt-4 overflow-x-auto rounded-xl border border-edge">
         <table className="w-full min-w-[640px] text-left text-sm">
@@ -151,7 +151,7 @@ export default async function StudioPage() {
                 <tr key={s.id} className="border-t border-edge bg-surface">
                   <td className="px-4 py-3">
                     <span className="font-bold text-white">
-                      {categoryEmoji(s.category)} {s.title}
+                      {s.title}
                     </span>
                     {pending && <span className="tag text-heat"> · sale pending</span>}
                   </td>
@@ -162,7 +162,7 @@ export default async function StudioPage() {
                   <td className="px-3 py-3 text-volt">{rank ? `#${rank}` : "—"}</td>
                   <td className="px-3 py-3 text-smoke">
                     {s.ratings.length > 0
-                      ? `${Math.round((s.ratings.reduce((sum, r) => sum + r.stars, 0) / s.ratings.length) * 10) / 10} 🔥 (${s.ratings.length})`
+                      ? `${Math.round((s.ratings.reduce((sum, r) => sum + r.stars, 0) / s.ratings.length) * 10) / 10} / 5 (${s.ratings.length})`
                       : "—"}
                   </td>
                   <td className="px-3 py-3 text-smoke">
@@ -191,7 +191,7 @@ export default async function StudioPage() {
       {soldSales.length > 0 && (
         <>
           <h2 className="display mt-10 text-2xl text-white">
-            Sales <span className="text-gradient-volt">Ledger</span>
+            Sales Ledger
           </h2>
           <div className="mt-4 space-y-2">
             {soldSales.map((s) => (
@@ -217,7 +217,7 @@ export default async function StudioPage() {
       {/* The future paid tier, primed honestly */}
       <div className="mt-12 rounded-xl border border-volt/40 bg-surface p-6">
         <p className="display text-xl text-white">
-          Heat Chart <span className="text-gradient-volt">Pro</span> is coming
+          Heat Chart Pro is coming
         </p>
         <p className="mt-2 max-w-2xl text-sm text-smoke">
           Deeper analytics, produced video ads for your pieces, priority

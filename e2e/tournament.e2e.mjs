@@ -52,7 +52,7 @@ check("forcing the final completes the tournament", t?.status === "COMPLETED");
 check("champion recorded (Bred Heat 11s led 11-8)", t?.champion?.title === "Bred Heat 11s");
 
 await page.goto(`${BASE}/tournaments/summer-heat-championship`, { waitUntil: "networkidle" });
-check("bracket page shows champion banner", await page.getByText("Champion 🏆").isVisible());
+check("bracket page shows champion banner", await page.getByText("Champion", { exact: true }).isVisible());
 await page.screenshot({ path: `${SHOTS}/bracket-champion.png`, fullPage: true });
 
 // Listing moves it to past champions

@@ -10,7 +10,7 @@ import AddPhotosForm from "@/components/AddPhotosForm";
 import ClaimProfileForm from "@/components/ClaimProfileForm";
 import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
-import { categoryEmoji } from "@/lib/categories";
+import { categoryLabel } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +148,7 @@ export default async function ArtistPage({ params }: Props) {
 
       {/* Trophy Shelf — championship hardware */}
       <h2 className="display mt-10 text-2xl text-white">
-        Trophy <span className="text-gradient-volt">Shelf</span>
+        Trophy Shelf
       </h2>
       {trophies.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed border-edge bg-surface p-5 text-sm text-smoke">
@@ -163,7 +163,7 @@ export default async function ArtistPage({ params }: Props) {
               href={`/tournaments/${t.slug}`}
               className="flex items-center gap-4 rounded-xl border border-volt/60 bg-surface p-4 glow-volt transition hover:border-volt"
             >
-              <span className="text-4xl">🏆</span>
+              <span className="display text-3xl text-volt">W</span>
               <div className="min-w-0">
                 <p className="truncate font-bold text-white">{t.name}</p>
                 <p className="truncate text-sm text-smoke">
@@ -178,7 +178,7 @@ export default async function ArtistPage({ params }: Props) {
 
       {/* The Closet — every one-of-one, with its live heat rank */}
       <h2 className="display mt-10 text-2xl text-white">
-        The <span className="text-gradient-heat">Closet</span>
+        The Closet
       </h2>
       <p className="mt-1 text-sm text-smoke">
         Every one-of-one in the collection, ranked live on the{" "}
@@ -218,7 +218,7 @@ export default async function ArtistPage({ params }: Props) {
                       className="absolute right-2 top-2 rounded bg-ink/85 px-2 py-1 text-sm"
                       title={s.tournamentsWon.map((t) => t.name).join(", ")}
                     >
-                      {"🏆".repeat(Math.min(s.tournamentsWon.length, 3))}
+                      {s.tournamentsWon.length > 0 ? `Champion ×${s.tournamentsWon.length}` : ""}
                     </span>
                   )}
                   {pendingSale && (
@@ -228,7 +228,7 @@ export default async function ArtistPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{categoryEmoji(s.category)} {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
+                  <p className="tag text-smoke">{categoryLabel(s.category)} · {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     {s._count.battlesWon}W–{shoeBattles - s._count.battlesWon}L ·{" "}

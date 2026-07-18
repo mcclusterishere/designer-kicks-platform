@@ -50,7 +50,7 @@ export default async function OutfitsPage() {
     <div className="mx-auto max-w-6xl px-4 py-12">
       <p className="tag text-heat">Outfit vs outfit</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Fit <span className="text-gradient-heat">Battles</span>
+        Fit Battles
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
         Whole looks — sneakers, apparel, accessories — head to head. The
@@ -61,22 +61,22 @@ export default async function OutfitsPage() {
         .
       </p>
 
-      <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+      <div className="mt-7 flex gap-6 overflow-x-auto border-b border-edge pb-0">
         {[
-          { href: "/battles", label: "⚔️ Battles" },
-          { href: "/outfits", label: "🧥 Fit Battles", current: true },
-          { href: "/rate", label: "🔥 Rate" },
-          { href: "/tournaments", label: "🏆 Brackets" },
-          { href: "/artists", label: "🥇 League" },
-          { href: "/heat-list", label: "🔥 Heat List" },
+          { href: "/battles", label: "Battles" },
+          { href: "/outfits", label: "Fit Battles", current: true },
+          { href: "/rate", label: "Rate" },
+          { href: "/tournaments", label: "Brackets" },
+          { href: "/artists", label: "League" },
+          { href: "/heat-list", label: "Heat List" },
         ].map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className={`tag shrink-0 rounded-full border px-4 py-2 transition ${
+            className={`tag shrink-0 border-b pb-1.5 transition ${
               l.current
-                ? "border-volt bg-volt/10 text-volt"
-                : "border-edge text-smoke hover:border-volt hover:text-white"
+                ? "border-volt text-white"
+                : "border-transparent text-smoke hover:text-white"
             }`}
           >
             {l.label}
@@ -87,7 +87,7 @@ export default async function OutfitsPage() {
       {/* One open league: house-curated looks and fan fits share the
           arena — provenance rides on each card, votes settle the rest. */}
       <section className="mt-10">
-        <div className="h-1.5 w-16 -skew-x-12 bg-heat" />
+        <div className="rule w-16" />
         <h2 className="display mt-2 text-2xl text-white sm:text-3xl">Live Fit Battles</h2>
         <p className="mt-1 text-sm text-smoke">
           League-office looks and fan-built fits, one arena. A fan fit
