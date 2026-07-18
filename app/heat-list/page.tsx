@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
+import { categoryEmoji } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export default async function HeatListPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold text-white">{entry.title}</p>
                 <p className="truncate text-sm text-smoke">
-                  {entry.baseShoe} · by{" "}
+                  {categoryEmoji(entry.category)} {entry.baseShoe} · by{" "}
                   {entry.artistSlug ? (
                     <Link
                       href={`/artists/${entry.artistSlug}`}

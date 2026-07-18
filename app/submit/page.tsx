@@ -29,7 +29,7 @@ export default async function SubmitPage() {
       </p>
 
       <ul className="mt-6 space-y-1 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">
-        <li>📸 One clean photo, good light, the shoe is the star (JPG/PNG/WebP, max 6MB)</li>
+        <li>📸 One clean photo, good light, your work is the star (JPG/PNG/WebP, max 6MB)</li>
         <li>🎨 Your own work only — no stock photos, no reposts</li>
         <li>⚔️ We review every submission before it enters a battle</li>
       </ul>
@@ -95,7 +95,7 @@ export default async function SubmitPage() {
               {artist.displayName}
             </Link>{" "}
             <span className="tag text-volt">✓ approved artist</span> — this
-            shoe joins your league record.
+            piece joins your league record.
           </p>
           <SubmitForm
             artistDefaults={{

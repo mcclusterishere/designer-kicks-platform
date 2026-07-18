@@ -30,7 +30,7 @@ await page.fill("#pl-ig", "@preloadtest");
 await page.fill("#pl-title", "Preload Test Custom");
 await page.fill("#pl-base", "Dunk High");
 await page.setInputFiles("#pl-img", { name: "p.png", mimeType: "image/png", buffer: PNG_1x1 });
-await page.getByRole("button", { name: "Pre-load Artist + Shoe" }).click();
+await page.getByRole("button", { name: "Pre-load Artist + Piece" }).click();
 await page.getByText("Artist is live").waitFor({ timeout: 15000 });
 check("preload succeeds with live confirmation", true);
 

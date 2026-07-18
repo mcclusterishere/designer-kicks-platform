@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { castVote } from "@/app/actions";
+import { categoryEmoji } from "@/lib/categories";
 
 type Side = {
   submissionId: string;
@@ -10,6 +11,7 @@ type Side = {
   artistSlug: string | null;
   socialHandle: string | null;
   baseShoe: string;
+  category: string;
   imageUrl: string;
   votes: number;
 };
@@ -74,7 +76,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                 />
               </div>
               <div className="p-4">
-                <p className="tag text-smoke">{side.baseShoe}</p>
+                <p className="tag text-smoke">{categoryEmoji(side.category)} {side.baseShoe}</p>
                 <h3 className="display mt-1 text-xl text-white">{side.title}</h3>
                 <p className="mt-1 text-sm text-smoke">
                   by{" "}
@@ -117,7 +119,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                     disabled={pending}
                     className="mt-4 w-full rounded-lg bg-volt py-3 tag font-bold text-ink transition hover:opacity-90 disabled:opacity-50"
                   >
-                    {pending ? "Counting…" : "Vote This Shoe"}
+                    {pending ? "Counting…" : "Vote This Piece"}
                   </button>
                 ) : (
                   <a

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
+import { categoryEmoji } from "@/lib/categories";
 import { computeBadges } from "@/lib/quiz";
 import { formatUsd } from "@/lib/market";
 import AskForm from "@/components/AskForm";
@@ -141,7 +142,7 @@ export default async function CollectorPage({ params }: Props) {
                   )}
                 </div>
                 <div className="p-4">
-                  <p className="tag text-smoke">{s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
+                  <p className="tag text-smoke">{categoryEmoji(s.category)} {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
                   <p className="mt-1 text-sm text-smoke">
                     by{" "}

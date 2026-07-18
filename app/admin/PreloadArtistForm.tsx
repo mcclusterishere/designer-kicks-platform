@@ -21,7 +21,7 @@ export default function PreloadArtistForm() {
           <Link href={`/artists/${state.artistSlug}`} className="underline">
             view their page
           </Link>
-          . Their shoe is approved and battle-ready.
+          . Their piece is approved and battle-ready.
           {state.emailSent && " Invite email sent automatically. ✉️"}
         </p>
         <div>
@@ -76,7 +76,7 @@ export default function PreloadArtistForm() {
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="tag text-smoke" htmlFor="pl-title">Shoe title *</label>
+          <label className="tag text-smoke" htmlFor="pl-title">Piece title *</label>
           <input id="pl-title" name="shoeTitle" required maxLength={80} placeholder='"Toxic Drip AF1"' className={inputClass} />
         </div>
         <div>
@@ -104,7 +104,7 @@ export default function PreloadArtistForm() {
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}
         className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
-        {pending ? "Creating…" : "Pre-load Artist + Shoe"}
+        {pending ? "Creating…" : "Pre-load Artist + Piece"}
       </button>
     </form>
   );

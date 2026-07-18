@@ -41,6 +41,7 @@ export type HeatEntry = {
   artistSlug: string | null;
   socialHandle: string | null;
   baseShoe: string;
+  category: string;
   imageUrl: string;
   wins: number;
   battles: number;
@@ -76,6 +77,7 @@ export async function getHeatList(): Promise<HeatEntry[]> {
       artistSlug: s.artist?.slug ?? null,
       socialHandle: s.socialHandle,
       baseShoe: s.baseShoe,
+      category: s.category,
       imageUrl: s.imageUrl,
       wins,
       battles,
