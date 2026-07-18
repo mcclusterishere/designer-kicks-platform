@@ -516,6 +516,49 @@ const articles = [
   },
 ];
 
+// Launch roster — real artists pre-loaded through the seed so the
+// league is never empty and no /admin work is needed. Claim emails are
+// placeholders until each artist shares their real one; update the
+// email here and the next deploy relinks their page to that account.
+const preloadArtists = [
+  {
+    slug: "shoebaker",
+    email: "claim.shoebaker@theheatchart.com",
+    displayName: "Shoebaker",
+    instagram: null,
+    city: null,
+    pieces: [
+      {
+        title: "Cotton Candy 11s",
+        baseShoe: "Air Jordan 11",
+        category: "sneakers",
+        description:
+          "Blacked-out patent and mesh with a cotton-candy melt — pink-to-blue gradient sole, liner, and lace loops.",
+        imageUrl: "/seed/sb-cc-1.webp",
+        extraImages: ["/seed/sb-cc-2.webp", "/seed/sb-cc-3.webp", "/seed/sb-cc-4.webp"],
+      },
+      {
+        title: "Pineapple Under the Sea",
+        baseShoe: "Air Jordan 11",
+        category: "sneakers",
+        description:
+          "White knit upper over a pineapple-yellow patent mudguard, icy blue outsole — summer under the sea on a Jordan 11.",
+        imageUrl: "/seed/sb-pine-1.webp",
+        extraImages: ["/seed/sb-pine-2.webp", "/seed/sb-pine-3.webp", "/seed/sb-pine-4.webp", "/seed/sb-pine-5.webp"],
+      },
+      {
+        title: "Patriot 1s",
+        baseShoe: "Air Jordan 1 Mid",
+        category: "sneakers",
+        description:
+          "Stars-and-stripes blocking over red, white, and navy panels — hand-detailed star fields on the toe and collar, finished with a gold USA lace charm.",
+        imageUrl: "/seed/sb-usa-1.webp",
+        extraImages: ["/seed/sb-usa-2.webp", "/seed/sb-usa-3.webp", "/seed/sb-usa-4.webp"],
+      },
+    ],
+  },
+];
+
 function loadQuestions() {
   try {
     const raw = readFileSync(path.join(here, "questions.json"), "utf8");
@@ -594,6 +637,55 @@ async function main() {
     console.log(
       `Articles topped up: ${newArticles} new, ${refreshed} refreshed, admin-edited left untouched.`
     );
+
+    // Roster pre-load: keyed by slug so it never duplicates. Changing an
+    // artist's claim email in preloadArtists relinks the page to the new
+    // account on the next deploy; pieces are keyed by title and only
+    // created when missing (admin/artist edits always survive).
+    for (const pa of preloadArtists) {
+      const user = await prisma.user.upsert({
+        where: { email: pa.email },
+        update: { name: pa.displayName },
+        create: { name: pa.displayName, email: pa.email },
+      });
+      let profile = await prisma.artistProfile.findUnique({ where: { slug: pa.slug } });
+      if (!profile) {
+        profile = await prisma.artistProfile.create({
+          data: {
+            userId: user.id,
+            slug: pa.slug,
+            displayName: pa.displayName,
+            instagram: pa.instagram,
+            city: pa.city,
+            status: "APPROVED",
+          },
+        });
+      } else if (profile.userId !== user.id) {
+        profile = await prisma.artistProfile.update({
+          where: { id: profile.id },
+          data: { userId: user.id },
+        });
+      }
+      let newPieces = 0;
+      for (const p of pa.pieces) {
+        const dup = await prisma.submission.findFirst({
+          where: { artistId: profile.id, title: p.title },
+        });
+        if (dup) continue;
+        await prisma.submission.create({
+          data: {
+            ...p,
+            artistName: profile.displayName,
+            socialHandle: profile.instagram,
+            email: pa.email,
+            status: "APPROVED",
+            artistId: profile.id,
+          },
+        });
+        newPieces++;
+      }
+      console.log(`Roster: ${pa.displayName} ready (${newPieces} new pieces).`);
+    }
     if (questionCount === 0) {
       for (const q of loadQuestions()) {
         await prisma.quizQuestion.create({
