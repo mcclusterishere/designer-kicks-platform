@@ -13,7 +13,13 @@ import {
 } from "@/lib/admin";
 import { headers } from "next/headers";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { slugify } from "@/lib/articles";
+import { slugify, siteUrl } from "@/lib/articles";
+import {
+  facebookConfigured,
+  instagramConfigured,
+  postToFacebookPage,
+  postToInstagram,
+} from "@/lib/social";
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
@@ -1808,4 +1814,83 @@ export async function saveArtistNotes(
   });
   // No revalidatePath: keep the client "Saved" state mounted.
   return { ok: true };
+}
+
+// ---------- The Feed + Broadcast ----------
+
+export type BroadcastResult =
+  | {
+      ok: true;
+      facebook: { ok: boolean; detail: string } | null;
+      instagram: { ok: boolean; detail: string } | null;
+      copyText: string;
+    }
+  | { ok: false; error: string };
+
+/**
+ * One composer, every channel: always posts into The Feed, cross-posts
+ * to the Facebook page and Instagram when their tokens are configured,
+ * and hands back copy-paste text for the manual channels either way.
+ */
+export async function broadcastPost(
+  _prev: BroadcastResult | null,
+  formData: FormData
+): Promise<BroadcastResult> {
+  await requireAdmin();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body || body.length > 2200) {
+    return { ok: false, error: "Say something (2,200 characters max — Instagram's cap)." };
+  }
+  const linkUrl = String(formData.get("linkUrl") ?? "").trim() || null;
+  if (linkUrl && !/^(https?:\/\/|\/)/.test(linkUrl)) {
+    return { ok: false, error: "Link must be a full URL or a /path on the site." };
+  }
+  const linkLabel = String(formData.get("linkLabel") ?? "").trim() || null;
+  const pinned = formData.get("pinned") === "on";
+
+  let imageUrl: string | null = null;
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
+    const ext = ALLOWED_TYPES[photo.type];
+    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
+    imageUrl = await saveUpload(
+      Buffer.from(await photo.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      photo.type
+    );
+  }
+
+  await prisma.feedPost.create({
+    data: { body, imageUrl, linkUrl, linkLabel, pinned },
+  });
+
+  const shareLink = linkUrl
+    ? linkUrl.startsWith("/")
+      ? `${siteUrl()}${linkUrl}`
+      : linkUrl
+    : null;
+  const [facebook, instagram] = await Promise.all([
+    facebookConfigured()
+      ? postToFacebookPage(body, { imageUrl, link: shareLink })
+      : Promise.resolve(null),
+    instagramConfigured()
+      ? postToInstagram(imageUrl, shareLink ? `${body}\n\n${shareLink}` : body)
+      : Promise.resolve(null),
+  ]);
+
+  revalidatePath("/");
+  return {
+    ok: true,
+    facebook,
+    instagram,
+    copyText: shareLink ? `${body}\n\n${shareLink}` : body,
+  };
+}
+
+export async function deleteFeedPost(id: string) {
+  await requireAdmin();
+  await prisma.feedPost.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/");
+  revalidatePath("/admin");
 }

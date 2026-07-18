@@ -7,6 +7,7 @@ import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
 import HypeTicker from "@/components/HypeTicker";
+import FeedScroller from "@/components/FeedScroller";
 
 export const dynamic = "force-dynamic";
 
@@ -348,6 +349,23 @@ export default async function HomePage() {
           {products.map((p) => (
             <ProductCard key={p.id} product={p} />
           ))}
+        </div>
+      </section>
+
+      {/* The Feed — the infinite scroll machine */}
+      <section className="border-t border-edge">
+        <div className="mx-auto max-w-6xl px-4 py-12">
+          <div className="mx-auto max-w-xl">
+            <div className="rule w-16" />
+            <h2 className="display mt-2 text-3xl text-white sm:text-4xl">The Feed</h2>
+            <p className="mt-1 text-sm text-smoke">
+              Everything moving on the chart — live battles, fresh customs,
+              drops, and word from the house. Sign in and it learns your taste.
+            </p>
+          </div>
+          <div className="mt-6">
+            <FeedScroller />
+          </div>
         </div>
       </section>
     </div>

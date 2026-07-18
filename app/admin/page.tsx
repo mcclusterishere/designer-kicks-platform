@@ -29,6 +29,7 @@ import { categoryEmoji } from "@/lib/categories";
 import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
+import BroadcastForm from "./BroadcastForm";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
 import { placesConfigured } from "@/lib/stores";
@@ -183,6 +184,12 @@ export default async function AdminPage({
     return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
   };
 
+  // Broadcast: the latest feed posts, deletable from the composer.
+  const feedPosts = await prisma.feedPost.findMany({
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+    take: 6,
+  });
+
   // Store Scout (beta): the prospecting board, grouped by pipeline stage.
   const storeLeads = await prisma.storeLead.findMany({
     orderBy: [{ createdAt: "desc" }],
@@ -267,6 +274,25 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+
+      {/* Broadcast: post to The Feed + every social channel at once */}
+      <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">Broadcast</h2>
+        <p className="mt-1 text-sm text-smoke">
+          One post → The Feed on the home page, the Facebook page and
+          Instagram when connected, and paste-ready copy for the rest.
+        </p>
+        <div className="mt-4">
+          <BroadcastForm
+            recent={feedPosts.map((p) => ({
+              id: p.id,
+              body: p.body,
+              pinned: p.pinned,
+              ago: humanizeAgo(p.createdAt),
+            }))}
+          />
+        </div>
       </section>
 
       {/* Pre-load artist (onboarding accelerator) */}

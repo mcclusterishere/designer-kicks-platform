@@ -278,6 +278,18 @@ model Battle {
   tournamentMatch TournamentMatch?
 }
 
+// Admin posts into The Feed on the home page — announcements, drops,
+// callouts. Cross-posted to socials by the Broadcast composer.
+model FeedPost {
+  id        String   @id @default(cuid())
+  body      String
+  imageUrl  String?
+  linkUrl   String?
+  linkLabel String?
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 model Tournament {
   id        String   @id @default(cuid())
   name      String
