@@ -3,7 +3,7 @@
 // Run with: npm run db:seed  (safe to re-run — it wipes and reseeds
 // demo content; it does NOT touch user accounts)
 import { PrismaClient } from "@prisma/client";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -587,6 +587,29 @@ const preloadArtists = [
       },
     ],
   },
+  {
+    // Already created on the live site from the admin panel — email:null
+    // means the seed NEVER touches this page's ownership or claim link,
+    // it only guarantees the pieces and their photos survive deploys.
+    slug: "hitman-benji",
+    email: null,
+    displayName: "Hitman Benji",
+    instagram: null,
+    city: null,
+    pieces: [
+      {
+        title: "Red Cupid Vest",
+        matchTitle: "cupid",
+        baseShoe: "Tactical vest blank",
+        category: "apparel",
+        baseColorway: "Red & gold brocade",
+        description:
+          "Black tactical vest rebuilt over red-and-gold cherub brocade — hand-laid black lace angel wings across the shoulders, inked cupid-girl centerpiece, and the crossed-pistol H×T mark punched underneath.",
+        imageUrl: "/seed/hb-cupid-1.webp",
+        extraImages: [],
+      },
+    ],
+  },
 ];
 
 function loadQuestions() {
@@ -670,16 +693,23 @@ async function main() {
 
     // Roster pre-load: keyed by slug so it never duplicates. Changing an
     // artist's claim email in preloadArtists relinks the page to the new
-    // account on the next deploy; pieces are keyed by title and only
-    // created when missing (admin/artist edits always survive).
+    // account on the next deploy (email:null = never touch ownership);
+    // pieces are keyed by title and created when missing. Admin/artist
+    // edits always survive — the seed only fills blanks and replaces
+    // photos whose upload files no longer exist on this machine.
+    const uploadFileExists = (imageUrl) => {
+      if (!imageUrl?.startsWith("/api/uploads/")) return true; // seed/external URLs: not ours to judge
+      return existsSync(path.join(process.cwd(), "data", "uploads", path.basename(imageUrl)));
+    };
     for (const pa of preloadArtists) {
-      const user = await prisma.user.upsert({
-        where: { email: pa.email },
-        update: { name: pa.displayName },
-        create: { name: pa.displayName, email: pa.email },
-      });
+      const claimEmail = pa.email ?? `claim.${pa.slug}@theheatchart.com`;
       let profile = await prisma.artistProfile.findUnique({ where: { slug: pa.slug } });
       if (!profile) {
+        const user = await prisma.user.upsert({
+          where: { email: claimEmail },
+          update: { name: pa.displayName },
+          create: { name: pa.displayName, email: claimEmail },
+        });
         profile = await prisma.artistProfile.create({
           data: {
             userId: user.id,
@@ -690,34 +720,56 @@ async function main() {
             status: "APPROVED",
           },
         });
-      } else if (profile.userId !== user.id) {
+      } else if (pa.email && profile.userId) {
         // Relink only while the page is unclaimed — once a real artist
         // has a password or OAuth login, the page is theirs forever.
-        const owner = await prisma.user.findUnique({
-          where: { id: profile.userId },
-          include: { _count: { select: { accounts: true } } },
+        const user = await prisma.user.upsert({
+          where: { email: pa.email },
+          update: { name: pa.displayName },
+          create: { name: pa.displayName, email: pa.email },
         });
-        const ownerClaimed =
-          Boolean(owner?.passwordHash) || (owner?._count.accounts ?? 0) > 0;
-        if (!ownerClaimed) {
-          profile = await prisma.artistProfile.update({
-            where: { id: profile.id },
-            data: { userId: user.id },
+        if (profile.userId !== user.id) {
+          const owner = await prisma.user.findUnique({
+            where: { id: profile.userId },
+            include: { _count: { select: { accounts: true } } },
           });
+          const ownerClaimed =
+            Boolean(owner?.passwordHash) || (owner?._count.accounts ?? 0) > 0;
+          if (!ownerClaimed) {
+            profile = await prisma.artistProfile.update({
+              where: { id: profile.id },
+              data: { userId: user.id },
+            });
+          }
         }
       }
       let newPieces = 0;
-      for (const p of pa.pieces) {
+      let repaired = 0;
+      for (const { matchTitle, ...p } of pa.pieces) {
         const dup = await prisma.submission.findFirst({
-          where: { artistId: profile.id, title: p.title },
+          where: {
+            artistId: profile.id,
+            title: { contains: matchTitle ?? p.title, mode: "insensitive" },
+          },
         });
         if (dup) {
-          // Taxonomy top-up for pieces seeded before the columns existed —
-          // only fills blanks, never overwrites artist/admin edits.
+          // Fill blanks and heal dead photos; never overwrite live edits.
           const fill = {};
           if (!dup.brand && p.brand) fill.brand = p.brand;
           if (!dup.silhouette && p.silhouette) fill.silhouette = p.silhouette;
           if (!dup.baseColorway && p.baseColorway) fill.baseColorway = p.baseColorway;
+          const gallery = dup.extraImages.filter(uploadFileExists);
+          if (!uploadFileExists(dup.imageUrl)) {
+            fill.imageUrl = p.imageUrl; // cover vanished with a redeploy — restore from the repo
+            if (gallery.length !== dup.extraImages.length) fill.extraImages = gallery;
+            repaired++;
+          } else if (
+            dup.imageUrl !== p.imageUrl &&
+            !dup.extraImages.includes(p.imageUrl) &&
+            p.imageUrl
+          ) {
+            fill.extraImages = [...gallery, p.imageUrl]; // cover is fine — ride along in the gallery
+          }
           if (Object.keys(fill).length) {
             await prisma.submission.update({ where: { id: dup.id }, data: fill });
           }
@@ -728,14 +780,16 @@ async function main() {
             ...p,
             artistName: profile.displayName,
             socialHandle: profile.instagram,
-            email: pa.email,
+            email: claimEmail,
             status: "APPROVED",
             artistId: profile.id,
           },
         });
         newPieces++;
       }
-      console.log(`Roster: ${pa.displayName} ready (${newPieces} new pieces).`);
+      console.log(
+        `Roster: ${pa.displayName} ready (${newPieces} new pieces${repaired ? `, ${repaired} photos healed` : ""}).`
+      );
     }
     if (questionCount === 0) {
       for (const q of loadQuestions()) {
