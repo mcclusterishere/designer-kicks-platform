@@ -253,6 +253,14 @@ time, .tabular {
   font-variant-numeric: tabular-nums;
 }
 
+/* Swipe galleries manage their own affordances — hide the scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Respect users who turn motion off */
 @media (prefers-reduced-motion: reduce) {
   .ticker-track,

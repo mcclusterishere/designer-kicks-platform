@@ -89,6 +89,9 @@ export async function createSubmission(
     image.type
   );
 
+  const extra = await saveImageList(formData.getAll("morePhotos"), 4);
+  if (!Array.isArray(extra)) return { ok: false, error: extra.error };
+
   await prisma.submission.create({
     data: {
       title,
@@ -100,6 +103,7 @@ export async function createSubmission(
       size: size || null,
       description: description || null,
       imageUrl,
+      extraImages: extra,
       artistId: artist.id,
     },
   });
@@ -111,6 +115,25 @@ export async function createSubmission(
 
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/** Validate + store a batch of gallery photos; returns urls or an error. */
+async function saveImageList(
+  files: FormDataEntryValue[],
+  max: number
+): Promise<string[] | { error: string }> {
+  const urls: string[] = [];
+  for (const f of files) {
+    if (!(f instanceof File) || f.size === 0) continue;
+    if (urls.length >= max) break;
+    if (f.size > MAX_UPLOAD_BYTES) return { error: "Each photo must be under 6MB." };
+    const ext = ALLOWED_TYPES[f.type];
+    if (!ext) return { error: "Photos must be JPG, PNG, or WebP." };
+    urls.push(
+      await saveUpload(Buffer.from(await f.arrayBuffer()), `${randomUUID()}.${ext}`, f.type)
+    );
+  }
+  return urls;
 }
 
 /**
@@ -247,6 +270,9 @@ export async function preloadArtist(
   const fileName = `${randomUUID()}.${ext}`;
   const imageUrl = await saveUpload(Buffer.from(await image.arrayBuffer()), fileName, image.type);
 
+  const plExtra = await saveImageList(formData.getAll("morePhotos"), 4);
+  if (!Array.isArray(plExtra)) return { ok: false, error: plExtra.error };
+
   await prisma.submission.create({
     data: {
       title: shoeTitle,
@@ -258,6 +284,7 @@ export async function preloadArtist(
       size: plSize || null,
       description: description || null,
       imageUrl,
+      extraImages: Array.isArray(plExtra) ? plExtra : [],
       status: "APPROVED",
       artistId: artist.id,
     },
@@ -518,6 +545,46 @@ export async function setAskingPrice(
   const me = await prisma.user.findUnique({ where: { id: session.user.id } });
   if (me?.collectorSlug) revalidatePath(`/collectors/${me.collectorSlug}`);
   revalidatePath("/market");
+  return { ok: true };
+}
+
+/**
+ * Add gallery photos to an existing piece — the artist from their own
+ * page, or an admin (e.g. topping up a pre-loaded artist's angles).
+ * Gallery is capped at 6 images total including the cover.
+ */
+export async function addSubmissionPhotos(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const submissionId = String(formData.get("submissionId") ?? "");
+
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: { artist: { select: { userId: true, slug: true } } },
+  });
+  if (!submission) return { ok: false, error: "Piece not found." };
+
+  const admin = await isAdmin();
+  const isArtistOwner = session?.user?.id && submission.artist?.userId === session.user.id;
+  if (!admin && !isArtistOwner) {
+    return { ok: false, error: "Only the piece's artist or an admin can add photos." };
+  }
+
+  const room = 6 - 1 - submission.extraImages.length;
+  if (room <= 0) return { ok: false, error: "Gallery is full (6 photos max)." };
+
+  const added = await saveImageList(formData.getAll("photos"), room);
+  if (!Array.isArray(added)) return { ok: false, error: added.error };
+  if (added.length === 0) return { ok: false, error: "Pick at least one photo." };
+
+  await prisma.submission.update({
+    where: { id: submissionId },
+    data: { extraImages: { push: added } },
+  });
+
+  if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
   return { ok: true };
 }
 

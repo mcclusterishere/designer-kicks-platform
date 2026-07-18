@@ -70,6 +70,7 @@ export default async function BattlePage({
             baseShoe: battle.subA.baseShoe,
             category: battle.subA.category,
             imageUrl: battle.subA.imageUrl,
+            extraImages: battle.subA.extraImages,
             votes: aVotes,
           }}
           b={{
@@ -81,6 +82,7 @@ export default async function BattlePage({
             baseShoe: battle.subB.baseShoe,
             category: battle.subB.category,
             imageUrl: battle.subB.imageUrl,
+            extraImages: battle.subB.extraImages,
             votes: bVotes,
           }}
         />

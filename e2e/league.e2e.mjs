@@ -70,10 +70,12 @@ await page.fill("#baseShoe", "Denim trucker jacket");
 await page.selectOption("#category", "apparel");
 await page.fill("#size", "2XL");
 await page.setInputFiles("#image", { name: "c.png", mimeType: "image/png", buffer: PNG_1x1 });
+await page.setInputFiles("#morePhotos", [{ name: "c2.png", mimeType: "image/png", buffer: PNG_1x1 }]);
 await page.getByRole("button", { name: "Submit To The Arena" }).click();
 await page.getByText("You're in.").waitFor({ timeout: 15000 });
 const sub = await prisma.submission.findFirst({ where: { email: EMAIL } });
 check("submission linked to approved artist", sub?.artistId === approved?.id);
+check("extra angle stored for the swipe gallery", sub?.extraImages?.length === 1);
 
 // Approve the shoe so it shows in the closet
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
@@ -233,10 +235,16 @@ await page.goto(`${BASE}/artists/league-test-studio`, { waitUntil: "networkidle"
 // After the buy-back the piece sits in the artist's own collector closet.
 check("artist closet shows provenance", await page.getByText(/In League Tester/).isVisible());
 
-// Battle page cross-links still work
-await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
-await page.locator("a[href^='/battles/']").first().click();
-await page.waitForURL("**/battles/**");
+// Battle page: swipeable inline galleries + cross-links
+const galleryBattle = await prisma.battle.findFirst({ where: { status: "ACTIVE" } });
+await prisma.submission.update({
+  where: { id: galleryBattle.subAId },
+  data: { extraImages: ["/seed/custom-2.svg"] },
+});
+await page.goto(`${BASE}/battles/${galleryBattle.id}`, { waitUntil: "networkidle" });
+check("both vote sides render swipe galleries", (await page.locator("[data-testid='vote-gallery']").count()) === 2);
+check("gallery holds multiple angles inline", (await page.locator("[data-testid='vote-gallery']").first().locator("img").count()) >= 2);
+check("gallery photo counter shows", await page.getByText("1/2").isVisible());
 check("battle page links artist profiles", (await page.locator("a[href^='/artists/']").count()) >= 1);
 
 // Cleanup

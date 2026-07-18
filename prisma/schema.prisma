@@ -19,6 +19,9 @@ model Submission {
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
   createdAt    DateTime @default(now())
 
+  // Gallery beyond the cover shot — voters swipe through these inline.
+  extraImages String[] @default([])
+
   artistId String?
   artist   ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: SetNull)
 

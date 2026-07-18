@@ -6,6 +6,8 @@ import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
 import FollowButton from "@/components/FollowButton";
 import RecordSaleForm from "@/components/RecordSaleForm";
+import AddPhotosForm from "@/components/AddPhotosForm";
+import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
 import { categoryEmoji } from "@/lib/categories";
 
@@ -44,8 +46,10 @@ export default async function ArtistPage({ params }: Props) {
   ]);
   // Every shoe's live position on the Heat List
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
-  // The artist managing their own page can record sales/transfers.
+  // The artist managing their own page can record sales/transfers;
+  // an admin can also curate galleries for pre-loaded artists.
   const isOwnPage = session?.user?.id === artist.userId;
+  const admin = await isAdmin();
 
   let wins = 0;
   let battles = 0;
@@ -235,6 +239,9 @@ export default async function ArtistPage({ params }: Props) {
                         <span className="text-white">{s.owner.name ?? "a collector"}&apos;s closet</span>
                       )}
                     </p>
+                  )}
+                  {(isOwnPage || admin) && (
+                    <AddPhotosForm submissionId={s.id} photoCount={1 + s.extraImages.length} />
                   )}
                   {isOwnPage && !pendingSale && !s.owner && <RecordSaleForm submissionId={s.id} />}
                 </div>

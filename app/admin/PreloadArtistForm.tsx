@@ -117,6 +117,11 @@ export default function PreloadArtistForm() {
         <input id="pl-img" name="image" type="file" required accept="image/jpeg,image/png,image/webp"
           className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-4 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
       </div>
+      <div>
+        <label className="tag text-smoke" htmlFor="pl-more">More angles (up to 4 — voters swipe through these)</label>
+        <input id="pl-more" name="morePhotos" type="file" multiple accept="image/jpeg,image/png,image/webp"
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
+      </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}
         className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">

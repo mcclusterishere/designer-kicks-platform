@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { castVote } from "@/app/actions";
 import { categoryEmoji } from "@/lib/categories";
 
@@ -13,8 +13,82 @@ type Side = {
   baseShoe: string;
   category: string;
   imageUrl: string;
+  extraImages: string[];
   votes: number;
 };
+
+/**
+ * Inline swipe gallery: thumb-scroll through a piece's angles right on
+ * the voting card — scroll-snap, dot indicators, arrows on hover. No
+ * modal, no new tab.
+ */
+function SideGallery({ images, alt }: { images: string[]; alt: string }) {
+  const [idx, setIdx] = useState(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const go = (dir: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth, behavior: "smooth" });
+  };
+
+  return (
+    <div className="group/gallery relative aspect-square w-full bg-panel">
+      <div
+        ref={trackRef}
+        data-testid="vote-gallery"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setIdx(Math.round(el.scrollLeft / el.clientWidth));
+        }}
+        className="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto"
+      >
+        {images.map((src, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={src}
+            src={src}
+            alt={i === 0 ? alt : `${alt} — angle ${i + 1}`}
+            className="h-full w-full shrink-0 snap-center object-cover"
+          />
+        ))}
+      </div>
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous photo"
+            onClick={() => go(-1)}
+            className="absolute left-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition group-hover/gallery:opacity-100 md:flex"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            aria-label="Next photo"
+            onClick={() => go(1)}
+            className="absolute right-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition group-hover/gallery:opacity-100 md:flex"
+          >
+            ›
+          </button>
+          <div className="pointer-events-none absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+            {images.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === idx ? "w-5 bg-volt" : "w-1.5 bg-white/50"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="tag pointer-events-none absolute right-2 top-2 rounded bg-ink/70 px-2 py-1 text-white">
+            {idx + 1}/{images.length}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
 
 type Props = {
   battleId: string;
@@ -67,14 +141,10 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                   Winner
                 </div>
               )}
-              <div className="aspect-square w-full bg-panel">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={side.imageUrl}
-                  alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <SideGallery
+                images={[side.imageUrl, ...side.extraImages]}
+                alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
+              />
               <div className="p-4">
                 <p className="tag text-smoke">{categoryEmoji(side.category)} {side.baseShoe}</p>
                 <h3 className="display mt-1 text-xl text-white">{side.title}</h3>

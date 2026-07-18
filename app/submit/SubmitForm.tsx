@@ -163,6 +163,20 @@ export default function SubmitForm({ artistDefaults }: Props) {
         )}
       </div>
 
+      <div>
+        <label htmlFor="morePhotos" className="tag text-smoke">
+          More angles <span className="normal-case">(up to 4 — voters swipe through these)</span>
+        </label>
+        <input
+          id="morePhotos"
+          name="morePhotos"
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp"
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink"
+        />
+      </div>
+
       {state?.error && (
         <p className="rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
           {state.error}
