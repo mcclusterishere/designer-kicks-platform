@@ -144,6 +144,7 @@ export default async function RootLayout({
                 <Link href="/drops" className="hover:text-white">Drop Calendar</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
+                <Link href="/story" className="hover:text-white">Our Story</Link>
                 <Link href="/shop" className="hover:text-white">Shop</Link>
                 <Link href="/admin" className="hover:text-white">Admin</Link>
               </div>

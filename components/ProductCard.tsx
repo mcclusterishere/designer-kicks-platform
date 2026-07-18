@@ -53,7 +53,7 @@ export default function ProductCard({ product }: Props) {
         )}
         {product.featured && (
           <span className="sticker absolute left-2 top-2 px-2 py-0.5 text-sm">
-            Hot
+            Editor&apos;s Pick
           </span>
         )}
       </div>
