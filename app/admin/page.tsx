@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { isAdmin, adminAccountOk } from "@/lib/admin";
+import { isAdmin, adminAccountOk, totpEnabled } from "@/lib/admin";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { finalizeExpiredOutfitBattles } from "@/lib/outfits";
 import {
@@ -38,6 +38,7 @@ import { placesConfigured } from "@/lib/stores";
 import { providersConfigured } from "@/lib/sneakerApi";
 import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
+import TwoFactorPanel from "./TwoFactorPanel";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function AdminPage({
   searchParams: Promise<{ edit?: string; editArticle?: string }>;
 }) {
   if (!(await isAdmin())) {
-    const accountOk = await adminAccountOk();
+    const [accountOk, twoFactor] = await Promise.all([adminAccountOk(), totpEnabled()]);
     return (
       <div className="mx-auto max-w-2xl px-4 py-12">
         <h1 className="display text-4xl text-white">Admin</h1>
@@ -59,7 +60,7 @@ export default async function AdminPage({
             with that account first — then the password box below works.
           </p>
         )}
-        <LoginForm />
+        <LoginForm twoFactor={twoFactor} />
       </div>
     );
   }
@@ -293,6 +294,8 @@ export default async function AdminPage({
       !storeTargets.includes(l) && !storeInvited.includes(l) && !storeJoined.includes(l)
   );
 
+  const twoFactorOn = await totpEnabled();
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex items-center justify-between">
@@ -301,6 +304,11 @@ export default async function AdminPage({
           <button className="tag text-smoke hover:text-white">Log out</button>
         </form>
       </div>
+
+      {/* Account security */}
+      <section className="mt-8">
+        <TwoFactorPanel enabled={twoFactorOn} />
+      </section>
 
       {/* Pending submissions */}
       <section className="mt-10">

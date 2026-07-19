@@ -2,12 +2,21 @@ import { cookies } from "next/headers";
 import { createHash, createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { verifyTotp } from "@/lib/totp";
 
 const ADMIN_COOKIE = "dk_admin";
 const SESSION_HOURS = 12;
 const MAX_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const NONCE_KEY = "adminNonce";
+const TOTP_KEY = "adminTotpSecret"; // active 2FA secret (enabled iff present)
+const TOTP_PENDING_KEY = "adminTotpPending"; // secret mid-setup, before confirm
+
+// The league office accounts. On a real deploy with ADMIN_EMAILS unset,
+// the panel falls back to these so the owner is never locked out of their
+// own site just for skipping an env var — while still requiring a
+// signed-in owner account (a password alone never reaches admin).
+const OWNER_EMAILS = ["mattmccluster@gmail.com", "matthew@mccluster.org"];
 
 /**
  * The admin-session nonce lives in the DB. Every admin cookie is signed
@@ -69,17 +78,25 @@ function sign(expiry: number, pw: string, nonce: string): string {
     .digest("hex");
 }
 
-/**
- * Second lock: when ADMIN_EMAILS is set (comma-separated), the admin
- * panel additionally requires being signed in as one of those member
- * accounts. A leaked password alone is then useless. Unset = legacy
- * password-only mode (local dev / tests).
- */
-export function adminAllowlist(): string[] {
+/** Emails explicitly configured via ADMIN_EMAILS (may be empty). */
+function configuredAllowlist(): string[] {
   return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Second lock: the admin panel additionally requires being signed in as
+ * one of these member accounts, so a leaked password alone is useless.
+ * Explicit ADMIN_EMAILS wins; otherwise, on a real deploy we fall back to
+ * the owner accounts (never leave prod password-only). Local/e2e with
+ * nothing configured returns [] → password-only, so dev + tests work.
+ */
+export function adminAllowlist(): string[] {
+  const configured = configuredAllowlist();
+  if (configured.length) return configured;
+  return isRealDeploy() ? [...OWNER_EMAILS] : [];
 }
 
 /**
@@ -101,16 +118,62 @@ function isRealDeploy(): boolean {
 
 export async function adminAccountOk(): Promise<boolean> {
   const list = adminAllowlist();
-  if (list.length === 0) {
-    // Fail closed on the live site: a password alone is never enough.
-    // The owner MUST set ADMIN_EMAILS (their signed-in member account)
-    // so a leaked/guessed password can't reach the panel. Local + e2e
-    // (no real https host) stay password-only so dev and tests work.
-    return !isRealDeploy();
-  }
+  // Empty only means "not a real deploy AND nothing configured" — local +
+  // e2e stay password-only so dev and tests work. Every real deploy has a
+  // non-empty list (configured or the owner fallback) and so fails closed.
+  if (list.length === 0) return true;
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
   return Boolean(email && list.includes(email));
+}
+
+// ---------- Two-step verification (TOTP authenticator app) ----------
+
+/** 2FA is on once a confirmed secret is stored. */
+export async function totpEnabled(): Promise<boolean> {
+  const row = await prisma.appSetting.findUnique({ where: { key: TOTP_KEY } });
+  return Boolean(row?.value);
+}
+
+async function settingValue(key: string): Promise<string | null> {
+  const row = await prisma.appSetting.findUnique({ where: { key } });
+  return row?.value ?? null;
+}
+
+/** Stash a fresh secret mid-setup; it isn't enforced until confirmed. */
+export async function beginTotpEnrollment(secret: string): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key: TOTP_PENDING_KEY },
+    update: { value: secret },
+    create: { key: TOTP_PENDING_KEY, value: secret },
+  });
+}
+
+export async function pendingTotpSecret(): Promise<string | null> {
+  return settingValue(TOTP_PENDING_KEY);
+}
+
+/** Promote the pending secret to active — 2FA is now required at login. */
+export async function activateTotp(): Promise<void> {
+  const pending = await settingValue(TOTP_PENDING_KEY);
+  if (!pending) return;
+  await prisma.appSetting.upsert({
+    where: { key: TOTP_KEY },
+    update: { value: pending },
+    create: { key: TOTP_KEY, value: pending },
+  });
+  await prisma.appSetting.deleteMany({ where: { key: TOTP_PENDING_KEY } });
+}
+
+export async function disableTotp(): Promise<void> {
+  await prisma.appSetting.deleteMany({ where: { key: { in: [TOTP_KEY, TOTP_PENDING_KEY] } } });
+}
+
+/** Verify a login code. Passes trivially when 2FA isn't enabled. */
+export async function verifyAdminTotp(code: string): Promise<boolean> {
+  const secret = await settingValue(TOTP_KEY);
+  if (!secret) return true; // 2FA off — nothing to check
+  return verifyTotp(secret, code, Math.floor(Date.now() / 1000));
 }
 
 export function checkPassword(password: string): boolean {

@@ -11,7 +11,15 @@ import {
   adminLoginAvailable,
   registerLoginAttempt,
   clearLoginAttempts,
+  totpEnabled,
+  verifyAdminTotp,
+  beginTotpEnrollment,
+  pendingTotpSecret,
+  activateTotp,
+  disableTotp,
+  adminAllowlist,
 } from "@/lib/admin";
+import { generateTotpSecret, otpauthUri, verifyTotp } from "@/lib/totp";
 import { headers } from "next/headers";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { slugify, siteUrl } from "@/lib/articles";
@@ -1340,10 +1348,59 @@ export async function adminLogin(
     );
     return { ok: false, error: "Wrong password." };
   }
+  // Third lock: authenticator-app code, when 2FA is switched on.
+  if (await totpEnabled()) {
+    const code = String(formData.get("code") ?? "");
+    if (!(await verifyAdminTotp(code))) {
+      return { ok: false, error: "Enter the 6-digit code from your authenticator app." };
+    }
+  }
   clearLoginAttempts(ip); // right password — only wrong guesses count
   await setAdminSession();
   revalidatePath("/admin");
   return { ok: true };
+}
+
+// ---------- Admin two-step verification (authenticator app) ----------
+
+export type TotpSetupResult = ActionResult & { secret?: string; uri?: string };
+
+/**
+ * Start 2FA enrollment: mint a secret, stash it as pending (not yet
+ * enforced), and hand back the key + otpauth URI so the admin can add it
+ * to their authenticator app. It only goes live after confirmAdminTotp.
+ */
+export async function startAdminTotpSetup(): Promise<TotpSetupResult> {
+  await requireAdmin();
+  const secret = generateTotpSecret();
+  await beginTotpEnrollment(secret);
+  const account = adminAllowlist()[0] ?? "admin";
+  return { ok: true, secret, uri: otpauthUri(secret, account) };
+}
+
+/** Confirm the pending secret with a live code, then enforce it at login. */
+export async function confirmAdminTotp(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const pending = await pendingTotpSecret();
+  if (!pending) return { ok: false, error: "Start setup first, then enter a code." };
+  const code = String(formData.get("code") ?? "");
+  if (!verifyTotp(pending, code, Math.floor(Date.now() / 1000))) {
+    return { ok: false, error: "That code didn't match — check your app's clock and try again." };
+  }
+  await activateTotp();
+  revalidatePath("/admin");
+  return { ok: true, note: "Two-step verification is on. You'll need a code next sign-in." };
+}
+
+/** Turn 2FA back off (already inside the panel, so the session vouches). */
+export async function disableAdminTotp(): Promise<ActionResult> {
+  await requireAdmin();
+  await disableTotp();
+  revalidatePath("/admin");
+  return { ok: true, note: "Two-step verification is off." };
 }
 
 export async function adminLogout() {
