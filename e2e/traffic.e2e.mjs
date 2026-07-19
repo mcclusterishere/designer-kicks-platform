@@ -83,7 +83,9 @@ check("admin pages not tracked", (await prisma.pageView.count({ where: { campaig
 await admin.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 await admin.fill("#password", ADMIN_PASSWORD);
 await admin.getByRole("button", { name: "Enter" }).click();
-await admin.getByText("Traffic", { exact: false }).first().waitFor({ timeout: 10000 });
+// The admin dashboard aggregates a lot — give it the suite-standard 20s
+// (it's the data-heaviest page in the app after a full e2e pass).
+await admin.getByText("Traffic", { exact: false }).first().waitFor({ timeout: 20000 });
 check("traffic pulse renders", await admin.getByRole("heading", { name: /Traffic/ }).isVisible());
 check("facebook listed as a source", await admin.getByText("Top sources (7d)").isVisible());
 const sourcesCard = admin.locator("div.rounded-xl", { hasText: "Top sources (7d)" }).first();

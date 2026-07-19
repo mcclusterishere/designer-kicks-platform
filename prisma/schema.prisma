@@ -352,6 +352,9 @@ model Tournament {
   // Talent level, like rec-league divisions: OPEN (anyone) |
   // RISING (up-and-comers) | ELITE (invitational heavyweights).
   division  String   @default("OPEN")
+  // Category wall: a bracket only ever holds one piece category —
+  // sneakers | apparel | headwear | accessories. Hats never face shoes.
+  category  String   @default("sneakers")
   prize     String?
   roundDays Int      @default(3)
   createdAt DateTime @default(now())

@@ -37,16 +37,47 @@ export async function registerUser(
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
 
-  if (!allowAttempt("register", await clientIp(), 5, HOUR)) {
+  if (!allowAttempt("register", await clientIp(), 10, HOUR)) {
     return { ok: false, error: "Too many sign-ups from this connection — try again later." };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return { ok: false, error: "An account with that email already exists — try signing in." };
-
-  await prisma.user.create({
-    data: { name, email, passwordHash: await hash(password, 10) },
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      _count: { select: { accounts: true } },
+      artistProfile: { select: { displayName: true, slug: true } },
+    },
   });
+
+  if (existing && (existing.passwordHash || existing._count.accounts > 0)) {
+    return { ok: false, error: "An account with that email already exists — try signing in." };
+  }
+
+  if (existing) {
+    // Duplicate info merges, never dead-ends — but only through the
+    // verified door. A passwordless shell account exists for every
+    // pre-loaded artist page; registering with its email ADOPTS it
+    // (profile, pieces, record) ONLY if the league already approved a
+    // claim from this exact email. Without that, knowing an artist's
+    // email must never be enough to take their page.
+    const verified = await prisma.artistClaim.findFirst({
+      where: { email, status: "APPROVED" },
+    });
+    if (!verified && existing.artistProfile) {
+      return {
+        ok: false,
+        error: `This email is attached to the ${existing.artistProfile.displayName} page, which hasn't been claimed yet. Head to that page and hit "Claim This Page" — the league verifies every claim by hand, then this email unlocks the account.`,
+      };
+    }
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { name, passwordHash: await hash(password, 10) },
+    });
+  } else {
+    await prisma.user.create({
+      data: { name, email, passwordHash: await hash(password, 10) },
+    });
+  }
 
   // Sign them straight in after registration.
   try {
@@ -54,6 +85,27 @@ export async function registerUser(
   } catch {
     // Account was created; worst case they sign in manually.
   }
+
+  if (existing?.artistProfile) {
+    return {
+      ok: true,
+      note: `This email already had the ${existing.artistProfile.displayName} artist page attached — it's yours now, no separate claim needed.`,
+    };
+  }
+
+  // If a claim from this email is still in the review queue, say so —
+  // the account hooks up automatically the moment it's approved.
+  const pendingClaim = await prisma.artistClaim.findFirst({
+    where: { email, status: "PENDING" },
+    include: { artist: { select: { displayName: true } } },
+  });
+  if (pendingClaim) {
+    return {
+      ok: true,
+      note: `Heads up: your claim on the ${pendingClaim.artist.displayName} page is still in review. When it's approved, that page attaches to this account automatically — nothing else to do.`,
+    };
+  }
+
   return { ok: true };
 }
 

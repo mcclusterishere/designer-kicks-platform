@@ -15,12 +15,35 @@ export default function RegisterForm() {
     null
   );
 
+  // A note means something merged (a pre-loaded page attached, or a
+  // claim is pending) — let them read it before moving on. Silent
+  // success goes straight through.
   useEffect(() => {
-    if (state?.ok) {
+    if (state?.ok && !state.note) {
       router.push("/profile");
       router.refresh();
     }
-  }, [state?.ok, router]);
+  }, [state?.ok, state?.note, router]);
+
+  if (state?.ok && state.note) {
+    return (
+      <div className="space-y-4" data-testid="register-note">
+        <p className="rounded-lg border border-volt/40 bg-volt/5 p-4 text-sm text-white">
+          ✓ Account created. {state.note}
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            router.push("/profile");
+            router.refresh();
+          }}
+          className="w-full rounded-lg bg-volt py-3 tag font-bold text-ink"
+        >
+          Take Me To My Profile →
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-4">

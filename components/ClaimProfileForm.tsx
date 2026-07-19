@@ -9,6 +9,13 @@ import { submitArtistClaim } from "@/app/actions";
  * time onboarding styled like a command line. Seller non-negotiables
  * (email, phone, street mailing address — no P.O. Boxes) are collected
  * with an explicit privacy promise: admin eyes only, never public.
+ *
+ * Navigation is forgiving on purpose: every answer can be revisited
+ * (back button or tap the transcript), revisits prefill the saved
+ * answer, and confirming an edit jumps straight back to the first
+ * unanswered question — usually the review screen, not a re-walk.
+ * Paste a full "street, city, ST zip" address at the street step and
+ * it splits itself into the right boxes.
  */
 
 type Step = {
@@ -38,8 +45,8 @@ const STEPS: Step[] = [
   {
     key: "phone",
     prompt:
-      "Phone number. Non-negotiable for sellers — it stays PRIVATE, admin eyes only, never shown on the site.",
-    placeholder: "(555) 555-0134",
+      "Phone number — digits only is fine, e.g. 719 555 0134. Non-negotiable for sellers, and it stays PRIVATE: admin eyes only, never shown on the site.",
+    placeholder: "(719) 555-0134",
     type: "tel",
     validate: (v) =>
       v.replace(/\D/g, "").length >= 10 ? null : "A real phone number is required to sell here.",
@@ -54,10 +61,10 @@ const STEPS: Step[] = [
   {
     key: "addressLine",
     prompt:
-      "Street mailing address. Also non-negotiable — and NO P.O. Boxes. It is never public: only the admin sees it, for seller verification and league mail.",
-    placeholder: "street address",
+      "Street line ONLY — house number + street name, plus apt/unit if you have one. Example: 412 W 9th St, Apt 3. City, state, and ZIP are the NEXT three questions, one at a time. (Or paste the whole address and I'll split it.) No P.O. Boxes — and it's never public: admin eyes only, for seller verification and league mail.",
+    placeholder: "412 W 9th St, Apt 3",
     validate: (v) => {
-      if (!v || v.length > 120) return "A street mailing address is required.";
+      if (!v || v.length > 120) return "The street line is required.";
       if (/\b(p\.?\s*o\.?\s*box|post\s*office\s*box|pob\b)/i.test(v))
         return "No P.O. Boxes — we need a street address. It stays private, promise.";
       return null;
@@ -65,19 +72,19 @@ const STEPS: Step[] = [
   },
   {
     key: "city",
-    prompt: "City?",
+    prompt: "City — just the city, e.g. Pueblo.",
     placeholder: "city",
     validate: (v) => (v.length > 0 && v.length <= 60 ? null : "City is required."),
   },
   {
     key: "state",
-    prompt: "State?",
-    placeholder: "e.g. CO",
+    prompt: "State — two letters, e.g. CO.",
+    placeholder: "CO",
     validate: (v) => (v.length > 0 && v.length <= 30 ? null : "State is required."),
   },
   {
     key: "zip",
-    prompt: "ZIP code?",
+    prompt: "ZIP code — five digits, e.g. 81005.",
     placeholder: "81005",
     validate: (v) => (/^\d{5}(-\d{4})?$/.test(v) ? null : "A valid ZIP code is required."),
   },
@@ -97,6 +104,37 @@ const STEPS: Step[] = [
   },
 ];
 
+const stepIndex = (key: string) => STEPS.findIndex((s) => s.key === key);
+
+/**
+ * Try to read a pasted full US address: "412 W 9th St, Apt 3, Pueblo,
+ * CO 81005" (state+zip together or comma-separated). Returns the four
+ * pieces or null if it doesn't confidently parse.
+ */
+function splitFullAddress(
+  v: string
+): { addressLine: string; city: string; state: string; zip: string } | null {
+  const m = v.match(
+    /^(.+?),\s*([A-Za-z .'-]+?),?\s+([A-Za-z]{2})\.?,?\s+(\d{5}(?:-\d{4})?)$/
+  );
+  if (!m) return null;
+  // The street part may itself contain a comma (apt/unit) — the first
+  // capture is greedy-left, so "412 W 9th St, Apt 3" survives whole.
+  const [, addressLine, city, state, zip] = m;
+  if (!addressLine.trim() || !city.trim()) return null;
+  return {
+    addressLine: addressLine.trim(),
+    city: city.trim(),
+    state: state.toUpperCase(),
+    zip,
+  };
+}
+
+/** Does this look like a whole address crammed into the street box? */
+function looksLikeFullAddress(v: string): boolean {
+  return /\d{5}(-\d{4})?\s*$/.test(v) || (v.match(/,/g) ?? []).length >= 2;
+}
+
 export default function ClaimProfileForm({
   artistId,
   displayName,
@@ -109,7 +147,9 @@ export default function ClaimProfileForm({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [doneNote, setDoneNote] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,27 +163,78 @@ export default function ClaimProfileForm({
     endRef.current?.scrollIntoView({ block: "nearest" });
   }, [open, step, review]);
 
+  /** First never-answered step after i, or the review screen. */
+  function nextUnanswered(after: number, a: Record<string, string>): number {
+    for (let j = after + 1; j < STEPS.length; j++) {
+      if (a[STEPS[j].key] === undefined) return j;
+    }
+    return STEPS.length;
+  }
+
+  /** Move to a step with its saved answer already in the box —
+   *  revisits never blank out, and there's no empty-flash frame. */
+  function goTo(target: number, a: Record<string, string>) {
+    setValue(target < STEPS.length ? a[STEPS[target].key] ?? "" : "");
+    setError(null);
+    setStep(target);
+  }
+
   function advance() {
     const v = value.trim();
     if (!current.optional && !v) {
       setError("This one's required.");
       return;
     }
+
+    // The street step is where whole addresses get pasted — split a
+    // parseable one into all four boxes instead of scolding.
+    if (current.key === "addressLine") {
+      const full = splitFullAddress(v);
+      if (full) {
+        if (/\b(p\.?\s*o\.?\s*box|post\s*office\s*box|pob\b)/i.test(full.addressLine)) {
+          setError("No P.O. Boxes — we need a street address. It stays private, promise.");
+          return;
+        }
+        const merged = { ...answers, ...full };
+        setAnswers(merged);
+        setInfo(
+          "That was the whole address — I split it into street / city / state / ZIP for you. Check the transcript, tap anything that's off."
+        );
+        goTo(nextUnanswered(stepIndex("zip"), merged), merged);
+        return;
+      }
+      if (looksLikeFullAddress(v)) {
+        setError(
+          "That looks like the full address — this box is just the street line (number + street). City, state, and ZIP come next. Or paste it as 'street, city, ST 81005' and I'll split it."
+        );
+        return;
+      }
+    }
+
     const bad = current.validate?.(v) ?? null;
     if (bad && (v || !current.optional)) {
       setError(bad);
       return;
     }
-    setAnswers((a) => ({ ...a, [current.key]: v }));
-    setValue("");
-    setError(null);
-    setStep((s) => s + 1);
+    const normalized =
+      current.key === "state" && v.length === 2 ? v.toUpperCase() : v;
+    const merged = { ...answers, [current.key]: normalized };
+    setAnswers(merged);
+    setInfo(null);
+    // Editing an old answer jumps back to the first gap — usually the
+    // review screen — instead of re-walking every later question.
+    goTo(nextUnanswered(step, merged), merged);
+  }
+
+  function goBack() {
+    if (step === 0) return;
+    setInfo(null);
+    goTo(Math.min(step, STEPS.length) - 1, answers);
   }
 
   function editStep(i: number) {
-    setValue(answers[STEPS[i].key] ?? "");
-    setStep(i);
-    setError(null);
+    setInfo(null);
+    goTo(i, answers);
   }
 
   function submit() {
@@ -153,8 +244,10 @@ export default function ClaimProfileForm({
       fd.set("artistId", artistId);
       for (const s of STEPS) fd.set(s.key, answers[s.key] ?? "");
       const res = await submitArtistClaim(null, fd);
-      if (res.ok) setDone(true);
-      else setServerError(res.error ?? "Something went wrong — try again.");
+      if (res.ok) {
+        setDoneNote(res.note ?? null);
+        setDone(true);
+      } else setServerError(res.error ?? "Something went wrong — try again.");
     });
   }
 
@@ -163,9 +256,8 @@ export default function ClaimProfileForm({
       <div className="mt-8 rounded-xl border border-volt/50 bg-volt/5 p-5 text-center">
         <p className="display text-xl text-volt">Claim received ✓</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-smoke">
-          The league office reviews every claim by hand. Once verified,
-          your password-setting link goes to the email you gave — then
-          this page is yours.
+          {doneNote ??
+            "The league office reviews every claim by hand. Once verified, your password-setting link goes to the email you gave — then this page is yours."}
         </p>
       </div>
     );
@@ -234,6 +326,8 @@ export default function ClaimProfileForm({
           </div>
         ))}
 
+        {info && <p className="text-volt">✓ {info}</p>}
+
         {/* The live question */}
         {!review && (
           <div>
@@ -253,6 +347,17 @@ export default function ClaimProfileForm({
                 aria-label={current.prompt}
                 className="min-w-0 flex-1 border-0 bg-transparent text-white caret-[#d9b96a] placeholder:text-smoke/40 focus:outline-none"
               />
+              {step > 0 && (
+                <button
+                  type="button"
+                  data-testid="claim-back"
+                  onClick={goBack}
+                  title="Back to the previous question"
+                  className="tag shrink-0 rounded border border-edge px-3 py-1.5 text-smoke transition hover:border-volt hover:text-white"
+                >
+                  ← back
+                </button>
+              )}
               <button
                 type="button"
                 data-testid="claim-next"
@@ -264,7 +369,8 @@ export default function ClaimProfileForm({
             </div>
             {error && <p className="mt-1 text-heat">! {error}</p>}
             <p className="mt-2 text-xs text-smoke/60">
-              {step + 1} / {STEPS.length} · tap any earlier answer to edit
+              {step + 1} / {STEPS.length} · ← back or tap any earlier answer to
+              fix it — your answers stay put
             </p>
           </div>
         )}
@@ -274,8 +380,8 @@ export default function ClaimProfileForm({
           <div>
             <p className="text-white">
               <span className="text-volt">✓</span> That&apos;s everything.
-              Double-check the transcript above (tap an answer to edit),
-              then file it.
+              Double-check the transcript above (tap an answer to edit —
+              you&apos;ll come straight back here), then file it.
             </p>
             {serverError && <p className="mt-2 text-heat">! {serverError}</p>}
             <button

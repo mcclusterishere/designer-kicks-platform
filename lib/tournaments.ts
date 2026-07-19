@@ -51,9 +51,12 @@ export async function createTournament(opts: {
   size: number;
   roundDays: number;
   division?: string;
+  // Category wall: the bracket's single lane (sneakers | apparel |
+  // headwear | accessories) — callers must pre-validate entrants.
+  category?: string;
   seededSubmissionIds: string[];
 }) {
-  const { name, prize, size, roundDays, division = "OPEN", seededSubmissionIds } = opts;
+  const { name, prize, size, roundDays, division = "OPEN", category = "sneakers", seededSubmissionIds } = opts;
 
   const base = slugify(name) || "tournament";
   let slug = base;
@@ -64,7 +67,7 @@ export async function createTournament(opts: {
   }
 
   const tournament = await prisma.tournament.create({
-    data: { name, slug, size, prize: prize || null, roundDays, division },
+    data: { name, slug, size, prize: prize || null, roundDays, division, category },
   });
 
   const rounds = totalRounds(size);

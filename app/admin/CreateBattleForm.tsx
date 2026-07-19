@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createBattle, type ActionResult } from "@/app/actions";
+import { categoryEmoji, categoryLabel } from "@/lib/categories";
 
-type Option = { id: string; title: string; artistName: string };
+type Option = { id: string; title: string; artistName: string; category: string };
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-white focus:border-volt focus:outline-none";
@@ -13,25 +14,51 @@ export default function CreateBattleForm({ options }: { options: Option[] }) {
     createBattle,
     null
   );
+  // Category wall, enforced in the UI too: picking Side A locks Side B
+  // to the same lane — hats never even appear against shoes.
+  const [sideA, setSideA] = useState("");
+  const laneOf = (id: string) => options.find((o) => o.id === id)?.category;
+  const lane = sideA ? laneOf(sideA) : null;
+  const sideBOptions = lane ? options.filter((o) => o.category === lane) : options;
 
   return (
     <form action={formAction} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {(["subAId", "subBId"] as const).map((name, i) => (
-          <div key={name}>
-            <label htmlFor={name} className="tag text-smoke">
-              {i === 0 ? "Side A" : "Side B"}
-            </label>
-            <select id={name} name={name} required className={inputClass}>
-              <option value="">Pick a custom…</option>
-              {options.map((o) => (
+        <div>
+          <label htmlFor="subAId" className="tag text-smoke">Side A</label>
+          <select
+            id="subAId"
+            name="subAId"
+            required
+            className={inputClass}
+            value={sideA}
+            onChange={(e) => setSideA(e.target.value)}
+          >
+            <option value="">Pick a custom…</option>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {categoryEmoji(o.category)} {o.title} — {o.artistName}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="subBId" className="tag text-smoke">
+            Side B{lane ? ` (${categoryLabel(lane)} only — category wall)` : ""}
+          </label>
+          <select id="subBId" name="subBId" required className={inputClass}>
+            <option value="">
+              {lane ? `Pick ${categoryLabel(lane)}…` : "Pick a custom…"}
+            </option>
+            {sideBOptions
+              .filter((o) => o.id !== sideA)
+              .map((o) => (
                 <option key={o.id} value={o.id}>
-                  {o.title} — {o.artistName}
+                  {categoryEmoji(o.category)} {o.title} — {o.artistName}
                 </option>
               ))}
-            </select>
-          </div>
-        ))}
+          </select>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>

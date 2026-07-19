@@ -29,7 +29,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
     createHouseOutfit,
     null
   );
-  const byCategory = ["sneakers", "apparel", "accessories"].map((c) => ({
+  const byCategory = ["sneakers", "apparel", "headwear", "accessories"].map((c) => ({
     category: c,
     pieces: pieces.filter((p) => p.category === c),
   }));

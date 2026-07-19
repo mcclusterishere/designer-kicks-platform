@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import { DIVISIONS, getTournamentBySlug, roundName, totalRounds } from "@/lib/tournaments";
+import { categoryEmoji, categoryLabel } from "@/lib/categories";
 import Countdown from "@/components/Countdown";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,12 @@ export default async function TournamentPage({ params }: Props) {
               title={DIVISIONS[t.division]?.blurb}
             >
               {DIVISIONS[t.division]?.label ?? t.division}
+            </span>
+            <span
+              className="tag rounded-full border border-edge px-2.5 py-0.5 text-smoke"
+              title="Category wall: this bracket holds one category only."
+            >
+              {categoryEmoji(t.category)} {categoryLabel(t.category)}
             </span>
           </div>
           <h1 className="display mt-1 text-4xl text-white sm:text-5xl">{t.name}</h1>

@@ -12,6 +12,7 @@ import {
   type CallOutOption,
 } from "@/app/actions";
 import type { FeedItem } from "@/lib/feed";
+import { categoryLabel } from "@/lib/categories";
 
 // The infinite scroll machine. Pages through /api/feed with an
 // IntersectionObserver sentinel — no button, no page numbers, it just
@@ -266,6 +267,9 @@ function PieceCard({
                 item.artistName
               )}
               {item.brand && <span> · {item.brand}</span>}
+              {item.category !== "sneakers" && (
+                <span className="text-volt"> · {categoryLabel(item.category)}</span>
+              )}
             </p>
           </div>
           {canCallOut && callout.state === "closed" && (

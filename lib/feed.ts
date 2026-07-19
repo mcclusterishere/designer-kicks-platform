@@ -53,6 +53,7 @@ export type FeedItem =
       artistName: string;
       artistSlug: string | null;
       brand: string | null;
+      category: string;
       votes: number;
       heat: { score: number; count: number } | null;
       // The viewer's own Rate-game score on this piece (null = hasn't
@@ -245,6 +246,7 @@ export async function getFeed(
         artistName: s.artist?.displayName ?? s.artistName,
         artistSlug: s.artist?.slug ?? null,
         brand,
+        category: s.category,
         votes: s._count.votes,
         heat: hs ? { score: hs.score, count: hs.count } : null,
         myStars,

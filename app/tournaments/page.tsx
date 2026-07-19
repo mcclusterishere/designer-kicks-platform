@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { finalizeExpiredBattles } from "@/lib/battles";
 import { DIVISIONS, listTournaments, totalRounds } from "@/lib/tournaments";
+import { categoryEmoji, categoryLabel } from "@/lib/categories";
 
 export const metadata = {
   title: "Tournaments — Custom Sneaker Championships | The Heat Chart",
@@ -44,6 +45,8 @@ export default async function TournamentsPage() {
                   <p className="display text-2xl text-white">{t.name}</p>
                   <p className="mt-1 text-sm text-smoke">
                     <span className="text-volt">{DIVISIONS[t.division]?.label ?? t.division}</span>
+                    {" · "}
+                    {categoryEmoji(t.category)} {categoryLabel(t.category)}
                     {" · "}
                     {t.size} customs · {totalRounds(t.size)} rounds
                     {t.prize && (

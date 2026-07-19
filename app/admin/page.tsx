@@ -162,7 +162,7 @@ export default async function AdminPage({
       },
     }),
   ]);
-  const categoryLeaders = ["sneakers", "apparel", "accessories"].map((cat) => ({
+  const categoryLeaders = ["sneakers", "apparel", "headwear", "accessories"].map((cat) => ({
     category: cat,
     top: approved
       .filter((s) => s.category === cat)
@@ -850,6 +850,7 @@ export default async function AdminPage({
               id: s.id,
               title: s.title,
               artistName: s.artistName,
+              category: s.category,
             }))}
           />
         </div>
@@ -994,6 +995,7 @@ export default async function AdminPage({
                 id: s.id,
                 title: s.title,
                 artistName: s.artistName,
+                category: s.category,
               }))}
             />
           </div>

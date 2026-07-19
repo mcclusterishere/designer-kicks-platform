@@ -105,8 +105,9 @@ export default function SubmitForm({ artistDefaults }: Props) {
           </label>
           <select id="category" name="category" className={inputClass} defaultValue="sneakers">
             <option value="sneakers">Sneakers</option>
-            <option value="apparel">Apparel</option>
-            <option value="accessories">Accessories</option>
+            <option value="apparel">Apparel (vests, jackets, tees)</option>
+            <option value="headwear">Headwear (hats, caps, brims)</option>
+            <option value="accessories">Accessories (chains, bags, extras)</option>
           </select>
         </div>
         <div>

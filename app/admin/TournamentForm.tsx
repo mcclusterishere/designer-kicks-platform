@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { createTournamentAction, type ActionResult } from "@/app/actions";
+import { categoryEmoji, categoryLabel } from "@/lib/categories";
 
-type Option = { id: string; title: string; artistName: string };
+type Option = { id: string; title: string; artistName: string; category: string };
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
@@ -15,6 +16,12 @@ export default function TournamentForm({ options }: { options: Option[] }) {
   );
   const [size, setSize] = useState(4);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  // Category wall: a bracket holds one lane. The first pick sets it and
+  // everything outside the lane grays out.
+  const lanes = new Set(
+    options.filter((o) => checked.has(o.id)).map((o) => o.category)
+  );
+  const lane = lanes.size === 1 ? [...lanes][0] : null;
 
   function toggle(id: string) {
     setChecked((prev) => {
@@ -67,23 +74,36 @@ export default function TournamentForm({ options }: { options: Option[] }) {
         <p className="tag text-smoke">
           Entrants — pick exactly {size} ({checked.size} selected). Seeding is
           automatic: Heat Score first, Heat List rank for unrated pieces.
+          {lane && (
+            <span className="text-volt"> {categoryLabel(lane)} bracket — category wall is on.</span>
+          )}
         </p>
         <div className="mt-2 grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded-lg border border-edge bg-surface p-3 sm:grid-cols-2">
-          {options.map((o) => (
-            <label key={o.id} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-white hover:bg-panel">
-              <input
-                type="checkbox"
-                name="participants"
-                value={o.id}
-                checked={checked.has(o.id)}
-                onChange={() => toggle(o.id)}
-                className="h-4 w-4 accent-[#d9b96a]"
-              />
-              <span className="truncate">
-                {o.title} <span className="text-smoke">— {o.artistName}</span>
-              </span>
-            </label>
-          ))}
+          {options.map((o) => {
+            const walledOut = lane !== null && o.category !== lane && !checked.has(o.id);
+            return (
+              <label
+                key={o.id}
+                className={`flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-panel ${
+                  walledOut ? "text-smoke/40" : "text-white"
+                }`}
+                title={walledOut ? `Category wall: this is ${categoryLabel(o.category)} — the bracket is ${categoryLabel(lane!)}.` : undefined}
+              >
+                <input
+                  type="checkbox"
+                  name="participants"
+                  value={o.id}
+                  checked={checked.has(o.id)}
+                  disabled={walledOut}
+                  onChange={() => toggle(o.id)}
+                  className="h-4 w-4 accent-[#d9b96a]"
+                />
+                <span className="truncate">
+                  {categoryEmoji(o.category)} {o.title} <span className="text-smoke">— {o.artistName}</span>
+                </span>
+              </label>
+            );
+          })}
           {options.length === 0 && (
             <p className="text-sm text-smoke">No approved submissions yet.</p>
           )}

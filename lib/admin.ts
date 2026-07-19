@@ -81,6 +81,15 @@ export function registerLoginAttempt(key: string): boolean {
   return entry.count <= MAX_ATTEMPTS;
 }
 
+/**
+ * A correct password clears the counter for that key. Successful
+ * logins must never eat the brute-force budget — only wrong guesses
+ * count against the 10-per-15-minutes window.
+ */
+export function clearLoginAttempts(key: string) {
+  attempts.delete(key);
+}
+
 export async function setAdminSession() {
   const pw = adminPassword();
   if (!pw) return;

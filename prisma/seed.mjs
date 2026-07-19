@@ -1430,14 +1430,28 @@ async function main() {
     await prisma.product.create({ data: p });
   }
 
-  for (const { daysAgo, ...a } of articles) {
-    await prisma.article.create({
+  for (const { daysAgo, question, ...a } of articles) {
+    const created = await prisma.article.create({
       data: {
         ...a,
         status: "PUBLISHED",
         publishedAt: new Date(now - daysAgo * DAY),
       },
     });
+    // The article's culture question — same shape as the launch path.
+    if (question) {
+      await prisma.quizQuestion.create({
+        data: {
+          question: question.q,
+          options: JSON.stringify(question.options),
+          answerIndex: question.answer,
+          category: "culture",
+          explanation: question.explain ?? null,
+          articleId: created.id,
+          active: true,
+        },
+      });
+    }
   }
 
   const questions = loadQuestions();

@@ -10,6 +10,7 @@ import {
   adminAccountOk,
   adminLoginAvailable,
   registerLoginAttempt,
+  clearLoginAttempts,
 } from "@/lib/admin";
 import { headers } from "next/headers";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
@@ -23,6 +24,7 @@ import {
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
+import { isPieceCategory, categoryLabel } from "@/lib/categories";
 import { cultureIQ } from "@/lib/iq";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -32,7 +34,9 @@ import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 
-export type ActionResult = { ok: boolean; error?: string };
+// note: an FYI that rides along with success — e.g. "your duplicate
+// claim was merged" — for forms that want to surface it.
+export type ActionResult = { ok: boolean; error?: string; note?: string };
 
 const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, string> = {
@@ -65,7 +69,7 @@ export async function createSubmission(
   if (!title || title.length > 80) return { ok: false, error: "Give your custom a name (max 80 characters)." };
   if (!artistName || artistName.length > 60) return { ok: false, error: "Artist / crew name is required." };
   if (!baseShoe) return { ok: false, error: "Tell us the base item (e.g. Air Force 1, hoodie blank)." };
-  if (!["sneakers", "apparel", "accessories"].includes(category)) {
+  if (!isPieceCategory(category)) {
     return { ok: false, error: "Pick a category." };
   }
   if (description.length > 600) return { ok: false, error: "Description is too long (max 600 characters)." };
@@ -313,7 +317,7 @@ export async function preloadArtist(
       email,
       baseShoe,
       ...plTaxonomy,
-      category: ["sneakers", "apparel", "accessories"].includes(plCategory) ? plCategory : "sneakers",
+      category: isPieceCategory(plCategory) ? plCategory : "sneakers",
       size: plSize || null,
       description: description || null,
       imageUrl,
@@ -884,26 +888,32 @@ export async function submitArtistClaim(
     return { ok: false, error: "This page has already been claimed." };
   }
 
+  const claimData = {
+    name,
+    socialProof,
+    message: message || null,
+    phone,
+    businessName: businessName || null,
+    addressLine,
+    city,
+    state,
+    zip,
+  };
+
+  // Duplicate info merges, never dead-ends: a re-file from the same
+  // email refreshes the pending claim with the newest answers.
   const existing = await prisma.artistClaim.findFirst({
     where: { artistId, email, status: "PENDING" },
   });
-  if (existing) return { ok: false, error: "Your claim is already in — we review every one." };
+  if (existing) {
+    await prisma.artistClaim.update({ where: { id: existing.id }, data: claimData });
+    return {
+      ok: true,
+      note: "You already had a claim pending on this page — we merged in your newest answers instead of filing a duplicate. Still in the review queue.",
+    };
+  }
 
-  await prisma.artistClaim.create({
-    data: {
-      artistId,
-      name,
-      email,
-      socialProof,
-      message: message || null,
-      phone,
-      businessName: businessName || null,
-      addressLine,
-      city,
-      state,
-      zip,
-    },
-  });
+  await prisma.artistClaim.create({ data: { artistId, email, ...claimData } });
 
   notifyAdmin(
     `Profile claim: ${artist.displayName}`,
@@ -948,28 +958,42 @@ export async function respondArtistClaim(claimId: string, approve: boolean): Pro
     }),
   ]);
 
-  // Claim link: reuse a live token, never rotate one out from under a DM.
-  let token = (
-    await prisma.passwordResetToken.findFirst({
-      where: { userId: user.id, expires: { gt: new Date() } },
-    })
-  )?.token;
-  if (!token) {
-    token = randomBytes(32).toString("hex");
-    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
-    await prisma.passwordResetToken.create({
-      data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
-    });
-  }
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
-  sendMail({
-    to: claim.email,
-    subject: `${claim.artist.displayName} — your Heat Chart page is verified ✓`,
-    text:
-      `Your claim on the ${claim.artist.displayName} page was approved.\n\n` +
-      `Set your password here (link valid 14 days):\n${base}/reset-password/${token}\n\n` +
-      `Your page: ${base}/artists/${claim.artist.slug}\n\nWelcome to the league.`,
-  }).catch(() => {});
+  if (user.passwordHash) {
+    // They already registered an account with this email — the page
+    // just attached itself to it. No password link needed; that's the
+    // merge working as designed.
+    sendMail({
+      to: claim.email,
+      subject: `${claim.artist.displayName} — your Heat Chart page is verified ✓`,
+      text:
+        `Your claim on the ${claim.artist.displayName} page was approved.\n\n` +
+        `Good news: you already have a Heat Chart account under this email, so the page is now attached to it. Just sign in:\n${base}/signin\n\n` +
+        `Your page: ${base}/artists/${claim.artist.slug}\n\nWelcome to the league.`,
+    }).catch(() => {});
+  } else {
+    // Claim link: reuse a live token, never rotate one out from under a DM.
+    let token = (
+      await prisma.passwordResetToken.findFirst({
+        where: { userId: user.id, expires: { gt: new Date() } },
+      })
+    )?.token;
+    if (!token) {
+      token = randomBytes(32).toString("hex");
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      await prisma.passwordResetToken.create({
+        data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      });
+    }
+    sendMail({
+      to: claim.email,
+      subject: `${claim.artist.displayName} — your Heat Chart page is verified ✓`,
+      text:
+        `Your claim on the ${claim.artist.displayName} page was approved.\n\n` +
+        `Set your password here (link valid 14 days):\n${base}/reset-password/${token}\n\n` +
+        `Your page: ${base}/artists/${claim.artist.slug}\n\nWelcome to the league.`,
+    }).catch(() => {});
+  }
 
   revalidatePath("/admin");
   revalidatePath(`/artists/${claim.artist.slug}`);
@@ -1256,6 +1280,7 @@ export async function adminLogin(
     );
     return { ok: false, error: "Wrong password." };
   }
+  clearLoginAttempts(ip); // right password — only wrong guesses count
   await setAdminSession();
   revalidatePath("/admin");
   return { ok: true };
@@ -1293,6 +1318,13 @@ export async function createBattle(
   ]);
   if (!a || !b || a.status !== "APPROVED" || b.status !== "APPROVED") {
     return { ok: false, error: "Both shoes must be approved submissions." };
+  }
+  // Category wall: hats never face shoes, vests never face hats.
+  if (a.category !== b.category) {
+    return {
+      ok: false,
+      error: `Category wall: "${a.title}" is ${categoryLabel(a.category)} and "${b.title}" is ${categoryLabel(b.category)} — pieces only battle inside their own category.`,
+    };
   }
 
   await prisma.battle.create({
@@ -1525,6 +1557,17 @@ export async function createTournamentAction(
   });
   if (subs.length !== size) return { ok: false, error: "All entrants must be approved submissions." };
 
+  // Category wall: a bracket holds one category, period. The category
+  // is derived from the entrants, never mixed.
+  const lanes = [...new Set(subs.map((s) => s.category))];
+  if (lanes.length > 1) {
+    return {
+      ok: false,
+      error: `Category wall: this bracket mixes ${lanes.map(categoryLabel).join(" and ")} — a tournament holds one category only. Hats never face shoes.`,
+    };
+  }
+  const category = lanes[0];
+
   // Seed by Heat Score (the Rate-game taste stat, smoothed) so even
   // battle-fresh pieces earn a real seed; Heat List rank breaks ties
   // and covers unrated pieces. Score never decides matches — votes do.
@@ -1542,7 +1585,7 @@ export async function createTournamentAction(
     return (heatRank.get(a) ?? Infinity) - (heatRank.get(b) ?? Infinity);
   });
 
-  await createTournament({ name, prize, size, roundDays, division, seededSubmissionIds: seeded });
+  await createTournament({ name, prize, size, roundDays, division, category, seededSubmissionIds: seeded });
 
   revalidatePath("/tournaments");
   revalidatePath("/battles");
@@ -2116,8 +2159,16 @@ export async function getCallOutOptions(
   if (target.artistId === profile.id) {
     return { ok: false, error: "That's your own piece." };
   }
+  // Category wall: you answer kicks with kicks, hats with hats.
+  const sameLane = mine.filter((s) => s.category === target.category);
+  if (sameLane.length === 0) {
+    return {
+      ok: false,
+      error: `Call-outs stay in-category — you need an approved ${categoryLabel(target.category)} piece in your closet to answer this one.`,
+    };
+  }
   const targetHeat = heatScore(target.ratings.map((r) => r.stars))?.score ?? 3.5;
-  const options = mine
+  const options = sameLane
     .map((s) => ({
       id: s.id,
       title: s.title,
@@ -2163,6 +2214,12 @@ export async function throwCallOut(
     return { ok: false, error: "Pick one of your own approved pieces." };
   }
   if (target.artistId === profile.id) return { ok: false, error: "Can't battle yourself." };
+  if (target.category !== mine.category) {
+    return {
+      ok: false,
+      error: `Category wall: that's a ${categoryLabel(target.category)} piece — answer it with your own ${categoryLabel(target.category)}, not ${categoryLabel(mine.category)}.`,
+    };
+  }
   const existing = await prisma.battle.findFirst({
     where: {
       status: "ACTIVE",

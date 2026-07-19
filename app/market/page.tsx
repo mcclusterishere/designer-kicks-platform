@@ -16,6 +16,7 @@ const CATEGORIES = [
   { key: "all", label: "All" },
   { key: "sneakers", label: "Sneakers" },
   { key: "apparel", label: "Apparel" },
+  { key: "headwear", label: "Headwear" },
   { key: "accessories", label: "Accessories" },
 ];
 
