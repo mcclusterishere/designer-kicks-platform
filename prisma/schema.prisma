@@ -88,11 +88,32 @@ model ArtistProfile {
   outreachNotes String?
   createdAt   DateTime @default(now())
 
+  // Where they already sell — captured at onboarding, shown on their page.
+  // null = never asked; false = "I don't sell anywhere yet" (→ portal);
+  // true = has at least one shop linked.
+  sellsOnline Boolean?
+
   submissions Submission[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
   drops       ArtistDrop[]
+  shops       ArtistShop[]
+}
+
+// An online shop an artist already sells through. v1 is capture + link
+// (works for every platform today); live inventory sync can bolt onto
+// this row later per platform (add tokens/externalId when built).
+model ArtistShop {
+  id        String   @id @default(cuid())
+  artistId  String
+  artist    ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  platform  String // ebay | shopify | etsy | depop | grailed | mercari | stockx | goat | website | instagram | other
+  url       String
+  label     String? // optional custom label ("My Depop", etc.)
+  createdAt DateTime @default(now())
+
+  @@index([artistId])
 }
 
 // A customizer-announced release date on the public drop calendar.

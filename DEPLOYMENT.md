@@ -39,7 +39,17 @@ Railway; merging the open PR is the deploy trigger.
 | `FB_PAGE_ID` / `FB_PAGE_ACCESS_TOKEN` / `IG_USER_ID` | Broadcast auto-posting | optional |
 | `CRON_SECRET` | guards `/api/cron/*` (finalize + drop-date sync) | recommended |
 | `KICKSDB_KEY` **or** `RAPIDAPI_STOCKX_KEY` **or** `APIFY_TOKEN` | drop-date auto-sync by SKU | optional |
+| `ANTHROPIC_API_KEY` (+ opt. `ADVISOR_MODEL`) | turns on the /sell AI Selling Advisor | optional |
+| `REF_EBAY_URL` / `REF_SHOPIFY_URL` / `REF_ETSY_URL` / `REF_DEPOP_URL` / `REF_GRAILED_URL` / … | your referral sign-up links on /sell | optional |
 | `NEXT_PUBLIC_GA_ID` | GA override only — live property is built in | not needed |
+
+  **Selling Hub** (`/sell`): platform guides + a Claude "Selling Advisor"
+  chat for artists learning to sell. The chat is **dormant** until
+  `ANTHROPIC_API_KEY` is set (it returns a friendly fallback and makes zero
+  outbound calls), so it ships free and turns on with the key. Each platform
+  card's button uses your `REF_<PLATFORM>_URL` referral link if set, else the
+  platform's plain sign-up page. Artists link their own stores in the Studio
+  ("Where you sell") → shown as "Shop their work" on their public page.
 
   **Drop-date auto-sync** (Admin → Newsroom → "Drop date auto-sync"):
   put a style code (SKU, e.g. `DZ5485-612`) on any drop article and the

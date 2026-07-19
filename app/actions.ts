@@ -44,6 +44,7 @@ import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
 import { isEditor, currentUserRole } from "@/lib/editor";
+import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -1982,6 +1983,65 @@ export async function saveJob(
   revalidatePath("/careers");
   revalidatePath("/admin");
   return { ok: true, note: "Posting is live on /careers." };
+}
+
+// ---------- Artist shops (where they already sell) ----------
+
+async function myApprovedArtist() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, status: true },
+  });
+}
+
+export async function addArtistShop(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const platform = String(formData.get("platform") ?? "").trim();
+  let url = String(formData.get("url") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim() || null;
+  if (!SELL_PLATFORMS.some((p) => p.key === platform)) {
+    return { ok: false, error: "Pick a platform." };
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    if (/^[\w-]+(\.[\w-]+)+/.test(url)) url = `https://${url}`;
+    else return { ok: false, error: "Enter a full link (https://…)." };
+  }
+  if (url.length > 400) return { ok: false, error: "That link is too long." };
+  const count = await prisma.artistShop.count({ where: { artistId: profile.id } });
+  if (count >= 20) return { ok: false, error: "That's plenty of shops for now." };
+  await prisma.artistShop.create({ data: { artistId: profile.id, platform, url, label } });
+  await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: true } });
+  revalidatePath("/studio");
+  return { ok: true, note: "Added to your page." };
+}
+
+export async function removeArtistShop(id: string) {
+  const profile = await myApprovedArtist();
+  if (!profile) return;
+  const shop = await prisma.artistShop.findUnique({ where: { id }, select: { artistId: true } });
+  if (!shop || shop.artistId !== profile.id) return; // ownership guard
+  await prisma.artistShop.delete({ where: { id } });
+  const remaining = await prisma.artistShop.count({ where: { artistId: profile.id } });
+  if (remaining === 0) {
+    await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: null } });
+  }
+  revalidatePath("/studio");
+}
+
+/** Artist says they don't sell anywhere yet → routes them to the portal. */
+export async function markSellsNowhere() {
+  const profile = await myApprovedArtist();
+  if (!profile) return;
+  await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: false } });
+  revalidatePath("/studio");
 }
 
 // ---------- Tournaments ----------

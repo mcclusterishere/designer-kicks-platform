@@ -8,6 +8,9 @@ import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
 import AnnounceDropForm from "./AnnounceDropForm";
+import AddShopForm from "./AddShopForm";
+import { removeArtistShop, markSellsNowhere } from "@/app/actions";
+import { platformLabel } from "@/lib/sellPlatforms";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -18,14 +21,15 @@ export default async function StudioPage() {
 
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, sellsOnline: true },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat, myDrops] = await Promise.all([
+  const [data, heat, myDrops, myShops] = await Promise.all([
     getStudioData(profile.id),
     getHeatList(),
     prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
+    prisma.artistShop.findMany({ where: { artistId: profile.id }, orderBy: { createdAt: "asc" } }),
   ]);
   if (!data) redirect("/submit");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
@@ -255,6 +259,52 @@ export default async function StudioPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Where you sell — surfaced on your public page + market */}
+      <div className="mt-12">
+        <p className="display text-xl text-white">Where you sell</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Link every shop you already sell through — eBay, Shopify, Etsy, Depop,
+          your own site, anywhere. They show up as “Shop their work” buttons on
+          your page so voters can buy straight from you.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <AddShopForm />
+          {myShops.length > 0 && (
+            <div className="mt-4 space-y-2 border-t border-edge pt-4">
+              {myShops.map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-bold text-white">{s.label || platformLabel(s.platform)}</span>{" "}
+                    <a href={s.url} target="_blank" rel="noopener noreferrer nofollow" className="truncate text-smoke hover:text-volt">
+                      {s.url}
+                    </a>
+                  </div>
+                  <form action={removeArtistShop.bind(null, s.id)}>
+                    <button className="tag shrink-0 text-heat underline">remove</button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+          {myShops.length === 0 && (
+            <div className="mt-4 border-t border-edge pt-4">
+              <p className="text-sm text-smoke">
+                Don&apos;t sell anywhere yet? We&apos;ll help you start —{" "}
+                <Link href="/sell" className="text-volt underline">the Selling Hub</Link>{" "}
+                has guides, the best platforms, and an AI advisor.
+              </p>
+              {profile.sellsOnline !== false && (
+                <form action={markSellsNowhere} className="mt-2">
+                  <button className="tag text-smoke underline hover:text-white">
+                    I don&apos;t sell anywhere yet →
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* The future paid tier, primed honestly */}

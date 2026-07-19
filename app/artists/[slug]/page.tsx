@@ -10,6 +10,7 @@ import AddPhotosForm from "@/components/AddPhotosForm";
 import ClaimProfileForm from "@/components/ClaimProfileForm";
 import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
+import { platformLabel } from "@/lib/sellPlatforms";
 import { categoryLabel } from "@/lib/categories";
 import HeatScore from "@/components/HeatScore";
 import ChallengeButton from "@/components/ChallengeButton";
@@ -36,7 +37,7 @@ export default async function ArtistPage({ params }: Props) {
   if (!artist) notFound();
 
   const session = await auth();
-  const [following, trophies, heat] = await Promise.all([
+  const [following, trophies, heat, shops] = await Promise.all([
     session?.user?.id
       ? prisma.artistFollow
           .findUnique({
@@ -46,6 +47,7 @@ export default async function ArtistPage({ params }: Props) {
       : false,
     getArtistTrophies(artist.id),
     getHeatList(),
+    prisma.artistShop.findMany({ where: { artistId: artist.id }, orderBy: { createdAt: "asc" } }),
   ]);
   // Every shoe's live position on the Heat List
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
@@ -155,6 +157,26 @@ export default async function ArtistPage({ params }: Props) {
 
       {claimable && (
         <ClaimProfileForm artistId={artist.id} displayName={artist.displayName} />
+      )}
+
+      {/* Shop their work — the artist's own storefronts */}
+      {shops.length > 0 && (
+        <div className="mt-8">
+          <p className="tag text-smoke">Shop their work</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {shops.map((s) => (
+              <a
+                key={s.id}
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="tag rounded-full border border-volt/50 px-4 py-2 text-volt transition hover:border-volt hover:bg-volt/10"
+              >
+                {s.label || platformLabel(s.platform)} ↗
+              </a>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Trophy Shelf — championship hardware */}
