@@ -140,6 +140,17 @@ const answerRow = await prisma.quizAnswer.findFirst({ where: { userId: fanUser.i
 check("answer ledgered one-shot", Boolean(answerRow));
 await fan.screenshot({ path: `${SHOTS}/feed-gameloop.png`, fullPage: false });
 
+// Vote in a community poll — one vote per fan, live split revealed
+check("community poll floats in the feed", await findInFeed(fan, "[data-feed-type=poll]"));
+const pollCard = fan.locator("[data-feed-type=poll]").first();
+await pollCard.locator("[data-testid=feed-poll-option]").first().click();
+await pollCard.locator("[data-testid=feed-poll-result]").first().waitFor({ timeout: 10000 });
+check("poll vote reveals the live community split", true);
+check(
+  "poll vote stored one-per-fan",
+  (await prisma.pollVote.count({ where: { userId: fanUser.id } })) === 1
+);
+
 // The IQ panel on the profile
 await fan.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
 await fan.locator("[data-testid=culture-iq]").waitFor({ timeout: 10000 });

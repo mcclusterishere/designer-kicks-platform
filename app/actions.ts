@@ -2152,6 +2152,48 @@ export async function answerFeedQuestion(
   return { ok: true, correct, answerIndex: q.answerIndex, explanation: q.explanation, iq };
 }
 
+export type PollVoteResult =
+  | { ok: true; tallies: number[]; total: number; choice: number }
+  | { ok: false; error: string };
+
+/**
+ * Cast a vote in a feed community poll. One vote per fan (unique
+ * pollId+userId); voting reveals the live community split. There's no
+ * right answer — the responses double as taste/audience data.
+ */
+export async function voteInPoll(pollId: string, choice: number): Promise<PollVoteResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to vote." };
+  const userId = session.user.id;
+  if (!allowAttempt("pollvote", userId, 60, 60 * 1000)) {
+    return { ok: false, error: "Slow down." };
+  }
+  const poll = await prisma.poll.findUnique({ where: { id: pollId } });
+  if (!poll || !poll.active) return { ok: false, error: "Poll closed." };
+  let options: string[] = [];
+  try {
+    options = JSON.parse(poll.options);
+  } catch {}
+  if (!Number.isInteger(choice) || choice < 0 || choice >= options.length) {
+    return { ok: false, error: "Pick an option." };
+  }
+  try {
+    await prisma.pollVote.create({ data: { pollId, userId, choice } });
+  } catch {
+    // Already voted — fall through and just return the current split.
+  }
+  const [rows, mine] = await Promise.all([
+    prisma.pollVote.groupBy({ by: ["choice"], where: { pollId }, _count: { _all: true } }),
+    prisma.pollVote.findUnique({
+      where: { pollId_userId: { pollId, userId } },
+      select: { choice: true },
+    }),
+  ]);
+  const tallies = options.map((_, i) => rows.find((r) => r.choice === i)?._count._all ?? 0);
+  const total = tallies.reduce((a, b) => a + b, 0);
+  return { ok: true, tallies, total, choice: mine?.choice ?? choice };
+}
+
 export type ClearMissResult =
   | { ok: true; iq: number; credits: number }
   | { ok: false; error: string };

@@ -9,6 +9,7 @@ import {
   rateDesign,
   throwCallOut,
   toggleFeedReaction,
+  voteInPoll,
   type CallOutOption,
 } from "@/app/actions";
 import type { FeedItem } from "@/lib/feed";
@@ -469,6 +470,100 @@ function QuestionCard({
   );
 }
 
+/**
+ * A community opinion poll — get-to-know-you, no right answer. Voting
+ * reveals the live community split; the responses double as taste and
+ * audience data.
+ */
+function PollCard({
+  item,
+  signedIn,
+}: {
+  item: Extract<FeedItem, { type: "poll" }>;
+  signedIn: boolean;
+}) {
+  const [result, setResult] = useState<{ tallies: number[]; total: number; choice: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function vote(i: number) {
+    if (busy || result) return;
+    setBusy(true);
+    const res = await voteInPoll(item.id, i);
+    if (res.ok) setResult({ tallies: res.tallies, total: res.total, choice: res.choice });
+    setBusy(false);
+  }
+
+  return (
+    <article
+      className="overflow-hidden rounded-2xl border border-volt/30 bg-surface"
+      data-testid="feed-item"
+      data-feed-type="poll"
+    >
+      <div className="flex items-center justify-between px-4 pt-4">
+        <span className="tag text-volt">Community poll</span>
+        {result && (
+          <span className="tag text-smoke">
+            {result.total} {result.total === 1 ? "vote" : "votes"}
+          </span>
+        )}
+      </div>
+      <p className="px-4 py-3 font-bold text-white">{item.question}</p>
+      <div className="grid grid-cols-1 gap-1.5 px-4 pb-4">
+        {item.options.map((opt, i) => {
+          if (result) {
+            const pct = result.total > 0 ? Math.round((result.tallies[i] / result.total) * 100) : 0;
+            const mine = i === result.choice;
+            return (
+              <div
+                key={i}
+                data-testid="feed-poll-result"
+                className={`relative overflow-hidden rounded-lg border px-3 py-2.5 text-sm ${
+                  mine ? "border-volt text-white" : "border-edge text-smoke"
+                }`}
+              >
+                <div
+                  className={`absolute inset-y-0 left-0 ${mine ? "bg-volt/20" : "bg-panel"}`}
+                  style={{ width: `${pct}%` }}
+                  aria-hidden
+                />
+                <span className="relative flex justify-between gap-3">
+                  <span>{opt}{mine ? " ·  your pick" : ""}</span>
+                  <span className="tabular-nums">{pct}%</span>
+                </span>
+              </div>
+            );
+          }
+          return signedIn ? (
+            <button
+              key={i}
+              type="button"
+              onClick={() => vote(i)}
+              disabled={busy}
+              data-testid="feed-poll-option"
+              className="rounded-lg border border-edge bg-panel px-3 py-2.5 text-left text-sm text-white transition hover:border-volt disabled:opacity-60"
+            >
+              {opt}
+            </button>
+          ) : (
+            <Link
+              key={i}
+              href="/signin"
+              className="rounded-lg border border-edge bg-panel px-3 py-2.5 text-sm text-white transition hover:border-volt"
+            >
+              {opt}
+            </Link>
+          );
+        })}
+        {!signedIn && (
+          <p className="tag mt-1 text-smoke">
+            <Link href="/signin" className="text-volt underline">Sign in</Link> to vote and see how the community leans.
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
 function Card({
   item,
   signedIn,
@@ -512,6 +607,9 @@ function Card({
   }
   if (item.type === "question") {
     return <QuestionCard item={item} signedIn={signedIn} />;
+  }
+  if (item.type === "poll") {
+    return <PollCard item={item} signedIn={signedIn} />;
   }
   return (
     <Link href={`/news/${item.slug}`} className="block" data-testid="feed-item" data-feed-type="drop">

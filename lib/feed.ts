@@ -69,6 +69,13 @@ export type FeedItem =
       articleTitle: string | null;
     }
   | {
+      type: "poll";
+      id: string;
+      question: string;
+      options: string[];
+      category: string;
+    }
+  | {
       type: "drop";
       slug: string;
       name: string;
@@ -97,7 +104,7 @@ export async function getFeed(
   const now = Date.now();
   const since = new Date(now - 90 * 24 * 3_600_000);
 
-  const [posts, battles, pieces, questions, articles, follows, viewer] = await Promise.all([
+  const [posts, battles, pieces, questions, articles, follows, viewer, polls] = await Promise.all([
     prisma.feedPost.findMany({
       where: { OR: [{ pinned: true }, { createdAt: { gte: since } }] },
       orderBy: { createdAt: "desc" },
@@ -155,6 +162,15 @@ export async function getFeed(
     userId
       ? prisma.user.findUnique({ where: { id: userId }, select: { favoriteBrands: true } })
       : Promise.resolve(null),
+    prisma.poll.findMany({
+      where: {
+        active: true,
+        // Fresh polls only — one a fan hasn't weighed in on yet.
+        ...(userId ? { votes: { none: { userId } } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    }),
   ]);
 
   const followed = new Set(follows.map((f) => f.artistId));
@@ -269,6 +285,24 @@ export async function getFeed(
         options,
         articleSlug: q.article?.slug ?? null,
         articleTitle: q.article?.title ?? null,
+      },
+    });
+  }
+
+  for (const poll of polls) {
+    let options: string[] = [];
+    try {
+      options = JSON.parse(poll.options);
+    } catch {}
+    if (options.length < 2) continue;
+    scored.push({
+      score: 44 + 0.6 * recency(poll.createdAt, now),
+      item: {
+        type: "poll",
+        id: poll.id,
+        question: poll.question,
+        options,
+        category: poll.category,
       },
     });
   }

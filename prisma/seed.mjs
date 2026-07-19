@@ -1634,8 +1634,48 @@ async function main() {
     });
   }
 
+  // Community polls — get-to-know-you opinion questions that ride in the
+  // feed. Idempotent top-up: only add a poll whose question isn't present.
+  const POLLS = [
+    {
+      question: "What's your everyday silhouette?",
+      options: ["Air Force 1", "Air Jordan 1", "Dunk", "New Balance", "Something nobody else has"],
+    },
+    {
+      question: "How do you rock a fresh pair?",
+      options: ["Box-fresh, never creased", "Beat 'em in — made to wear", "Rotate a heavy roster", "Depends on the fit"],
+    },
+    {
+      question: "Where does the custom scene live hardest for you?",
+      options: ["The DMV", "NYC / Tri-state", "The West Coast", "The South", "Online only"],
+    },
+    {
+      question: "What pulls you to a custom first?",
+      options: ["The colorway", "The story behind it", "Wild technique", "Who made it"],
+    },
+    {
+      question: "Your grail right now is…",
+      options: ["A retro Jordan", "A rare collab", "A one-of-one custom", "The pair that started it for me"],
+    },
+    {
+      question: "How'd you find The Heat Chart?",
+      options: ["Designer Kicks / Facebook", "An artist put me on", "A friend", "Just stumbled in"],
+    },
+  ];
+  let pollsAdded = 0;
+  for (const p of POLLS) {
+    const exists = await prisma.poll.findFirst({ where: { question: p.question } });
+    if (!exists) {
+      await prisma.poll.create({
+        data: { question: p.question, options: JSON.stringify(p.options) },
+      });
+      pollsAdded++;
+    }
+  }
+  const totalPolls = await prisma.poll.count({ where: { active: true } });
+
   console.log(
-    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles, ${questions.length} quiz questions.`
+    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles, ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
   );
 }
 

@@ -469,6 +469,7 @@ model User {
   designRatings DesignRating[]
   feedReactions FeedReaction[]
   feedComments  FeedComment[]
+  pollVotes     PollVote[]
 }
 
 // A buyer's standing offer on a piece — the demand side of the price
@@ -654,6 +655,35 @@ model GiveawayEntry {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   source     String   @default("quiz") // quiz | manual
   createdAt  DateTime @default(now())
+}
+
+// Community opinion polls that ride in the feed — get-to-know-you
+// questions (favorite silhouette, how you rock your kicks, your grail)
+// with no right answer. One vote per fan reveals the live community
+// split, and the responses double as audience/taste data.
+model Poll {
+  id        String     @id @default(cuid())
+  question  String
+  options   String // JSON array of choice strings
+  category  String     @default("culture")
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  votes     PollVote[]
+
+  @@index([active, createdAt])
+}
+
+model PollVote {
+  id        String   @id @default(cuid())
+  pollId    String
+  poll      Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  choice    Int
+  createdAt DateTime @default(now())
+
+  @@unique([pollId, userId]) // one vote per fan per poll
+  @@index([pollId])
 }
 
 model Article {
