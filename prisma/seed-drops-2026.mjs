@@ -11,7 +11,7 @@ const ADIDAS = "https://www.adidas.com/us/release-dates";
 const COVERS = ["/seed/news-1.svg", "/seed/news-2.svg", "/seed/news-3.svg", "/seed/news-4.svg", "/seed/news-5.svg"];
 
 let n = 0;
-function d({ slug, name, date, dateLabel, price, sku, colorway, where, raffleUrl, excerpt, story, q, options, answer, explain, tags, rumored }) {
+function d({ slug, name, date, dateLabel, price, sku, colorway, where, raffleUrl, excerpt, story, deep, q, options, answer, explain, tags, rumored }) {
   n++;
   return {
     slug,
@@ -37,6 +37,7 @@ function d({ slug, name, date, dateLabel, price, sku, colorway, where, raffleUrl
       "## The story",
       "",
       ...story.flatMap((p) => [p, ""]),
+      ...(deep && deep.length ? ["## The deep cuts", "", ...deep.map((f) => `- ${f}`), ""] : []),
       "## How to cop",
       "",
       "1. **Launch draw** — enter the minute it opens; the raffle button above takes you there.",
