@@ -55,6 +55,17 @@ export type FeedItem =
       brand: string | null;
       votes: number;
       heat: { score: number; count: number } | null;
+      // The viewer's own Rate-game score on this piece (null = hasn't
+      // rated — the feed card shows the flames to vote right there).
+      myStars: number | null;
+    }
+  | {
+      type: "question";
+      id: string;
+      question: string;
+      options: string[];
+      articleSlug: string | null;
+      articleTitle: string | null;
     }
   | {
       type: "drop";
@@ -85,7 +96,7 @@ export async function getFeed(
   const now = Date.now();
   const since = new Date(now - 90 * 24 * 3_600_000);
 
-  const [posts, battles, pieces, articles, follows, viewer] = await Promise.all([
+  const [posts, battles, pieces, questions, articles, follows, viewer] = await Promise.all([
     prisma.feedPost.findMany({
       where: { OR: [{ pinned: true }, { createdAt: { gte: since } }] },
       orderBy: { createdAt: "desc" },
@@ -115,10 +126,19 @@ export async function getFeed(
       orderBy: { createdAt: "desc" },
       include: {
         artist: { select: { slug: true, displayName: true } },
-        ratings: { select: { stars: true } },
+        ratings: { select: { stars: true, userId: true } },
         _count: { select: { votes: true } },
       },
       take: 60,
+    }),
+    prisma.quizQuestion.findMany({
+      where: {
+        active: true,
+        ...(userId ? { answers: { none: { userId } } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      include: { article: { select: { slug: true, title: true } } },
+      take: 12,
     }),
     prisma.article.findMany({
       where: {
@@ -201,9 +221,15 @@ export async function getFeed(
   for (const s of pieces) {
     const hs = heatScore(s.ratings.map((r) => r.stars));
     const brand = pieceTaxonomy(s).brand ?? null;
+    const myStars = userId
+      ? (s.ratings.find((r) => r.userId === userId)?.stars ?? null)
+      : null;
     let personal = 0;
     if (s.artistId && followed.has(s.artistId)) personal += 12;
     if (brand && favBrands.has(brand.toLowerCase())) personal += 10;
+    // Unrated pieces surface first for this viewer — the feed IS the
+    // Rate game now, so it deals you what you haven't scored.
+    if (userId && myStars === null) personal += 8;
     scored.push({
       score:
         30 +
@@ -221,6 +247,26 @@ export async function getFeed(
         brand,
         votes: s._count.votes,
         heat: hs ? { score: hs.score, count: hs.count } : null,
+        myStars,
+      },
+    });
+  }
+
+  for (const q of questions) {
+    let options: string[] = [];
+    try {
+      options = JSON.parse(q.options);
+    } catch {}
+    if (options.length !== 4) continue;
+    scored.push({
+      score: 42 + 0.6 * recency(q.createdAt, now),
+      item: {
+        type: "question",
+        id: q.id,
+        question: q.question,
+        options,
+        articleSlug: q.article?.slug ?? null,
+        articleTitle: q.article?.title ?? null,
       },
     });
   }

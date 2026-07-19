@@ -10,6 +10,8 @@ import { categoryLabel } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
+import IQPanel from "@/components/IQPanel";
+import { cultureIQ } from "@/lib/iq";
 import { respondOffer, withdrawOffer } from "@/app/actions";
 
 export const metadata = { title: "Your Profile — The Heat Chart" };
@@ -74,6 +76,17 @@ export default async function ProfilePage() {
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
   const badges = computeBadges({ wins: wonRuns, answered, correct });
+
+  // Culture IQ + the misses that can be cleared with credits.
+  const [iqData, missRows, creditUser] = await Promise.all([
+    cultureIQ(user.id),
+    prisma.quizAnswer.findMany({
+      where: { userId: user.id, correct: false, cleared: false },
+      orderBy: { createdAt: "desc" },
+      include: { question: { select: { question: true } } },
+    }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { credits: true } }),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -156,6 +169,17 @@ export default async function ProfilePage() {
             .
           </p>
         )}
+      </div>
+
+      {/* Culture IQ — the score that follows you */}
+      <div id="iq" className="mt-10 scroll-mt-24">
+        <h2 className="display text-2xl text-white">Culture IQ</h2>
+        <IQPanel
+          iq={iqData.iq}
+          correct={iqData.correct}
+          misses={missRows.map((m) => ({ id: m.id, question: m.question.question }))}
+          credits={creditUser?.credits ?? 0}
+        />
       </div>
 
       {/* Taste profile — what this fan's votes, ratings, and closet say */}

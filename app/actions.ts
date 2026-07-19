@@ -23,6 +23,7 @@ import {
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
+import { cultureIQ } from "@/lib/iq";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt, randomBytes } from "crypto";
@@ -1434,6 +1435,7 @@ export async function saveArticle(
     status: publish ? "PUBLISHED" : "DRAFT",
   };
 
+  let articleId = id;
   if (id) {
     const existing = await prisma.article.findUnique({ where: { id } });
     if (!existing) return { ok: false, error: "Article not found." };
@@ -1446,9 +1448,37 @@ export async function saveArticle(
       },
     });
   } else {
-    await prisma.article.create({
+    const created = await prisma.article.create({
       data: { ...data, publishedAt: publish ? new Date() : null },
     });
+    articleId = created.id;
+  }
+
+  // The culture question that rides with the story: floats in the feed,
+  // joins the infinite pool, and links readers back here to study up.
+  const cqText = String(formData.get("cqQuestion") ?? "").trim();
+  const cqOptions = [0, 1, 2, 3].map((i) => String(formData.get(`cqOption${i}`) ?? "").trim());
+  const cqAnswer = Number(formData.get("cqAnswer"));
+  if (cqText) {
+    if (cqOptions.some((o) => !o)) {
+      return { ok: false, error: "Culture question needs all four answer options." };
+    }
+    if (!Number.isInteger(cqAnswer) || cqAnswer < 0 || cqAnswer > 3) {
+      return { ok: false, error: "Mark which culture-question option is correct." };
+    }
+    const cqExplanation = String(formData.get("cqExplanation") ?? "").trim() || null;
+    const existingQ = await prisma.quizQuestion.findFirst({ where: { articleId } });
+    const qData = {
+      question: cqText,
+      options: JSON.stringify(cqOptions),
+      answerIndex: cqAnswer,
+      category: "culture",
+      explanation: cqExplanation,
+      articleId,
+      active: true,
+    };
+    if (existingQ) await prisma.quizQuestion.update({ where: { id: existingQ.id }, data: qData });
+    else await prisma.quizQuestion.create({ data: qData });
   }
 
   revalidatePath("/news");
@@ -1937,49 +1967,9 @@ export async function deleteFeedPost(id: string) {
   revalidatePath("/admin");
 }
 
-/** An approved artist posts to The Feed from their Studio. */
-export async function artistFeedPost(
-  _prev: ActionResult | null,
-  formData: FormData
-): Promise<ActionResult> {
-  const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
-  const profile = await prisma.artistProfile.findUnique({
-    where: { userId: session.user.id },
-  });
-  if (!profile || profile.status !== "APPROVED") {
-    return { ok: false, error: "Only approved artists can post to The Feed." };
-  }
-  if (!allowAttempt("feedpost", session.user.id, 10, 60 * 60 * 1000)) {
-    return { ok: false, error: "Easy — 10 posts an hour max." };
-  }
-
-  const body = String(formData.get("body") ?? "").trim();
-  if (!body || body.length > 2200) return { ok: false, error: "Say something (2,200 characters max)." };
-  const linkUrl = String(formData.get("linkUrl") ?? "").trim() || null;
-  if (linkUrl && !/^(https?:\/\/|\/)/.test(linkUrl)) {
-    return { ok: false, error: "Link must be a full URL or a /path on the site." };
-  }
-
-  let imageUrl: string | null = null;
-  const photo = formData.get("photo");
-  if (photo instanceof File && photo.size > 0) {
-    if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[photo.type];
-    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
-    imageUrl = await saveUpload(
-      Buffer.from(await photo.arrayBuffer()),
-      `${randomUUID()}.${ext}`,
-      photo.type
-    );
-  }
-
-  await prisma.feedPost.create({
-    data: { body, imageUrl, linkUrl, artistId: profile.id },
-  });
-  revalidatePath("/");
-  return { ok: true };
-}
+// (Artist status posting was cut by design: the feed is kicks only —
+// inventory, battles, drops, culture questions, and house broadcasts.
+// Artists compete through Call Outs, not captions.)
 
 /** Fan taps the flame on a feed post — one per fan, tap again to take it back. */
 export async function toggleFeedReaction(
@@ -2029,4 +2019,174 @@ export async function addFeedComment(
     ok: true,
     comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body },
   };
+}
+
+// ---------- Culture IQ: feed questions + the credit repair shop ----------
+
+export type FeedAnswerResult =
+  | { ok: true; correct: boolean; answerIndex: number; explanation: string | null; iq: number }
+  | { ok: false; error: string };
+
+/** Answer a culture question straight from the feed. One shot, forever. */
+export async function answerFeedQuestion(
+  questionId: string,
+  choice: number
+): Promise<FeedAnswerResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to play." };
+  const userId = session.user.id;
+  if (!allowAttempt("feedquiz", userId, 60, 60 * 1000)) {
+    return { ok: false, error: "Slow down." };
+  }
+  const q = await prisma.quizQuestion.findUnique({ where: { id: questionId } });
+  if (!q || !q.active) return { ok: false, error: "Question retired." };
+  if (!Number.isInteger(choice) || choice < 0 || choice > 3) {
+    return { ok: false, error: "Pick an answer." };
+  }
+  const correct = choice === q.answerIndex;
+  try {
+    await prisma.quizAnswer.create({
+      data: { userId, questionId, correct, source: "feed" },
+    });
+  } catch {
+    return { ok: false, error: "You already took this one — no do-overs." };
+  }
+  const { iq } = await cultureIQ(userId);
+  return { ok: true, correct, answerIndex: q.answerIndex, explanation: q.explanation, iq };
+}
+
+export type ClearMissResult =
+  | { ok: true; iq: number; credits: number }
+  | { ok: false; error: string };
+
+/** 1 credit clears 1 miss. The question is burned — never asked again. */
+export async function clearQuizMiss(answerId: string): Promise<ClearMissResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const userId = session.user.id;
+  const miss = await prisma.quizAnswer.findUnique({ where: { id: answerId } });
+  if (!miss || miss.userId !== userId) return { ok: false, error: "Miss not found." };
+  if (miss.correct || miss.cleared) return { ok: false, error: "Nothing to clear there." };
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } });
+  if ((user?.credits ?? 0) < 1) {
+    return { ok: false, error: "You need a credit — grab them on the Heat Check page." };
+  }
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { credits: { decrement: 1 } } }),
+    prisma.creditTransaction.create({
+      data: { userId, delta: -1, reason: "iq-clear" },
+    }),
+    prisma.quizAnswer.update({ where: { id: answerId }, data: { cleared: true } }),
+  ]);
+  const { iq } = await cultureIQ(userId);
+  const fresh = await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } });
+  return { ok: true, iq, credits: fresh?.credits ?? 0 };
+}
+
+// ---------- Call Out: artist challenges from the feed ----------
+
+export type CallOutOption = { id: string; title: string; heat: number | null };
+export type CallOutOptionsResult =
+  | { ok: true; options: CallOutOption[] }
+  | { ok: false; error: string };
+
+/**
+ * The challenger's rack: their approved pieces sorted by how close
+ * each one's Heat Score sits to the target piece — matched heat makes
+ * a fair fight.
+ */
+export async function getCallOutOptions(
+  targetSubmissionId: string
+): Promise<CallOutOptionsResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Only approved artists can call someone out." };
+  }
+  const [target, mine] = await Promise.all([
+    prisma.submission.findUnique({
+      where: { id: targetSubmissionId },
+      include: { ratings: { select: { stars: true } } },
+    }),
+    prisma.submission.findMany({
+      where: { artistId: profile.id, status: "APPROVED" },
+      include: { ratings: { select: { stars: true } } },
+    }),
+  ]);
+  if (!target || target.status !== "APPROVED") return { ok: false, error: "Piece not found." };
+  if (target.artistId === profile.id) {
+    return { ok: false, error: "That's your own piece." };
+  }
+  const targetHeat = heatScore(target.ratings.map((r) => r.stars))?.score ?? 3.5;
+  const options = mine
+    .map((s) => ({
+      id: s.id,
+      title: s.title,
+      heat: heatScore(s.ratings.map((r) => r.stars))?.score ?? null,
+    }))
+    .sort(
+      (a, b) =>
+        Math.abs((a.heat ?? 3.5) - targetHeat) - Math.abs((b.heat ?? 3.5) - targetHeat)
+    )
+    .slice(0, 8);
+  if (options.length === 0) {
+    return { ok: false, error: "You need an approved piece in your closet first." };
+  }
+  return { ok: true, options };
+}
+
+export type CallOutResult =
+  | { ok: true; battleId: string }
+  | { ok: false; error: string };
+
+/** Throw the challenge: target vs your pick, live vote battle, 3 days. */
+export async function throwCallOut(
+  targetSubmissionId: string,
+  mySubmissionId: string
+): Promise<CallOutResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Only approved artists can call someone out." };
+  }
+  if (!allowAttempt("callout", session.user.id, 3, 24 * 60 * 60 * 1000)) {
+    return { ok: false, error: "Three call-outs a day keeps it sporting." };
+  }
+  const [target, mine] = await Promise.all([
+    prisma.submission.findUnique({ where: { id: targetSubmissionId } }),
+    prisma.submission.findUnique({ where: { id: mySubmissionId } }),
+  ]);
+  if (!target || target.status !== "APPROVED") return { ok: false, error: "Target piece not found." };
+  if (!mine || mine.status !== "APPROVED" || mine.artistId !== profile.id) {
+    return { ok: false, error: "Pick one of your own approved pieces." };
+  }
+  if (target.artistId === profile.id) return { ok: false, error: "Can't battle yourself." };
+  const existing = await prisma.battle.findFirst({
+    where: {
+      status: "ACTIVE",
+      OR: [
+        { subAId: target.id, subBId: mine.id },
+        { subAId: mine.id, subBId: target.id },
+      ],
+    },
+  });
+  if (existing) return { ok: false, error: "These two are already battling — go vote." };
+
+  const battle = await prisma.battle.create({
+    data: {
+      title: "Called Out",
+      subAId: target.id,
+      subBId: mine.id,
+      endsAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    },
+  });
+  revalidatePath("/");
+  revalidatePath("/battles");
+  return { ok: true, battleId: battle.id };
 }

@@ -88,6 +88,27 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
             placeholder="https://www.nike.com/launch" className={inputClass} />
         </div>
       </div>
+      {/* The culture question that rides with this story into the feed */}
+      <div className="rounded-lg border border-volt/30 bg-surface p-3">
+        <p className="tag text-volt">Culture question (optional — floats in The Feed, feeds Culture IQ)</p>
+        <input name="cqQuestion" maxLength={200} placeholder='e.g. "What year did the AJ1 first release?"'
+          className={inputClass} />
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <input key={i} name={`cqOption${i}`} maxLength={80}
+              placeholder={`Option ${["A", "B", "C", "D"][i]}`} className={inputClass} />
+          ))}
+        </div>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <select name="cqAnswer" defaultValue="0" className={inputClass} aria-label="Correct option">
+            {[0, 1, 2, 3].map((i) => (
+              <option key={i} value={i}>Correct: {["A", "B", "C", "D"][i]}</option>
+            ))}
+          </select>
+          <input name="cqExplanation" maxLength={200} placeholder="One-line explanation (shown after answering)"
+            className={inputClass} />
+        </div>
+      </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="publish" defaultChecked={defaults?.status === "PUBLISHED"}
           className="h-4 w-4 accent-[#d9b96a]" />

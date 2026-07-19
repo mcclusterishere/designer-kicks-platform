@@ -7,7 +7,6 @@ import { getHeatList } from "@/lib/battles";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
-import StudioPostForm from "./StudioPostForm";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -22,23 +21,10 @@ export default async function StudioPage() {
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat, myPosts] = await Promise.all([
-    getStudioData(profile.id),
-    getHeatList(),
-    prisma.feedPost.findMany({
-      where: { artistId: profile.id },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: { _count: { select: { reactions: true, comments: true } } },
-    }),
-  ]);
+  const [data, heat] = await Promise.all([getStudioData(profile.id), getHeatList()]);
   if (!data) redirect("/submit");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const { artist, stats, votesSeries, followsLast14, soldSales } = data;
-  const postAgo = (d: Date) => {
-    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-    return days === 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`;
-  };
 
   const bestRank = Math.min(
     ...artist.submissions.map((s) => heatRank.get(s.id) ?? Infinity)
@@ -91,26 +77,6 @@ export default async function StudioPage() {
             <p className="tag mt-1 text-smoke">{t.label}</p>
           </div>
         ))}
-      </div>
-
-      {/* The mic: post into The Feed on the home page */}
-      <div className="mt-8 rounded-xl border border-volt/40 bg-panel p-5">
-        <h2 className="display text-lg text-white">Your Mic</h2>
-        <p className="mt-1 text-sm text-smoke">
-          Posts land in The Feed on the home page — every fan scrolling
-          sees your work. Fans who follow you see it ranked higher.
-        </p>
-        <div className="mt-4">
-          <StudioPostForm
-            recent={myPosts.map((p) => ({
-              id: p.id,
-              body: p.body,
-              ago: postAgo(p.createdAt),
-              reactions: p._count.reactions,
-              comments: p._count.comments,
-            }))}
-          />
-        </div>
       </div>
 
       {/* Momentum */}
