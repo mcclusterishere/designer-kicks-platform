@@ -72,7 +72,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
   );
 }
 
-type OutfitOption = { id: string; name: string; kind: string; itemCount: number };
+type OutfitOption = { id: string; name: string; kind: string; itemCount: number; heat: number };
 
 export function OutfitBattleForm({ outfits }: { outfits: OutfitOption[] }) {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -89,7 +89,7 @@ export function OutfitBattleForm({ outfits }: { outfits: OutfitOption[] }) {
               <option value="" disabled>Pick a fit</option>
               {outfits.map((o) => (
                 <option key={o.id} value={o.id}>
-                  [{o.kind === "HOUSE" ? "House" : "Fan"}] {o.name} ({o.itemCount} pieces)
+                  [{o.kind === "HOUSE" ? "House" : "Fan"}] {o.name} ({o.itemCount} pieces · {o.heat.toFixed(1)}🔥)
                 </option>
               ))}
             </select>

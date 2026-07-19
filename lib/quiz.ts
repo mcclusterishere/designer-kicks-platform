@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { iqFromCounts } from "./iq";
 
 // Game economy — tune these to taste.
 export const FREE_STRIKES_PER_DAY = 3; // free wrong answers per day
@@ -63,6 +64,7 @@ export type QuizBadge = { key: string; label: string; emoji: string; description
 export type LeaderboardEntry = {
   userId: string;
   name: string;
+  iq: number; // Culture IQ — the ranking stat
   wins: number;
   answered: number;
   correct: number;
@@ -82,39 +84,65 @@ export function computeBadges(stats: { wins: number; answered: number; correct: 
 }
 
 /**
- * All-time Heat Check leaderboard: ranked by checks passed, then
- * accuracy. Includes both free and paid runs — this is the prestige
- * layer where purchased strikes DO count (unlike giveaway entries).
+ * The Culture IQ leaderboard: one score, every question on the site.
+ * Feed quiz cards and Heat Check runs write into the same QuizAnswer
+ * ledger, so the ranking stat is Culture IQ (100 + 2 per correct − 3
+ * per uncleared miss). Checks passed and accuracy stay as the
+ * tiebreakers and the flex line. Paid runs count here — this is for
+ * bragging rights, not giveaway odds.
  */
 export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]> {
-  const rows = await prisma.quizRun.groupBy({
-    by: ["userId"],
-    _sum: { correctCount: true, wrongCount: true },
-    _count: { _all: true },
-  });
-  const wonRows = await prisma.quizRun.groupBy({
-    by: ["userId"],
-    where: { status: "WON" },
-    _count: { _all: true },
-  });
+  const [correctRows, missRows, runRows, wonRows] = await Promise.all([
+    prisma.quizAnswer.groupBy({
+      by: ["userId"],
+      where: { correct: true },
+      _count: { _all: true },
+    }),
+    prisma.quizAnswer.groupBy({
+      by: ["userId"],
+      where: { correct: false, cleared: false },
+      _count: { _all: true },
+    }),
+    prisma.quizRun.groupBy({
+      by: ["userId"],
+      _sum: { correctCount: true, wrongCount: true },
+    }),
+    prisma.quizRun.groupBy({
+      by: ["userId"],
+      where: { status: "WON" },
+      _count: { _all: true },
+    }),
+  ]);
+  const correctByUser = new Map(correctRows.map((r) => [r.userId, r._count._all]));
+  const missByUser = new Map(missRows.map((r) => [r.userId, r._count._all]));
   const winsByUser = new Map(wonRows.map((r) => [r.userId, r._count._all]));
+  const runByUser = new Map(runRows.map((r) => [r.userId, r._sum]));
 
+  const userIds = [
+    ...new Set([...correctByUser.keys(), ...missByUser.keys(), ...runByUser.keys()]),
+  ];
   const users = await prisma.user.findMany({
-    where: { id: { in: rows.map((r) => r.userId) } },
+    where: { id: { in: userIds } },
     select: { id: true, name: true },
   });
   const nameByUser = new Map(users.map((u) => [u.id, u.name ?? "Sneakerhead"]));
 
-  return rows
-    .map((r) => {
-      const correct = r._sum.correctCount ?? 0;
-      const wrong = r._sum.wrongCount ?? 0;
-      const answered = correct + wrong;
-      const wins = winsByUser.get(r.userId) ?? 0;
+  return userIds
+    .map((userId) => {
+      const ledgerCorrect = correctByUser.get(userId) ?? 0;
+      const ledgerMisses = missByUser.get(userId) ?? 0;
+      const runs = runByUser.get(userId);
+      // Display stats blend both surfaces; answered prefers the ledger
+      // (feed + game) and falls back to legacy run totals.
+      const runAnswered = (runs?.correctCount ?? 0) + (runs?.wrongCount ?? 0);
+      const answered = Math.max(ledgerCorrect + ledgerMisses, runAnswered);
+      const correct = Math.max(ledgerCorrect, runs?.correctCount ?? 0);
+      const wins = winsByUser.get(userId) ?? 0;
       const stats = { wins, answered, correct };
       return {
-        userId: r.userId,
-        name: nameByUser.get(r.userId) ?? "Sneakerhead",
+        userId,
+        name: nameByUser.get(userId) ?? "Sneakerhead",
+        iq: iqFromCounts(ledgerCorrect, ledgerMisses),
         wins,
         answered,
         correct,
@@ -123,7 +151,7 @@ export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]
       };
     })
     .filter((e) => e.answered > 0)
-    .sort((a, b) => b.wins - a.wins || b.accuracy - a.accuracy || b.answered - a.answered)
+    .sort((a, b) => b.iq - a.iq || b.wins - a.wins || b.answered - a.answered)
     .slice(0, limit);
 }
 

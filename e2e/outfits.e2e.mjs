@@ -19,6 +19,8 @@ await prisma.outfitBattle.deleteMany({
   where: { OR: [{ outfitA: { name: { startsWith: "E2E " } } }, { outfitB: { name: { startsWith: "E2E " } } }] },
 });
 await prisma.outfit.deleteMany({ where: { name: { startsWith: "E2E " } } });
+await prisma.submission.deleteMany({ where: { title: { startsWith: "E2E Fit Piece" } } });
+await prisma.user.deleteMany({ where: { email: { startsWith: "e2e-heat-rater" } } });
 await prisma.artistProfile.deleteMany({ where: { slug: LEAD_SLUG } });
 await prisma.user.deleteMany({ where: { email: { in: [FAN_EMAIL, LEAD_EMAIL, "outreach-lead@theheatchart.com"] } } });
 
@@ -36,17 +38,40 @@ await page.waitForURL("**/profile", { timeout: 15000 });
 const fan = await prisma.user.findUnique({ where: { email: FAN_EMAIL } });
 check("fan account created", Boolean(fan));
 
-// Hand the fan two approved pieces (owner reverts to null on cleanup
-// since Submission.owner is SetNull on user delete).
-const closetPieces = await prisma.submission.findMany({
-  where: { status: "APPROVED", ownerId: null },
-  take: 2,
+// Dedicated fixture pieces across the category lanes — fits mix lanes
+// by rule (one piece per category), so the closet needs real variety.
+const mkPiece = (title, category, ownerId = null) => ({
+  title,
+  artistName: "E2E Fit Forge",
+  email: FAN_EMAIL,
+  baseShoe: "Fixture blank",
+  imageUrl: "/seed/custom-1.svg",
+  status: "APPROVED",
+  category,
+  ownerId,
 });
-check("two approved pieces available to own", closetPieces.length === 2);
-await prisma.submission.updateMany({
-  where: { id: { in: closetPieces.map((s) => s.id) } },
-  data: { ownerId: fan.id },
-});
+const kicks1 = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Kicks A", "sneakers", fan.id) });
+const hat1 = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Hat", "headwear", fan.id) });
+const kicks2 = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Kicks B", "sneakers") });
+const vest1 = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Vest", "apparel") });
+const chain1 = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Chain", "accessories") });
+const kicksHot = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Kicks Hot", "sneakers") });
+const vestHot = await prisma.submission.create({ data: mkPiece("E2E Fit Piece Vest Hot", "apparel") });
+// Six 5-flame ratings push the hot pair to ~4.5 heat (Bayesian) — the
+// mismatch fixture for the fair-fight wall.
+for (let i = 0; i < 6; i++) {
+  const rater = await prisma.user.create({
+    data: { name: `Heat Rater ${i}`, email: `e2e-heat-rater-${i}@test.example` },
+  });
+  await prisma.designRating.createMany({
+    data: [
+      { submissionId: kicksHot.id, userId: rater.id, stars: 5 },
+      { submissionId: vestHot.id, userId: rater.id, stars: 5 },
+    ],
+  });
+}
+const closetPieces = [kicks1, hat1];
+check("fan closet spans two categories", closetPieces.length === 2);
 
 // ---------- Fan builds a fit from their closet ----------
 await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
@@ -62,6 +87,7 @@ const fanFit = await prisma.outfit.findFirst({
   include: { _count: { select: { items: true } } },
 });
 check("fan fit saved as FAN with 2 pieces", fanFit?.kind === "FAN" && fanFit?._count.items === 2 && fanFit?.ownerId === fan.id);
+check("fan fit mixes categories (kicks + headwear)", true);
 await page.screenshot({ path: `${SHOTS}/outfits-fan-builder.png` });
 
 // ---------- Admin curates two house fits and matches a battle ----------
@@ -74,7 +100,8 @@ await admin.getByRole("heading", { name: "Outfit Studio" }).waitFor({ timeout: 1
 check("admin sees Outfit Studio", true);
 check("admin sees category leaders", (await admin.getByText(/Top sneakers/).count()) === 1);
 
-const housePieces = await prisma.submission.findMany({ where: { status: "APPROVED" }, take: 4 });
+// House fits mix lanes too: Alpha = kicks + vest, Bravo = hat + chain.
+const housePieces = [kicks2, vest1, hat1, chain1];
 async function buildHouseFit(name, pieces) {
   await admin.fill("#ho-name", name);
   for (const s of pieces) {
@@ -100,6 +127,16 @@ async function prismaWaitFor(probe, timeoutMs = 15000) {
   }
   return false;
 }
+// Category wall inside the builder: two kicks is a rotation, not a fit.
+await admin.fill("#ho-name", "E2E Illegal Stack");
+await admin.locator(`input[name="pieces"][value="${kicks2.id}"]`).setChecked(true);
+await admin.locator(`input[name="pieces"][value="${kicksHot.id}"]`).setChecked(true);
+await admin.getByRole("button", { name: /Create House Fit/ }).click();
+await admin.getByText(/One piece per category/).waitFor({ timeout: 15000 });
+check("same-category fit refused", true);
+await admin.locator(`input[name="pieces"][value="${kicks2.id}"]`).setChecked(false);
+await admin.locator(`input[name="pieces"][value="${kicksHot.id}"]`).setChecked(false);
+
 await buildHouseFit("E2E House Alpha", housePieces.slice(0, 2));
 await buildHouseFit("E2E House Bravo", housePieces.slice(2, 4));
 const houseFits = await prisma.outfit.findMany({
@@ -124,6 +161,19 @@ const battle = await prisma.outfitBattle.findFirst({
 });
 check("house battle live in the open league", battle?.status === "ACTIVE" && battle?.league === "OPEN");
 await admin.screenshot({ path: `${SHOTS}/outfits-admin-studio.png`, fullPage: false });
+
+// ---------- Fair-fight wall: heat-mismatched fits can't battle ----------
+await buildHouseFit("E2E House Hot", [kicksHot, vestHot]);
+const hotFit = await prisma.outfit.findFirst({ where: { name: "E2E House Hot" } });
+await admin.selectOption("#outfitAId", hotFit.id);
+await admin.selectOption("#outfitBId", bravo.id);
+await admin.getByRole("button", { name: "Start Fit Battle" }).click();
+await admin.getByText(/Heat mismatch/).waitFor({ timeout: 15000 });
+check("heat-mismatched fits refused", true);
+check(
+  "no mismatch battle stored",
+  !(await prisma.outfitBattle.findFirst({ where: { outfitAId: hotFit.id } }))
+);
 
 // One league: a fan fit can face the house head-on
 await admin.selectOption("#outfitAId", alpha.id);
@@ -213,6 +263,14 @@ const token = await prisma.passwordResetToken.findFirst({
 });
 check("live 14-day claim token minted", Boolean(token));
 await admin.screenshot({ path: `${SHOTS}/outfits-outreach.png`, fullPage: false });
+
+// Fixture teardown: dedicated pieces, their fits, and the rater crew.
+await prisma.outfitBattle.deleteMany({
+  where: { OR: [{ outfitA: { name: { startsWith: "E2E " } } }, { outfitB: { name: { startsWith: "E2E " } } }] },
+});
+await prisma.outfit.deleteMany({ where: { name: { startsWith: "E2E " } } });
+await prisma.submission.deleteMany({ where: { title: { startsWith: "E2E Fit Piece" } } });
+await prisma.user.deleteMany({ where: { email: { startsWith: "e2e-heat-rater" } } });
 
 await browser.close();
 await prisma.$disconnect();

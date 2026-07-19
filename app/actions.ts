@@ -593,15 +593,26 @@ async function buildOutfit(
 ): Promise<ActionResult> {
   if (!name || name.length > 60) return { ok: false, error: "Give the fit a name (max 60 characters)." };
   const unique = [...new Set(submissionIds)];
-  if (unique.length < 2 || unique.length > 5) {
-    return { ok: false, error: "A fit is 2 to 5 pieces." };
+  if (unique.length < 2 || unique.length > 4) {
+    return { ok: false, error: "A fit is 2 to 4 pieces — one per category." };
   }
   const pieces = await prisma.submission.findMany({
     where: { id: { in: unique }, status: "APPROVED" },
   });
   if (pieces.length !== unique.length) return { ok: false, error: "One of those pieces isn't available." };
+  // Outfits are the ONLY place categories mix — and mixing is the
+  // point. One piece per lane: kicks + apparel + headwear + accessories.
+  // Two kicks is a rotation, not a fit.
+  const fitLanes = pieces.map((p) => p.category);
+  if (new Set(fitLanes).size !== fitLanes.length) {
+    const dupe = fitLanes.find((c, i) => fitLanes.indexOf(c) !== i);
+    return {
+      ok: false,
+      error: `One piece per category — this fit has two ${categoryLabel(dupe ?? "")} pieces. Mix lanes: kicks, apparel, headwear, accessories.`,
+    };
+  }
   if (kind === "FAN" && pieces.some((p) => p.ownerId !== ownerId)) {
-    return { ok: false, error: "Fan fits are built only from pieces you own." };
+    return { ok: false, error: "Fan fits are built only from pieces you own — cop them first." };
   }
 
   await prisma.outfit.create({
@@ -660,11 +671,32 @@ export async function createOutfitBattleAction(
   if (!Number.isFinite(days) || days < 1 || days > 14) {
     return { ok: false, error: "Battles run 1–14 days." };
   }
+  const withHeat = {
+    include: { items: { include: { submission: { include: { ratings: { select: { stars: true } } } } } } },
+  } as const;
   const [a, b] = await Promise.all([
-    prisma.outfit.findUnique({ where: { id: outfitAId } }),
-    prisma.outfit.findUnique({ where: { id: outfitBId } }),
+    prisma.outfit.findUnique({ where: { id: outfitAId }, ...withHeat }),
+    prisma.outfit.findUnique({ where: { id: outfitBId }, ...withHeat }),
   ]);
   if (!a || !b) return { ok: false, error: "Fit not found." };
+
+  // Fair fights only: a fit's overall heat is the average of its
+  // pieces' Heat Scores, and battles only pair fits within 0.75 of a
+  // flame. A 4.5-flame curator fit never farms a 2-flame starter fit.
+  const outfitHeat = (o: typeof a) => {
+    const scores = o.items.map(
+      (i) => heatScore(i.submission.ratings.map((r) => r.stars))?.score ?? 3.5
+    );
+    return scores.length ? scores.reduce((s, x) => s + x, 0) / scores.length : 3.5;
+  };
+  const heatA = outfitHeat(a);
+  const heatB = outfitHeat(b);
+  if (Math.abs(heatA - heatB) > 0.75) {
+    return {
+      ok: false,
+      error: `Heat mismatch: "${a.name}" runs ${heatA.toFixed(1)} flames and "${b.name}" runs ${heatB.toFixed(1)} — fits only battle within 0.75 of a flame.`,
+    };
+  }
 
   // One open league: house fits and fan fits share the same arena —
   // a fan look beating a house look IS the content.

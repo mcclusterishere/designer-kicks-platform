@@ -129,11 +129,13 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
   return (
     <section className="mt-10">
       <h2 className="display text-2xl text-white">
-        Heat Check <span className="text-volt">Leaderboard</span>
+        Culture IQ <span className="text-volt">Leaderboard</span>
       </h2>
       <p className="mt-1 text-sm text-smoke">
-        All-time checks passed, then accuracy. Paid runs count here — this
-        is for bragging rights, not giveaway odds.
+        One score, every question on the site — feed quizzes and Heat
+        Checks write the same ledger. +2 a correct, −3 an uncleared miss,
+        everyone starts at 100. Paid runs count here — this is for
+        bragging rights, not giveaway odds.
       </p>
       <ol className="mt-4 space-y-2">
         {entries.map((e, i) => (
@@ -154,12 +156,12 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
                 ))}
               </p>
               <p className="tag text-smoke">
-                {e.answered} answered · {e.accuracy}% accuracy
+                {e.answered} answered · {e.accuracy}% accuracy · {e.wins} checks passed
               </p>
             </div>
             <p className="display shrink-0 text-xl text-white">
-              {e.wins}
-              <span className="tag ml-1 text-smoke">passed</span>
+              {e.iq}
+              <span className="tag ml-1 text-smoke">IQ</span>
             </p>
           </li>
         ))}

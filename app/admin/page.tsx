@@ -17,7 +17,7 @@ import {
   setSaleVerified,
 } from "@/app/actions";
 import { formatUsd } from "@/lib/market";
-import { getSiteAnalytics } from "@/lib/analytics";
+import { getSiteAnalytics, heatScore } from "@/lib/analytics";
 import { getTrafficPulse } from "@/lib/traffic";
 import MiniBars from "@/components/MiniBars";
 import LoginForm from "./LoginForm";
@@ -150,6 +150,9 @@ export default async function AdminPage({
       include: {
         _count: { select: { items: true } },
         owner: { select: { name: true } },
+        items: {
+          include: { submission: { select: { ratings: { select: { stars: true } } } } },
+        },
       },
     }),
     prisma.outfitBattle.findMany({
@@ -951,12 +954,21 @@ export default async function AdminPage({
             </p>
           ) : (
             <OutfitBattleForm
-              outfits={outfits.map((o) => ({
-                id: o.id,
-                name: o.kind === "FAN" && o.owner?.name ? `${o.name} — ${o.owner.name}` : o.name,
-                kind: o.kind,
-                itemCount: o._count.items,
-              }))}
+              outfits={outfits.map((o) => {
+                const scores = o.items.map(
+                  (i) => heatScore(i.submission.ratings.map((r) => r.stars))?.score ?? 3.5
+                );
+                const heat = scores.length
+                  ? scores.reduce((sum, x) => sum + x, 0) / scores.length
+                  : 3.5;
+                return {
+                  id: o.id,
+                  name: o.kind === "FAN" && o.owner?.name ? `${o.name} — ${o.owner.name}` : o.name,
+                  kind: o.kind,
+                  itemCount: o._count.items,
+                  heat: Math.round(heat * 10) / 10,
+                };
+              })}
             />
           )}
         </div>

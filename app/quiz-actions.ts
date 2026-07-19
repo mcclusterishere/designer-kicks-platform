@@ -90,15 +90,32 @@ export async function startQuizRun(): Promise<QuizActionResult> {
   const existing = await getActiveRun(userId);
   if (existing) return { ok: true, state: await buildState(userId, existing) };
 
-  const questions = await prisma.quizQuestion.findMany({
-    where: { active: true },
-    select: { id: true },
-  });
-  if (questions.length < HEAT_CHECK_TARGET) {
-    return { ok: false, error: "The question bank is still being loaded — check back soon." };
+  // The pool excludes every question this player has EVER answered —
+  // in the feed or in past runs. Answered is answered; questions never
+  // come back (that's the Culture IQ ledger rule).
+  const [questions, burned] = await Promise.all([
+    prisma.quizQuestion.findMany({
+      where: { active: true },
+      select: { id: true },
+    }),
+    prisma.quizAnswer.findMany({
+      where: { userId },
+      select: { questionId: true },
+    }),
+  ]);
+  const burnedIds = new Set(burned.map((b) => b.questionId));
+  const pool = questions.filter((q) => !burnedIds.has(q.id));
+  if (pool.length < HEAT_CHECK_TARGET) {
+    return {
+      ok: false,
+      error:
+        burned.length > 0
+          ? "You've answered nearly every question on the site — new ones land with every drop article. Check back after the next drop."
+          : "The question bank is still being loaded — check back soon.",
+    };
   }
 
-  const picked = shuffle(questions.map((q) => q.id)).slice(0, RUN_QUEUE_SIZE);
+  const picked = shuffle(pool.map((q) => q.id)).slice(0, RUN_QUEUE_SIZE);
   const run = await prisma.quizRun.create({
     data: { userId, questionIds: JSON.stringify(picked) },
   });
@@ -134,6 +151,17 @@ export async function answerQuestion(
   const options = JSON.parse(question.options) as string[];
   const correct = optionIndex === question.answerIndex;
   const correctAnswer = options[question.answerIndex];
+
+  // Every answer — right or wrong — lands in the Culture IQ ledger,
+  // the same one the feed quiz writes. Unique per (user, question):
+  // a question already answered in the feed just doesn't re-score.
+  try {
+    await prisma.quizAnswer.create({
+      data: { userId, questionId: question.id, correct, source: "gauntlet" },
+    });
+  } catch {
+    // Already in the ledger (raced with a feed answer) — never rescore.
+  }
 
   if (correct) {
     const newCorrect = run.correctCount + 1;
