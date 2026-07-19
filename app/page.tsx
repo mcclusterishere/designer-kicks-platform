@@ -61,7 +61,7 @@ export default async function HomePage() {
         >
           <div>
             <p className="tag inline-block -skew-x-6 border-l-4 border-volt bg-surface px-3 py-1.5 text-volt">
-              Custom sneaker battles · Est. on Facebook
+              Custom sneaker culture · An Equity Uprise project
             </p>
             <h1 className="display mt-5 max-w-3xl text-6xl text-white sm:text-7xl">
               Your customs.
@@ -71,9 +71,10 @@ export default async function HomePage() {
               <span className="text-gradient-volt">The Heat List.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-smoke">
-              Submit the hardest custom kicks you&apos;ve painted, go
-              head-to-head with other artists in vote battles, and let the
-              culture crown the winner.
+              Submit the hardest custom kicks you&apos;ve painted, battle other
+              artists for votes, climb the Heat List, and grow your Culture IQ.
+              A community built to celebrate the craft — and put independent
+              artists on.
             </p>
             <div className="mt-9 flex flex-wrap gap-5">
               <Link

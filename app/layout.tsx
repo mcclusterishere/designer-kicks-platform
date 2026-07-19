@@ -29,9 +29,9 @@ const bodoni = Bodoni_Moda({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: "The Heat Chart — Custom Sneaker Battles, Rankings & Drops",
+  title: "The Heat Chart — Custom Sneaker Culture, Battles & Culture IQ",
   description:
-    "Submit your customized kicks, battle other artists in head-to-head vote-offs, and climb the chart. Plus the hottest releases and customization gear.",
+    "Showcase your custom kicks, battle other artists in community vote-offs, climb the Heat List, and build your Culture IQ. A home for custom-sneaker culture — a project of McCluster Corp's Equity Uprise program.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -118,8 +118,10 @@ export default async function RootLayout({
                   <span className="text-volt">Chart</span>
                 </p>
                 <p className="mt-1 max-w-md">
-                  Custom sneaker battles, the Heat List, and the gear to build
-                  your next grail. Formerly Designer Kicks.
+                  Custom-sneaker culture: vote battles, the Heat List, the
+                  Culture IQ game, and the independent makers behind it all. A
+                  project of McCluster Corp / Equity Uprise; grew out of the
+                  Designer Kicks community.
                 </p>
               </div>
               <div className="flex flex-wrap gap-6">
@@ -144,6 +146,11 @@ export default async function RootLayout({
               cost to you. Nike, Jordan, adidas and other brand names belong to
               their respective owners; customs featured here are independent
               artist work and not affiliated with the brands.
+            </p>
+            <p className="mt-3 text-xs">
+              © 2026 McCluster Corp · The Heat Chart is a McCluster Corp /
+              Equity Uprise project supporting creative opportunity and
+              culture education.
             </p>
           </div>
         </footer>
