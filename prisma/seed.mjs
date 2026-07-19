@@ -1634,6 +1634,38 @@ async function main() {
     });
   }
 
+  // Jordan drop catalog (historical vault + verified 2026 releases),
+  // sourced from the owner's master spreadsheets — the accuracy source of
+  // truth. Idempotent top-up: create by slug, never overwrite later admin
+  // edits, and never touch existing articles (conflicts are reviewed
+  // separately, not auto-replaced).
+  const catalogPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "catalog-articles.json");
+  let catalogArticles = [];
+  try {
+    catalogArticles = JSON.parse(readFileSync(catalogPath, "utf8"));
+  } catch {}
+  let catalogAdded = 0;
+  for (const a of catalogArticles) {
+    if (!a.slug) continue;
+    const exists = await prisma.article.findUnique({ where: { slug: a.slug } });
+    if (exists) continue;
+    await prisma.article.create({
+      data: {
+        slug: a.slug,
+        title: a.title,
+        excerpt: a.excerpt,
+        content: a.content,
+        coverImage: a.coverImage ?? null,
+        tags: a.tags ?? null,
+        status: a.status ?? "PUBLISHED",
+        publishedAt: new Date(),
+        dropAt: a.dropAt ? new Date(a.dropAt) : null,
+      },
+    });
+    catalogAdded++;
+  }
+  const totalArticles = await prisma.article.count();
+
   // Community polls — get-to-know-you opinion questions that ride in the
   // feed. Idempotent top-up: only add a poll whose question isn't present.
   const POLLS = [
@@ -1675,7 +1707,7 @@ async function main() {
   const totalPolls = await prisma.poll.count({ where: { active: true } });
 
   console.log(
-    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${articles.length} articles, ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
+    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
   );
 }
 
