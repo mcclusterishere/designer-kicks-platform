@@ -8,7 +8,7 @@ export default function DropSyncControls({
   withSku,
   total,
 }: {
-  providers: { kicksdb: boolean; stockx: boolean; apify: boolean };
+  providers: { kicksdb: boolean; stockx: boolean; apify: boolean; gemini: boolean };
   withSku: number;
   total: number;
 }) {
@@ -16,7 +16,7 @@ export default function DropSyncControls({
     async () => refreshDropDatesNow(),
     null
   );
-  const live = providers.kicksdb || providers.stockx || providers.apify;
+  const live = providers.kicksdb || providers.stockx || providers.apify || providers.gemini;
 
   const chip = (label: string, on: boolean) => (
     <span
@@ -53,6 +53,7 @@ export default function DropSyncControls({
         {chip("KicksDB", providers.kicksdb)}
         {chip("StockX (RapidAPI)", providers.stockx)}
         {chip("Apify", providers.apify)}
+        {chip("Gemini (free)", providers.gemini)}
       </div>
 
       {!live && (

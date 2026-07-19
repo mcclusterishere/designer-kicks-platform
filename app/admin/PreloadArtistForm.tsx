@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
-import { preloadArtist, type PreloadResult } from "@/app/actions";
+import { preloadArtist, analyzeShoePhotos, type PreloadResult } from "@/app/actions";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
@@ -12,6 +12,41 @@ export default function PreloadArtistForm({ homeHref = "/admin" }: { homeHref?: 
     preloadArtist,
     null
   );
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [aiPending, startAi] = useTransition();
+
+  // Photos → filled fields. Only ever fills EMPTY fields, so nothing the
+  // editor already typed gets stomped.
+  function autofillFromPhotos() {
+    setAiMsg(null);
+    startAi(async () => {
+      const fd = new FormData();
+      const cover = (document.getElementById("pl-img") as HTMLInputElement | null)?.files;
+      const more = (document.getElementById("pl-more") as HTMLInputElement | null)?.files;
+      if (cover) Array.from(cover).forEach((f) => fd.append("image", f));
+      if (more) Array.from(more).forEach((f) => fd.append("morePhotos", f));
+      const res = await analyzeShoePhotos(fd);
+      if (!res.ok) {
+        setAiMsg(res.error);
+        return;
+      }
+      const fill = (id: string, v: string | null) => {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        if (el && v && !el.value.trim()) el.value = v;
+      };
+      fill("pl-title", res.draft.title);
+      fill("pl-base", res.draft.baseShoe);
+      fill("pl-brand", res.draft.brand);
+      fill("pl-sil", res.draft.silhouette);
+      fill("pl-cw", res.draft.baseColorway);
+      fill("pl-desc", res.draft.description);
+      if (res.draft.category) {
+        const sel = document.getElementById("pl-cat") as HTMLSelectElement | null;
+        if (sel) sel.value = res.draft.category;
+      }
+      setAiMsg("Filled in what the photos show — give it a once-over before staging.");
+    });
+  }
 
   if (state?.ok) {
     return (
@@ -135,6 +170,18 @@ export default function PreloadArtistForm({ homeHref = "/admin" }: { homeHref?: 
         <label className="tag text-smoke" htmlFor="pl-more">More angles (up to 5 — 5–6 photos total, voters swipe through these)</label>
         <input id="pl-more" name="morePhotos" type="file" multiple accept="image/jpeg,image/png,image/webp"
           className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
+      </div>
+      <div className="rounded-lg border border-edge bg-panel/40 p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={autofillFromPhotos} disabled={aiPending}
+            className="rounded-lg border border-volt/60 bg-volt/10 px-4 py-2 tag font-bold text-volt disabled:opacity-50">
+            {aiPending ? "Looking at the photos…" : "✨ Fill details from the photos"}
+          </button>
+          <p className="text-xs text-smoke">
+            Pick the photos above first — the AI works out the shoe, brand, and colorway so you just review.
+          </p>
+        </div>
+        {aiMsg && <p className="mt-2 text-xs text-volt">{aiMsg}</p>}
       </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}

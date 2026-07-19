@@ -33,6 +33,8 @@ import ArticleForm from "./ArticleForm";
 import GiveawayForm from "./GiveawayForm";
 import { categoryEmoji } from "@/lib/categories";
 import QuestionForm from "./QuestionForm";
+import AiQuestionForm from "./AiQuestionForm";
+import WeeklyBrief from "./WeeklyBrief";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
@@ -720,6 +722,9 @@ export default async function AdminPage({
           <span className="font-mono text-volt">?utm_source=facebook&amp;utm_campaign=your-post</span>{" "}
           and watch the source and campaign light up here.
         </p>
+        <div className="mt-4">
+          <WeeklyBrief />
+        </div>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { label: "Visitors today", value: traffic.visitorsToday },
@@ -1394,6 +1399,9 @@ export default async function AdminPage({
             ({questions.filter((q) => q.active).length} active / {questions.length})
           </span>
         </h2>
+        <div className="mt-4">
+          <AiQuestionForm />
+        </div>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
           <p className="tag text-volt">Add a question</p>
           <div className="mt-3">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { editorBroadcast, type BroadcastResult } from "@/app/actions";
+import { useActionState, useEffect } from "react";
+import { editorBroadcast, draftCaptions, type BroadcastResult, type CaptionsResult } from "@/app/actions";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
@@ -29,9 +29,55 @@ export default function EditorBroadcastForm() {
     editorBroadcast,
     null
   );
+  const [draft, draftAction, drafting] = useActionState<CaptionsResult | null, FormData>(
+    draftCaptions,
+    null
+  );
+
+  // A fresh AI draft lands in the composer, ready to edit before posting.
+  useEffect(() => {
+    if (draft?.ok) {
+      const box = document.getElementById("eb-body") as HTMLTextAreaElement | null;
+      if (box) box.value = draft.post;
+    }
+  }, [draft]);
 
   return (
     <div className="space-y-4">
+      {/* Blank-box killer: say what it's about, get captions to edit */}
+      <form action={draftAction} className="rounded-xl border border-edge bg-panel/40 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="tag text-smoke" htmlFor="dc-about">Need words? Say what the post is about</label>
+            <input id="dc-about" name="about" maxLength={400}
+              placeholder="e.g. new artist page for Nova Kicks — sunset AF1s, link /artists/nova-kicks"
+              className={inputClass} />
+          </div>
+          <button type="submit" disabled={drafting}
+            className="rounded-lg border border-volt/60 bg-volt/10 px-4 py-2.5 tag font-bold text-volt disabled:opacity-50">
+            {drafting ? "Writing…" : "✨ Draft it for me"}
+          </button>
+        </div>
+        {draft && !draft.ok && <p className="mt-2 text-xs text-heat">{draft.error}</p>}
+        {draft?.ok && (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <p className="tag text-smoke">Instagram version</p>
+              <textarea readOnly rows={4} value={draft.instagram} onFocus={(e) => e.target.select()}
+                className="mt-1 w-full rounded-lg border border-edge bg-panel px-3 py-2 text-xs text-white" />
+            </div>
+            <div>
+              <p className="tag text-smoke">X / short version</p>
+              <textarea readOnly rows={4} value={draft.x} onFocus={(e) => e.target.select()}
+                className="mt-1 w-full rounded-lg border border-edge bg-panel px-3 py-2 text-xs text-white" />
+            </div>
+            <p className="text-xs text-smoke sm:col-span-2">
+              The main caption is in the composer below — tweak it, add the photo, post.
+            </p>
+          </div>
+        )}
+      </form>
+
       <form action={formAction} className="space-y-3">
         <div>
           <label className="tag text-smoke" htmlFor="eb-body">The post *</label>

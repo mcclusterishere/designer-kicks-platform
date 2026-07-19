@@ -11,6 +11,7 @@ import EditorBroadcastForm from "./EditorBroadcastForm";
 import StageProspectForm from "./StageProspectForm";
 import MessageOffice from "./MessageOffice";
 import OnboardAgent from "./OnboardAgent";
+import LeadFinder from "./LeadFinder";
 import CopyField from "./CopyField";
 
 export const metadata = { title: "Your workspace — The Heat Chart", robots: { index: false } };
@@ -247,6 +248,12 @@ export default async function EditorDesk({
                 <li>Give it a share under <a href="#socials" className="text-[var(--d-sage)] underline underline-offset-2">Share</a>.</li>
               </ol>
               <p className="mt-2.5">A page is done — and paid — once it has both pieces. A calm 20 is the day.</p>
+            </div>
+
+            {/* Find someone new */}
+            <div className="mb-7">
+              <Sub step="Find" title="Scout for artists" hint="The AI hunts; you pick who's worth a page." />
+              <LeadFinder />
             </div>
 
             {/* Optional: research a lead first */}

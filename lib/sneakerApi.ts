@@ -4,7 +4,7 @@
  *
  * Design (per the plan we mapped out):
  *  - A waterfall of providers, tried in order until one answers:
- *        KicksDB  →  RapidAPI StockX  →  Apify
+ *        KicksDB  →  RapidAPI StockX  →  Apify  →  Gemini (search-grounded)
  *    Each provider is gated on its own API key. With no keys set the
  *    whole thing is DORMANT — no outbound calls, nothing breaks — so the
  *    site ships today for $0 and lights up the moment a free key lands in
@@ -26,12 +26,15 @@
  *   APIFY_SNEAKER_ACTOR    actor id (default dev00~sneaker-database-api)
  */
 
+import { geminiConfigured, geminiJson } from "./gemini";
+
 export type DropSource =
   | "manual"
   | "SNKRS"
   | "RapidAPI_StockX"
   | "KicksDB"
-  | "Apify";
+  | "Apify"
+  | "Gemini";
 
 /** Higher wins. A date may only be overwritten by an equal-or-higher source. */
 export const SOURCE_AUTHORITY: Record<string, number> = {
@@ -40,6 +43,7 @@ export const SOURCE_AUTHORITY: Record<string, number> = {
   RapidAPI_StockX: 70,
   KicksDB: 60,
   Apify: 40,
+  Gemini: 30, // search-grounded AI lookup — solid, but a real API beats it
   boutique: 20,
 };
 
@@ -58,18 +62,24 @@ export type SneakerHit = {
 };
 
 /** Which providers have keys in the environment right now. */
-export function providersConfigured(): { kicksdb: boolean; stockx: boolean; apify: boolean } {
+export function providersConfigured(): {
+  kicksdb: boolean;
+  stockx: boolean;
+  apify: boolean;
+  gemini: boolean;
+} {
   return {
     kicksdb: Boolean(process.env.KICKSDB_KEY),
     stockx: Boolean(process.env.RAPIDAPI_STOCKX_KEY),
     apify: Boolean(process.env.APIFY_TOKEN),
+    gemini: Boolean(process.env.GEMINI_API_KEY),
   };
 }
 
 /** True when at least one provider can be called. */
 export function sneakerApiLive(): boolean {
   const p = providersConfigured();
-  return p.kicksdb || p.stockx || p.apify;
+  return p.kicksdb || p.stockx || p.apify || p.gemini;
 }
 
 // A provider signalled it can't help — RATE_LIMIT (429), NO_KEY (unset),
@@ -214,6 +224,43 @@ async function fromApify(query: string): Promise<SneakerHit> {
   return hit;
 }
 
+/**
+ * Free fallback: Gemini with Search grounding looks the shoe up like a
+ * human would. Only a confident, dated answer counts — anything shaky
+ * throws FAILED so the caller treats it like a miss, never a guess.
+ */
+async function fromGemini(query: string): Promise<SneakerHit> {
+  if (!geminiConfigured()) throw new ProviderError("NO_KEY");
+  const out = await geminiJson<{
+    name?: string;
+    sku?: string;
+    releaseDate?: string | null;
+    retailPriceUsd?: number | null;
+    confidence?: string;
+  }>({
+    system:
+      "You look up sneaker release info. Given a style code (SKU) or shoe name, find the OFFICIAL release date from reliable sneaker sources. " +
+      'Return ONLY JSON: {"name":string|null,"sku":string|null,"releaseDate":"YYYY-MM-DD"|null,"retailPriceUsd":number|null,"confidence":"low"|"medium"|"high"}. ' +
+      "If sources disagree or you are unsure, set releaseDate null or confidence low — never guess a date.",
+    parts: [{ text: `Sneaker release date lookup: ${query}` }],
+    search: true,
+    temperature: 0,
+  });
+  if (!out) throw new ProviderError("FAILED", "no answer");
+  const conf = out.confidence === "high" || out.confidence === "medium";
+  const date = out.releaseDate ? parseDate(out.releaseDate) : null;
+  if (!conf || (!date && !out.sku)) throw new ProviderError("FAILED", "low confidence");
+  const price = Number(out.retailPriceUsd);
+  return {
+    source: "Gemini",
+    sku: out.sku?.trim() || null,
+    name: out.name?.trim() || null,
+    releaseDate: date,
+    image: null,
+    retailPriceCents: Number.isFinite(price) && price > 0 ? Math.round(price * 100) : null,
+  };
+}
+
 // --- The waterfall --------------------------------------------------------
 
 /**
@@ -228,6 +275,7 @@ export async function lookupSneaker(query: string): Promise<SneakerHit | null> {
     fromKicksDB,
     fromRapidStockX,
     fromApify,
+    fromGemini, // free tier — last so a real sneaker API answers first
   ];
   for (const provider of chain) {
     try {

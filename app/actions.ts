@@ -46,6 +46,7 @@ import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
 import { isEditor, currentUserRole, ensureRefCode, editorRefLink } from "@/lib/editor";
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
+import { geminiConfigured, geminiJson, imageParts } from "@/lib/gemini";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -2159,6 +2160,261 @@ export async function createResearchedProfile(
   return { ok: true, note: `Preloaded ${artistName} — now in the onboarding pipeline.`, artistUrl: `${base}/artists/${artist.slug}`, claimUrl };
 }
 
+// ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
+
+const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour
+
+async function aiGate(): Promise<string | null> {
+  if (!geminiConfigured()) return "The AI assist is off — an admin adds GEMINI_API_KEY to switch it on.";
+  const me = await currentUserRole();
+  if (me && !allowAttempt("geminiassist", me.id, AI_RATE.max, AI_RATE.windowMs)) {
+    return "Slow down — too many AI calls this hour.";
+  }
+  return null;
+}
+
+export type ShoeDraft = {
+  title: string | null;
+  baseShoe: string | null;
+  brand: string | null;
+  silhouette: string | null;
+  baseColorway: string | null;
+  category: string | null;
+  description: string | null;
+};
+export type AnalyzeResult = { ok: true; draft: ShoeDraft } | { ok: false; error: string };
+
+/**
+ * Look at the uploaded shoe photos and pre-fill the staging form: base
+ * shoe, brand, silhouette, donor colorway, a title and a story line.
+ * The editor reviews instead of typing — quality control, not data entry.
+ */
+export async function analyzeShoePhotos(formData: FormData): Promise<AnalyzeResult> {
+  await requireEditor();
+  const gate = await aiGate();
+  if (gate) return { ok: false, error: gate };
+
+  const files = [formData.get("image"), ...formData.getAll("morePhotos")].filter(
+    (f): f is File => f instanceof File && f.size > 0
+  );
+  if (files.length === 0) return { ok: false, error: "Pick the photos first, then let the AI take a look." };
+  const parts = await imageParts(files);
+  if (parts.length === 0) return { ok: false, error: "Those files don't look like photos it can read." };
+
+  const out = await geminiJson<Record<string, unknown>>({
+    system:
+      "You identify custom sneakers from photos for a staging form. From the images, work out the donor shoe underneath the custom work. " +
+      'Return ONLY JSON: {"title":string|null,"baseShoe":string|null,"brand":string|null,"silhouette":string|null,"baseColorway":string|null,"category":"sneakers"|"apparel"|"accessories","description":string|null}. ' +
+      "title: a short, evocative name for THIS custom (no quotes in it). baseShoe: the donor model (e.g. Air Force 1). brand: the maker (Nike, Jordan). " +
+      "silhouette: the full model name (e.g. Air Force 1 Low). baseColorway: what the donor pair was before the work, null if unknowable. " +
+      "description: 1-2 sentences on the visible technique/materials. Use null anywhere you can't tell from the photos — never guess.",
+    parts: [...parts, { text: "Identify this custom and fill the form fields." }],
+    temperature: 0.2,
+  });
+  if (!out) return { ok: false, error: "Couldn't read the photos just now — try again in a moment." };
+  const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const cat = s(out.category);
+  return {
+    ok: true,
+    draft: {
+      title: s(out.title),
+      baseShoe: s(out.baseShoe),
+      brand: s(out.brand),
+      silhouette: s(out.silhouette),
+      baseColorway: s(out.baseColorway),
+      category: cat && isPieceCategory(cat) ? cat : null,
+      description: s(out.description),
+    },
+  };
+}
+
+export type LeadCandidate = {
+  name: string;
+  instagram: string | null;
+  link: string | null;
+  city: string | null;
+  why: string | null;
+};
+export type FindLeadsResult =
+  | { ok: true; leads: LeadCandidate[]; note?: string }
+  | { ok: false; error: string };
+
+/**
+ * The scout: hunt for custom-sneaker artists worth onboarding, filtered
+ * against who's already on the chart. Feeds the research → stage flow.
+ */
+export async function findLeads(
+  _prev: FindLeadsResult | null,
+  formData: FormData
+): Promise<FindLeadsResult> {
+  await requireEditor();
+  const gate = await aiGate();
+  if (gate) return { ok: false, error: gate };
+  const focus = String(formData.get("focus") ?? "").trim().slice(0, 200);
+
+  const out = await geminiJson<{ candidates?: unknown[] }>({
+    system:
+      "You scout custom-sneaker artists (customizers who hand-paint/rework sneakers) who could join The Heat Chart, a battle-league platform. " +
+      "Use search to find REAL, currently-active artists with public Instagram or portfolio pages. Prefer independent artists over big brands. " +
+      'Return ONLY JSON: {"candidates":[{"name":string,"instagram":string|null,"link":string|null,"city":string|null,"why":string}]} with up to 10 candidates. ' +
+      "instagram is the bare handle. link is their most useful public URL. why is one short line on what makes their work stand out. Only list artists you actually found — never invent.",
+    parts: [{ text: focus ? `Scout brief from the editor: ${focus}` : "Scout brief: notable independent custom-sneaker artists active right now." }],
+    search: true,
+    temperature: 0.4,
+  });
+  if (!out?.candidates?.length) return { ok: false, error: "The scout came back empty — try a more specific brief." };
+
+  const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const raw: LeadCandidate[] = out.candidates
+    .map((c) => {
+      const o = (c ?? {}) as Record<string, unknown>;
+      return {
+        name: s(o.name) ?? "",
+        instagram: s(o.instagram)?.replace(/^@/, "") ?? null,
+        link: s(o.link),
+        city: s(o.city),
+        why: s(o.why),
+      };
+    })
+    .filter((c) => c.name)
+    .slice(0, 10);
+
+  // Skip anyone already on the chart (by IG handle or display name).
+  const existing = await prisma.artistProfile.findMany({ select: { displayName: true, instagram: true } });
+  const handles = new Set(existing.map((e) => e.instagram?.toLowerCase()).filter(Boolean));
+  const names = new Set(existing.map((e) => e.displayName.toLowerCase()));
+  const leads = raw.filter(
+    (c) => !(c.instagram && handles.has(c.instagram.toLowerCase())) && !names.has(c.name.toLowerCase())
+  );
+  const dropped = raw.length - leads.length;
+  return {
+    ok: true,
+    leads,
+    note: dropped > 0 ? `${dropped} already on the chart — filtered out.` : undefined,
+  };
+}
+
+export type CaptionsResult =
+  | { ok: true; post: string; instagram: string; x: string }
+  | { ok: false; error: string };
+
+/** Blank-box killer: draft channel-fitted captions for a cross-post. */
+export async function draftCaptions(
+  _prev: CaptionsResult | null,
+  formData: FormData
+): Promise<CaptionsResult> {
+  await requireEditor();
+  const gate = await aiGate();
+  if (gate) return { ok: false, error: gate };
+  const about = String(formData.get("about") ?? "").trim().slice(0, 400);
+  if (!about) return { ok: false, error: "Say what the post is about — a link or a line is enough." };
+
+  const out = await geminiJson<{ post?: string; instagram?: string; x?: string }>({
+    system:
+      "You write social captions for The Heat Chart, a custom-sneaker battle league where fans vote on artists' work. Voice: warm, culture-fluent, zero corporate filler. " +
+      'Return ONLY JSON: {"post":string,"instagram":string,"x":string}. ' +
+      "post: the main Feed/Facebook caption, 2-3 sentences, ends inviting people to vote/look. instagram: same energy plus 3-5 relevant hashtags on their own line. x: under 200 characters, punchy. Never invent facts not in the brief.",
+    parts: [{ text: `What we're posting about:\n${about}` }],
+    temperature: 0.7,
+  });
+  const post = out?.post?.trim();
+  if (!post) return { ok: false, error: "No caption came back — try rephrasing the brief." };
+  return { ok: true, post, instagram: out?.instagram?.trim() || post, x: out?.x?.trim() || post.slice(0, 200) };
+}
+
+export type QuizGenResult = { ok: true; created: number } | { ok: false; error: string };
+
+/**
+ * Draft new Culture IQ questions with search-checked facts. They land
+ * INACTIVE — the owner reviews and flips each one live from the panel.
+ */
+export async function generateQuizQuestions(
+  _prev: QuizGenResult | null,
+  formData: FormData
+): Promise<QuizGenResult> {
+  await requireAdmin();
+  if (!geminiConfigured()) return { ok: false, error: "Add GEMINI_API_KEY to switch the generator on." };
+  const topic = String(formData.get("topic") ?? "").trim().slice(0, 160);
+  const difficulty = Math.min(3, Math.max(1, Number(formData.get("difficulty")) || 1));
+
+  const out = await geminiJson<{ questions?: unknown[] }>({
+    system:
+      "You write sneaker-culture trivia for the Culture IQ quiz. Facts must be verifiable — use search to confirm each answer. " +
+      'Return ONLY JSON: {"questions":[{"question":string,"options":[string,string,string,string],"answerIndex":0|1|2|3,"explanation":string,"category":string}]} with exactly 5 questions. ' +
+      "Wrong options must be plausible. explanation: one sentence teaching the fact. category: one word like history, design, culture, drops.",
+    parts: [{ text: topic ? `Topic: ${topic}. Difficulty ${difficulty}/3.` : `General sneaker culture. Difficulty ${difficulty}/3.` }],
+    search: true,
+    temperature: 0.6,
+  });
+  if (!out?.questions?.length) return { ok: false, error: "Nothing usable came back — try a narrower topic." };
+
+  let created = 0;
+  for (const q of out.questions.slice(0, 8)) {
+    const o = (q ?? {}) as Record<string, unknown>;
+    const question = typeof o.question === "string" ? o.question.trim() : "";
+    const options = Array.isArray(o.options) ? o.options.filter((x): x is string => typeof x === "string") : [];
+    const answerIndex = Number(o.answerIndex);
+    if (!question || options.length !== 4 || !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex > 3) continue;
+    const dupe = await prisma.quizQuestion.findFirst({ where: { question }, select: { id: true } });
+    if (dupe) continue;
+    await prisma.quizQuestion.create({
+      data: {
+        question,
+        options: JSON.stringify(options),
+        answerIndex,
+        difficulty,
+        category: typeof o.category === "string" && o.category.trim() ? o.category.trim().toLowerCase() : "history",
+        explanation: typeof o.explanation === "string" ? o.explanation.trim() : null,
+        active: false, // owner reviews, then flips live
+      },
+    });
+    created++;
+  }
+  if (created === 0) return { ok: false, error: "Every draft was malformed or a duplicate — run it again." };
+  revalidatePath("/admin");
+  return { ok: true, created };
+}
+
+export type BriefResult = { ok: true; brief: string } | { ok: false; error: string };
+
+/** The Monday note: last 7 days, in plain speech, from real numbers. */
+export async function generateWeeklyBrief(): Promise<BriefResult> {
+  await requireAdmin();
+  if (!geminiConfigured()) return { ok: false, error: "Add GEMINI_API_KEY to switch the brief on." };
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [pageviews, sources, newArtists, newPieces, articlesPublished, claims] = await Promise.all([
+    prisma.pageView.count({ where: { createdAt: { gte: since } } }),
+    prisma.pageView.groupBy({
+      by: ["source"],
+      where: { createdAt: { gte: since } },
+      _count: true,
+      orderBy: { _count: { source: "desc" } },
+      take: 6,
+    }),
+    prisma.artistProfile.count({ where: { createdAt: { gte: since } } }),
+    prisma.submission.count({ where: { createdAt: { gte: since } } }),
+    prisma.article.count({ where: { createdAt: { gte: since }, status: "PUBLISHED" } }),
+    prisma.artistClaim.count({ where: { createdAt: { gte: since } } }),
+  ]);
+  const facts =
+    `Pageviews: ${pageviews}\n` +
+    `Top sources: ${sources.map((s) => `${s.source} (${s._count})`).join(", ") || "none"}\n` +
+    `New artist pages staged: ${newArtists}\nNew pieces: ${newPieces}\n` +
+    `Articles published: ${articlesPublished}\nClaim requests: ${claims}`;
+  const out = await geminiJson<{ brief?: string }>({
+    system:
+      "You write a short Monday brief for the owner of The Heat Chart. Plain speech, warm, zero fluff. " +
+      "Structure: 2-3 sentences on what happened, then one 'this week, push:' line with the single highest-leverage move the numbers suggest. " +
+      "Sources starting with 'ref:' are an editor's tracked link — that traffic is the intern's. " +
+      'Return ONLY JSON: {"brief": string}. Under 130 words. Use only the numbers given — never invent.',
+    parts: [{ text: `Last 7 days:\n${facts}` }],
+    temperature: 0.5,
+  });
+  const brief = out?.brief?.trim();
+  if (!brief) return { ok: false, error: "The brief didn't come back — try again in a moment." };
+  return { ok: true, brief };
+}
+
 /** Artist says they don't sell anywhere yet → routes them to the portal. */
 export async function markSellsNowhere() {
   const profile = await myApprovedArtist();
@@ -2968,6 +3224,39 @@ export async function throwCallOut(
 export type DmScriptResult = { ok: true; script: string } | { ok: false; error: string };
 
 /**
+ * Gemini pass over a template DM: keep every link byte-for-byte, sound
+ * like a person who actually looked at their work. Falls back to the
+ * template on any doubt — a DM must never lose its claim link.
+ */
+async function personalizeDm(
+  template: string,
+  facts: { displayName: string; bio: string | null; city: string | null; instagram: string | null },
+  mustKeep: string[]
+): Promise<string> {
+  if (!geminiConfigured()) return template;
+  const out = await geminiJson<{ dm?: string }>({
+    system:
+      "You polish outreach DMs for The Heat Chart, a custom-sneaker battle league. Rewrite the draft so it feels personal to THIS artist — reference their specialty/city naturally if known. " +
+      "Rules: keep EVERY URL from the draft exactly as written; same warm, no-strings tone; no hashtags; at most one emoji; under 90 words. " +
+      'Return ONLY JSON: {"dm": string}.',
+    parts: [
+      {
+        text:
+          `Artist: ${facts.displayName}\n` +
+          (facts.city ? `City: ${facts.city}\n` : "") +
+          (facts.instagram ? `Instagram: @${facts.instagram}\n` : "") +
+          (facts.bio ? `Bio: ${facts.bio}\n` : "") +
+          `\nDraft DM to improve:\n${template}`,
+      },
+    ],
+    temperature: 0.6,
+  });
+  const dm = out?.dm?.trim();
+  if (!dm || !mustKeep.every((u) => dm.includes(u))) return template;
+  return dm;
+}
+
+/**
  * A personalized, paste-ready DM for a pre-loaded artist — the no-email
  * path while Resend waits. Reuses any live claim link so a link already
  * sitting in someone's DMs never dies.
@@ -2994,12 +3283,10 @@ export async function outreachDmScript(artistId: string): Promise<DmScriptResult
   const claimed = Boolean(profile.user.passwordHash) || profile.user._count.accounts > 0;
 
   if (claimed) {
-    return {
-      ok: true,
-      script:
-        `Yo ${profile.displayName} — your page is yours and the culture's already voting on your work: ${pageUrl}\n\n` +
-        `Next move: drop more photos from your Studio and watch your rank climb. Fans see your pairs head-to-head every day — every vote builds your record.`,
-    };
+    const template =
+      `Yo ${profile.displayName} — your page is yours and the culture's already voting on your work: ${pageUrl}\n\n` +
+      `Next move: drop more photos from your Studio and watch your rank climb. Fans see your pairs head-to-head every day — every vote builds your record.`;
+    return { ok: true, script: await personalizeDm(template, profile, [pageUrl]) };
   }
 
   let token = (
@@ -3020,13 +3307,11 @@ export async function outreachDmScript(artistId: string): Promise<DmScriptResult
   }
   const claimUrl = `${base}/reset-password/${token}`;
   const pieces = profile.submissions.map((s) => `your ${s.title}`).join(" and ");
-  return {
-    ok: true,
-    script:
-      `Yo ${profile.displayName} — I put ${pieces || "your work"} up in our battle league where people vote on heat head-to-head: ${pageUrl}\n\n` +
-      `Free page you can claim, no cost, one of one just like the pair. This link makes it yours in 30 seconds: ${claimUrl}\n\n` +
-      `Claim it and gain new fans from our page — you get a live rank, votes on every pair, and a record that follows your name. That's it, no strings.`,
-  };
+  const template =
+    `Yo ${profile.displayName} — I put ${pieces || "your work"} up in our battle league where people vote on heat head-to-head: ${pageUrl}\n\n` +
+    `Free page you can claim, no cost, one of one just like the pair. This link makes it yours in 30 seconds: ${claimUrl}\n\n` +
+    `Claim it and gain new fans from our page — you get a live rank, votes on every pair, and a record that follows your name. That's it, no strings.`;
+  return { ok: true, script: await personalizeDm(template, profile, [pageUrl, claimUrl]) };
 }
 
 // Group Scout: hand-tracked Facebook groups, no automation, each with
