@@ -151,6 +151,27 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* Now hiring — kept high on the page so the job is easy to find */}
+      <section className="border-b border-edge bg-surface">
+        <Link
+          href="/careers"
+          className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 transition hover:opacity-90"
+        >
+          <div className="flex items-center gap-4">
+            <span className="display text-3xl text-volt">✎</span>
+            <div>
+              <p className="tag text-heat">We&apos;re hiring — remote, paid</p>
+              <p className="display text-xl text-white sm:text-2xl">
+                Editor (Intern) — <span className="text-volt">50¢ per onboarding</span>
+              </p>
+            </div>
+          </div>
+          <span className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink">
+            See the job + apply →
+          </span>
+        </Link>
+      </section>
+
       {/* Live battles */}
       <section className="mx-auto max-w-6xl px-4 py-12">
         {tournament && (

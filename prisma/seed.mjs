@@ -1137,33 +1137,43 @@ async function seedTeamAndCareers() {
     slug: "editor",
     title: "Editor (Intern)",
     location: "Remote",
-    payLine: "$1 per social post — up to $6/day",
+    payLine: "$0.50 per onboarding",
     body: [
       "## The role",
       "",
-      "Help run The Heat Chart's voice. You'll post to our socials, keep the",
-      "newsroom fresh, and tee up outreach to artists and shops — all from a",
+      "Help grow The Heat Chart. You'll bring artists and shops onto the",
+      "platform, keep the newsroom fresh, and run our socials — all from a",
       "simple Editor Desk. Our website is the origin; the socials are feeders.",
       "",
       "## What you'll do",
       "",
+      "- Onboard artists and shops onto the platform",
       "- Write and edit drop articles; swap in better photos",
       "- Cross-post to our connected social channels",
       "- Stage outreach prospects for the office to send",
-      "- Keep it in the culture — accurate, hype, real",
       "",
       "## Pay",
       "",
-      "**$1 per social post, up to $6 a day.** Remote, flexible hours.",
+      "**50 cents for every person you onboard.** Remote, flexible hours.",
       "",
       "## Who we want",
       "",
-      "Someone who lives in sneaker culture, writes clean, and moves fast.",
+      "Someone who lives in sneaker culture, hustles, and moves fast.",
       "No degree required — show us your feed.",
     ].join("\n"),
   };
-  const exists = await prisma.jobPosting.findUnique({ where: { slug: editorJob.slug } });
-  if (!exists) await prisma.jobPosting.create({ data: editorJob });
+  // Upsert so the canonical posting's pay/copy update on deploy, without
+  // touching its OPEN/CLOSED status (the owner controls that in admin).
+  await prisma.jobPosting.upsert({
+    where: { slug: editorJob.slug },
+    update: {
+      title: editorJob.title,
+      location: editorJob.location,
+      payLine: editorJob.payLine,
+      body: editorJob.body,
+    },
+    create: editorJob,
+  });
 }
 
 async function main() {

@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { createHash, createHmac, timingSafeEqual, randomBytes } from "crypto";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { verifyTotp } from "@/lib/totp";
 
@@ -97,18 +96,15 @@ export function adminAllowlist(): string[] {
 }
 
 /**
- * The optional "member account" second lock. It's OPT-IN: only when the
- * owner sets ADMIN_EMAILS does the panel also require being signed in as
- * one of those accounts. Unset (the default) = password-only, so the owner
- * just needs the admin password — the recommended second factor is the
- * authenticator-app 2FA, which layers on top when they turn it on.
+ * Admin is PASSWORD-ONLY right now, by owner request — the admin password
+ * (plus the authenticator-app 2FA once it's switched on) is the whole gate.
+ * The old "must be signed in as a member account" lock is disabled so a
+ * stray ADMIN_EMAILS value can't lock the owner out. When 2FA is on it
+ * becomes the real second factor. (configuredAllowlist stays available for
+ * labels/tooling; it just doesn't gate access.)
  */
 export async function adminAccountOk(): Promise<boolean> {
-  const list = configuredAllowlist();
-  if (list.length === 0) return true; // password-only unless the owner opts in
-  const session = await auth();
-  const email = session?.user?.email?.toLowerCase();
-  return Boolean(email && list.includes(email));
+  return true;
 }
 
 // ---------- Two-step verification (TOTP authenticator app) ----------
