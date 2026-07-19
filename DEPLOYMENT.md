@@ -19,6 +19,21 @@ Railway; merging the open PR is the deploy trigger.
 | `ADMIN_EMAILS` | `mattmccluster@gmail.com` — admin sign-in | required |
 | `AUTH_SECRET` | session crypto — `openssl rand -base64 32` | required |
 | `RESEND_API_KEY` + `EMAIL_FROM` | outreach + claim + reset emails | recommended |
+
+  Resend DNS (Railway → Domains → theheatchart.com). Names must match
+  exactly — the two mail records live on the `send` subdomain, NOT `@`:
+
+  | Type | Name | Content | Priority |
+  | --- | --- | --- | --- |
+  | MX | `send` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+  | TXT | `send` | `v=spf1 include:amazonses.com ~all` | — |
+  | TXT | `resend._domainkey` | `p=MIGfMA0…` (from Resend) | — |
+
+  `EMAIL_FROM`: `The Heat Chart <league@theheatchart.com>` — sending
+  needs no mailbox. Receiving at league@: free forwarder (ImprovMX)
+  with root MX `@` → `mx1.improvmx.com` (10) + `mx2.improvmx.com`
+  (20), alias league@ → your Gmail; reply-as via Gmail send-as with
+  SMTP `smtp.resend.com`, user `resend`, password = the API key.
 | `GOOGLE_PLACES_API_KEY` | Store Scout zip scans | optional |
 | `AFF_EBAY_TEMPLATE` … | affiliate tags on /go links | as approved |
 | `FB_PAGE_ID` / `FB_PAGE_ACCESS_TOKEN` / `IG_USER_ID` | Broadcast auto-posting | optional |
