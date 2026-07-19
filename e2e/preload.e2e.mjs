@@ -54,17 +54,49 @@ check("public artist page live", await page.getByText("Preload Test Custom").isV
 // ---- Claim flow: the real artist asserts ownership, admin verifies ----
 check("unclaimed page invites a claim", await page.getByRole("button", { name: "Claim This Page" }).isVisible());
 await page.getByRole("button", { name: "Claim This Page" }).click();
-await page.fill("#cl-name", "Preload Test Artist");
-await page.fill("#cl-email", EMAIL);
-await page.fill("#cl-proof", "@preloadtest");
+
+// The claim terminal: one question at a time, Enter/next to advance.
+const claimInput = page.locator("[data-testid=claim-input]");
+const claimNext = page.locator("[data-testid=claim-next]");
+async function answer(text) {
+  await claimInput.fill(text);
+  await claimNext.click();
+}
+check("terminal onboarding opens", await claimInput.isVisible());
+await answer("Preload Test Artist"); // name
+await answer(EMAIL); // email (login)
+await answer("719-555-0134"); // phone — seller non-negotiable
+await answer(""); // business name — optional skip
+await answer("P.O. Box 12"); // the guard must refuse this
+check(
+  "P.O. Box refused with the privacy promise",
+  await page.getByText("It stays private, promise").isVisible()
+);
+await answer("417 W Test Ave"); // real street address
+await answer("Pueblo"); // city
+await answer("CO"); // state
+await answer("81005"); // zip
+await answer("@preloadtest"); // proof
+await answer(""); // message — optional skip
 await page.getByRole("button", { name: "Submit Claim For Verification" }).click();
 await page.getByText("Claim received ✓").waitFor({ timeout: 15000 });
 const claimRow = await prisma.artistClaim.findFirst({ where: { artistId: artist.id } });
 check("claim lands PENDING in the queue", claimRow?.status === "PENDING");
+check(
+  "seller non-negotiables captured",
+  claimRow?.phone === "719-555-0134" &&
+    claimRow?.addressLine === "417 W Test Ave" &&
+    claimRow?.city === "Pueblo" &&
+    claimRow?.zip === "81005"
+);
 
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 await page.getByText("Profile Claims").waitFor({ timeout: 10000 });
 check("claim visible to admin", await page.getByText("@preloadtest").first().isVisible());
+check(
+  "private seller info shown to admin only",
+  await page.getByText("Seller info — private, admin only").first().isVisible()
+);
 await page.getByRole("button", { name: "Verify & Hand Over" }).click();
 await page.getByText("approved ✓").waitFor({ timeout: 15000 });
 const verdict = await prisma.artistClaim.findUnique({ where: { id: claimRow.id } });

@@ -68,7 +68,7 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
-        <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#c8ff00]" />
+        <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#d9b96a]" />
         Text/email me about drops, battles, and giveaways
       </label>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}

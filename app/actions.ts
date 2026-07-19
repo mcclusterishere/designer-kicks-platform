@@ -846,9 +846,29 @@ export async function submitArtistClaim(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const socialProof = String(formData.get("socialProof") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
+  // Seller non-negotiables — private, admin-only, never public.
+  const phone = String(formData.get("phone") ?? "").trim();
+  const businessName = String(formData.get("businessName") ?? "").trim();
+  const addressLine = String(formData.get("addressLine") ?? "").trim();
+  const city = String(formData.get("city") ?? "").trim();
+  const state = String(formData.get("state") ?? "").trim();
+  const zip = String(formData.get("zip") ?? "").trim();
 
   if (!name || name.length > 60) return { ok: false, error: "Your name is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "A valid email is required — it becomes your account." };
+  if (phone.replace(/\D/g, "").length < 10) {
+    return { ok: false, error: "A real phone number is required to sell on the platform." };
+  }
+  if (!addressLine || addressLine.length > 120) {
+    return { ok: false, error: "A street mailing address is required to sell on the platform." };
+  }
+  if (/\b(p\.?\s*o\.?\s*box|post\s*office\s*box|pob\b)/i.test(addressLine)) {
+    return { ok: false, error: "No P.O. Boxes — a street address is required (it stays private, admin-only)." };
+  }
+  if (!city || city.length > 60) return { ok: false, error: "City is required." };
+  if (!state || state.length > 30) return { ok: false, error: "State is required." };
+  if (!/^\d{5}(-\d{4})?$/.test(zip)) return { ok: false, error: "A valid ZIP code is required." };
+  if (businessName.length > 80) return { ok: false, error: "Business name is too long." };
   if (!socialProof || socialProof.length > 120) {
     return { ok: false, error: "Drop your Instagram or shop link so we can verify it's you." };
   }
@@ -873,7 +893,19 @@ export async function submitArtistClaim(
   if (existing) return { ok: false, error: "Your claim is already in — we review every one." };
 
   await prisma.artistClaim.create({
-    data: { artistId, name, email, socialProof, message: message || null },
+    data: {
+      artistId,
+      name,
+      email,
+      socialProof,
+      message: message || null,
+      phone,
+      businessName: businessName || null,
+      addressLine,
+      city,
+      state,
+      zip,
+    },
   });
 
   notifyAdmin(

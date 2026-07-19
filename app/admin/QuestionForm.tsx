@@ -27,7 +27,7 @@ export default function QuestionForm() {
               value={i}
               required
               aria-label={`Option ${String.fromCharCode(65 + i)} is correct`}
-              className="h-4 w-4 accent-[#c8ff00]"
+              className="h-4 w-4 accent-[#d9b96a]"
             />
             <input
               name={`option${i}`}

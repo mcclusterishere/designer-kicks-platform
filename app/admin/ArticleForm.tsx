@@ -90,7 +90,7 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="publish" defaultChecked={defaults?.status === "PUBLISHED"}
-          className="h-4 w-4 accent-[#c8ff00]" />
+          className="h-4 w-4 accent-[#d9b96a]" />
         Published (unchecked = draft, hidden from the site)
       </label>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}

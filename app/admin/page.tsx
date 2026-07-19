@@ -668,6 +668,18 @@ export default async function AdminPage({
                       {c.name} · {c.email}
                     </p>
                     <p className="text-sm text-volt">Proof: {c.socialProof}</p>
+                    {(c.phone || c.addressLine) && (
+                      <div className="mt-1.5 rounded-lg border border-edge bg-panel px-3 py-2 text-xs">
+                        <p className="tag text-smoke/70">Seller info — private, admin only</p>
+                        {c.businessName && <p className="mt-1 text-white">{c.businessName}</p>}
+                        {c.phone && <p className="text-smoke">{c.phone}</p>}
+                        {c.addressLine && (
+                          <p className="text-smoke">
+                            {c.addressLine}, {c.city}, {c.state} {c.zip}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {c.message && <p className="mt-1 text-sm text-smoke">{c.message}</p>}
                     {c.status === "APPROVED" && approvedClaimLinks.has(c.id) && (
                       <p className="mt-1 break-all font-mono text-xs text-volt">

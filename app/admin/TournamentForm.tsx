@@ -77,7 +77,7 @@ export default function TournamentForm({ options }: { options: Option[] }) {
                 value={o.id}
                 checked={checked.has(o.id)}
                 onChange={() => toggle(o.id)}
-                className="h-4 w-4 accent-[#c8ff00]"
+                className="h-4 w-4 accent-[#d9b96a]"
               />
               <span className="truncate">
                 {o.title} <span className="text-smoke">— {o.artistName}</span>

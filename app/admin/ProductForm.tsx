@@ -55,7 +55,7 @@ export default function ProductForm({ defaults }: { defaults?: Defaults }) {
         </div>
         <div className="flex items-end pb-2">
           <label className="flex items-center gap-2 text-sm text-smoke">
-            <input type="checkbox" name="featured" defaultChecked={defaults?.featured} className="h-4 w-4 accent-[#c8ff00]" />
+            <input type="checkbox" name="featured" defaultChecked={defaults?.featured} className="h-4 w-4 accent-[#d9b96a]" />
             Featured on homepage
           </label>
         </div>

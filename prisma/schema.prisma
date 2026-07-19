@@ -241,6 +241,15 @@ model ArtistClaim {
   email       String
   socialProof String? // IG handle / shop link that proves it's them
   message     String?
+  // Seller verification — PRIVATE, admin eyes only, never rendered on
+  // any public page. Street address required (no P.O. Boxes) so the
+  // league knows its sellers are real.
+  phone        String?
+  businessName String?
+  addressLine  String?
+  city         String?
+  state        String?
+  zip          String?
   status      String  @default("PENDING") // PENDING | APPROVED | REJECTED
 
   createdAt DateTime @default(now())

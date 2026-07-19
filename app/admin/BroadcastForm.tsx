@@ -64,7 +64,7 @@ export default function BroadcastForm({ recent }: { recent: RecentPost[] }) {
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-smoke">
-          <input type="checkbox" name="pinned" className="h-4 w-4 accent-[#c8ff00]" />
+          <input type="checkbox" name="pinned" className="h-4 w-4 accent-[#d9b96a]" />
           Pin to the top of The Feed
         </label>
         {state && !state.ok && <p className="text-sm text-heat">{state.error}</p>}
