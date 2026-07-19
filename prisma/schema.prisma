@@ -720,6 +720,14 @@ model Article {
   // to enter its raffle. Articles with dropAt appear on /drops.
   dropAt      DateTime?
   raffleUrl   String?
+  // Release-date sync: the style code (e.g. "DZ5485-612") keys the
+  // sneaker-API waterfall, dropSource records who set the current date
+  // (manual | SNKRS | RapidAPI_StockX | KicksDB | Apify), and
+  // dropCheckedAt is the last time the sync touched this row. Manual
+  // dates outrank every API source, so a human edit is never overwritten.
+  sku           String?
+  dropSource    String?
+  dropCheckedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -728,6 +736,8 @@ model Article {
   // News list filters PUBLISHED by publishedAt; /drops filters by dropAt.
   @@index([status, publishedAt])
   @@index([status, dropAt])
+  // The drop-date sync walks every article carrying a style code.
+  @@index([sku])
 }
 
 // Tiny key/value store for server-side settings. Currently holds the

@@ -33,6 +33,8 @@ import { saveUpload } from "@/lib/storage";
 import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
+import { refreshDropDates } from "@/lib/dropRefresh";
+import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -1545,6 +1547,7 @@ export async function saveArticle(
   const tags = String(formData.get("tags") ?? "").trim();
   const dropAtRaw = String(formData.get("dropAt") ?? "").trim();
   const raffleUrl = String(formData.get("raffleUrl") ?? "").trim();
+  const sku = String(formData.get("sku") ?? "").trim().toUpperCase();
   const publish = formData.get("publish") === "on";
 
   if (!title || title.length > 120) return { ok: false, error: "Title is required (max 120 characters)." };
@@ -1587,6 +1590,7 @@ export async function saveArticle(
     tags: tags || null,
     dropAt,
     raffleUrl: raffleUrl || null,
+    sku: sku || null,
     status: publish ? "PUBLISHED" : "DRAFT",
   };
 
@@ -1594,17 +1598,23 @@ export async function saveArticle(
   if (id) {
     const existing = await prisma.article.findUnique({ where: { id } });
     if (!existing) return { ok: false, error: "Article not found." };
+    // A human touching the drop date makes it authoritative ("manual"),
+    // which outranks every API source so the sync never overwrites it.
+    // Leave the source alone when the date wasn't changed.
+    const dateChanged = (dropAt?.getTime() ?? null) !== (existing.dropAt?.getTime() ?? null);
+    const dropSource = dateChanged ? (dropAt ? "manual" : null) : existing.dropSource;
     await prisma.article.update({
       where: { id },
       data: {
         ...data,
+        dropSource,
         // Stamp publishedAt on the first publish; keep the original date on edits.
         publishedAt: publish ? existing.publishedAt ?? new Date() : existing.publishedAt,
       },
     });
   } else {
     const created = await prisma.article.create({
-      data: { ...data, publishedAt: publish ? new Date() : null },
+      data: { ...data, dropSource: dropAt ? "manual" : null, publishedAt: publish ? new Date() : null },
     });
     articleId = created.id;
   }
@@ -1649,6 +1659,57 @@ export async function deleteArticle(id: string) {
   await prisma.article.delete({ where: { id } });
   revalidatePath("/news");
   revalidatePath("/admin");
+}
+
+// ---------- Drop-date sync (SKU → release date waterfall) ----------
+
+/**
+ * Admin "Refresh dates now" — runs the sneaker-API waterfall over every
+ * article carrying a style code and updates the calendar where a
+ * trustworthy source moved the date. Dormant (no-op) until a provider key
+ * is set. The one-line summary rides back on the ActionResult note.
+ */
+export async function refreshDropDatesNow(): Promise<ActionResult> {
+  await requireAdmin();
+  if (!sneakerApiLive()) {
+    return {
+      ok: false,
+      error:
+        "No sneaker-API key set yet. Add KICKSDB_KEY, RAPIDAPI_STOCKX_KEY, or APIFY_TOKEN in the environment to turn the sync on.",
+    };
+  }
+  const s = await refreshDropDates({ onlyFuture: true });
+  revalidatePath("/drops");
+  revalidatePath("/admin");
+  revalidatePath("/news");
+  const bits = [`${s.checked} checked`, `${s.updated} updated`];
+  if (s.notFound) bits.push(`${s.notFound} not found`);
+  if (s.skippedManual) bits.push(`${s.skippedManual} manual dates kept`);
+  return { ok: true, note: `Drop sync: ${bits.join(" · ")}.` };
+}
+
+/**
+ * Admin "Find style code" — discovers a SKU for an article from its
+ * headline via the waterfall's search, and saves it so future syncs have
+ * something to key on. Dormant until a provider key is set.
+ */
+export async function lookupSkuForArticle(id: string): Promise<ActionResult> {
+  await requireAdmin();
+  if (!sneakerApiLive()) {
+    return { ok: false, error: "No sneaker-API key set — can't look up style codes yet." };
+  }
+  const article = await prisma.article.findUnique({
+    where: { id },
+    select: { title: true },
+  });
+  if (!article) return { ok: false, error: "Article not found." };
+  const hit = await findSku(article.title).catch(() => null);
+  if (!hit?.sku) {
+    return { ok: false, error: "No style code matched that headline. Add it by hand." };
+  }
+  await prisma.article.update({ where: { id }, data: { sku: hit.sku.toUpperCase() } });
+  revalidatePath("/admin");
+  return { ok: true, note: `Found style code ${hit.sku}${hit.name ? ` (${hit.name})` : ""}.` };
 }
 
 // ---------- Tournaments ----------

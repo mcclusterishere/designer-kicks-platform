@@ -35,6 +35,9 @@ import { GroupForm, GroupLeadRow } from "./GroupScout";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
 import { placesConfigured } from "@/lib/stores";
+import { providersConfigured } from "@/lib/sneakerApi";
+import DropSyncControls from "./DropSyncControls";
+import FindSkuButton from "./FindSkuButton";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -1304,6 +1307,16 @@ export default async function AdminPage({
         <h2 className="display text-2xl text-white">
           Newsroom <span className="text-smoke">({articles.length})</span>
         </h2>
+
+        {/* Release-date auto-sync (SKU → date waterfall) */}
+        <div className="mt-4">
+          <DropSyncControls
+            providers={providersConfigured()}
+            withSku={articles.filter((a) => a.sku).length}
+            total={articles.length}
+          />
+        </div>
+
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
           <p className="tag text-volt">{editArticleRow ? "Edit article" : "Write article"}</p>
           {editArticleRow && (
@@ -1325,6 +1338,11 @@ export default async function AdminPage({
                       coverImage: editArticleRow.coverImage,
                       tags: editArticleRow.tags,
                       status: editArticleRow.status,
+                      dropAt: editArticleRow.dropAt,
+                      raffleUrl: editArticleRow.raffleUrl,
+                      sku: editArticleRow.sku,
+                      dropSource: editArticleRow.dropSource,
+                      dropCheckedAt: editArticleRow.dropCheckedAt,
                     }
                   : undefined
               }
@@ -1347,9 +1365,23 @@ export default async function AdminPage({
                 <span className={a.status === "PUBLISHED" ? "text-volt" : "text-heat"}>
                   · {a.status.toLowerCase()}
                 </span>
-                <p className="truncate text-xs text-smoke">/news/{a.slug}</p>
+                <p className="truncate text-xs text-smoke">
+                  /news/{a.slug}
+                  {a.dropAt && (
+                    <>
+                      {" · "}
+                      {a.sku ? (
+                        <span className="font-mono text-white">{a.sku}</span>
+                      ) : (
+                        <span className="text-heat">no style code</span>
+                      )}
+                      {a.dropSource && <span className="text-smoke/60"> · {a.dropSource}</span>}
+                    </>
+                  )}
+                </p>
               </div>
               <div className="flex shrink-0 gap-2">
+                {a.dropAt && !a.sku && <FindSkuButton articleId={a.id} />}
                 <Link
                   href={`/admin?editArticle=${a.id}`}
                   className="rounded border border-edge px-3 py-1.5 tag text-white hover:border-volt"

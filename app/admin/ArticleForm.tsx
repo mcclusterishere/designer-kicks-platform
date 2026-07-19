@@ -14,6 +14,9 @@ type Defaults = {
   status?: string;
   dropAt?: Date | null;
   raffleUrl?: string | null;
+  sku?: string | null;
+  dropSource?: string | null;
+  dropCheckedAt?: Date | null;
 };
 
 const inputClass =
@@ -87,6 +90,22 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
           <input id="a-raffle" name="raffleUrl" defaultValue={defaults?.raffleUrl ?? ""}
             placeholder="https://www.nike.com/launch" className={inputClass} />
         </div>
+      </div>
+      <div>
+        <label className="tag text-smoke" htmlFor="a-sku">
+          Style code / SKU <span className="normal-case">(keys the auto date-sync — e.g. DZ5485-612)</span>
+        </label>
+        <input id="a-sku" name="sku" maxLength={40} defaultValue={defaults?.sku ?? ""}
+          placeholder="DZ5485-612" className={`${inputClass} font-mono uppercase`} />
+        {defaults?.dropSource && (
+          <p className="tag mt-1 text-smoke/70">
+            Date source: <span className={defaults.dropSource === "manual" ? "text-volt" : "text-white"}>{defaults.dropSource}</span>
+            {defaults.dropCheckedAt && (
+              <> · last checked {new Date(defaults.dropCheckedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</>
+            )}
+            {defaults.dropSource === "manual" && <> · locked from auto-sync</>}
+          </p>
+        )}
       </div>
       {/* The culture question that rides with this story into the feed */}
       <div className="rounded-lg border border-volt/30 bg-surface p-3">

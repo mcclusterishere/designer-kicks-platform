@@ -37,7 +37,22 @@ Railway; merging the open PR is the deploy trigger.
 | `GOOGLE_PLACES_API_KEY` | Store Scout zip scans | optional |
 | `AFF_EBAY_TEMPLATE` … | affiliate tags on /go links | as approved |
 | `FB_PAGE_ID` / `FB_PAGE_ACCESS_TOKEN` / `IG_USER_ID` | Broadcast auto-posting | optional |
+| `CRON_SECRET` | guards `/api/cron/*` (finalize + drop-date sync) | recommended |
+| `KICKSDB_KEY` **or** `RAPIDAPI_STOCKX_KEY` **or** `APIFY_TOKEN` | drop-date auto-sync by SKU | optional |
 | `NEXT_PUBLIC_GA_ID` | GA override only — live property is built in | not needed |
+
+  **Drop-date auto-sync** (Admin → Newsroom → "Drop date auto-sync"):
+  put a style code (SKU, e.g. `DZ5485-612`) on any drop article and the
+  site pulls its release date from a provider waterfall — KicksDB →
+  StockX (RapidAPI, host `stockx5.p.rapidapi.com`) → Apify — trying each
+  until one answers. It's **dormant** with no key set (zero outbound
+  calls), so it ships safe for $0; add any one free-tier key to switch it
+  on. A human-set date is tagged `manual` and is never overwritten by a
+  scraper. Schedule the nightly job like `finalize`:
+  `GET /api/cron/refresh-drops` with `Authorization: Bearer <CRON_SECRET>`
+  (daily is plenty — cached resale data 24h old is fine for a calendar).
+  Optional overrides: `KICKSDB_API_URL`, `RAPIDAPI_STOCKX_HOST`,
+  `APIFY_SNEAKER_ACTOR`.
 
 ## 2. Post-deploy smoke test (5 minutes, on your phone)
 
@@ -102,6 +117,10 @@ The repo now handles most of this itself — but two settings are yours:
       `Authorization: Bearer <CRON_SECRET>` header every few minutes so
       results settle even in quiet hours. (Any external cron / GitHub
       Action works; Railway has a cron service.)
+- [ ] **Schedule the drop-date sync** (only once a sneaker-API key is set —
+      it's a no-op otherwise). Same scheduler, once a day:
+      `GET /api/cron/refresh-drops` with the `Authorization: Bearer
+      <CRON_SECRET>` header. Keys/behavior are in §1's env table.
 - [ ] Optional but ideal: set the `S3_*` vars (Cloudflare R2 free tier)
       so artist photos serve from the bucket, not through the app process.
 
