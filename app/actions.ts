@@ -24,7 +24,7 @@ import {
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
-import { isPieceCategory, categoryLabel } from "@/lib/categories";
+import { isPieceCategory, categoryLabel, PIECE_CATEGORY_KEYS } from "@/lib/categories";
 import { cultureIQ } from "@/lib/iq";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -593,22 +593,25 @@ async function buildOutfit(
 ): Promise<ActionResult> {
   if (!name || name.length > 60) return { ok: false, error: "Give the fit a name (max 60 characters)." };
   const unique = [...new Set(submissionIds)];
-  if (unique.length < 2 || unique.length > 4) {
-    return { ok: false, error: "A fit is 2 to 4 pieces — one per category." };
+  if (unique.length !== PIECE_CATEGORY_KEYS.length) {
+    return {
+      ok: false,
+      error: "A full outfit is three pieces — one pair of kicks, one apparel piece, one accessory.",
+    };
   }
   const pieces = await prisma.submission.findMany({
     where: { id: { in: unique }, status: "APPROVED" },
   });
   if (pieces.length !== unique.length) return { ok: false, error: "One of those pieces isn't available." };
-  // Outfits are the ONLY place categories mix — and mixing is the
-  // point. One piece per lane: kicks + apparel + headwear + accessories.
-  // Two kicks is a rotation, not a fit.
-  const fitLanes = pieces.map((p) => p.category);
-  if (new Set(fitLanes).size !== fitLanes.length) {
-    const dupe = fitLanes.find((c, i) => fitLanes.indexOf(c) !== i);
+  // Outfits are the ONLY place categories mix — and a fit is a FULL
+  // look: exactly one piece from each of the three lanes (kicks +
+  // apparel + accessory). No dupes, no gaps.
+  const fitLanes = new Set(pieces.map((p) => p.category));
+  if (fitLanes.size !== PIECE_CATEGORY_KEYS.length) {
+    const missing = PIECE_CATEGORY_KEYS.filter((c) => !fitLanes.has(c));
     return {
       ok: false,
-      error: `One piece per category — this fit has two ${categoryLabel(dupe ?? "")} pieces. Mix lanes: kicks, apparel, headwear, accessories.`,
+      error: `A full outfit needs one from each category — you're missing ${missing.map(categoryLabel).join(" and ")}.`,
     };
   }
   if (kind === "FAN" && pieces.some((p) => p.ownerId !== ownerId)) {
@@ -680,6 +683,20 @@ export async function createOutfitBattleAction(
   ]);
   if (!a || !b) return { ok: false, error: "Fit not found." };
 
+  // Two leagues: fan looks battle other fan looks (the Fan Fit League),
+  // and the admin's curated house fits battle each other (Curator
+  // Battles). They never cross — a fan's closet look isn't matched
+  // against a hand-picked house fit.
+  if (a.kind !== b.kind) {
+    return {
+      ok: false,
+      error:
+        a.kind === "FAN" || b.kind === "FAN"
+          ? "Fan fits battle in the Fan Fit League — match two fan looks, or two house looks, never one of each."
+          : "Match two fits from the same league.",
+    };
+  }
+
   // Fair fights only: a fit's overall heat is the average of its
   // pieces' Heat Scores, and battles only pair fits within 0.75 of a
   // flame. A 4.5-flame curator fit never farms a 2-flame starter fit.
@@ -698,12 +715,12 @@ export async function createOutfitBattleAction(
     };
   }
 
-  // One open league: house fits and fan fits share the same arena —
-  // a fan look beating a house look IS the content.
+  // League follows the fits: FAN (Fan Fit League) or HOUSE (Curator
+  // Battles). Both fits are the same kind — checked above.
   await prisma.outfitBattle.create({
     data: {
       title: title || null,
-      league: "OPEN",
+      league: a.kind,
       outfitAId,
       outfitBId,
       endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),

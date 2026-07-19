@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   startQuizRun,
   answerQuestion,
+  forfeitQuestion,
   resumeRun,
   abandonRun,
   buyCreditPack,
@@ -28,6 +29,32 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
+  const forfeitedRef = useRef<Set<string>>(new Set());
+
+  // Anti-cheat: leaving the screen mid-question (tab switch, app
+  // backgrounded) burns that question. It's recorded as a miss so it
+  // never returns, and we auto-advance — no reveal, no notice. Looking
+  // up an answer elsewhere gains nothing because it's already gone.
+  useEffect(() => {
+    if (!state || state.status !== "ACTIVE" || !state.question) return;
+    const qid = state.question.id;
+    const runId = state.runId;
+    function onLeave() {
+      if (document.visibilityState !== "hidden") return;
+      if (forfeitedRef.current.has(qid)) return;
+      forfeitedRef.current.add(qid);
+      startTransition(async () => {
+        const res = await forfeitQuestion(runId, qid);
+        if (res.ok && "state" in res && res.state) {
+          setState(res.state);
+          setFeedback(null);
+          setPicked(null);
+        }
+      });
+    }
+    document.addEventListener("visibilitychange", onLeave);
+    return () => document.removeEventListener("visibilitychange", onLeave);
+  }, [state?.runId, state?.status, state?.question?.id]);
 
   function run(action: () => Promise<{ ok: boolean } & Record<string, unknown>>) {
     setError(null);

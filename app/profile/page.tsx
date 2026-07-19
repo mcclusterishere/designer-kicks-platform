@@ -436,19 +436,23 @@ export default async function ProfilePage() {
         </div>
       )}
 
-      {/* Build a Fit — enter the fit battles with owned pieces */}
-      {user.ownedPieces.length >= 2 && (
+      {/* Build a Fit — a full look from owned pieces, one per category */}
+      {(() => {
+        const lanes = new Set(user.ownedPieces.map((s) => s.category));
+        const canBuild = ["sneakers", "apparel", "accessories"].every((c) => lanes.has(c));
+        return canBuild ? (
         <div className="mt-10">
           <h2 className="display text-2xl text-white">
             Build a Fit
           </h2>
           <p className="mt-1 text-sm text-smoke">
-            Style 2–5 pieces from your closet into a full look and enter the{" "}
+            A full look is <span className="text-white">three pieces you own</span> — one pair of
+            kicks, one apparel piece, one accessory. Assemble it and enter the{" "}
             <Link href="/outfits" className="text-volt underline">
-              Fit Battles
-            </Link>{" "}
-            — your fit can face other fans or the house itself, decided by
-            the culture&apos;s votes.
+              Fan Fit League
+            </Link>
+            , where your look battles other fans&apos; looks — decided by the
+            culture&apos;s votes.
           </p>
           <FitBuilder
             pieces={user.ownedPieces.map((s) => ({
@@ -459,7 +463,8 @@ export default async function ProfilePage() {
             }))}
           />
         </div>
-      )}
+        ) : null;
+      })()}
 
       <h2 className="display mt-10 text-2xl text-white">Your Info</h2>
       <p className="mt-1 text-sm text-smoke">

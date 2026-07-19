@@ -224,6 +224,59 @@ export async function answerQuestion(
   };
 }
 
+/**
+ * Anti-cheat: the player left the screen mid-question (tab hidden /
+ * app backgrounded). Burn the current question as a miss — it lands in
+ * the Culture IQ ledger so it NEVER returns, and it costs a strike
+ * exactly like a wrong answer — then advance. Critically this returns
+ * NO feedback: leaving to look up the answer reveals nothing and gains
+ * nothing, because the question is already forfeited. Silent by design
+ * (the client just moves to the next question) so cheaters can't learn
+ * the rule and switch to a second device.
+ */
+export async function forfeitQuestion(
+  runId: string,
+  questionId: string
+): Promise<QuizActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to play." };
+  const userId = session.user.id;
+
+  const run = await prisma.quizRun.findUnique({ where: { id: runId } });
+  if (!run || run.userId !== userId) return { ok: false, error: "Run not found." };
+  if (run.status !== "ACTIVE") return { ok: true, state: await buildState(userId, run) };
+
+  const ids = JSON.parse(run.questionIds) as string[];
+  const currentId = ids[run.currentIndex];
+  // Stale/raced (they already answered): no-op, just report state.
+  if (currentId !== questionId) {
+    return { ok: true, state: await buildState(userId, run) };
+  }
+
+  // Burn it in the ledger — a miss, never returns, no reveal.
+  try {
+    await prisma.quizAnswer.create({
+      data: { userId, questionId: currentId, correct: false, source: "gauntlet-forfeit" },
+    });
+  } catch {
+    // Already answered elsewhere (feed) — never rescore.
+  }
+  const strike = await consumeStrike(userId);
+  const outOfQuestions = run.currentIndex + 1 >= ids.length;
+  const updated = await prisma.quizRun.update({
+    where: { id: run.id },
+    data: {
+      wrongCount: run.wrongCount + 1,
+      usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
+      currentIndex: run.currentIndex + 1,
+      status: !strike ? "NEEDS_CREDITS" : outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
+      completedAt: outOfQuestions && strike ? new Date() : null,
+    },
+  });
+  // No feedback — the correct answer is never disclosed on a forfeit.
+  return { ok: true, state: await buildState(userId, updated) };
+}
+
 /** After buying credits, unblock the stalled run and continue. */
 export async function resumeRun(runId: string): Promise<QuizActionResult> {
   const session = await auth();

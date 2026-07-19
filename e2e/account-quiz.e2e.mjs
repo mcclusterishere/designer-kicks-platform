@@ -58,6 +58,38 @@ await page.getByRole("button", { name: "Start The Heat Check" }).click();
 await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 10000 });
 check("quiz run starts with a question", true);
 
+// ---------- Anti-cheat: leaving the screen burns the question ----------
+// Switching tabs / backgrounding mid-question forfeits it silently: the
+// question is recorded as a miss (never returns), the deck advances,
+// and the correct answer is NEVER revealed.
+const preForfeitQ = (await page.locator("[data-testid=quiz-question]").first().textContent())?.trim();
+const forfeitsBefore = await prisma.quizAnswer.count({ where: { userId: dbUser.id, source: "gauntlet-forfeit" } });
+await page.evaluate(() => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+  Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+  document.dispatchEvent(new Event("visibilitychange"));
+});
+await page
+  .waitForFunction(
+    (prev) => {
+      const h = document.querySelector("[data-testid=quiz-question]");
+      return h && h.textContent.trim() !== prev;
+    },
+    preForfeitQ,
+    { timeout: 15000 }
+  )
+  .catch(() => {});
+await page.evaluate(() => {
+  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+  Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+});
+const forfeitsAfter = await prisma.quizAnswer.count({ where: { userId: dbUser.id, source: "gauntlet-forfeit" } });
+check("leaving the screen burns the question as a miss", forfeitsAfter === forfeitsBefore + 1);
+check(
+  "forfeit reveals no answer (no reveal shown)",
+  !(await page.getByText(/Wrong — it was/).isVisible().catch(() => false))
+);
+
 async function currentQuestion() {
   const text = (await page.locator("[data-testid=quiz-question]").first().textContent())?.trim();
   return prisma.quizQuestion.findFirst({ where: { question: text ?? "" } });

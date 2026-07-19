@@ -29,7 +29,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
     createHouseOutfit,
     null
   );
-  const byCategory = ["sneakers", "apparel", "headwear", "accessories"].map((c) => ({
+  const byCategory = ["sneakers", "apparel", "accessories"].map((c) => ({
     category: c,
     pieces: pieces.filter((p) => p.category === c),
   }));
@@ -40,6 +40,10 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
         <label className="tag text-smoke" htmlFor="ho-name">Fit name *</label>
         <input id="ho-name" name="name" required maxLength={60} placeholder='"All-City Sunday"' className={inputClass} />
       </div>
+      <p className="text-xs text-smoke">
+        A full outfit is <span className="text-white">exactly three pieces</span> — one from each
+        column: kicks, apparel, accessory.
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {byCategory.map((group) => (
           <div key={group.category} className="rounded-lg border border-edge bg-surface p-3">
@@ -66,7 +70,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
       {state?.ok && <p className="text-sm text-volt">Fit created ✓ — match it below.</p>}
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending} className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
-        {pending ? "Creating…" : "Create House Fit (2–5 pieces)"}
+        {pending ? "Creating…" : "Create House Fit (one per category)"}
       </button>
     </form>
   );
@@ -81,6 +85,11 @@ export function OutfitBattleForm({ outfits }: { outfits: OutfitOption[] }) {
   );
   return (
     <form action={formAction} className="space-y-3">
+      <p className="text-xs text-smoke">
+        Match same-league only: two <span className="text-white">[Fan]</span> looks
+        (Fan Fit League) or two <span className="text-white">[House]</span> looks
+        (Curator Battles). Heat within 0.75🔥.
+      </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {["outfitAId", "outfitBId"].map((field, i) => (
           <div key={field}>

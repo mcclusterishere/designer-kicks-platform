@@ -2,15 +2,14 @@
 // read as what they are everywhere, instead of defaulting to shoe-speak.
 //
 // These are also the league's CATEGORY WALLS: every piece lives in
-// exactly one lane and never battles outside it — hats don't face
-// shoes, vests don't face hats, chains don't face either. Enforced at
+// exactly one lane and never battles outside it. The ONLY place lanes
+// mix is a full outfit (one piece from each of the three). Enforced at
 // every point a matchup is created: admin battles, call-outs, and
 // tournament seeding.
 export const CATEGORY_META: Record<string, { emoji: string; label: string }> = {
   sneakers: { emoji: "👟", label: "Sneakers" },
   apparel: { emoji: "🧥", label: "Apparel" },
-  headwear: { emoji: "🧢", label: "Headwear" },
-  accessories: { emoji: "⛓️", label: "Accessories" },
+  accessories: { emoji: "🧢", label: "Accessories" },
 };
 
 export const PIECE_CATEGORY_KEYS = Object.keys(CATEGORY_META);

@@ -7,7 +7,7 @@ import OutfitVotePanel from "@/components/OutfitVotePanel";
 export const metadata = {
   title: "Fit Battles — Outfit vs Outfit | The Heat Chart",
   description:
-    "Full looks built from one-of-one customs go head-to-head in one open league — house-curated fits vs fan-built fits, decided by your votes.",
+    "Full looks — kicks, apparel, accessory — go head-to-head. Fans battle fans in the Fan Fit League; the house runs Curator Battles. Your votes decide.",
 };
 export const dynamic = "force-dynamic";
 
@@ -45,6 +45,8 @@ export default async function OutfitsPage() {
 
   const active = battles.filter((b) => b.status === "ACTIVE");
   const completed = battles.filter((b) => b.status === "COMPLETED");
+  const fanActive = active.filter((b) => b.league === "FAN");
+  const houseActive = active.filter((b) => b.league !== "FAN");
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
@@ -85,22 +87,55 @@ export default async function OutfitsPage() {
         ))}
       </div>
 
-      {/* One open league: house-curated looks and fan fits share the
-          arena — provenance rides on each card, votes settle the rest. */}
+      {/* Two leagues: the Fan Fit League (fans' closet looks vs each
+          other) and Curator Battles (the house's hand-picked fits). */}
       <section className="mt-10">
         <div className="rule w-16" />
-        <h2 className="display mt-2 text-2xl text-white sm:text-3xl">Live Fit Battles</h2>
+        <h2 className="display mt-2 text-2xl text-white sm:text-3xl">
+          <span className="text-volt">Fan Fit League</span>
+        </h2>
         <p className="mt-1 text-sm text-smoke">
-          League-office looks and fan-built fits, one arena. A fan fit
-          taking down a house fit is exactly the kind of upset we live for.
+          Looks built by fans from pieces they actually own, battling other
+          fans. Cop a full fit — kicks, apparel, accessory — and enter.
         </p>
-        {active.length === 0 ? (
+        {fanActive.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-6 text-center text-smoke">
-            No live fit battles right now — new matchups drop as fits come in.
+            No live fan fit battles yet — build one from your closet to kick it off.
           </p>
         ) : (
           <div className="mt-5 space-y-8">
-            {active.map((b) => (
+            {fanActive.map((b) => (
+              <div key={b.id}>
+                {b.title && <p className="tag mb-2 text-volt">{b.title}</p>}
+                <OutfitVotePanel
+                  battleId={b.id}
+                  a={toSide(b, "A")}
+                  b={toSide(b, "B")}
+                  active
+                  isAuthed={Boolean(session?.user)}
+                  yourVote={voteMap.get(b.id) ?? null}
+                  winnerId={b.winnerId}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-12">
+        <div className="rule w-16" />
+        <h2 className="display mt-2 text-2xl text-white sm:text-3xl">Curator Battles</h2>
+        <p className="mt-1 text-sm text-smoke">
+          The house&apos;s hand-picked looks from across the whole roster,
+          head to head.
+        </p>
+        {houseActive.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-6 text-center text-smoke">
+            No live curator battles right now — new matchups drop regularly.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-8">
+            {houseActive.map((b) => (
               <div key={b.id}>
                 {b.title && <p className="tag mb-2 text-volt">{b.title}</p>}
                 <OutfitVotePanel

@@ -261,20 +261,20 @@ check("claimed password untouched by re-preload", Boolean(claimedUser?.passwordH
 const wallKicks = await prisma.submission.create({
   data: { title: "Wall Kicks", artistName: "Preload Test Artist", email: EMAIL, baseShoe: "AF1", imageUrl: "/seed/custom-1.svg", status: "APPROVED", category: "sneakers", artistId: artist.id },
 });
-const wallHat = await prisma.submission.create({
-  data: { title: "Wall Fitted", artistName: "Preload Test Artist", email: EMAIL, baseShoe: "New Era 59FIFTY", imageUrl: "/seed/custom-2.svg", status: "APPROVED", category: "headwear", artistId: artist.id },
+const wallChain = await prisma.submission.create({
+  data: { title: "Wall Chain", artistName: "Preload Test Artist", email: EMAIL, baseShoe: "Cuban link", imageUrl: "/seed/custom-2.svg", status: "APPROVED", category: "accessories", artistId: artist.id },
 });
 await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
 await page.getByText("Start a Battle", { exact: false }).first().waitFor({ timeout: 10000 }).catch(() => {});
-await page.selectOption("#subAId", wallHat.id);
-check("side B announces the wall", await page.getByText(/Headwear only — category wall/).isVisible());
+await page.selectOption("#subAId", wallChain.id);
+check("side B announces the wall", await page.getByText(/Accessories only — category wall/).isVisible());
 const sideBTexts = await page.locator("#subBId option").allTextContents();
 check("sneakers walled out of side B", !sideBTexts.some((t) => t.includes("Wall Kicks")));
-const hatBox = page.locator(`input[name="participants"][value="${wallHat.id}"]`);
-await hatBox.check();
+const chainBox = page.locator(`input[name="participants"][value="${wallChain.id}"]`);
+await chainBox.check();
 const kickBox = page.locator(`input[name="participants"][value="${wallKicks.id}"]`);
 check("tournament picker grays the other lane", await kickBox.isDisabled());
-check("bracket announces its lane", await page.getByText("Headwear bracket — category wall is on.").isVisible());
+check("bracket announces its lane", await page.getByText("Accessories bracket — category wall is on.").isVisible());
 await page.screenshot({ path: `${SHOTS}/category-walls.png`, fullPage: false });
 check(
   "no cross-category battles exist anywhere",

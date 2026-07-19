@@ -100,8 +100,7 @@ export default function PreloadArtistForm() {
           <select id="pl-cat" name="category" defaultValue="sneakers" className={inputClass}>
             <option value="sneakers">👟 Sneakers</option>
             <option value="apparel">🧥 Apparel</option>
-            <option value="headwear">🧢 Headwear</option>
-            <option value="accessories">⛓️ Accessories</option>
+            <option value="accessories">🧢 Accessories</option>
           </select>
         </div>
         <div>
