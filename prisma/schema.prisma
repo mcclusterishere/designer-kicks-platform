@@ -651,6 +651,10 @@ model Article {
 
 model Product {
   id           String  @id @default(cuid())
+  // Stable key for the seed top-up: curated slate products upsert by
+  // slug (create-only — admin edits are never overwritten on deploy).
+  // Admin-created products have no slug and are never touched.
+  slug         String? @unique
   name         String
   merchant     String
   category     String // marketplace | retail | customization | cleaning | accessories

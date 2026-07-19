@@ -126,6 +126,17 @@ check("outbound click logged with merchant + hash", Boolean(clickRow?.visitorHas
 const evil = await go("https://evil-phisher.example/steal");
 check("unknown host refused — no open redirect", evil.status === 302 && new URL(evil.location, BASE).pathname === "/");
 
+// New marketplace merchants pass the allowlist
+const etsy = await go("https://www.etsy.com/search?q=custom%20sneakers");
+check("etsy allowlisted for the Market", etsy.status === 302 && etsy.location.startsWith("https://www.etsy.com/search"));
+
+// ---------- Admin Market Pulse shows the money funnel ----------
+await admin.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+const marketPulse = admin.locator('[data-testid="market-pulse"]');
+check("market pulse renders", await marketPulse.getByRole("heading", { name: "Market Pulse" }).isVisible());
+check("market pulse counts stockx clicks", (await marketPulse.getByText("stockx", { exact: true }).count()) >= 1);
+check("market pulse shows placement refs", (await marketPulse.getByText("e2e-go", { exact: true }).count()) >= 1);
+
 const botGo = await fetch(`${BASE}/go?u=${encodeURIComponent("https://www.goat.com/search?query=x")}&ref=e2e-go`, {
   redirect: "manual",
   headers: { "user-agent": "facebookexternalhit/1.1" },

@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { drops2026 } from "./seed-drops-2026.mjs";
+import { marketSlate } from "./seed-products.mjs";
 
 const prisma = new PrismaClient();
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -122,33 +123,20 @@ const submissions = [
   },
 ];
 
-// Affiliate marketplace starter set. URLs are PLAIN merchant links —
-// swap in your tagged affiliate links from AFFILIATES.md as you get
-// approved for each program (edit in /admin).
-const products = [
-  // Marketplaces
-  { name: "Hyped + Rare Pairs", merchant: "StockX", category: "marketplace", blurb: "Live-market pricing on the most hyped releases.", affiliateUrl: "https://stockx.com/sneakers", featured: true, sortOrder: 1 },
-  { name: "Authenticated Grails", merchant: "GOAT", category: "marketplace", blurb: "New + used grails, every pair verified.", affiliateUrl: "https://www.goat.com/sneakers", sortOrder: 2 },
-  { name: "Rare Sneaker Vault", merchant: "Flight Club", category: "marketplace", blurb: "The consignment OG for deadstock heat.", affiliateUrl: "https://www.flightclub.com/", sortOrder: 3 },
-  { name: "Region-Exclusive Drops", merchant: "KicksCrew", category: "marketplace", blurb: "Overseas exclusives you can't get at home.", affiliateUrl: "https://www.kickscrew.com/", sortOrder: 4 },
-  // Retail
-  { name: "New Release Wall", merchant: "Foot Locker", category: "retail", blurb: "Launch calendar staples and restocks.", affiliateUrl: "https://www.footlocker.com/category/shoes.html", sortOrder: 10 },
-  { name: "Hype Drops + Exclusives", merchant: "JD Sports", category: "retail", blurb: "Frequent exclusives on the newest silhouettes.", affiliateUrl: "https://www.jdsports.com/", sortOrder: 11 },
-  { name: "Boutique Launches", merchant: "END. Clothing", category: "retail", blurb: "Boutique collabs, raffles, and limited runs.", affiliateUrl: "https://www.endclothing.com/us/footwear", sortOrder: 12 },
-  { name: "Nike By You Customs", merchant: "Nike", category: "retail", blurb: "Factory-custom colorways straight from Nike.", affiliateUrl: "https://www.nike.com/nike-by-you", sortOrder: 13 },
-  // Customization supplies
-  { name: "Leather Paint Starter Kit", merchant: "Angelus Direct", category: "customization", blurb: "The industry-standard paints every customizer starts with.", price: "From $34.99", affiliateUrl: "https://angelusdirect.com/collections/paint-kits", featured: true, sortOrder: 20 },
-  { name: "Neon Collection Paints", merchant: "Angelus Direct", category: "customization", blurb: "The glow-bright colors behind half the customs in the arena.", price: "From $4.49", affiliateUrl: "https://angelusdirect.com/collections/neon-collection", sortOrder: 21 },
-  { name: "Finisher + Sealer Range", merchant: "Angelus Direct", category: "customization", blurb: "Matte to high-gloss topcoats that lock your work in.", price: "From $5.99", affiliateUrl: "https://angelusdirect.com/collections/finishers", sortOrder: 22 },
-  // Cleaning
-  { name: "Signature Cleaning Kit", merchant: "Reshoevn8r", category: "cleaning", blurb: "3-brush deep-clean system the resellers swear by.", price: "From $29.95", affiliateUrl: "https://reshoevn8r.com/collections/cleaning-kits", featured: true, sortOrder: 30 },
-  { name: "Rain & Stain Spray", merchant: "Crep Protect", category: "cleaning", blurb: "Hydrophobic shield before the first wear. Non-negotiable.", price: "From $14.99", affiliateUrl: "https://crepprotect.com/collections/all", sortOrder: 31 },
-  { name: "Premium Shoe Cleaner", merchant: "Jason Markk", category: "cleaning", blurb: "Gentle enough for suede, strong enough for midsoles.", price: "From $8", affiliateUrl: "https://jasonmarkk.com/collections/shoe-care", sortOrder: 32 },
-  // Accessories
-  { name: "Premium Rope Laces", merchant: "Lace Lab", category: "accessories", blurb: "The lace swap that finishes a custom.", price: "From $8.99", affiliateUrl: "https://www.lacelab.com/collections/rope-laces", featured: true, sortOrder: 40 },
-  { name: "Crease Protectors", merchant: "Amazon", category: "accessories", blurb: "Keep the toe box crispy between wears.", price: "From $9.99", affiliateUrl: "https://www.amazon.com/s?k=sneaker+crease+protector", sortOrder: 41 },
-  { name: "Sneaker Display Cases", merchant: "Amazon", category: "accessories", blurb: "Stack and show the collection properly.", price: "From $24.99", affiliateUrl: "https://www.amazon.com/s?k=sneaker+display+case", sortOrder: 42 },
-  { name: "Cedar Shoe Trees", merchant: "Amazon", category: "accessories", blurb: "Shape + moisture control for pairs that matter.", price: "From $19.99", affiliateUrl: "https://www.amazon.com/s?k=cedar+shoe+trees", sortOrder: 43 },
+// The Market's curated slate lives in seed-products.mjs. Products top
+// up by slug on deploy (create-only — /admin edits always win). The
+// names below are the retired pre-slug starter set: launch seeding
+// clears them once so the curated slate replaces them cleanly. The
+// shop was never public while they existed, and admin-created products
+// (different names, no slug) are never touched.
+const products = marketSlate;
+const retiredStarterNames = [
+  "Hyped + Rare Pairs", "Authenticated Grails", "Rare Sneaker Vault",
+  "Region-Exclusive Drops", "New Release Wall", "Hype Drops + Exclusives",
+  "Boutique Launches", "Nike By You Customs", "Leather Paint Starter Kit",
+  "Neon Collection Paints", "Finisher + Sealer Range", "Signature Cleaning Kit",
+  "Rain & Stain Spray", "Premium Shoe Cleaner", "Premium Rope Laces",
+  "Crease Protectors", "Sneaker Display Cases", "Cedar Shoe Trees",
 ];
 
 // Drop Report seed articles. Release info researched July 2026 from
@@ -169,6 +157,12 @@ const articles = [
     daysAgo: 1,
     dropAt: new Date("2026-09-05T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
+    question: {
+      q: "Peel back the Velcro tongue patch on the original 2006 'Tour Yellow' AJ4 — what branding was hidden underneath?",
+      options: ["Nike Air", "Rare Air", "Jordan Flight", "Tuned Air"],
+      answer: 1,
+      explain: "It was just the second AJ4 with the removable patch revealing 'Rare Air,' after the 2005 Undefeated x AJ4 introduced the concept.",
+    },
     content: [
       "## The drop at a glance",
       "",
@@ -183,6 +177,12 @@ const articles = [
       "## Why this one matters",
       "",
       "The 'Tour Yellow' Air Jordan 4 dropped once — May 2006 — and then vanished for two decades. This September it gets its **first retro ever**, and colorways that skip a generation are exactly the ones that disappear on release day. Rare Air-era nostalgia is real, and AJ4s are consistently among the most-flipped retros on the market.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The original dropped May 20, 2006 as the Air Jordan 4 Retro LS 'Tour Yellow' (314254-171) at $125 — the 2026 drop is its first retro ever, 20 years later.",
+      "- It was only the second AJ4 to hide 'Rare Air' branding under a removable Velcro tongue patch, a concept introduced on the 2005 Undefeated x Air Jordan 4.",
+      "- The 2026 numbers are locked: September 5, 2026, $220, IO2463-102, White/Tour Yellow-Dark Blue Grey-Black, with the Tour Yellow riding a speckled cement-effect midsole.",
       "",
       "## How to cop",
       "",
@@ -207,6 +207,17 @@ const articles = [
     daysAgo: 3,
     dropAt: new Date("2026-10-10T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
+    question: {
+      q: "What was the collector complaint about the 2017 'Royal' that the 2026 retro was built to fix?",
+      options: [
+        "It used tumbled leather instead of smooth 1985-style leather",
+        "It swapped the Nike Air heel for a Jumpman",
+        "It only released in a mid cut",
+        "It reversed the black/royal blocking",
+      ],
+      answer: 0,
+      explain: "The 2017 pair's tumbled leather drew years of criticism; the 2026 release returns to smooth leather closer to the 1985 original.",
+    },
     content: [
       "## The drop at a glance",
       "",
@@ -223,6 +234,12 @@ const articles = [
       "Bred. Chicago. **Royal.** Those are the three 1985 originals, and the Royal has only ever seen three High OG releases. This fourth release matters because Nike is going back to the **smooth leather closer to the 1985 original** — not the tumbled leather of the 2017 pair — which is exactly what collectors have been asking for.",
       "",
       "Expect one of the most contested SNKRS drops of Q4. If you only chase one pair this fall, this is a defensible pick.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The 2017 Royal (555088-007) dropped April 1, 2017 at $160 in tumbled leather — the exact gripe this 2026 pair answers.",
+      "- 2026 is only the fourth High OG release of the Royal in 40-plus years: 1985, 2013, 2017, 2026.",
+      "- This one uses the standard High OG cut, not the more limited '85 shape.",
       "",
       "## How to cop",
       "",
@@ -247,6 +264,12 @@ const articles = [
     daysAgo: 5,
     dropAt: new Date("2026-08-08T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
+    question: {
+      q: "What did the original 2010 Air Jordan 6 'Oreo' retail for on release day?",
+      options: ["$125", "$135", "$150", "$175"],
+      answer: 2,
+      explain: "The March 20, 2010 release (384664-101) retailed at $150 — and never returned until the 2026 retro.",
+    },
     content: [
       "## The drop at a glance",
       "",
@@ -255,14 +278,20 @@ const articles = [
       "| **Release date** | August 8, 2026 |",
       "| **Retail price** | $215 |",
       "| **Style code** | CT8529-108 |",
-      "| **Colorway** | White / Black — white tumbled leather, black speckled suede |",
+      "| **Colorway** | Black / White — black nubuck and suede base, white tumbled leather overlays |",
       "| **Where** | Nike.com / SNKRS, Finish Line, Foot Locker, JD Sports, Hibbett |",
       "",
       "## 16 years is a long time",
       "",
-      "The 'Oreo' 6 last released in **2010**, and this return stays close to the original blocking — white tumbled leather up top, black speckled midsole doing the cookie work. Long-dormant colorways carry real nostalgia demand: people who missed it as teenagers now have adult money.",
+      "The 'Oreo' 6 last released in **2010**, and this return stays true to the original blocking — a black nubuck and suede base with white tumbled leather overlays doing the cream work, the same way the 2010 pair wore it. Long-dormant colorways carry real nostalgia demand: people who missed it as teenagers now have adult money.",
       "",
       "Expect a fast sell-through. Wide sizing helps your odds, but do not sleep on release morning.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The original 'Oreo' 6 (384664-101) dropped March 20, 2010 at $150 — its only run before 2026.",
+      "- The 2026 retro comes in full family sizing: $215 men, $155 GS, $95 PS, $80 toddler.",
+      "- The speckle isn't just underfoot — it hits the black midsole, the lace lock, and the heel tab.",
       "",
       "## How to cop",
       "",
@@ -283,6 +312,12 @@ const articles = [
     tags: "Travis Scott, Jordan, Rumors",
     coverImage: "/seed/news-4.svg",
     daysAgo: 7,
+    question: {
+      q: "The 2022 Reverse Mocha Low set the all-time SNKRS record — how many draw entries did Nike report?",
+      options: ["1.2 million", "2.4 million", "3.8 million", "5.6 million"],
+      answer: 2,
+      explain: "Nike reported 3.8 million SNKRS entries, the most ever; 2.4 million was the 30-minute travisscott.com presale figure.",
+    },
     content: [
       "## Rumor status: strong, but not official",
       "",
@@ -299,6 +334,12 @@ const articles = [
       "",
       "This is the **high-top follow-up to 2022's Reverse Mocha Low** — the shoe that broke SNKRS entry records. It inverts the blocking of the 2019 'Mocha' High that started the whole Travis AJ1 era. Travis Scott AJ1 Highs are the most heavily traded modern Jordans, and early expectations put resale in the several-hundred-to-four-figure range.",
       "",
+      "## The deep cuts",
+      "",
+      "- The 2022 Reverse Mocha Low (DM7866-162) dropped July 21, 2022 at $150 and set the all-time SNKRS record: 3.8 million entries for roughly 60,000 pairs — about a 1.5% win rate.",
+      "- Before SNKRS even opened, the travisscott.com presale pulled 2.4 million entries in about 30 minutes.",
+      "- The High inverts the 2019 'Mocha' (CD4487-100) blocking: white tumbled leather base, brown suede overlays, black reverse Swoosh, sail midsole.",
+      "",
       "## Realistic ways in",
       "",
       "- **SNKRS exclusive access** — buy Jordan product on your Nike account all year; access drops favor active accounts.",
@@ -312,10 +353,21 @@ const articles = [
     slug: "august-2026-sneaker-release-dates-calendar",
     title: "August 2026 Sneaker Release Dates: Every Drop That Actually Matters",
     excerpt:
-      "The full August 2026 sneaker release calendar — Jordan 1 'Love Letter', Flint 13s, Oreo 6s, three Kobe Protros, and the Space Jam 9s, with dates and prices.",
+      "The full August 2026 sneaker release calendar — Jordan 1 'Love Letter', Flint 13s, Oreo 6s, the Kobe 'Halo' birthday drop, and the Space Jam 9s, with dates and prices.",
     tags: "Release Dates, Calendar, SNKRS",
     coverImage: "/seed/news-5.svg",
     daysAgo: 0,
+    question: {
+      q: "Nike's official 'Mamba Day' drops land on April 13 every year — what does that date mark?",
+      options: [
+        "Kobe's birthday",
+        "His 81-point game",
+        "The 8/24 jersey retirement",
+        "His 60-point final NBA game on April 13, 2016",
+      ],
+      answer: 3,
+      explain: "Mamba Day commemorates Kobe's 60-point farewell against Utah on April 13, 2016; his birthday is Aug 23 and Kobe Bryant Day is 8/24.",
+    },
     content: [
       "## The calendar",
       "",
@@ -324,20 +376,26 @@ const articles = [
       "| Aug 1 | Air Jordan 1 High OG 'Love Letter' (DZ5485-201) | $185 |",
       "| Aug 1 | Air Jordan 13 Retro 'Flint' (IW3808-400) | $215 |",
       "| Aug 8 | Air Jordan 6 'Oreo' (CT8529-108) | $215 |",
-      "| Aug 8 | Nike Kobe 8 Protro 'Mambacurial' | $200 |",
-      "| Aug 15 | Nike Kobe 5 Protro 'Dodgers' | $190 |",
-      "| Aug 23 | Kobe 10 Elite Low Protro 'Halo' (Mamba Day) | TBC |",
+      "| Aug 8 → Sep 19 (delayed) | Nike Kobe 8 Protro 'Mambacurial' | $200 |",
+      "| Aug 15 → Sep 8 (moved) | Nike Kobe 5 Protro 'Dodgers' | $190 |",
+      "| Aug 23 | Kobe 10 Elite Low Protro 'Halo' (Kobe's birthday) | TBC |",
       "| Aug 29 | Air Jordan 9 Retro OG 'Space Jam' (HV4794-106) | $215 |",
       "",
       "## The ones to actually chase",
       "",
-      "**Jordan 1 'Love Letter' (Aug 1)** — MJ's retirement letter to basketball, printed on the medial side. Story pairs like this age well.",
+      "**Jordan 1 'Love Letter' (Aug 1)** — a tribute to MJ's 2003 farewell letter to basketball. The letter itself isn't printed on the shoe; his sign-off, 'Much Love and Respect,' is debossed on the inner ankle flap, with a leather hangtag to match. Story pairs like this age well.",
       "",
       "**Jordan 6 'Oreo' (Aug 8)** — first return in 16 years. [Full breakdown here](/news/air-jordan-6-oreo-2026-release-date).",
       "",
-      "**The Kobe month** — three Protro drops in four weeks, capped by Mamba Day on August 23. Kobe releases are still the hardest wins on SNKRS; enter everything.",
+      "**The Kobe slate** — August thinned out late: the 8 'Mambacurial' slid to September 19 (the $200 tag holds) and the 5 'Dodgers' moved to September 8, leaving the 10 Elite Low 'Halo' to carry the month on August 23 — Kobe's birthday, his would-be 48th. Don't call it Mamba Day: Nike runs that on April 13, and Kobe Bryant Day is 8/24. Kobe releases are still the hardest wins on SNKRS; enter everything.",
       "",
       "**Space Jam 9s (Aug 29)** — timed to the movie's 30th anniversary with OG-style packaging and shaping closer to the 1993 original.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The Kobe 11 EM Protro 'Mamba Day' dropped April 13, 2026 — Nike anchors Mamba Day to the anniversary of Kobe's 60-point final game, April 13, 2016.",
+      "- The all-white 'Halo' tribute series has run yearly since the Kobe 8 Protro 'Halo' in 2023, working through both Kobe 9 builds on its way to the 10.",
+      "- Aug 1 is a double-header — Flint 13 (IW3808-400, $215) and Love Letter 1 (DZ5485-201, $185) drop together — with the Oreo 6 ($215) on Aug 8 and the Space Jam 9 (HV4794-106, $215) closing the month Aug 29.",
       "",
       "## Game plan",
       "",
@@ -360,16 +418,28 @@ const articles = [
     dropAt: new Date("2026-07-23T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "What is Nike's official name for the creamy off-white leather base on the 'Birds of Paradise' 4?",
+      options: ["Sail", "Summit White", "Phantom", "Coconut Milk"],
+      answer: 3,
+      explain: "The SNKRS listing is officially 'Coconut Milk and Bright Mango' (HV0823-101).",
+    },
     content: [
       "## The drop",
       "",
-      "The **Air Jordan 4 'Birds of Paradise'** lands **Wednesday, July 23, 2026** for **$220** as a women's exclusive. The blocking is Coconut Milk leather over Bright Mango hits with a Muslin midsole — the rare 4 that reads soft instead of loud, and it photographs beautifully.",
+      "The **Air Jordan 4 'Birds of Paradise'** lands **Thursday, July 23, 2026** for **$220** as a women's exclusive. The blocking is Coconut Milk leather over Bright Mango hits with a Muslin midsole — the rare 4 that reads soft instead of loud, and it photographs beautifully.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The official colorway (HV0823-101) runs Coconut Milk/Metallic Gold-Muslin-Bright Mango-Sundial-Black — SNKRS lists it simply as 'Coconut Milk and Bright Mango.'",
+      "- The color story lives underfoot: a semi-translucent gradient outsole fades Bright Mango through Sundial into navy, with translucent TPU wings and eyestays softening the build.",
+      "- The namesake bird of paradise flower — Strelitzia — is native to South Africa.",
       "",
       "## How to cop",
       "",
       "1. **SNKRS** at 10 AM ET — set the notification now.",
       "2. **Retailer raffles** — women's-exclusive 4s often sit a touch longer than the men's hype pairs, so in-store lists are a real path.",
-      "3. Sizing note: women's sizing — men, convert down 1.5 and hunt the larger end of the run.",
+      "3. Sizing note: this runs women's sizing — men, convert UP 1.5 (a men's 9 wears a women's 10.5 in Nike sizing) and hunt the larger end of the run.",
       "",
       "## The customizer angle",
       "",
@@ -380,22 +450,34 @@ const articles = [
   },
   {
     slug: "air-jordan-8-bin-23-release-date",
-    title: "Air Jordan 8 'BIN 23' Drops July 24 at $350 — The Premium Series Is Back",
+    title: "Air Jordan 8 'BIN 23' Drops August 15 at $355 — 2026's Third BIN Release",
     excerpt:
-      "The Air Jordan 8 'BIN 23' releases July 24, 2026 for $350 in Legion Pine and red — the luxury BIN series returns with full-grain leather and numbered pairs.",
+      "The Air Jordan 8 'BIN 23' releases August 15, 2026 for $355 in Legion Pine and red — the third BIN 23 drop of the year, with luxury materials and numbered pairs.",
     tags: "Jordan, Release Dates, Grails",
     coverImage: "/seed/drop-2.svg",
-    dropAt: new Date("2026-07-24T12:00:00Z"),
+    dropAt: new Date("2026-08-15T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "How many pairs of the Air Jordan 8 'BIN 23' are being produced?",
+      options: ["1,985 pairs", "2,300 pairs", "8,000 pairs", "23,000 pairs"],
+      answer: 1,
+      explain: "Production is capped at 2,300 individually numbered pairs, echoing the BIN 23 name.",
+    },
     content: [
       "## The drop",
       "",
-      "**BIN 23 is back.** The premium line that gave grails the luxury treatment returns on the **Air Jordan 8**, dropping **Thursday, July 24, 2026** at **$350**. Legion Pine nubuck, deep red accents, upgraded materials throughout — this is the 8 built like a dress shoe.",
+      "**BIN 23 rolls on.** The premium line that gives grails the luxury treatment lands on the **Air Jordan 8** — the third BIN 23 drop of 2026, after the AJ3 and AJ6 earlier this year — arriving **Saturday, August 15, 2026** at **$355**. Legion Pine nubuck, deep red accents, upgraded materials throughout — this is the 8 built like a dress shoe.",
       "",
       "## Why it matters",
       "",
       "BIN pairs are produced in tighter numbers than general releases and historically hold resale value better than almost any non-collab retro. If you're buying one pair this month as an investment piece, this is the conversation.",
+      "",
+      "## The deep cuts",
+      "",
+      "- Limited to 2,300 individually numbered pairs — a nod to the BIN '23' name (style code IO2053-300).",
+      "- The extras run deep: a red wax '23' seal on the left tongue, wooden shoe trees, dust bags, a retro card, and a green pull-out box.",
+      "- It sells through SNKRS and Tier-0/select Jordan stockists, dressed in tonal Legion Pine nubuck and suede.",
       "",
       "## How to cop",
       "",
@@ -404,7 +486,7 @@ const articles = [
       "",
       "## The collector angle",
       "",
-      "A $350 retail with limited numbers is exactly the kind of piece our [Market](/market) exists for — record the sale with a receipt and the ✓ travels with the shoe forever.",
+      "A $355 retail with 2,300 numbered pairs is exactly the kind of piece our [Market](/market) exists for — record the sale with a receipt and the ✓ travels with the shoe forever.",
       "",
       "*Dates shift — check the [Drop Calendar](/drops) before you camp.*",
     ].join("\n"),
@@ -419,10 +501,27 @@ const articles = [
     dropAt: new Date("2026-07-25T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "The AJ4 'Comic' pulls its ink-line artwork from which piece of MJ history?",
+      options: [
+        "Space Jam animation storyboards",
+        "His 1985 comic-style Nike 'Dunk' T-shirt",
+        "A 1996 SLAM magazine cover",
+        "His Wheaties box illustration",
+      ],
+      answer: 1,
+      explain: "Jordan Brand lifted the graphic language from the 1985 comic-themed Nike tee of MJ dunking, not from any film or magazine art.",
+    },
     content: [
       "## The drop",
       "",
       "The **Air Jordan 4 'Comic'** hits **Saturday, July 25, 2026** for **$230** — Off White base, Anthracite structure, and Fire Pink hits with comic-book ink detailing on the panels. It's the loudest 4 of the summer and the one your feed will not shut up about.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The artwork traces to MJ's 1985 comic-style Nike 'Dunk' T-shirt — Michael soaring for a dunk in comic-book linework.",
+      "- Comic-book 'POW!'-style graphics hit the panels, and the Nike Air heel branding is redrawn in a vintage comic font with a pixelated gradient.",
+      "- Full family sizing: $230 adult, $165 GS, $105 PS, $90 TD — retailers list it under JA1135-100, some under IO2362-100.",
       "",
       "## How to cop",
       "",
@@ -447,10 +546,22 @@ const articles = [
     dropAt: new Date("2026-08-01T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "The 'Love Letter' AJ1 carries the phrase MJ used to sign his 2003 farewell letter — what's debossed on the inner ankle flap?",
+      options: ["'I'm Back'", "'Love of the Game'", "'Much Love and Respect'", "'Forever, Michael'"],
+      answer: 2,
+      explain: "MJ closed his 2003 open letter to basketball with 'Much Love and Respect,' and Jordan Brand debossed it into the ankle flap.",
+    },
     content: [
       "## Two grails, one morning",
       "",
       "**Saturday, August 1, 2026** is the deepest morning of the summer: the **Air Jordan 13 'Flint'** returns in Navy/Flint Grey/University Blue at **$215**, and the **Air Jordan 1 High OG 'Love Letter'** drops in Shadow Brown and Team Red at **$185**.",
+      "",
+      "## The deep cuts",
+      "",
+      "- The Flint 13 last retroed May 30, 2020 at $190 (414571-404) in the same Navy/Flint Grey/University Blue blocking.",
+      "- The Love Letter honors MJ's 2003 farewell — an open letter to basketball that ran in Sunday newspapers four days after his final NBA game, signed 'Much Love and Respect.'",
+      "- That sign-off is debossed on the Love Letter's inner ankle flap and repeated on a basketball-shaped leather hangtag.",
       "",
       "## The game plan",
       "",
@@ -469,12 +580,18 @@ const articles = [
     slug: "nike-kobe-5-protro-dodgers-release-date",
     title: "Nike Kobe 5 Protro 'Dodgers' (IO6256-400): Release Date, Price & the Full Story",
     excerpt:
-      "Everything on the Nike Kobe 5 Protro 'Dodgers' — the August 15, 2026 release date, $190 price, style code IO6256-400, Rush Blue with red baseball stitching — plus the whole lineage: the Kobe 6 'Dodgers' that began as Vanessa Bryant's player exclusive and debuted on the mound at Dodger Stadium.",
+      "Everything on the Nike Kobe 5 Protro 'Dodgers' — the September 8, 2026 release date, $190 price, style code IO6256-400, Rush Blue with red baseball stitching — plus the whole lineage: the Kobe 6 'Dodgers' that began as Vanessa Bryant's player exclusive and debuted on the mound at Dodger Stadium.",
     tags: "Kobe, Release Dates, SNKRS, Dodgers",
     coverImage: "/seed/kb6d-1.webp",
-    dropAt: new Date("2026-08-15T12:00:00Z"),
+    dropAt: new Date("2026-09-08T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "When Natalia Bryant debuted the Kobe 6 'Dodgers' with the first pitch on Lakers Night 2023, which Dodgers All-Star caught it?",
+      options: ["Clayton Kershaw", "Freddie Freeman", "Will Smith", "Mookie Betts"],
+      answer: 3,
+      explain: "Mookie Betts handled catching duties that night — the toss took one bounce before landing in his glove.",
+    },
     content: [
       "## Quick facts",
       "",
@@ -484,12 +601,12 @@ const articles = [
       "| **Style code** | IO6256-400 |",
       "| **Colorway** | Rush Blue / Wolf Grey / Comet Red |",
       "| **Price** | $190 |",
-      "| **Release date** | August 15, 2026 (some retail calendars point to September 8 — see below) |",
+      "| **Release date** | September 8, 2026 (moved off an earlier August 15 placeholder — see below) |",
       "| **Where** | SNKRS + select Nike Basketball retailers |",
       "",
       "## When does the Kobe 5 Protro 'Dodgers' drop?",
       "",
-      "Most release calendars — including the majors — have the **Kobe 5 Protro 'Dodgers'** landing **Saturday, August 15, 2026 for $190**. A minority of calendars list **September 8**. Kobe dates move more than any line Nike runs, so treat August 15 as the target and check back the week of. Either way it caps a loaded stretch: the 8 'Mambacurial' lands August 8 and the 10 Elite Low 'Halo' follows on Mamba Day, August 23.",
+      "The current consensus across the majors — Sneaker News, Sneaker Files, Sole Retriever — has the **Kobe 5 Protro 'Dodgers'** landing **Tuesday, September 8, 2026 for $190**. The August 15 date you may have seen earlier was a placeholder that has since been scrubbed. Kobe dates move more than any line Nike runs, so treat September 8 as the target and check back the week of. Either way it sits in a loaded stretch: the 10 Elite Low 'Halo' drops August 23 — Kobe's birthday, not Mamba Day, which Nike runs on April 13 — and the 8 'Mambacurial', delayed off its original August date, follows on September 19.",
       "",
       "## The design: Dodger blue, snakeskin, baseball stitching",
       "",
@@ -515,22 +632,28 @@ const articles = [
       "",
       "## Kobe and the Dodgers",
       "",
-      "Kobe was an LA institution across every code the city plays — courtside at Staples, in the stands at Chavez Ravine. The Dodgers honored him after his passing, and the 8/24 numbers still ring around both franchises every Mamba Day. A Dodger-blue Kobe isn't a novelty colorway; it's a city handshake.",
+      "Kobe was an LA institution across every code the city plays — courtside at Staples, in the stands at Chavez Ravine. The Dodgers honored him after his passing, and the 8/24 numbers still ring around both franchises every Kobe Bryant Day, August 24. A Dodger-blue Kobe isn't a novelty colorway; it's a city handshake.",
       "",
       "![Full-length Game Royal outsole with the sheath logo under the Kobe 6 'Dodgers'](/seed/kb6d-5.webp)",
+      "",
+      "## The deep cuts",
+      "",
+      "- The Kobe 6 'Dodgers' (CW2190-400) wide release was itself delayed — from Mamba Day, April 13, 2025 to May 30, 2025 — after UNDEFEATED broke it early on March 15, 2025 at its La Brea and Shibuya doors.",
+      "- Natalia Bryant debuted the PE throwing the ceremonial first pitch on Lakers Night at Dodger Stadium, September 1, 2023 — Kobe himself threw a Dodgers first pitch back in 2000.",
+      "- The Kobe 5 'Dodgers' hides 8 and 24 on the inner tongue in old-TV-style graphics, with a silver white-outlined Swoosh and red baseball stitching at the heel.",
       "",
       "## How to actually get a pair",
       "",
       "1. **SNKRS, 10 AM ET** on release day — pure draw, enter from every account in the household.",
       "2. **House of Hoops / Foot Locker app raffles** typically open the week prior.",
       "3. Watch **UNDEFEATED and boutique Nike Basketball accounts** — the 6 'Dodgers' proved this line gets boutique-first treatment.",
-      "4. Miss it? The 8 'Mambacurial' (Aug 8) cools off faster if you just want Mamba energy on foot.",
+      "4. Miss it? The 8 'Mambacurial' (delayed to September 19) cools off faster if you just want Mamba energy on foot.",
       "",
       "## FAQ",
       "",
       "**Is the 'Dodgers' a Kobe 5 or a Kobe 6?** Both exist. The **6** (CW2190-400) was the original — Vanessa Bryant's PE turned retail release. The **5** (IO6256-400) is the 2026 follow-up covered here.",
       "",
-      "**What did the Kobe 6 'Dodgers' retail for?** $180 at retail; resale ran multiples of that from day one.",
+      "**What did the Kobe 6 'Dodgers' retail for?** $190 at retail ($120 GS); resale ran multiples of that from day one.",
       "",
       "**Will the Kobe 5 'Dodgers' restock?** Kobe Protros rarely restock meaningfully — treat launch day as the day.",
       "",
@@ -547,6 +670,12 @@ const articles = [
     dropAt: new Date("2026-08-29T12:00:00Z"),
     raffleUrl: "https://www.nike.com/launch",
     daysAgo: 0,
+    question: {
+      q: "In 2008 the White/True Red Jordan 9 returned as half of a Countdown Pack — which Air Jordan shared the box?",
+      options: ["Air Jordan 11", "Air Jordan 13", "Air Jordan 14", "Air Jordan 7"],
+      answer: 2,
+      explain: "Countdown Packs paired models whose numbers summed to 23, so the 9 was boxed with the 14.",
+    },
     content: [
       "## The drop",
       "",
@@ -556,21 +685,27 @@ const articles = [
       "",
       "## The anniversary box",
       "",
-      "This isn't a standard-box release. **Space Jam hit theaters November 15, 1996** — thirty years ago this fall — and the 9 comes wrapped for the occasion: a **Tune Squad-styled lid**, a **galaxy-print interior**, and a hardwood-court insert telling the story of the film that united Michael Jordan and Bugs Bunny, with both the AJ9 and AJ11 featured on screen. Collectors: the box is part of the grail this time. Keep it clean.",
+      "This isn't a standard-box release. **Space Jam hit theaters November 15, 1996** — thirty years ago this fall — and the 9 comes wrapped for the occasion: reports point to **custom packaging styled after the classic 1993 OG 'MJ face' box**, honoring the crossover that united Michael Jordan and Bugs Bunny, with both the AJ9 and AJ11 featured on screen. Nike hasn't detailed every flourish yet, but collectors: the box is part of the grail this time. Keep it clean.",
       "",
       "![The 30th-anniversary Space Jam packaging](/seed/spacejam9-box.jpg)",
       "",
       "## The history — the Jordan MJ never wore in an NBA game",
       "",
-      "Tinker Hatfield designed the 9 for a season that never happened. It released in **November 1993 at $125** — weeks after MJ walked away from basketball to play minor-league baseball — making it the only numbered Air Jordan of his career that he never laced up in an NBA game as an active player. Hatfield leaned into the moment: a minimalist upper, a one-pull lacing system, the lightest Jordan yet, and an outsole ringed with words in **Japanese, Swahili, Russian and more** — 'dedicated,' 'intense,' 'freedom' — a map of how far past basketball the man's reach had grown.",
+      "Tinker Hatfield designed the 9 for a season that never happened. It released in **November 1993 at $125** — weeks after MJ walked away from basketball to play minor-league baseball — and MJ never wore the 9 in an NBA game; it launched into the void of his first retirement, a distinction it shares with the AJ15. (The closest it ever came: a 2002 Wizards preseason cameo in the 'Cool Grey' retro — but preseason isn't the show.) Hatfield leaned into the moment: a minimalist upper, a one-pull lacing system, the lightest Jordan yet, and an outsole ringed with words in **Japanese, Swahili, Russian and more** — 'dedicated,' 'intense,' 'freedom' — a map of how far past basketball the man's reach had grown.",
       "",
       "And when Chicago raised **'The Spirit'** — the Jordan statue outside the United Center — on November 1, 1994, Hatfield put the 9 on its feet. It has stood in this shoe for three decades.",
       "",
       "## The retro record",
       "",
-      "The White/Black-True Red 9 came back in **2002**, in **2010**, and for the film's 20th anniversary in **November 2016**, when it first took the 'Space Jam' name alongside the 11. The 2026 release is its **first return in OG trim** — and the first with the anniversary packaging.",
+      "The White/Black-True Red 9 came back in **2002**, in the **2008 Countdown Pack**, in **2010**, and for the film's 20th anniversary on **December 3, 2016** — though Nike sold that pair officially as the Air Jordan 9 Retro OG 'White & Black' ($190, 302370-112); it never actually carried the 'Space Jam' name. The 2026 release is the first with **shaping corrected to the 1993 original** — and the first with the anniversary packaging.",
       "",
       "![On foot](/seed/spacejam9-onfoot.jpg)",
+      "",
+      "## The deep cuts",
+      "",
+      "- In the 2008 Countdown Pack the White/True Red 9 shared its box with the AJ14 — CDP pairings always summed to 23 (9 + 14).",
+      "- The 'Spirit' statue outside the United Center went up November 1, 1994 with the AJ9 on its feet, and the OG outsole rings words like 'dedicated' and 'freedom' in multiple languages.",
+      "- The 2026 pair (HV4794-106, $215, Aug 29) shares its HV4794 base code with 2025's Cool Grey retro.",
       "",
       "## How to cop",
       "",
@@ -1014,10 +1149,24 @@ async function main() {
       prisma.product.count(),
       prisma.quizQuestion.count(),
     ]);
-    if (productCount === 0) {
-      for (const p of products) {
+    // One-time retirement of the pre-slug starter set (the Market was
+    // never public while it existed), then slug-keyed top-up: curated
+    // products are created if missing and NEVER updated, so link/price
+    // edits made in /admin survive every deploy. Admin-created products
+    // have no slug and are never touched.
+    await prisma.product.deleteMany({
+      where: { slug: null, name: { in: retiredStarterNames } },
+    });
+    let newProducts = 0;
+    for (const p of products) {
+      const exists = await prisma.product.findUnique({ where: { slug: p.slug } });
+      if (!exists) {
         await prisma.product.create({ data: p });
+        newProducts++;
       }
+    }
+    if (productCount === 0 || newProducts > 0) {
+      console.log(`Market slate: ${newProducts} new product(s) stocked.`);
     }
     let newArticles = 0;
     let refreshed = 0;

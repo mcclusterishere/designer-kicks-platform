@@ -25,7 +25,7 @@ type Props = {
 export default function ProductCard({ product }: Props) {
   return (
     <a
-      href={goHref(product.affiliateUrl, "shop")}
+      href={goHref(product.affiliateUrl, `shop:${product.category}`)}
       target="_blank"
       rel="noopener noreferrer sponsored"
       className={`card-lift group flex flex-col overflow-hidden rounded-xl border bg-surface ${
@@ -45,7 +45,7 @@ export default function ProductCard({ product }: Props) {
             className="flex h-full w-full items-center justify-center p-4"
             style={{
               backgroundImage:
-                "repeating-linear-gradient(-45deg, rgba(200,255,0,0.05) 0 14px, transparent 14px 28px)",
+                "repeating-linear-gradient(-45deg, rgba(217,185,106,0.06) 0 14px, transparent 14px 28px)",
             }}
           >
             <span className="display -rotate-3 border-2 border-smoke/40 px-3 py-1.5 text-center text-2xl text-smoke/80">

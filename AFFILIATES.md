@@ -1,9 +1,49 @@
 # Affiliate Program Playbook — The Heat Chart
 
-This is your signup roadmap for monetizing the Shop page. The shop is
-pre-stocked with products pointing at **plain merchant links**. As each
-program approves you, swap in your tagged affiliate link via the
-**/admin** panel (Shop Products → Edit).
+This is your signup roadmap for monetizing every outbound buy link on
+the site — the Market page, the Where-to-Buy strips on drop sheets, and
+the buy links inside articles. All of them route through `/go`, which
+logs the click (see **Market Pulse** in /admin) and applies your
+affiliate tag automatically.
+
+## How links get paid (do this once per program)
+
+You do NOT edit links one at a time. When a program approves you, it
+gives you either a **deep-link template** (Impact-style:
+`https://xxx.pxf.io/c/YOURID/.../...?u={url}`) or **tracking
+parameters** (eBay-style: `&campid=XXXX&toolid=10001`). Paste it into
+the matching Railway variable and *every* link for that merchant —
+site-wide, past and future — starts paying instantly:
+
+| Railway variable | Merchant |
+|---|---|
+| `AFF_STOCKX_TEMPLATE` | StockX |
+| `AFF_GOAT_TEMPLATE` | GOAT |
+| `AFF_EBAY_TEMPLATE` | eBay |
+| `AFF_ETSY_TEMPLATE` | Etsy |
+| `AFF_KICKSCREW_TEMPLATE` | KicksCrew |
+| `AFF_STADIUMGOODS_TEMPLATE` | Stadium Goods |
+| `AFF_GRAILED_TEMPLATE` | Grailed |
+| `AFF_FLIGHTCLUB_TEMPLATE` | Flight Club |
+| `AFF_FOOTLOCKER_TEMPLATE` | Foot Locker |
+| `AFF_FINISHLINE_TEMPLATE` | Finish Line |
+| `AFF_JDSPORTS_TEMPLATE` | JD Sports |
+| `AFF_END_TEMPLATE` | END. |
+| `AFF_AMAZON_TEMPLATE` | Amazon |
+| `AFF_ANGELUS_TEMPLATE` | Angelus Direct |
+| `AFF_RESHOEVN8R_TEMPLATE` | Reshoevn8r |
+| `AFF_CREP_TEMPLATE` | Crep Protect |
+| `AFF_JASONMARKK_TEMPLATE` | Jason Markk |
+| `AFF_LACELAB_TEMPLATE` | Lace Lab |
+| `AFF_UNDEFEATED_TEMPLATE` | UNDEFEATED |
+
+Template rules: a value containing `{url}` (encoded) or `{plain}` (raw)
+REPLACES the destination — use this for Impact/Sovrn deep links. A value
+starting with `&` or `?` APPENDS parameters — use this for eBay campid
+or Amazon `&tag=yourtag-20`.
+
+Per-product link swaps in **/admin → Shop Products → Edit** still work
+for one-off cases, but the env template is the tool for the job.
 
 > ⚠️ Rates below come from affiliate directories and merchant pages as of
 > July 2026. Exact rates are only visible inside each network dashboard
@@ -35,6 +75,7 @@ program approves you, swap in your tagged affiliate link via the
 | Stadium Goods | FlexOffers / Skimlinks | ~4% | 30 days |
 | KicksCrew | Impact / CJ | ~4–5% (best marketplace rate) | 30 days |
 | eBay | eBay Partner Network | 1–4% by category | 24 hours |
+| Etsy | Awin — <https://www.awin.com/us/publishers/etsy> | ~2–4% | 30 days |
 | Grailed | FlexOffers — <https://www.grailed.com/drycleanonly/grailed-affiliate-program> | ~1–2.2% *(unverified)* | ~15 days |
 
 ## Retail (new releases)
@@ -79,6 +120,10 @@ program approves you, swap in your tagged affiliate link via the
   Locker) **manually reviews your site** — they want real content and
   traffic. Launch the site, post battles for a few weeks, point the
   Facebook page at it, *then* apply. Nike is the hardest approval.
+- **Etsy runs on Awin**, and Awin charges a ~$5 signup deposit that is
+  refunded with your first payout. Etsy is worth it for this site — the
+  audience literally commissions custom sneakers there, and the Market's
+  Etsy card deep-links to the custom-sneaker search.
 - Programs run **per-region** on different networks (Awin UK vs
   Impact/Rakuten US). Apply in the region your traffic comes from.
 - Avoid AliExpress/Temu for this audience — counterfeit sneakers will

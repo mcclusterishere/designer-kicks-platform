@@ -58,6 +58,36 @@ export const MERCHANTS: Merchant[] = [
     tagEnv: "AFF_EBAY_TEMPLATE",
   },
   {
+    key: "etsy",
+    label: "Etsy",
+    hosts: ["etsy.com"],
+    // The custom-sneaker marketplace: hand-painted pairs, customizer
+    // commissions, display gear. Our own audience shops here.
+    search: (q) => `https://www.etsy.com/search?q=${encodeURIComponent(q)}`,
+    tagEnv: "AFF_ETSY_TEMPLATE",
+  },
+  {
+    key: "stadiumgoods",
+    label: "Stadium Goods",
+    hosts: ["stadiumgoods.com"],
+    search: (q) => `https://www.stadiumgoods.com/en-us/search?q=${encodeURIComponent(q)}`,
+    tagEnv: "AFF_STADIUMGOODS_TEMPLATE",
+  },
+  {
+    key: "grailed",
+    label: "Grailed",
+    hosts: ["grailed.com"],
+    search: (q) => `https://www.grailed.com/shop?query=${encodeURIComponent(q)}`,
+    tagEnv: "AFF_GRAILED_TEMPLATE",
+  },
+  {
+    key: "finishline",
+    label: "Finish Line",
+    hosts: ["finishline.com"],
+    search: (q) => `https://www.finishline.com/store/browse/search.jsp?Ntt=${encodeURIComponent(q)}`,
+    tagEnv: "AFF_FINISHLINE_TEMPLATE",
+  },
+  {
     key: "kickscrew",
     label: "KicksCrew",
     hosts: ["kickscrew.com"],

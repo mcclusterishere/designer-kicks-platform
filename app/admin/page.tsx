@@ -210,6 +210,36 @@ export default async function AdminPage({
     }),
   ]);
   const clicksByCampaign = new Map(campaignHits.map((c) => [c.campaign, c._count]));
+
+  // Market Pulse: outbound /go clicks by merchant and by on-site spot.
+  // This is the money funnel — and the traffic proof for affiliate
+  // program applications.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const [merchant7, merchant30, ref30] = await Promise.all([
+    prisma.outboundClick.groupBy({
+      by: ["merchant"],
+      where: { createdAt: { gte: new Date(Date.now() - 7 * DAY_MS) } },
+      _count: true,
+    }),
+    prisma.outboundClick.groupBy({
+      by: ["merchant"],
+      where: { createdAt: { gte: new Date(Date.now() - 30 * DAY_MS) } },
+      _count: true,
+    }),
+    prisma.outboundClick.groupBy({
+      by: ["ref"],
+      where: { createdAt: { gte: new Date(Date.now() - 30 * DAY_MS) } },
+      _count: true,
+    }),
+  ]);
+  const merchant7Map = new Map(merchant7.map((m) => [m.merchant, m._count]));
+  const marketRows = merchant30
+    .map((m) => ({ merchant: m.merchant, clicks30: m._count, clicks7: merchant7Map.get(m.merchant) ?? 0 }))
+    .sort((a, b) => b.clicks30 - a.clicks30);
+  const marketRefs = ref30
+    .map((r) => ({ ref: r.ref ?? "(untagged)", clicks30: r._count }))
+    .sort((a, b) => b.clicks30 - a.clicks30)
+    .slice(0, 12);
   const groupBase = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
   const groupRows = groupLeads.map((g) => ({
     id: g.id,
@@ -1253,6 +1283,66 @@ export default async function AdminPage({
             </div>
           ))}
           {articles.length === 0 && <p className="text-sm text-smoke">No articles yet.</p>}
+        </div>
+      </section>
+
+      {/* Market Pulse: the affiliate money funnel */}
+      <section className="mt-12" data-testid="market-pulse">
+        <h2 className="display text-2xl text-white">Market Pulse</h2>
+        <p className="mt-1 text-sm text-smoke">
+          Every outbound buy click, by merchant and by where on the site it
+          happened. When an affiliate program approves you, paste its link
+          template into Railway (the AFF_ variables) and every click below
+          starts paying — these numbers are also your traffic proof for the
+          applications.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-volt">Clicks by merchant</p>
+            {marketRows.length === 0 ? (
+              <p className="mt-3 text-sm text-smoke">
+                No outbound clicks yet — they start counting the moment
+                people tap buy links on drops, articles, or the Market.
+              </p>
+            ) : (
+              <table className="mt-3 w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-smoke">
+                    <th className="pb-2">Merchant</th>
+                    <th className="pb-2 text-right">7 days</th>
+                    <th className="pb-2 text-right">30 days</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketRows.map((m) => (
+                    <tr key={m.merchant} className="border-t border-edge/60">
+                      <td className="py-1.5 font-mono text-white">{m.merchant}</td>
+                      <td className="py-1.5 text-right text-smoke">{m.clicks7}</td>
+                      <td className="py-1.5 text-right text-volt">{m.clicks30}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="rounded-xl border border-edge bg-surface p-4">
+            <p className="tag text-volt">Where the clicks come from (30d)</p>
+            {marketRefs.length === 0 ? (
+              <p className="mt-3 text-sm text-smoke">
+                Placement data appears here — drop sheets, article buy
+                strips, and Market categories each carry their own tag.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-1.5 text-sm">
+                {marketRefs.map((r) => (
+                  <li key={r.ref} className="flex items-center justify-between border-t border-edge/60 py-1.5 first:border-t-0">
+                    <span className="truncate font-mono text-white">{r.ref}</span>
+                    <span className="ml-3 shrink-0 text-volt">{r.clicks30}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </section>
 

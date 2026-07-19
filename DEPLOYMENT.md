@@ -93,3 +93,31 @@ loses nothing meanwhile).
       via Impact once GA has 2–3 weeks of history
 - [ ] Watch Traffic Pulse + GA after the first FB post; double down on
       whichever group/post format converts
+
+## 6. Affiliate go-live (the money switch)
+
+The site is already wired: every buy link routes through /go, logs to
+Market Pulse in /admin, and auto-tags itself from the `AFF_*_TEMPLATE`
+Railway variables. Full program-by-program details live in
+**AFFILIATES.md**. The human sequence:
+
+1. [ ] Prereqs once: business email (league@theheatchart.com), payout
+       bank account or PayPal, and your tax info (W-9 as an individual
+       is fine to start — every network asks during onboarding).
+2. [ ] **Day one, no review barrier:** eBay Partner Network (paste the
+       campid append-template) and FlexOffers (unlocks Flight Club,
+       Stadium Goods, Grailed, Crep Protect, Finish Line, JD Sports).
+3. [ ] **Amazon Associates** — covers all the supply/accessory cards.
+       Remember: 3 qualifying sales in 180 days or reapply.
+4. [ ] **Awin ($5 refundable deposit) → Etsy** — the custom-sneaker
+       marketplace; our audience commissions work there.
+5. [ ] **After 2–3 weeks of GA history:** Impact applications — StockX,
+       KicksCrew, Foot Locker, adidas, END. Use Market Pulse screenshots
+       as traffic proof.
+6. [ ] **Direct customizer programs:** Angelus, Reshoevn8r, Lace Lab —
+       small brands, warm to creators; email if the portal is closed.
+7. [ ] As each approval lands, paste its template into Railway
+       (AFFILIATES.md → "How links get paid") — no code changes, links
+       upgrade site-wide instantly.
+8. [ ] When the slate looks right in /admin, flip `SHOP_LIVE` to true in
+       lib/flags.ts (one word) and the Market goes public.
