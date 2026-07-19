@@ -106,6 +106,19 @@ export default async function ProfilePage() {
       {/* First-visit welcome — dismissed once, never seen again */}
       <Walkthrough />
 
+      {user.role === "EDITOR" && (
+        <Link
+          href="/editor"
+          className="mt-6 flex items-center justify-between rounded-xl border border-volt/50 bg-surface p-4 transition hover:border-volt"
+        >
+          <div>
+            <p className="tag text-volt">Editor access</p>
+            <p className="mt-0.5 text-sm text-white">Open your Editor Desk →</p>
+          </div>
+          <span className="display text-2xl text-volt">✎</span>
+        </Link>
+      )}
+
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "Votes cast", value: user._count.votes },

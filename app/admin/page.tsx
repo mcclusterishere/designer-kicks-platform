@@ -16,6 +16,11 @@ import {
   setDropAnnouncementStatus,
   respondArtistClaim,
   setSaleVerified,
+  revokeEditor,
+  replyToEditor,
+  setProspectStatus,
+  setJobApplicationStatus,
+  setJobStatus,
 } from "@/app/actions";
 import { formatUsd } from "@/lib/market";
 import { getSiteAnalytics, heatScore } from "@/lib/analytics";
@@ -39,6 +44,7 @@ import { providersConfigured } from "@/lib/sneakerApi";
 import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
 import TwoFactorPanel from "./TwoFactorPanel";
+import { GrantEditorForm, NewJobForm } from "./TeamControls";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +130,39 @@ export default async function AdminPage({
     orderBy: { dropAt: "asc" },
     include: { artist: { select: { displayName: true, slug: true } } },
   });
+
+  // Team: editors, their message threads, staged prospects, and careers.
+  const [editors, editorThread, stagedProspects, jobPostings, jobApplications] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "EDITOR" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, email: true, passwordHash: true },
+    }),
+    prisma.editorMessage.findMany({
+      orderBy: { createdAt: "asc" },
+      take: 200,
+      include: { editor: { select: { name: true, email: true } } },
+    }),
+    prisma.outreachProspect.findMany({
+      where: { status: { in: ["STAGED", "APPROVED"] } },
+      orderBy: { createdAt: "asc" },
+      include: { stagedBy: { select: { name: true, email: true } } },
+    }),
+    prisma.jobPosting.findMany({ orderBy: [{ status: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] }),
+    prisma.jobApplication.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: { job: { select: { title: true } } },
+    }),
+  ]);
+  // Group the message threads by editor and count admin-unread.
+  const threadsByEditor = new Map<string, typeof editorThread>();
+  for (const m of editorThread) {
+    const arr = threadsByEditor.get(m.editorId) ?? [];
+    arr.push(m);
+    threadsByEditor.set(m.editorId, arr);
+  }
+  const unreadFromEditors = editorThread.filter((m) => !m.fromAdmin && !m.readByAdmin).length;
 
   // Profile claims: pending for review, plus recent approvals with their
   // live claim links so the DM can be re-sent manually.
@@ -308,6 +347,160 @@ export default async function AdminPage({
       {/* Account security */}
       <section className="mt-8">
         <TwoFactorPanel enabled={twoFactorOn} />
+      </section>
+
+      {/* Team & Careers */}
+      <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
+        <h2 className="display text-2xl text-white">
+          Team &amp; Careers{" "}
+          {unreadFromEditors > 0 && <span className="text-heat">({unreadFromEditors} new msg)</span>}
+        </h2>
+
+        {/* Grant editor */}
+        <div className="mt-4">
+          <p className="tag text-volt">Add an editor</p>
+          <p className="mt-1 text-xs text-smoke">
+            Grants the scoped Editor Desk (content, cross-posting, outreach
+            staging, messaging) — never the admin panel. New emails get a
+            set-password link to send them.
+          </p>
+          <div className="mt-3">
+            <GrantEditorForm />
+          </div>
+        </div>
+
+        {/* Editors + their threads */}
+        {editors.length > 0 && (
+          <div className="mt-6 space-y-4">
+            <p className="tag text-smoke">Editors ({editors.length})</p>
+            {editors.map((ed) => {
+              const thread = threadsByEditor.get(ed.id) ?? [];
+              return (
+                <div key={ed.id} className="rounded-lg border border-edge bg-panel p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-white">{ed.name || ed.email}</span>{" "}
+                      <span className="tag text-smoke">{ed.email}</span>
+                      {!ed.passwordHash && <span className="tag ml-2 text-heat">· hasn&apos;t set password</span>}
+                    </div>
+                    <form action={revokeEditor.bind(null, ed.id)}>
+                      <button className="rounded border border-heat px-3 py-1.5 tag text-heat">Remove editor</button>
+                    </form>
+                  </div>
+                  {thread.length > 0 && (
+                    <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto border-t border-edge pt-3">
+                      {thread.map((m) => (
+                        <div key={m.id} className={`text-sm ${m.fromAdmin ? "text-smoke" : "text-white"}`}>
+                          <span className="tag mr-1.5 text-smoke/60">{m.fromAdmin ? "You" : "Them"}:</span>
+                          <span className="whitespace-pre-wrap">{m.body}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <form
+                    action={async (fd: FormData) => {
+                      "use server";
+                      await replyToEditor(null, fd);
+                    }}
+                    className="mt-3 flex gap-2"
+                  >
+                    <input type="hidden" name="editorId" value={ed.id} />
+                    <input name="body" required maxLength={2000} placeholder="Reply…"
+                      className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none" />
+                    <button className="rounded-lg bg-volt px-4 tag font-bold text-ink">Send</button>
+                  </form>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Staged outreach prospects */}
+        {stagedProspects.length > 0 && (
+          <div className="mt-6">
+            <p className="tag text-smoke">Staged outreach ({stagedProspects.length})</p>
+            <div className="mt-2 space-y-2">
+              {stagedProspects.map((p) => (
+                <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-bold text-white">{p.name}</span>
+                    {p.platform && <span className="text-smoke"> · {p.platform}</span>}
+                    {p.handle && <span className="text-smoke"> · {p.handle}</span>}
+                    {p.contact && <span className="text-smoke"> · {p.contact}</span>}
+                    <span className={`tag ml-2 ${p.status === "APPROVED" ? "text-volt" : "text-heat"}`}>{p.status.toLowerCase()}</span>
+                    {p.notes && <p className="mt-0.5 text-xs text-smoke">{p.notes}</p>}
+                    <p className="tag text-smoke/60">by {p.stagedBy.name || p.stagedBy.email}{p.fileUrl && <> · <a href={p.fileUrl} target="_blank" rel="noopener noreferrer" className="text-volt underline">file</a></>}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    {p.status === "STAGED" && (
+                      <form action={setProspectStatus.bind(null, p.id, "APPROVED")}>
+                        <button className="rounded border border-volt px-2.5 py-1 tag text-volt">Approve</button>
+                      </form>
+                    )}
+                    <form action={setProspectStatus.bind(null, p.id, "SENT")}>
+                      <button className="rounded border border-edge px-2.5 py-1 tag text-white">Sent</button>
+                    </form>
+                    <form action={setProspectStatus.bind(null, p.id, "ARCHIVED")}>
+                      <button className="rounded border border-edge px-2.5 py-1 tag text-smoke">Archive</button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Careers: postings + new posting + applications */}
+        <div className="mt-6">
+          <p className="tag text-smoke">Job postings</p>
+          <div className="mt-2 space-y-2">
+            {jobPostings.map((j) => (
+              <div key={j.id} className="flex items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <Link href="/careers" className="font-bold text-white hover:text-volt">{j.title}</Link>
+                  <span className="text-smoke"> · {j.payLine}</span>
+                  <span className={`tag ml-2 ${j.status === "OPEN" ? "text-volt" : "text-smoke"}`}>{j.status.toLowerCase()}</span>
+                </div>
+                <form action={setJobStatus.bind(null, j.id, j.status === "OPEN" ? "CLOSED" : "OPEN")}>
+                  <button className="rounded border border-edge px-3 py-1.5 tag text-white">{j.status === "OPEN" ? "Close" : "Reopen"}</button>
+                </form>
+              </div>
+            ))}
+            {jobPostings.length === 0 && <p className="text-sm text-smoke">No postings yet.</p>}
+          </div>
+          <details className="mt-3 rounded-lg border border-edge bg-panel p-4">
+            <summary className="tag cursor-pointer text-volt">+ New job posting</summary>
+            <div className="mt-3"><NewJobForm /></div>
+          </details>
+        </div>
+
+        {jobApplications.length > 0 && (
+          <div className="mt-6">
+            <p className="tag text-smoke">Applications ({jobApplications.length})</p>
+            <div className="mt-2 space-y-2">
+              {jobApplications.map((ap) => (
+                <div key={ap.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-bold text-white">{ap.name}</span>{" "}
+                    <a href={`mailto:${ap.email}`} className="text-volt underline">{ap.email}</a>
+                    <span className="text-smoke"> · {ap.job.title}</span>
+                    <span className={`tag ml-2 ${ap.status === "HIRED" ? "text-volt" : ap.status === "PASSED" ? "text-smoke" : "text-heat"}`}>{ap.status.toLowerCase()}</span>
+                    {ap.links && <p className="mt-0.5 truncate text-xs text-smoke">{ap.links}</p>}
+                    {ap.pitch && <p className="mt-0.5 text-xs text-smoke">{ap.pitch}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    <form action={setJobApplicationStatus.bind(null, ap.id, "HIRED")}>
+                      <button className="rounded border border-volt px-2.5 py-1 tag text-volt">Hire</button>
+                    </form>
+                    <form action={setJobApplicationStatus.bind(null, ap.id, "PASSED")}>
+                      <button className="rounded border border-edge px-2.5 py-1 tag text-smoke">Pass</button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Pending submissions */}

@@ -43,6 +43,7 @@ import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
+import { isEditor, currentUserRole } from "@/lib/editor";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -1318,6 +1319,12 @@ async function requireAdmin() {
   if (!(await isAdmin())) redirect("/admin");
 }
 
+/** Editor Desk actions: the editor role OR an admin may pass. */
+async function requireEditor() {
+  if (await isAdmin()) return;
+  if (!(await isEditor())) redirect("/editor");
+}
+
 export async function adminLogin(
   _prev: ActionResult | null,
   formData: FormData
@@ -1593,7 +1600,7 @@ export async function saveArticle(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireAdmin();
+  await requireEditor(); // editors write + edit content; admins too
   const id = String(formData.get("id") ?? "");
   const title = String(formData.get("title") ?? "").trim();
   const rawSlug = String(formData.get("slug") ?? "").trim();
@@ -1767,6 +1774,214 @@ export async function lookupSkuForArticle(id: string): Promise<ActionResult> {
   await prisma.article.update({ where: { id }, data: { sku: hit.sku.toUpperCase() } });
   revalidatePath("/admin");
   return { ok: true, note: `Found style code ${hit.sku}${hit.name ? ` (${hit.name})` : ""}.` };
+}
+
+// ---------- Editor Desk ----------
+
+/** Editor stages a mild-outreach prospect (with optional media upload). */
+export async function stageProspect(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireEditor();
+  const me = await currentUserRole();
+  if (!me) return { ok: false, error: "Sign in with your editor account first." };
+  if (!allowAttempt("stageprospect", me.id, 60, 60 * 60 * 1000)) {
+    return { ok: false, error: "Slow down a touch — too many at once." };
+  }
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name || name.length > 120) return { ok: false, error: "A name/handle is required." };
+  const platform = String(formData.get("platform") ?? "").trim() || null;
+  const handle = String(formData.get("handle") ?? "").trim() || null;
+  const contact = String(formData.get("contact") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  if (notes && notes.length > 1000) return { ok: false, error: "Keep notes under 1,000 characters." };
+
+  let fileUrl: string | null = null;
+  const file = formData.get("file");
+  if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: "File must be under 6MB." };
+    const ext = ALLOWED_TYPES[file.type];
+    if (!ext) return { ok: false, error: "Upload a JPG, PNG, or WebP." };
+    fileUrl = await saveUpload(Buffer.from(await file.arrayBuffer()), `${randomUUID()}.${ext}`, file.type);
+  }
+
+  await prisma.outreachProspect.create({
+    data: { stagedById: me.id, name, platform, handle, contact, notes, fileUrl },
+  });
+  notifyAdmin("Editor staged a prospect", `${me.name || me.email} staged "${name}" for outreach review.`);
+  revalidatePath("/editor");
+  revalidatePath("/admin");
+  return { ok: true, note: "Staged for the office to review." };
+}
+
+/** Editor sends a message — to the league office only. */
+export async function sendEditorMessage(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireEditor();
+  const me = await currentUserRole();
+  if (!me) return { ok: false, error: "Sign in with your editor account first." };
+  if (!allowAttempt("editormsg", me.id, 30, 60 * 60 * 1000)) {
+    return { ok: false, error: "Too many messages — give it a minute." };
+  }
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body || body.length > 2000) return { ok: false, error: "Say something (2,000 characters max)." };
+  await prisma.editorMessage.create({
+    data: { editorId: me.id, body, fromAdmin: false, readByAdmin: false, readByEditor: true },
+  });
+  notifyAdmin("Message from editor", `${me.name || me.email}: ${body.slice(0, 400)}`);
+  revalidatePath("/editor");
+  revalidatePath("/admin");
+  return { ok: true, note: "Sent to the office." };
+}
+
+// ---------- Admin: Team (editors) ----------
+
+/** Grant editor to an email; creates the account + a claim link if new. */
+export async function grantEditor(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  const name = String(formData.get("name") ?? "").trim() || null;
+
+  let user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    user = await prisma.user.create({
+      data: { email, name, role: "EDITOR", emailVerified: new Date() },
+    });
+  } else {
+    await prisma.user.update({ where: { id: user.id }, data: { role: "EDITOR", ...(name ? { name } : {}) } });
+  }
+
+  // A set-password / claim link for accounts that can't sign in yet.
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  let claimUrl: string | null = null;
+  if (!user.passwordHash) {
+    let token = (
+      await prisma.passwordResetToken.findFirst({ where: { userId: user.id, expires: { gt: new Date() } } })
+    )?.token;
+    if (!token) {
+      token = randomBytes(32).toString("hex");
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      await prisma.passwordResetToken.create({
+        data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      });
+    }
+    claimUrl = `${base}/reset-password/${token}`;
+  }
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    note: claimUrl
+      ? `${email} is now an editor. Send them this set-password link: ${claimUrl}`
+      : `${email} is now an editor. They can sign in and open the Editor Desk.`,
+  };
+}
+
+export async function revokeEditor(userId: string) {
+  await requireAdmin();
+  await prisma.user.update({ where: { id: userId }, data: { role: "MEMBER" } });
+  revalidatePath("/admin");
+}
+
+/** Admin replies to an editor; marks that editor's inbound as read. */
+export async function replyToEditor(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const editorId = String(formData.get("editorId") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!editorId) return { ok: false, error: "Missing editor." };
+  if (!body || body.length > 2000) return { ok: false, error: "Say something (2,000 characters max)." };
+  await prisma.editorMessage.create({
+    data: { editorId, body, fromAdmin: true, readByAdmin: true, readByEditor: false },
+  });
+  await prisma.editorMessage.updateMany({
+    where: { editorId, fromAdmin: false, readByAdmin: false },
+    data: { readByAdmin: true },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/editor");
+  return { ok: true, note: "Reply sent." };
+}
+
+export async function setProspectStatus(
+  id: string,
+  status: "STAGED" | "APPROVED" | "SENT" | "ARCHIVED"
+) {
+  await requireAdmin();
+  await prisma.outreachProspect.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+}
+
+// ---------- Careers ----------
+
+/** Public: apply to a job posting. Rate-limited by IP. */
+export async function applyToJob(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const ip = await clientIp();
+  if (!allowAttempt("jobapply", ip, 8, 60 * 60 * 1000)) {
+    return { ok: false, error: "Too many applications from here — try again later." };
+  }
+  const jobId = String(formData.get("jobId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const links = String(formData.get("links") ?? "").trim() || null;
+  const pitch = String(formData.get("pitch") ?? "").trim() || null;
+  if (!name || name.length > 120) return { ok: false, error: "Your name, please." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "A valid email, please." };
+  if (pitch && pitch.length > 1500) return { ok: false, error: "Keep the pitch under 1,500 characters." };
+  const job = await prisma.jobPosting.findFirst({ where: { id: jobId, status: "OPEN" } });
+  if (!job) return { ok: false, error: "That posting just closed." };
+  await prisma.jobApplication.create({ data: { jobId: job.id, name, email, links, pitch } });
+  notifyAdmin("New job application", `${name} <${email}> applied for "${job.title}".${links ? ` Links: ${links}` : ""}`);
+  return { ok: true, note: "Application in. We read every one — thank you." };
+}
+
+export async function setJobApplicationStatus(
+  id: string,
+  status: "NEW" | "REVIEWED" | "HIRED" | "PASSED"
+) {
+  await requireAdmin();
+  await prisma.jobApplication.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+}
+
+export async function setJobStatus(id: string, status: "OPEN" | "CLOSED") {
+  await requireAdmin();
+  await prisma.jobPosting.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+  revalidatePath("/careers");
+}
+
+/** Admin creates a new job posting. */
+export async function saveJob(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const title = String(formData.get("title") ?? "").trim();
+  const payLine = String(formData.get("payLine") ?? "").trim();
+  const location = String(formData.get("location") ?? "").trim() || "Remote";
+  const body = String(formData.get("body") ?? "").trim();
+  if (!title || title.length > 120) return { ok: false, error: "A job title is required." };
+  if (!body) return { ok: false, error: "Describe the role in the body." };
+  const slug = slugify(title);
+  if (!slug) return { ok: false, error: "Couldn't derive a URL slug from that title." };
+  const clash = await prisma.jobPosting.findUnique({ where: { slug } });
+  if (clash) return { ok: false, error: `A posting already uses the slug "${slug}".` };
+  await prisma.jobPosting.create({ data: { slug, title, payLine, location, body } });
+  revalidatePath("/careers");
+  revalidatePath("/admin");
+  return { ok: true, note: "Posting is live on /careers." };
 }
 
 // ---------- Tournaments ----------
@@ -2178,11 +2393,13 @@ export type BroadcastResult =
  * to the Facebook page and Instagram when their tokens are configured,
  * and hands back copy-paste text for the manual channels either way.
  */
-export async function broadcastPost(
-  _prev: BroadcastResult | null,
-  formData: FormData
-): Promise<BroadcastResult> {
-  await requireAdmin();
+/**
+ * The broadcast pipeline the site runs as origin: it publishes to The Feed
+ * (our site) and fans out to the free crosspost channels (Facebook Page +
+ * Instagram) as feeders. Shared by the admin and the Editor Desk — the
+ * guard lives in the thin wrappers below, not here.
+ */
+async function runBroadcast(formData: FormData): Promise<BroadcastResult> {
   const body = String(formData.get("body") ?? "").trim();
   if (!body || body.length > 2200) {
     return { ok: false, error: "Say something (2,200 characters max — Instagram's cap)." };
@@ -2232,6 +2449,23 @@ export async function broadcastPost(
     instagram,
     copyText: shareLink ? `${body}\n\n${shareLink}` : body,
   };
+}
+
+export async function broadcastPost(
+  _prev: BroadcastResult | null,
+  formData: FormData
+): Promise<BroadcastResult> {
+  await requireAdmin();
+  return runBroadcast(formData);
+}
+
+/** Same broadcast, from the Editor Desk (editor role or admin). */
+export async function editorBroadcast(
+  _prev: BroadcastResult | null,
+  formData: FormData
+): Promise<BroadcastResult> {
+  await requireEditor();
+  return runBroadcast(formData);
 }
 
 export async function deleteFeedPost(id: string) {

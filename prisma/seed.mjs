@@ -1121,11 +1121,59 @@ function loadQuestions() {
   }
 }
 
+// Team + careers seed — idempotent, runs every deploy in both modes.
+// Creates the first editor (Seth) so he can claim + sign in, and posts
+// the Editor role on /careers. Never overwrites live edits.
+async function seedTeamAndCareers() {
+  // First editor: passwordless account he claims via a set-password link
+  // the owner sends him (Admin → Team → "Make editor" regenerates it).
+  await prisma.user.upsert({
+    where: { email: "seal.seth12@gmail.com" },
+    update: { role: "EDITOR" },
+    create: { email: "seal.seth12@gmail.com", name: "Seth", role: "EDITOR", emailVerified: new Date() },
+  });
+
+  const editorJob = {
+    slug: "editor",
+    title: "Editor (Intern)",
+    location: "Remote",
+    payLine: "$1 per social post — up to $6/day",
+    body: [
+      "## The role",
+      "",
+      "Help run The Heat Chart's voice. You'll post to our socials, keep the",
+      "newsroom fresh, and tee up outreach to artists and shops — all from a",
+      "simple Editor Desk. Our website is the origin; the socials are feeders.",
+      "",
+      "## What you'll do",
+      "",
+      "- Write and edit drop articles; swap in better photos",
+      "- Cross-post to our connected social channels",
+      "- Stage outreach prospects for the office to send",
+      "- Keep it in the culture — accurate, hype, real",
+      "",
+      "## Pay",
+      "",
+      "**$1 per social post, up to $6 a day.** Remote, flexible hours.",
+      "",
+      "## Who we want",
+      "",
+      "Someone who lives in sneaker culture, writes clean, and moves fast.",
+      "No degree required — show us your feed.",
+    ].join("\n"),
+  };
+  const exists = await prisma.jobPosting.findUnique({ where: { slug: editorJob.slug } });
+  if (!exists) await prisma.jobPosting.create({ data: editorJob });
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
   // for production, then pre-load real artists from /admin.
   const includeDemo = process.env.SEED_DEMO !== "false";
+
+  // Team + careers seed runs in every mode (idempotent top-up).
+  await seedTeamAndCareers();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.

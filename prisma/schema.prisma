@@ -449,6 +449,11 @@ model User {
   image         String?
   passwordHash  String? // null for OAuth-only accounts
 
+  // Privilege tier. MEMBER is everyone; EDITOR unlocks the scoped Editor
+  // Desk (content + cross-posting + mild outreach) but NOT the admin
+  // panel — admin stays a separate password + owner-account gate.
+  role String @default("MEMBER") // MEMBER | EDITOR
+
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
@@ -490,6 +495,77 @@ model User {
   feedReactions FeedReaction[]
   feedComments  FeedComment[]
   pollVotes     PollVote[]
+
+  editorMessages   EditorMessage[]
+  stagedProspects  OutreachProspect[]
+}
+
+// A private thread between an editor and the league office. Editors can
+// only message the admin (no editor-to-editor / editor-to-member); the
+// admin replies from the Team panel. fromAdmin flips the direction.
+model EditorMessage {
+  id           String   @id @default(cuid())
+  editorId     String
+  editor       User     @relation(fields: [editorId], references: [id], onDelete: Cascade)
+  body         String
+  fromAdmin    Boolean  @default(false) // false = editor→admin, true = admin→editor
+  readByAdmin  Boolean  @default(false)
+  readByEditor Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([editorId, createdAt])
+}
+
+// Mild outreach the editor stages for the admin to send: a prospect with
+// their handle/contact, notes, and an optional uploaded file (media kit,
+// screenshot). Admin reviews → APPROVED/SENT/ARCHIVED.
+model OutreachProspect {
+  id         String   @id @default(cuid())
+  stagedById String
+  stagedBy   User     @relation(fields: [stagedById], references: [id], onDelete: Cascade)
+  name       String
+  platform   String? // instagram | tiktok | youtube | email | other
+  handle     String? // @handle or profile URL
+  contact    String? // email / DM target
+  notes      String?
+  fileUrl    String? // uploaded media kit / reference
+  status     String   @default("STAGED") // STAGED | APPROVED | SENT | ARCHIVED
+  createdAt  DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([stagedById])
+}
+
+// A public job listing on /careers.
+model JobPosting {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  location  String   @default("Remote")
+  payLine   String // e.g. "$1 per social post — up to $6/day"
+  body      String // markdown
+  status    String   @default("OPEN") // OPEN | CLOSED
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  applications JobApplication[]
+
+  @@index([status, sortOrder])
+}
+
+model JobApplication {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name      String
+  email     String
+  links     String? // portfolio / socials
+  pitch     String? // why them
+  status    String   @default("NEW") // NEW | REVIEWED | HIRED | PASSED
+  createdAt DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([status, createdAt])
 }
 
 // A buyer's standing offer on a piece — the demand side of the price
