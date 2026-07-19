@@ -35,6 +35,8 @@ import { categoryEmoji } from "@/lib/categories";
 import QuestionForm from "./QuestionForm";
 import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
+import CatalogPanel from "./CatalogPanel";
+import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
@@ -52,6 +54,38 @@ import { editorRefLink } from "@/lib/editor";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+// The shoe knowledge base — its own async section so its queries only
+// run when the Market tab is open.
+async function CatalogSection() {
+  const stats = await catalogStats();
+  return (
+    <section className="mt-10 rounded-xl border border-volt/40 bg-panel p-5">
+      <h2 className="display text-2xl text-white">
+        Shoe Catalog <span className="text-smoke">({stats.total.toLocaleString()})</span>
+      </h2>
+      <p className="mt-1 text-sm text-smoke">
+        The knowledge base behind affiliate matching: real retail sneakers with SKU, brand,
+        colorway, and retail price. Grow it query-by-query — customs resolve to a real SKU here,
+        and SKU-level buy links convert far better than name search.
+      </p>
+      <div className="mt-4">
+        <CatalogPanel configured={catalogConfigured()} />
+      </div>
+      {stats.total > 0 && (
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-smoke">
+          <span>
+            Top brands:{" "}
+            {stats.brands.map((b) => `${b.name} (${b.count})`).join(" · ")}
+          </span>
+          <span>
+            Latest: {stats.latest.map((l) => l.sku).join(", ")}
+          </span>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default async function AdminPage({
   searchParams,
@@ -1570,6 +1604,8 @@ export default async function AdminPage({
         </div>
       </section>
       )}
+
+      {show("market") && <CatalogSection />}
 
       {/* Sales ledger */}
       {show("market") && (

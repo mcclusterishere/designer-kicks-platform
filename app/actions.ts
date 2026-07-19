@@ -47,6 +47,7 @@ import { isEditor, currentUserRole, ensureRefCode, editorRefLink } from "@/lib/e
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
 import { geminiConfigured, geminiJson, imageParts } from "@/lib/gemini";
+import { importFromKicksDB } from "@/lib/catalog";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -2158,6 +2159,31 @@ export async function createResearchedProfile(
   revalidatePath("/editor");
   revalidatePath("/admin");
   return { ok: true, note: `Preloaded ${artistName} — now in the onboarding pipeline.`, artistUrl: `${base}/artists/${artist.slug}`, claimUrl };
+}
+
+// ---------- Shoe catalog (knowledge base for affiliate matching) ----------
+
+export type CatalogImportResult = ActionResult & { imported?: number; updated?: number; seen?: number };
+
+/** Bulk-import real sneakers into the catalog by search query (admin). */
+export async function importCatalog(
+  _prev: CatalogImportResult | null,
+  formData: FormData
+): Promise<CatalogImportResult> {
+  await requireAdmin();
+  const query = String(formData.get("query") ?? "").trim().slice(0, 80);
+  const pages = Math.min(10, Math.max(1, Number(formData.get("pages")) || 1));
+  if (!query) return { ok: false, error: "Give it a query — a brand or model like \"Jordan\" or \"Air Force 1\"." };
+  const res = await importFromKicksDB(query, pages);
+  if (!res.ok) return { ok: false, error: res.error ?? "Import failed." };
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    imported: res.imported,
+    updated: res.updated,
+    seen: res.seen,
+    note: res.error, // partial-success warnings ride along
+  };
 }
 
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------

@@ -877,3 +877,26 @@ model Product {
   sortOrder    Int     @default(0)
   createdAt    DateTime @default(now())
 }
+
+// The shoe knowledge base: real retail sneakers imported in bulk from a
+// provider (KicksDB first). Powers affiliate matching site-wide — a
+// custom's donor shoe (brand/silhouette/colorway) resolves to a real
+// SKU here, and SKU-level buy links convert far better than name search.
+model CatalogShoe {
+  id               String    @id @default(cuid())
+  sku              String    @unique
+  name             String
+  brand            String?
+  silhouette       String?
+  colorway         String?
+  imageUrl         String?
+  retailPriceCents Int?
+  releaseDate      DateTime?
+  source           String // kicksdb | manual | ...
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([brand])
+  @@index([silhouette])
+  @@index([name])
+}
