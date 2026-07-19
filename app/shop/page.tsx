@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import ProductCard from "@/components/ProductCard";
+import { SHOP_LIVE } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,8 @@ const CATEGORY_ORDER = [
 ];
 
 export default async function ShopPage() {
+  // Stashed until the shop is fully curated — drops carry the buy links.
+  if (!SHOP_LIVE) redirect("/drops");
   const products = await prisma.product.findMany({
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   });

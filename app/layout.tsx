@@ -7,6 +7,7 @@ import GoogleAnalytics from "@/components/GoogleAnalytics";
 import HeaderNav from "@/components/HeaderNav";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
+import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
 import "./globals.css";
 
@@ -126,7 +127,9 @@ export default async function RootLayout({
                 <Link href="/drops" className="hover:text-white">Drops</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
-                <Link href="/shop" className="hover:text-white">Shop</Link>
+                {SHOP_LIVE && (
+                  <Link href="/shop" className="hover:text-white">Shop</Link>
+                )}
                 <Link href="/story" className="hover:text-white">Our Story</Link>
               </div>
             </div>

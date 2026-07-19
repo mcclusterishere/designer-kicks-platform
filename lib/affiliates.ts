@@ -31,6 +31,12 @@ export const MERCHANTS: Merchant[] = [
     // for the fans, and the click still gets counted.
   },
   {
+    key: "adidas",
+    label: "adidas CONFIRMED",
+    hosts: ["adidas.com"],
+    // Same deal as Nike: launch/raffle links for adidas drops.
+  },
+  {
     key: "stockx",
     label: "StockX",
     hosts: ["stockx.com"],

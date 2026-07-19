@@ -6,6 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { drops2026 } from "./seed-drops-2026.mjs";
 
 const prisma = new PrismaClient();
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -155,6 +156,9 @@ const products = [
 // Kicks, Sneaker News, House of Heat) — dates shift, re-verify before
 // promoting a post.
 const articles = [
+  // The rest-of-2026 drop slate — one article per release, each with a
+  // culture question (see seed-drops-2026.mjs).
+  ...drops2026,
   {
     slug: "air-jordan-4-tour-yellow-release-date-2026",
     title: "Air Jordan 4 'Tour Yellow' Release Date: The 20-Year Wait Ends September 5",

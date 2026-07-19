@@ -8,6 +8,7 @@ import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
 import HypeTicker from "@/components/HypeTicker";
 import FeedScroller from "@/components/FeedScroller";
+import { SHOP_LIVE } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
@@ -329,28 +330,30 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Shop preview */}
-      <section className="mx-auto max-w-6xl px-4 py-12">
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="rule w-16" />
-            <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
-              Gear <span className="text-heat">&amp; Heat</span>
-            </h2>
+      {/* Shop preview — stashed behind SHOP_LIVE until it's fully curated */}
+      {SHOP_LIVE && (
+        <section className="mx-auto max-w-6xl px-4 py-12">
+          <div className="flex items-end justify-between">
+            <div>
+              <div className="rule w-16" />
+              <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
+                Gear <span className="text-heat">&amp; Heat</span>
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
+            >
+              Full shop →
+            </Link>
           </div>
-          <Link
-            href="/shop"
-            className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
-          >
-            Full shop →
-          </Link>
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-          {products.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
+          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* The Feed — the infinite scroll machine */}
       <section className="border-t border-edge">
