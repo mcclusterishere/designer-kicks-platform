@@ -7,6 +7,7 @@ import { getHeatList } from "@/lib/battles";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
+import AnnounceDropForm from "./AnnounceDropForm";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -21,7 +22,11 @@ export default async function StudioPage() {
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat] = await Promise.all([getStudioData(profile.id), getHeatList()]);
+  const [data, heat, myDrops] = await Promise.all([
+    getStudioData(profile.id),
+    getHeatList(),
+    prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
+  ]);
   if (!data) redirect("/submit");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const { artist, stats, votesSeries, followsLast14, soldSales } = data;
@@ -213,6 +218,44 @@ export default async function StudioPage() {
           </div>
         </>
       )}
+
+      {/* Announce your own drops onto the public calendar */}
+      <div className="mt-12">
+        <p className="display text-xl text-white">Announce a drop</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Got a release coming? Put it on the public drop calendar — it goes
+          live once the league office approves it.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <AnnounceDropForm />
+        </div>
+        {myDrops.length > 0 && (
+          <div className="mt-5">
+            <p className="tag text-smoke">Your announced drops</p>
+            <div className="mt-2">
+              {myDrops.map((d) => (
+                <div key={d.id} className="flex items-center gap-3 border-b border-edge/60 py-2.5">
+                  <span className="tag w-16 shrink-0 text-heat">
+                    {d.dropAt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-white">{d.title}</span>
+                  <span
+                    className={`tag shrink-0 ${
+                      d.status === "APPROVED"
+                        ? "text-volt"
+                        : d.status === "REJECTED"
+                          ? "text-heat"
+                          : "text-smoke"
+                    }`}
+                  >
+                    {d.status === "APPROVED" ? "Live" : d.status === "REJECTED" ? "Declined" : "In review"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* The future paid tier, primed honestly */}
       <div className="mt-12 rounded-xl border border-volt/40 bg-surface p-6">

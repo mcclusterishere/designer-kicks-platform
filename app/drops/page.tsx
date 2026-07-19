@@ -38,7 +38,8 @@ export default async function DropsPage({
   const nextStart = new Date(Date.UTC(year, month + 1, 1));
   const prevStart = new Date(Date.UTC(year, month - 1, 1));
 
-  const [monthDrops, nextUp] = await Promise.all([
+  const artistDropInclude = { artist: { select: { slug: true, displayName: true } } };
+  const [monthDrops, nextUp, monthArtistDrops, nextUpArtist] = await Promise.all([
     prisma.article.findMany({
       where: { status: "PUBLISHED", dropAt: { gte: monthStart, lt: nextStart } },
       orderBy: { dropAt: "asc" },
@@ -47,6 +48,18 @@ export default async function DropsPage({
       where: { status: "PUBLISHED", dropAt: { gte: new Date(now.getTime() - 86400000) } },
       orderBy: { dropAt: "asc" },
       take: 5,
+    }),
+    // Customizer-announced drops, once an admin has approved them.
+    prisma.artistDrop.findMany({
+      where: { status: "APPROVED", dropAt: { gte: monthStart, lt: nextStart } },
+      orderBy: { dropAt: "asc" },
+      include: artistDropInclude,
+    }),
+    prisma.artistDrop.findMany({
+      where: { status: "APPROVED", dropAt: { gte: new Date(now.getTime() - 86400000) } },
+      orderBy: { dropAt: "asc" },
+      take: 5,
+      include: artistDropInclude,
     }),
   ]);
 
@@ -63,6 +76,50 @@ export default async function DropsPage({
       links: buyLinks(dropName(a.title), a.raffleUrl, "drops"),
     });
   }
+  for (const ad of monthArtistDrops) {
+    const d = ad.dropAt.getUTCDate();
+    (dropDays[d] ??= []).push({
+      slug: `artist-${ad.id}`,
+      name: ad.title,
+      excerpt: ad.description ?? `A custom drop from ${ad.artist.displayName}.`,
+      cover: ad.imageUrl ?? null,
+      dropAtISO: ad.dropAt.toISOString(),
+      links: ad.buyUrl ? [{ label: "Cop / details", href: goHref(ad.buyUrl, "drops") }] : [],
+      href: ad.artist.slug ? `/artists/${ad.artist.slug}` : "/artists",
+      linkLabel: `${ad.artist.displayName} →`,
+      badge: "Artist drop",
+      hasIcs: false,
+    });
+  }
+
+  // Unified, date-sorted rows for the readable list + "Next up".
+  type Row = {
+    id: string;
+    date: Date;
+    name: string;
+    href: string;
+    action: { label: string; href: string } | null;
+    artist: boolean;
+  };
+  const toArticleRow = (a: (typeof monthDrops)[number]): Row => ({
+    id: a.id,
+    date: a.dropAt!,
+    name: dropName(a.title),
+    href: `/news/${a.slug}`,
+    action: a.raffleUrl ? { label: "Raffle ↗", href: goHref(a.raffleUrl, "drops") } : null,
+    artist: false,
+  });
+  const toArtistRow = (ad: (typeof monthArtistDrops)[number]): Row => ({
+    id: ad.id,
+    date: ad.dropAt,
+    name: ad.title,
+    href: ad.artist.slug ? `/artists/${ad.artist.slug}` : "/artists",
+    action: ad.buyUrl ? { label: "Cop ↗", href: goHref(ad.buyUrl, "drops") } : null,
+    artist: true,
+  });
+  const byDate = (a: Row, b: Row) => a.date.getTime() - b.date.getTime();
+  const monthRows: Row[] = [...monthDrops.map(toArticleRow), ...monthArtistDrops.map(toArtistRow)].sort(byDate);
+  const nextRows: Row[] = [...nextUp.map(toArticleRow), ...nextUpArtist.map(toArtistRow)].sort(byDate).slice(0, 6);
 
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const leadingBlanks = monthStart.getUTCDay();
@@ -107,28 +164,29 @@ export default async function DropsPage({
 
       {/* This month's drops — the readable half of the calendar */}
       <div className="mt-6 border-t border-edge">
-        {monthDrops.length === 0 ? (
+        {monthRows.length === 0 ? (
           <p className="py-8 text-center text-sm text-smoke">No drops this month.</p>
         ) : (
-          monthDrops.map((a) => (
-            <div key={a.id} className="flex items-center gap-4 border-b border-edge py-3.5">
+          monthRows.map((r) => (
+            <div key={r.id} className="flex items-center gap-4 border-b border-edge py-3.5">
               <span className="display w-10 shrink-0 text-center text-2xl text-volt tabular">
-                {a.dropAt!.getUTCDate()}
+                {r.date.getUTCDate()}
               </span>
               <Link
-                href={`/news/${a.slug}`}
+                href={r.href}
                 className="min-w-0 flex-1 truncate text-white transition hover:text-volt"
               >
-                {dropName(a.title)}
+                {r.name}
+                {r.artist && <span className="tag ml-2 text-volt">· Artist</span>}
               </Link>
-              {a.raffleUrl && (
+              {r.action && (
                 <a
-                  href={goHref(a.raffleUrl, "drops")}
+                  href={r.action.href}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
                   className="tag shrink-0 text-volt underline underline-offset-4"
                 >
-                  Raffle ↗
+                  {r.action.label}
                 </a>
               )}
             </div>
@@ -137,33 +195,34 @@ export default async function DropsPage({
       </div>
 
       {/* Next up, regardless of month */}
-      {nextUp.length > 0 && (
+      {nextRows.length > 0 && (
         <div className="mt-10">
           <p className="tag text-smoke">Next up</p>
           <div className="mt-2">
-            {nextUp.map((a) => (
-              <div key={a.id} className="flex items-center gap-4 border-b border-edge/60 py-3">
+            {nextRows.map((r) => (
+              <div key={r.id} className="flex items-center gap-4 border-b border-edge/60 py-3">
                 <span className="tag w-16 shrink-0 text-heat">
-                  {a.dropAt!.toLocaleDateString("en-US", {
+                  {r.date.toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     timeZone: "UTC",
                   })}
                 </span>
                 <Link
-                  href={`/news/${a.slug}`}
+                  href={r.href}
                   className="min-w-0 flex-1 truncate text-sm text-white transition hover:text-volt"
                 >
-                  {dropName(a.title)}
+                  {r.name}
+                  {r.artist && <span className="tag ml-2 text-volt">· Artist</span>}
                 </Link>
-                {a.raffleUrl && (
+                {r.action && (
                   <a
-                    href={goHref(a.raffleUrl, "drops")}
+                    href={r.action.href}
                     target="_blank"
                     rel="noopener noreferrer nofollow"
                     className="tag shrink-0 text-volt underline underline-offset-4"
                   >
-                    Raffle ↗
+                    {r.action.label}
                   </a>
                 )}
               </div>

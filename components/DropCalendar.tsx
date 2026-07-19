@@ -8,7 +8,7 @@ import Link from "next/link";
 import Countdown from "@/components/Countdown";
 
 export type DayDrop = {
-  slug: string;
+  slug: string; // unique key; article slug for editorial drops
   name: string;
   excerpt: string;
   cover: string | null;
@@ -17,10 +17,16 @@ export type DayDrop = {
   // Raffle first (if any), then the merchants that pay commission —
   // every href already routed through /go for tagging + click receipts.
   links: { label: string; href: string }[];
+  // Artist-announced drops override these: they link to the artist page
+  // (not /news), carry a badge, and have no per-article .ics.
+  href?: string; // primary "story" link (default /news/<slug>)
+  linkLabel?: string; // default "The story + history →"
+  badge?: string | null; // e.g. "Artist drop"
+  hasIcs?: boolean; // false for artist drops (no article to export)
 };
 
 /** All-day Google Calendar template link for a drop. */
-function gcalHref(name: string, iso: string, slug: string): string {
+function gcalHref(name: string, iso: string, storyPath: string): string {
   const d = new Date(iso);
   const ymd = (x: Date) =>
     `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, "0")}${String(x.getUTCDate()).padStart(2, "0")}`;
@@ -29,7 +35,7 @@ function gcalHref(name: string, iso: string, slug: string): string {
     action: "TEMPLATE",
     text: `${name} — drop day`,
     dates: `${ymd(d)}/${ymd(next)}`,
-    details: `The story + raffle links: ${typeof location !== "undefined" ? location.origin : ""}/news/${slug}`,
+    details: `Details: ${typeof location !== "undefined" ? location.origin : ""}${storyPath}`,
   });
   return `https://calendar.google.com/calendar/render?${params}`;
 }
@@ -203,7 +209,14 @@ export function DropCalendar({
                       />
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-white">{dp.name}</p>
+                      <p className="font-bold text-white">
+                        {dp.name}
+                        {dp.badge && (
+                          <span className="ml-2 rounded bg-volt/15 px-1.5 py-0.5 align-middle tag text-volt">
+                            {dp.badge}
+                          </span>
+                        )}
+                      </p>
                       <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-smoke">
                         {dp.excerpt}
                       </p>
@@ -216,27 +229,29 @@ export function DropCalendar({
                   )}
                   <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5">
                     <Link
-                      href={`/news/${dp.slug}`}
+                      href={dp.href ?? `/news/${dp.slug}`}
                       className="tag text-volt underline underline-offset-4"
                     >
-                      The story + history →
+                      {dp.linkLabel ?? "The story + history →"}
                     </Link>
                     {dp.dropAtISO && (
                       <>
                         <a
-                          href={gcalHref(dp.name, dp.dropAtISO, dp.slug)}
+                          href={gcalHref(dp.name, dp.dropAtISO, dp.href ?? `/news/${dp.slug}`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="tag text-smoke underline underline-offset-4 hover:text-white"
                         >
                           Google Cal
                         </a>
-                        <a
-                          href={`/api/drop-ics/${dp.slug}`}
-                          className="tag text-smoke underline underline-offset-4 hover:text-white"
-                        >
-                          .ics
-                        </a>
+                        {dp.hasIcs !== false && (
+                          <a
+                            href={`/api/drop-ics/${dp.slug}`}
+                            className="tag text-smoke underline underline-offset-4 hover:text-white"
+                          >
+                            .ics
+                          </a>
+                        )}
                       </>
                     )}
                   </div>

@@ -92,6 +92,26 @@ model ArtistProfile {
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
+  drops       ArtistDrop[]
+}
+
+// A customizer-announced release date on the public drop calendar.
+// Approved artists post their own upcoming drops; admin reviews before
+// they go live (PENDING -> APPROVED), same vetting as submissions.
+model ArtistDrop {
+  id          String        @id @default(cuid())
+  artistId    String
+  artist      ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dropAt      DateTime
+  imageUrl    String?
+  buyUrl      String?
+  status      String        @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt   DateTime      @default(now())
+
+  @@index([status, dropAt])
+  @@index([artistId])
 }
 
 // BETA (admin-only): Group Scout. Facebook groups worth pitching —

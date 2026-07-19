@@ -1356,6 +1356,75 @@ export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJE
   revalidatePath("/heat-list");
 }
 
+/**
+ * A customizer announces their own upcoming drop onto the calendar.
+ * Approved artists only; it lands PENDING and shows on /drops once an
+ * admin approves it (same vetting as submissions).
+ */
+export async function announceArtistDrop(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, status: true, displayName: true },
+  });
+  if (!profile) return { ok: false, error: "Artist accounts only — apply for one first." };
+  if (profile.status !== "APPROVED") {
+    return { ok: false, error: "Your artist account is still under review." };
+  }
+  if (!allowAttempt("artistdrop", session.user.id, 10, 60 * 60 * 1000)) {
+    return { ok: false, error: "Slow down — a few drop announcements an hour." };
+  }
+
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const buyUrl = String(formData.get("buyUrl") ?? "").trim();
+  const imageUrl = String(formData.get("imageUrl") ?? "").trim();
+  const dateRaw = String(formData.get("dropAt") ?? "").trim();
+
+  if (!title || title.length > 120) return { ok: false, error: "A drop title is required." };
+  if (description.length > 600) return { ok: false, error: "Keep the description under 600 characters." };
+  if (buyUrl && (buyUrl.length > 300 || !/^https?:\/\//i.test(buyUrl))) {
+    return { ok: false, error: "The buy link must be a full http(s):// URL." };
+  }
+  if (imageUrl && (imageUrl.length > 400 || !/^(https?:\/\/|\/)/i.test(imageUrl))) {
+    return { ok: false, error: "The image must be a URL." };
+  }
+  const dropAt = dateRaw ? new Date(`${dateRaw}T12:00:00Z`) : null;
+  if (!dropAt || Number.isNaN(dropAt.getTime())) return { ok: false, error: "Pick a valid release date." };
+  if (dropAt.getTime() < Date.now() - 86400000) {
+    return { ok: false, error: "The release date can't be in the past." };
+  }
+
+  await prisma.artistDrop.create({
+    data: {
+      artistId: profile.id,
+      title,
+      description: description || null,
+      buyUrl: buyUrl || null,
+      imageUrl: imageUrl || null,
+      dropAt,
+    },
+  });
+  notifyAdmin(
+    `Drop announcement: ${profile.displayName}`,
+    `${profile.displayName} announced "${title}" for ${dropAt.toISOString().slice(0, 10)}. Review it at ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+  );
+  revalidatePath("/studio");
+  return { ok: true };
+}
+
+/** Admin verdict on a customizer's announced drop. */
+export async function setDropAnnouncementStatus(id: string, status: "APPROVED" | "REJECTED") {
+  await requireAdmin();
+  await prisma.artistDrop.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+  revalidatePath("/drops");
+}
+
 export async function createBattle(
   _prev: ActionResult | null,
   formData: FormData

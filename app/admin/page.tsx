@@ -13,6 +13,7 @@ import {
   deleteQuestion,
   forceAdvanceTournament,
   setArtistStatus,
+  setDropAnnouncementStatus,
   respondArtistClaim,
   setSaleVerified,
 } from "@/app/actions";
@@ -111,6 +112,13 @@ export default async function AdminPage({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
     include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
+  // Customizer-announced drops awaiting review before they hit /drops.
+  const pendingDrops = await prisma.artistDrop.findMany({
+    where: { status: "PENDING" },
+    orderBy: { dropAt: "asc" },
+    include: { artist: { select: { displayName: true, slug: true } } },
   });
 
   // Profile claims: pending for review, plus recent approvals with their
@@ -832,6 +840,66 @@ export default async function AdminPage({
                       </button>
                     </form>
                     <form action={setArtistStatus.bind(null, a.id, "REJECTED")}>
+                      <button className="rounded border border-heat px-4 py-2 tag text-heat">
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10 rounded-xl border border-edge bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Announced Drops{" "}
+          <span className={pendingDrops.length ? "text-heat" : "text-smoke"}>
+            ({pendingDrops.length})
+          </span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Release dates customizers posted from their Studio. Approve to put
+          them on the public drop calendar.
+        </p>
+        {pendingDrops.length === 0 ? (
+          <p className="mt-3 text-sm text-smoke">No drops awaiting review.</p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {pendingDrops.map((d) => (
+              <div key={d.id} className="rounded-xl border border-edge bg-surface p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-white">{d.title}</p>
+                    <p className="text-sm text-smoke">
+                      {d.artist.displayName} ·{" "}
+                      {d.dropAt.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      })}
+                    </p>
+                    {d.description && <p className="mt-1 text-sm text-smoke">{d.description}</p>}
+                    {d.buyUrl && (
+                      <a
+                        href={d.buyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-volt underline"
+                      >
+                        {d.buyUrl}
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <form action={setDropAnnouncementStatus.bind(null, d.id, "APPROVED")}>
+                      <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                        Approve
+                      </button>
+                    </form>
+                    <form action={setDropAnnouncementStatus.bind(null, d.id, "REJECTED")}>
                       <button className="rounded border border-heat px-4 py-2 tag text-heat">
                         Reject
                       </button>
