@@ -1230,6 +1230,34 @@ async function main() {
       return existsSync(path.join(process.cwd(), "data", "uploads", path.basename(imageUrl)));
     };
 
+    // Heal any legacy 'headwear' pieces: that category was briefly a
+    // fourth lane, then merged back into 'accessories'. Without this,
+    // such a piece is orphaned (invisible in every 3-lane filter).
+    const healedHats = await prisma.submission.updateMany({
+      where: { category: "headwear" },
+      data: { category: "accessories" },
+    });
+    if (healedHats.count > 0) {
+      console.log(`Category heal: moved ${healedHats.count} headwear piece(s) → accessories.`);
+    }
+
+    // Backfill legacy 'OPEN'-league fit battles to the two real leagues
+    // (FAN / HOUSE) so the /outfits page files them under the right
+    // section instead of dumping every old one into "Curator Battles."
+    const openBattles = await prisma.outfitBattle.findMany({
+      where: { league: "OPEN" },
+      include: { outfitA: { select: { kind: true } } },
+    });
+    for (const b of openBattles) {
+      await prisma.outfitBattle.update({
+        where: { id: b.id },
+        data: { league: b.outfitA?.kind === "FAN" ? "FAN" : "HOUSE" },
+      });
+    }
+    if (openBattles.length > 0) {
+      console.log(`League backfill: ${openBattles.length} OPEN fit battle(s) relabeled.`);
+    }
+
     // Re-attributions: pieces that were seeded under the wrong artist on
     // an earlier deploy. The roster loop only ADDS pieces, so a stale
     // copy on the live DB would never move — this heals it. Runs BEFORE
@@ -1386,26 +1414,38 @@ async function main() {
     const bank = loadQuestions();
     const existingTrivia = await prisma.quizQuestion.findMany({
       where: { articleId: null },
-      select: { question: true },
+      select: { id: true, question: true, options: true, answerIndex: true },
     });
-    const haveQ = new Set(existingTrivia.map((q) => q.question));
+    const byText = new Map(existingTrivia.map((q) => [q.question, q]));
     let newQuestions = 0;
+    let fixedQuestions = 0;
     for (const q of bank) {
-      if (haveQ.has(q.question)) continue;
-      await prisma.quizQuestion.create({
-        data: {
-          question: q.question,
-          options: JSON.stringify(q.options),
-          answerIndex: q.answerIndex,
-          difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
-          category: q.category || "history",
-          explanation: q.explanation || null,
-        },
-      });
-      newQuestions++;
+      const content = {
+        options: JSON.stringify(q.options),
+        answerIndex: q.answerIndex,
+        difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
+        category: q.category || "history",
+        explanation: q.explanation || null,
+      };
+      const existing = byText.get(q.question);
+      if (existing) {
+        // Repair the correctness fields when questions.json fixes a wrong
+        // answer/options — otherwise a bad answerIndex would score players
+        // wrong forever and burn into the IQ ledger. Only touches content
+        // that actually differs; never flips the admin's `active` toggle.
+        if (existing.options !== content.options || existing.answerIndex !== content.answerIndex) {
+          await prisma.quizQuestion.update({ where: { id: existing.id }, data: content });
+          fixedQuestions++;
+        }
+      } else {
+        await prisma.quizQuestion.create({ data: { question: q.question, ...content } });
+        newQuestions++;
+      }
     }
     const totalQuestions = await prisma.quizQuestion.count({ where: { active: true } });
-    console.log(`Quiz bank: ${newQuestions} new trivia question(s); ${totalQuestions} active total.`);
+    console.log(
+      `Quiz bank: ${newQuestions} new, ${fixedQuestions} corrected; ${totalQuestions} active total.`
+    );
     const activeGiveaway = await prisma.giveaway.findFirst({
       where: { status: "ACTIVE", endsAt: { gt: new Date() } },
     });

@@ -1,14 +1,27 @@
 import { prisma } from "./db";
 import { advanceTournaments } from "./tournaments";
 
+// Lazy finalization runs from many public page renders. Under a traffic
+// burst, thousands of simultaneous renders would all scan + update the
+// same expired battles and race advanceTournaments() into double-created
+// rounds. This throttle collapses a burst to one run per interval per
+// instance: the first render does the work, the rest no-op. The cron
+// endpoint passes force=true so scheduled finalization always runs.
+let lastFinalizeAt = 0;
+const FINALIZE_INTERVAL_MS = 60 * 1000;
+
 /**
  * Completes any ACTIVE battle whose clock has run out, crowning the
  * submission with more votes. A tie leaves winnerId null (tournament
  * matches resolve ties in favor of the higher seed). Also advances any
  * tournaments whose rounds just completed. Called lazily from pages
- * that show battle state, plus the cron endpoint.
+ * that show battle state (throttled), plus the cron endpoint (force).
  */
-export async function finalizeExpiredBattles() {
+export async function finalizeExpiredBattles(force = false) {
+  const now = Date.now();
+  if (!force && now - lastFinalizeAt < FINALIZE_INTERVAL_MS) return;
+  lastFinalizeAt = now; // claim the slot before awaiting so a burst collapses to one run
+
   const expired = await prisma.battle.findMany({
     where: { status: "ACTIVE", endsAt: { lt: new Date() } },
     select: { id: true, subAId: true, subBId: true },

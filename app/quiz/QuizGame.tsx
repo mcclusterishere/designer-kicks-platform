@@ -15,6 +15,11 @@ import {
 
 const DIFFICULTY = { 1: "Easy", 2: "Medium", 3: "Hard" } as Record<number, string>;
 
+// How long the player can be off-screen before the current question is
+// forfeited. Long enough to forgive a notification glance or a brief
+// lock; far shorter than it takes to actually look an answer up.
+const LEAVE_GRACE_MS = 3000;
+
 type Props = {
   initialState: QuizState | null;
   purchaseResult: string | null;
@@ -31,16 +36,19 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
   const [pending, startTransition] = useTransition();
   const forfeitedRef = useRef<Set<string>>(new Set());
 
-  // Anti-cheat: leaving the screen mid-question (tab switch, app
-  // backgrounded) burns that question. It's recorded as a miss so it
-  // never returns, and we auto-advance — no reveal, no notice. Looking
-  // up an answer elsewhere gains nothing because it's already gone.
+  // Anti-cheat: LEAVING the screen mid-question burns that question —
+  // recorded as a miss so it never returns, auto-advanced, no reveal,
+  // no notice. But phones background constantly (a notification, a
+  // quick screen lock, glancing at a text), so a brief hide is
+  // forgiven: only staying gone long enough to actually look something
+  // up (past the grace window) forfeits. A cheater who leaves to search
+  // is away far longer than this; a mom who glances at a text is not.
   useEffect(() => {
     if (!state || state.status !== "ACTIVE" || !state.question) return;
     const qid = state.question.id;
     const runId = state.runId;
-    function onLeave() {
-      if (document.visibilityState !== "hidden") return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function burn() {
       if (forfeitedRef.current.has(qid)) return;
       forfeitedRef.current.add(qid);
       startTransition(async () => {
@@ -52,8 +60,19 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
         }
       });
     }
-    document.addEventListener("visibilitychange", onLeave);
-    return () => document.removeEventListener("visibilitychange", onLeave);
+    function onVis() {
+      if (document.visibilityState === "hidden") {
+        timer = setTimeout(burn, LEAVE_GRACE_MS);
+      } else if (timer) {
+        clearTimeout(timer); // came back in time — question survives
+        timer = null;
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      if (timer) clearTimeout(timer);
+    };
   }, [state?.runId, state?.status, state?.question?.id]);
 
   function run(action: () => Promise<{ ok: boolean } & Record<string, unknown>>) {

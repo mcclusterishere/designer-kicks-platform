@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   const before = await prisma.battle.count({ where: { status: "ACTIVE" } });
-  await finalizeExpiredBattles();
+  await finalizeExpiredBattles(true); // scheduled run always executes, bypassing the lazy throttle
   const after = await prisma.battle.count({ where: { status: "ACTIVE" } });
 
   return NextResponse.json({ finalized: before - after, activeBattles: after });

@@ -84,6 +84,33 @@ Recommendation: ship Phase 1 today, start Phase 2 after the FB traffic
 test proves retention (App Review takes days-to-weeks and the PWA
 loses nothing meanwhile).
 
+## 4.5 Ready for a traffic flood (1k+ users)
+
+The repo now handles most of this itself — but two settings are yours:
+
+- [ ] **Size the DB pool.** In Railway → Postgres → the `DATABASE_URL`
+      you copy into the app service, append
+      `?connection_limit=20&pool_timeout=20&connect_timeout=10`. Without
+      it Prisma's tiny default pool is the first thing to fall over under
+      a spike. Keep `connection_limit` well under Postgres `max_connections`.
+- [ ] **Run ONE instance for launch.** The in-memory rate limiter and the
+      startup seed assume a single instance. Don't enable replicas/
+      autoscaling for the launch window (Hobby is single by default).
+- [ ] **Schedule the finalizer.** Battles finalize lazily on page views
+      (throttled to once/min), but add a scheduler hitting
+      `GET /api/health`-style `GET /api/cron/finalize` with the
+      `Authorization: Bearer <CRON_SECRET>` header every few minutes so
+      results settle even in quiet hours. (Any external cron / GitHub
+      Action works; Railway has a cron service.)
+- [ ] Optional but ideal: set the `S3_*` vars (Cloudflare R2 free tier)
+      so artist photos serve from the bucket, not through the app process.
+
+What the repo already does for you now: `railway.json` runs
+`prisma db push` (syncs the new columns/tables) + the idempotent seed +
+`next start` on every deploy, with `/api/health` as the healthcheck; hot
+query paths are indexed; the finalizer is throttled; security headers,
+a branded error page, and a 404 page are in place.
+
 ## 5. First-week ops
 
 - [ ] Broadcast the launch post (pinned) + cross-post everywhere

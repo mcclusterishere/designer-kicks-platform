@@ -40,8 +40,11 @@ export async function registerUser(
   // COPPA: the service is 13+. The affirmation is required at signup.
   if (!age13) return { ok: false, error: "You must confirm you're at least 13 to create an account." };
 
-  if (!allowAttempt("register", await clientIp(), 10, HOUR)) {
-    return { ok: false, error: "Too many sign-ups from this connection — try again later." };
+  // Generous per-IP: a viral post pulls many real signups through one
+  // carrier-grade NAT / shared mobile gateway. Email uniqueness + the
+  // 13+ gate are the real guards; this just blunts scripted floods.
+  if (!allowAttempt("register", await clientIp(), 30, HOUR)) {
+    return { ok: false, error: "Too many sign-ups from this connection — try again in a bit." };
   }
 
   const existing = await prisma.user.findUnique({

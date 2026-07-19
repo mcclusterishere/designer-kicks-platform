@@ -605,7 +605,12 @@ async function buildOutfit(
   if (pieces.length !== unique.length) return { ok: false, error: "One of those pieces isn't available." };
   // Outfits are the ONLY place categories mix — and a fit is a FULL
   // look: exactly one piece from each of the three lanes (kicks +
-  // apparel + accessory). No dupes, no gaps.
+  // apparel + accessory). Every piece must be a real category (guards
+  // crafted requests / legacy values), and all three lanes must be
+  // covered — three unique canonical categories IS the whole set.
+  if (!pieces.every((p) => isPieceCategory(p.category))) {
+    return { ok: false, error: "One of those pieces has an unrecognized category." };
+  }
   const fitLanes = new Set(pieces.map((p) => p.category));
   if (fitLanes.size !== PIECE_CATEGORY_KEYS.length) {
     const missing = PIECE_CATEGORY_KEYS.filter((c) => !fitLanes.has(c));
@@ -1144,11 +1149,13 @@ export async function placeOffer(
     });
   }
 
-  // Ping the seller — but throttle PER SELLER (not just per buyer) so
-  // offers can't be weaponized to email-bomb a target or burn Resend
-  // quota: at most a handful of offer emails to any one seller per hour.
+  // Ping the seller — throttled per (buyer → seller) pair: one buyer
+  // can't email-bomb a seller (or burn Resend quota), and because the
+  // key includes the buyer, one attacker can't exhaust a shared per-
+  // seller budget and starve OTHER buyers' legit offer emails.
   const sellerEmail = submission.owner?.email ?? submission.artist?.user?.email;
-  if (sellerEmail && allowAttempt("offermail", sellerEmail.toLowerCase(), 6, 60 * 60 * 1000)) {
+  const mailKey = `${sellerEmail?.toLowerCase()}:${session.user.id}`;
+  if (sellerEmail && allowAttempt("offermail", mailKey, 3, 60 * 60 * 1000)) {
     sendMail({
       to: sellerEmail,
       subject: `$${amount} offer on "${submission.title}" 💸`,
@@ -1399,7 +1406,7 @@ export async function endBattleNow(battleId: string) {
     where: { id: battleId },
     data: { endsAt: new Date(Date.now() - 1000) },
   });
-  await finalizeExpiredBattles();
+  await finalizeExpiredBattles(true); // explicit admin action — settle now
   revalidatePath("/battles");
   revalidatePath("/admin");
   revalidatePath("/heat-list");
@@ -1658,7 +1665,7 @@ export async function forceAdvanceTournament(tournamentId: string) {
       data: { endsAt: new Date(Date.now() - 1000) },
     });
   }
-  await finalizeExpiredBattles();
+  await finalizeExpiredBattles(true); // explicit admin "advance now" — bypass the lazy throttle
   revalidatePath("/tournaments");
   revalidatePath("/battles");
   revalidatePath("/admin");
@@ -2157,21 +2164,31 @@ export async function clearQuizMiss(answerId: string): Promise<ClearMissResult> 
   const miss = await prisma.quizAnswer.findUnique({ where: { id: answerId } });
   if (!miss || miss.userId !== userId) return { ok: false, error: "Miss not found." };
   if (miss.correct || miss.cleared) return { ok: false, error: "Nothing to clear there." };
-  // Atomic spend: the conditional decrement (credits >= 1) and the
-  // cleared flip happen together, so two concurrent clears can't both
-  // pass a stale balance read and double-spend one credit.
-  const spent = await prisma.$transaction(async (tx) => {
+  // Fully atomic + idempotent per answer. The cleared flip is the guard:
+  // updateMany({ cleared:false }) succeeds for exactly ONE of two
+  // concurrent double-clicks (count===1); the loser sees count===0 and
+  // spends nothing. Only after winning the flip do we take the credit —
+  // and the conditional decrement (credits>=1) still prevents a negative
+  // balance. So one credit clears one miss, never two.
+  const result = await prisma.$transaction(async (tx) => {
+    const flip = await tx.quizAnswer.updateMany({
+      where: { id: answerId, userId, correct: false, cleared: false },
+      data: { cleared: true },
+    });
+    if (flip.count === 0) return "already"; // a concurrent clear got it first
     const dec = await tx.user.updateMany({
       where: { id: userId, credits: { gte: 1 } },
       data: { credits: { decrement: 1 } },
     });
-    if (dec.count === 0) return false;
+    if (dec.count === 0) throw new Error("no-credit"); // rolls back the flip
     await tx.creditTransaction.create({ data: { userId, delta: -1, reason: "iq-clear" } });
-    await tx.quizAnswer.update({ where: { id: answerId }, data: { cleared: true } });
-    return true;
-  });
-  if (!spent) {
+    return "ok";
+  }).catch((e) => (e instanceof Error && e.message === "no-credit" ? "no-credit" : Promise.reject(e)));
+  if (result === "no-credit") {
     return { ok: false, error: "You need a credit — grab them on the Heat Check page." };
+  }
+  if (result === "already") {
+    return { ok: false, error: "That one's already cleared." };
   }
   const { iq } = await cultureIQ(userId);
   const fresh = await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } });

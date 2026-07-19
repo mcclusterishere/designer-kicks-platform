@@ -54,6 +54,13 @@ model Submission {
   tournamentsWon Tournament[]      @relation("tournamentChampion")
   matchesAsA     TournamentMatch[] @relation("matchSubA")
   matchesAsB     TournamentMatch[] @relation("matchSubB")
+
+  // Hot paths: the Heat List / feed / analytics all filter APPROVED;
+  // artist pages, call-outs, and the roster seed filter by artistId;
+  // fan closets filter by ownerId.
+  @@index([status])
+  @@index([artistId])
+  @@index([ownerId])
 }
 
 model ArtistProfile {
@@ -301,6 +308,10 @@ model Battle {
 
   votes Vote[]
   tournamentMatch TournamentMatch?
+
+  // Hot path: lazy finalization scans (status ACTIVE, endsAt < now) and
+  // the feed lists active battles — on nearly every page render.
+  @@index([status, endsAt])
 }
 
 // Posts in The Feed on the home page. artistId null = the house
@@ -319,6 +330,8 @@ model FeedPost {
 
   reactions FeedReaction[]
   comments  FeedComment[]
+
+  @@index([pinned, createdAt])
 }
 
 // One flame per fan per post.
@@ -363,6 +376,9 @@ model Tournament {
   champion   Submission? @relation("tournamentChampion", fields: [championId], references: [id])
 
   matches TournamentMatch[]
+
+  // advanceTournaments() loads ACTIVE tournaments on many page renders.
+  @@index([status])
 }
 
 model TournamentMatch {
@@ -561,6 +577,10 @@ model QuizQuestion {
   createdAt   DateTime @default(now())
 
   answers QuizAnswer[]
+
+  // Quiz pool + count filter on active; culture-question upsert on articleId.
+  @@index([active])
+  @@index([articleId])
 }
 
 // The Culture IQ ledger: one row per user per question, forever. A
@@ -650,6 +670,10 @@ model Article {
   updatedAt   DateTime  @updatedAt
 
   cultureQuestions QuizQuestion[]
+
+  // News list filters PUBLISHED by publishedAt; /drops filters by dropAt.
+  @@index([status, publishedAt])
+  @@index([status, dropAt])
 }
 
 // Tiny key/value store for server-side settings. Currently holds the

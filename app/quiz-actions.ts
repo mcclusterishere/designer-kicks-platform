@@ -151,23 +151,19 @@ export async function answerQuestion(
   const options = JSON.parse(question.options) as string[];
   const correct = optionIndex === question.answerIndex;
   const correctAnswer = options[question.answerIndex];
-
-  // Every answer — right or wrong — lands in the Culture IQ ledger,
-  // the same one the feed quiz writes. Unique per (user, question):
-  // a question already answered in the feed just doesn't re-score.
-  try {
-    await prisma.quizAnswer.create({
-      data: { userId, questionId: question.id, correct, source: "gauntlet" },
-    });
-  } catch {
-    // Already in the ledger (raced with a feed answer) — never rescore.
-  }
+  const outOfQuestions = run.currentIndex + 1 >= ids.length;
 
   if (correct) {
     const newCorrect = run.correctCount + 1;
     const won = newCorrect >= HEAT_CHECK_TARGET;
-    const updated = await prisma.quizRun.update({
-      where: { id: run.id },
+    // Atomically CLAIM this question's advance. The where-guard on
+    // currentIndex + status means only ONE request (not a racing
+    // forfeit or a double-tap) can process this question — the loser
+    // gets count === 0 and does nothing. This is what stops a correct
+    // answer being flipped to a miss, a WON run reverting to ACTIVE,
+    // and a strike being burned twice.
+    const claim = await prisma.quizRun.updateMany({
+      where: { id: run.id, currentIndex: run.currentIndex, status: "ACTIVE" },
       data: {
         correctCount: newCorrect,
         currentIndex: run.currentIndex + 1,
@@ -175,12 +171,23 @@ export async function answerQuestion(
         completedAt: won ? new Date() : null,
       },
     });
-
+    if (claim.count === 0) {
+      const fresh = await prisma.quizRun.findUnique({ where: { id: run.id } });
+      return { ok: true, state: await buildState(userId, fresh ?? run) };
+    }
+    // We own the transition — record the ledger answer (a losing forfeit
+    // never wrote its miss, so a correct answer wins the ledger too).
+    try {
+      await prisma.quizAnswer.create({
+        data: { userId, questionId: question.id, correct: true, source: "gauntlet" },
+      });
+    } catch {
+      // Already answered in the feed — never rescore.
+    }
     let earnedEntry = false;
     if (won) {
       // Sweepstakes-law guard: giveaway entries come ONLY from runs
-      // completed without purchased strikes. Paid runs count for the
-      // leaderboard and badges, never for the prize.
+      // completed without purchased strikes.
       if (!run.usedPaidStrikes) {
         const giveaway = await getActiveGiveaway();
         if (giveaway) {
@@ -194,24 +201,39 @@ export async function answerQuestion(
       revalidatePath("/profile");
       revalidatePath("/quiz");
     }
-
+    const updated = await prisma.quizRun.findUnique({ where: { id: run.id } });
     return {
       ok: true,
-      state: await buildState(userId, updated),
+      state: await buildState(userId, updated ?? run),
       feedback: { correct: true, correctAnswer, explanation: question.explanation, earnedEntry },
     };
   }
 
-  // Wrong answer: costs a strike (free daily first, then purchased credits).
+  // Wrong answer. Claim the advance FIRST so only one request processes
+  // it, THEN consume a strike — so a racing forfeit/double-tap can't
+  // burn two strikes for one question.
+  const claim = await prisma.quizRun.updateMany({
+    where: { id: run.id, currentIndex: run.currentIndex, status: "ACTIVE" },
+    data: { currentIndex: run.currentIndex + 1, wrongCount: run.wrongCount + 1 },
+  });
+  if (claim.count === 0) {
+    const fresh = await prisma.quizRun.findUnique({ where: { id: run.id } });
+    return {
+      ok: true,
+      state: await buildState(userId, fresh ?? run),
+      feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry: false },
+    };
+  }
+  try {
+    await prisma.quizAnswer.create({
+      data: { userId, questionId: question.id, correct: false, source: "gauntlet" },
+    });
+  } catch {}
   const strike = await consumeStrike(userId);
-  const outOfQuestions = run.currentIndex + 1 >= ids.length;
   const updated = await prisma.quizRun.update({
     where: { id: run.id },
     data: {
-      wrongCount: run.wrongCount + 1,
       usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
-      // Always advance so answers can't be brute-forced by retrying.
-      currentIndex: run.currentIndex + 1,
       status: !strike ? "NEEDS_CREDITS" : outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
       completedAt: outOfQuestions && strike ? new Date() : null,
     },
@@ -253,6 +275,19 @@ export async function forfeitQuestion(
     return { ok: true, state: await buildState(userId, run) };
   }
 
+  // Claim the advance atomically. If the player actually answered this
+  // question in the same instant (a legit answer beating the delayed
+  // forfeit), that request wins the claim and this one does nothing —
+  // so the answer is never overwritten with a miss and no strike is
+  // double-burned.
+  const claim = await prisma.quizRun.updateMany({
+    where: { id: run.id, currentIndex: run.currentIndex, status: "ACTIVE" },
+    data: { currentIndex: run.currentIndex + 1, wrongCount: run.wrongCount + 1 },
+  });
+  if (claim.count === 0) {
+    const fresh = await prisma.quizRun.findUnique({ where: { id: run.id } });
+    return { ok: true, state: await buildState(userId, fresh ?? run) };
+  }
   // Burn it in the ledger — a miss, never returns, no reveal.
   try {
     await prisma.quizAnswer.create({
@@ -266,9 +301,7 @@ export async function forfeitQuestion(
   const updated = await prisma.quizRun.update({
     where: { id: run.id },
     data: {
-      wrongCount: run.wrongCount + 1,
       usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
-      currentIndex: run.currentIndex + 1,
       status: !strike ? "NEEDS_CREDITS" : outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
       completedAt: outOfQuestions && strike ? new Date() : null,
     },
@@ -295,9 +328,18 @@ export async function resumeRun(runId: string): Promise<QuizActionResult> {
     if (!strike) {
       return { ok: false, error: "Still no strikes available — grab a credit pack first." };
     }
+    // If the stall happened on the LAST question, there's nothing left to
+    // resume into — the run is over, not active (avoids a stuck
+    // "Loading question…" card).
+    const ids = JSON.parse(run.questionIds) as string[];
+    const done = run.currentIndex >= ids.length;
     const updated = await prisma.quizRun.update({
       where: { id: run.id },
-      data: { status: "ACTIVE", usedPaidStrikes: run.usedPaidStrikes || strike === "paid" },
+      data: {
+        status: done ? "OUT_OF_QUESTIONS" : "ACTIVE",
+        completedAt: done ? new Date() : null,
+        usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
+      },
     });
     return { ok: true, state: await buildState(userId, updated) };
   }

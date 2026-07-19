@@ -82,10 +82,21 @@ export function adminAllowlist(): string[] {
     .filter(Boolean);
 }
 
-/** A real, public deployment — a real https site URL is configured. */
+/**
+ * A real, public deployment. True if a real https site URL is
+ * configured OR we're running on Railway (env markers it injects) —
+ * so a prod box that simply forgot to set NEXT_PUBLIC_SITE_URL still
+ * fails closed instead of silently dropping to password-only admin.
+ * Local + e2e (no https URL, no Railway markers) stay password-only.
+ */
 function isRealDeploy(): boolean {
   const site = (process.env.NEXT_PUBLIC_SITE_URL || "").toLowerCase();
-  return /^https:\/\//.test(site) && !site.includes("localhost");
+  if (/^https:\/\//.test(site) && !site.includes("localhost")) return true;
+  return Boolean(
+    process.env.RAILWAY_ENVIRONMENT_NAME ||
+      process.env.RAILWAY_PROJECT_ID ||
+      process.env.RAILWAY_SERVICE_ID
+  );
 }
 
 export async function adminAccountOk(): Promise<boolean> {

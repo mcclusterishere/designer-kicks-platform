@@ -11,8 +11,16 @@ export const OUTFIT_INCLUDE = {
   owner: { select: { name: true, collectorSlug: true } },
 } as const;
 
+// Same lazy-throttle as battles: collapse a render burst to one run.
+let lastOutfitFinalizeAt = 0;
+const OUTFIT_FINALIZE_INTERVAL_MS = 60 * 1000;
+
 /** Settle every expired fit battle — most votes wins, tie goes to A. */
-export async function finalizeExpiredOutfitBattles() {
+export async function finalizeExpiredOutfitBattles(force = false) {
+  const now = Date.now();
+  if (!force && now - lastOutfitFinalizeAt < OUTFIT_FINALIZE_INTERVAL_MS) return;
+  lastOutfitFinalizeAt = now;
+
   const expired = await prisma.outfitBattle.findMany({
     where: { status: "ACTIVE", endsAt: { lte: new Date() } },
     include: { votes: { select: { outfitId: true } } },

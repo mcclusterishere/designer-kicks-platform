@@ -18,18 +18,24 @@ export async function sendMail(opts: {
     return { delivered: false };
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: [opts.to], subject: opts.subject, text: opts.text }),
-  });
-
-  if (!res.ok) {
-    console.error("[mailer] send failed:", res.status, await res.text());
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [opts.to], subject: opts.subject, text: opts.text }),
+      // Never let a slow/hung Resend hold the request's DB connection open.
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) {
+      console.error("[mailer] send failed:", res.status, await res.text());
+      return { delivered: false };
+    }
+    return { delivered: true };
+  } catch (e) {
+    console.error("[mailer] send error:", e);
     return { delivered: false };
   }
-  return { delivered: true };
 }
