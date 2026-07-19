@@ -336,6 +336,85 @@ time, .tabular {
   display: none;
 }
 
+/* ─────────────────────────────────────────────────────────────────────
+   THE DESK — the worker's all-day room.
+
+   The public site is a show floor: gold, high-contrast, loud on purpose.
+   The Desk is the opposite — a calm, warm, low-fatigue workspace you can
+   stare at for hours without your shoulders climbing. Soft warm-charcoal,
+   muted sage, gentle clay; no neon, no blinking, no shouting caps. Scoped
+   under .desk so it never touches the storefront's luxury theme, and so
+   the forms embedded from /admin quietly re-skin to match.
+   ───────────────────────────────────────────────────────────────────── */
+.desk {
+  --d-bg: #17181b;      /* soft warm-charcoal — kinder than pure ink */
+  --d-raise: #1e2024;   /* a raised card */
+  --d-panel: #202329;   /* header strips, insets */
+  --d-line: #2c2f35;    /* hairline borders, low contrast on purpose */
+  --d-ink: #e9e6df;     /* soft off-white — never stark #fff */
+  --d-soft: #a8a59c;    /* calm secondary text */
+  --d-faint: #7d7a73;   /* faintest labels */
+  --d-sage: #8fbda4;    /* the calm primary — muted eucalyptus */
+  --d-sage-bg: rgba(143, 189, 164, 0.1);
+  --d-clay: #d6a67f;    /* warm gentle accent — warmth, not alarm */
+  --d-clay-bg: rgba(214, 166, 127, 0.1);
+
+  background: var(--d-bg);
+  color: var(--d-ink);
+}
+
+/* Re-skin the embedded /admin forms without editing each one. A .desk
+   ancestor gives these higher specificity than Tailwind's single-class
+   utilities, so the gold/copper quietly becomes sage/clay in here. */
+.desk .bg-surface { background-color: var(--d-raise) !important; }
+.desk .bg-panel,
+.desk .bg-panel\/70,
+.desk .bg-panel\/80,
+.desk .bg-panel\/40 { background-color: var(--d-panel) !important; }
+.desk .border-edge,
+.desk .divide-edge > * { border-color: var(--d-line) !important; }
+.desk .text-smoke,
+.desk .text-smoke\/50,
+.desk .text-smoke\/60 { color: var(--d-soft) !important; }
+.desk .text-volt { color: var(--d-sage) !important; }
+.desk .text-heat { color: var(--d-clay) !important; }
+.desk .bg-volt { background-color: var(--d-sage) !important; color: #16281f !important; }
+.desk .text-ink { color: #16281f !important; }
+.desk [class*="border-volt"] { border-color: color-mix(in srgb, var(--d-sage) 55%, transparent) !important; }
+.desk [class*="border-heat"] { border-color: color-mix(in srgb, var(--d-clay) 55%, transparent) !important; }
+.desk [class*="bg-volt\/"] { background-color: var(--d-sage-bg) !important; }
+.desk [class*="bg-heat\/"] { background-color: var(--d-clay-bg) !important; }
+.desk .focus\:border-volt:focus { border-color: var(--d-sage) !important; }
+.desk :focus-visible { outline-color: var(--d-sage) !important; }
+.desk ::selection { background: var(--d-sage); color: #16281f; }
+
+/* Calm the loud typography helpers inside the Desk: the fashion-serif
+   caps and the mono tracking both relax into a soft, readable sans. */
+.desk .display {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  line-height: 1.15;
+}
+.desk .tag {
+  font-family: var(--font-sans);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 0.72rem;
+}
+/* No shouting in the workspace: the embedded /admin forms lean on mono +
+   ALL-CAPS + wide tracking for labels. In here that all relaxes into a
+   soft, normal-case sans so nothing feels like a warning light. */
+.desk .uppercase { text-transform: none !important; }
+.desk [class*="tracking-"] { letter-spacing: normal !important; }
+.desk .font-mono { font-family: var(--font-sans) !important; }
+/* A gentle progress fill for the day's count — grows in softly. */
+.desk .calm-fill {
+  background: linear-gradient(90deg, var(--d-sage), #a9cdba);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Respect users who turn motion off */
 @media (prefers-reduced-motion: reduce) {
   .ticker-track,
