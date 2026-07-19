@@ -160,6 +160,7 @@ await reg.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await reg.fill("#name", "Preload Test Artist");
 await reg.fill("#email", EMAIL);
 await reg.fill("#password", "registerpass1");
+await reg.check("#age13");
 await reg.getByRole("button", { name: "Create Account" }).click();
 // React 19 resets the form when the action resolves — wait for the
 // refusal to land before typing the next registration into it.
@@ -170,6 +171,7 @@ check("unverified email can't grab the page via register", true);
 await reg.fill("#name", "Second Claimer");
 await reg.fill("#email", EMAIL2);
 await reg.fill("#password", "registerpass2");
+await reg.check("#age13");
 await reg.getByRole("button", { name: "Create Account" }).click();
 await reg.locator("[data-testid=register-note]").waitFor({ timeout: 15000 });
 check("pending claim surfaced at signup", await reg.getByText(/still in review/).isVisible());
@@ -206,6 +208,7 @@ await adopt.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await adopt.fill("#name", "Preload Test Artist");
 await adopt.fill("#email", EMAIL);
 await adopt.fill("#password", "adoptedpass1");
+await adopt.check("#age13");
 await adopt.getByRole("button", { name: "Create Account" }).click();
 await adopt.locator("[data-testid=register-note]").waitFor({ timeout: 15000 });
 check("verified register adopts the artist page", await adopt.getByText(/it's yours now/).isVisible());

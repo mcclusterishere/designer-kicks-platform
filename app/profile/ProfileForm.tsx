@@ -71,7 +71,7 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
         <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#d9b96a]" />
         Text/email me about drops, battles, and giveaways
       </label>
-      {state?.error && <p className="text-sm text-heat">{state.error}</p>}
+      {state?.error && <p className="text-sm text-heat" role="alert">{state.error}</p>}
       {state?.ok && <p className="text-sm text-volt">Saved.</p>}
       <button
         type="submit"

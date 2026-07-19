@@ -28,6 +28,20 @@ export default function PrivacyPage() {
               giveaway entries, submissions, offers, and recorded sales.
             </li>
             <li>
+              <span className="text-white">Seller details</span> — if you become
+              a verified seller, your phone number and street mailing address.
+              These are private: admin-only, never shown on the site.
+            </li>
+            <li>
+              <span className="text-white">Payment info</span> — when you buy
+              quiz credit packs, the payment is processed by Stripe; we receive
+              a confirmation and never see your full card number.
+            </li>
+            <li>
+              <span className="text-white">Shipping info</span> — if you win a
+              giveaway, the mailing address we need to send the prize.
+            </li>
+            <li>
               <span className="text-white">Sign-in via Google/Facebook</span>{" "}
               (when enabled) — your name, email, and avatar from that provider.
               We never see those passwords.
@@ -49,11 +63,33 @@ export default function PrivacyPage() {
             <li>We don&apos;t sell your personal information.</li>
             <li>We don&apos;t share it with advertisers.</li>
             <li>
-              We share data only with the services that run the site (hosting,
-              email delivery, payment processing when it launches) and when the
-              law requires it.
+              We share data only with the services that run the site — hosting
+              (Railway), email delivery (Resend for outbound mail, ImprovMX for
+              forwarding), payment processing (Stripe), and analytics (Google
+              Analytics) — and when the law requires it.
             </li>
           </ul>
+        </section>
+        <section>
+          <h2 className="display text-xl text-white">Children under 13</h2>
+          <p className="mt-2">
+            The Heat Chart is intended for people 13 and older. We do not
+            knowingly collect personal information from children under 13. If we
+            learn that we have, we delete it. If you believe a child under 13
+            has given us information, email{" "}
+            <span className="text-white">hello@theheatchart.com</span> and
+            we&apos;ll remove it.
+          </p>
+        </section>
+        <section>
+          <h2 className="display text-xl text-white">How long we keep it</h2>
+          <p className="mt-2">
+            Account and activity data is kept while your account is open and
+            deleted on request (see below). Anonymous traffic records are
+            deleted after 180 days. Records we&apos;re legally required to keep
+            (e.g. giveaway winner records) are held only as long as the law
+            requires.
+          </p>
         </section>
         <section>
           <h2 className="display text-xl text-white">Public by design</h2>

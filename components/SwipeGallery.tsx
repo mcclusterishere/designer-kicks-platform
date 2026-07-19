@@ -52,7 +52,7 @@ export default function SwipeGallery({
             type="button"
             aria-label="Previous photo"
             onClick={() => go(-1)}
-            className="absolute left-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition group-hover/gallery:opacity-100 md:flex"
+            className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition focus-visible:opacity-100 group-hover/gallery:opacity-100 group-focus-within/gallery:opacity-100"
           >
             ‹
           </button>
@@ -60,7 +60,7 @@ export default function SwipeGallery({
             type="button"
             aria-label="Next photo"
             onClick={() => go(1)}
-            className="absolute right-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition group-hover/gallery:opacity-100 md:flex"
+            className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-ink/70 text-white opacity-0 transition focus-visible:opacity-100 group-hover/gallery:opacity-100 group-focus-within/gallery:opacity-100"
           >
             ›
           </button>

@@ -22,9 +22,10 @@ export default function AskForm({
       <input
         name="price"
         inputMode="decimal"
+        aria-label="Your asking price in dollars (blank to delist)"
         defaultValue={currentAskCents ? String(currentAskCents / 100) : ""}
         placeholder="ask $ (blank = delist)"
-        className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+        className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke focus:border-volt focus:outline-none"
       />
       <button
         type="submit"
@@ -33,7 +34,7 @@ export default function AskForm({
       >
         {pending ? "…" : state?.ok ? "Saved ✓" : "Set Ask"}
       </button>
-      {state?.error && <span className="text-xs text-heat">{state.error}</span>}
+      {state?.error && <span role="alert" className="text-xs text-heat">{state.error}</span>}
     </form>
   );
 }

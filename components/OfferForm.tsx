@@ -55,8 +55,9 @@ export default function OfferForm({
         name="amount"
         required
         inputMode="decimal"
+        aria-label="Your offer in dollars"
         placeholder="your offer $"
-        className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+        className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke focus:border-volt focus:outline-none"
       />
       <button
         type="submit"
@@ -65,7 +66,7 @@ export default function OfferForm({
       >
         {pending ? "…" : "Offer"}
       </button>
-      {state?.error && <span className="text-xs text-heat">{state.error}</span>}
+      {state?.error && <span role="alert" className="text-xs text-heat">{state.error}</span>}
     </form>
   );
 }

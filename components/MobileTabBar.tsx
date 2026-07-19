@@ -120,6 +120,7 @@ export default function MobileTabBar() {
                 key={tab.href}
                 href={tab.href}
                 aria-label="Heat Check quiz"
+                aria-current={active ? "page" : undefined}
                 className="relative -top-4 flex flex-col items-center"
               >
                 <span
@@ -141,6 +142,7 @@ export default function MobileTabBar() {
             <Link
               key={tab.href}
               href={tab.href}
+              aria-current={active ? "page" : undefined}
               className={`flex flex-col items-center gap-0.5 px-3 py-2 transition ${
                 active ? "text-volt" : "text-smoke hover:text-white"
               }`}

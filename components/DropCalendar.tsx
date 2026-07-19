@@ -3,7 +3,7 @@
 // The tappable half of /drops: a month grid where any day with a drop
 // opens a bottom sheet — the drop list for that date with the story
 // (explanation + history) and raffle links. Pure client state, no deps.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Countdown from "@/components/Countdown";
 
@@ -52,6 +52,20 @@ export function DropCalendar({
   dropDays: Record<number, DayDrop[]>;
 }) {
   const [openDay, setOpenDay] = useState<number | null>(null);
+  // Focus management for the bottom sheet: remember what opened it so
+  // focus returns there on close, and the sheet's close button to move
+  // focus in on open.
+  const openerRef = useRef<HTMLElement | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  function openSheet(day: number, e: React.MouseEvent<HTMLButtonElement>) {
+    openerRef.current = e.currentTarget;
+    setOpenDay(day);
+  }
+  function closeSheet() {
+    setOpenDay(null);
+    openerRef.current?.focus();
+  }
   // "Today" in the VIEWER'S timezone, not the server's — computed on
   // the client so the gold ring always matches the reader's clock.
   const [todayDay, setTodayDay] = useState<number | null>(null);
@@ -66,10 +80,33 @@ export function DropCalendar({
   const monthName = monthTitle.split(" ")[0];
   const drops = openDay !== null ? (dropDays[openDay] ?? []) : [];
 
-  // While the sheet is up: Esc closes, the page behind stays put.
+  // While the sheet is up: Esc closes, the page behind stays put, focus
+  // moves into the sheet, and Tab is trapped within it.
   useEffect(() => {
     if (openDay === null) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpenDay(null);
+    closeBtnRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpenDay(null);
+        openerRef.current?.focus();
+        return;
+      }
+      if (e.key === "Tab" && sheetRef.current) {
+        const focusable = sheetRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -86,7 +123,7 @@ export function DropCalendar({
       )}
       <div className="mt-2 grid grid-cols-7 text-center">
         {WEEKDAYS.map((w, i) => (
-          <p key={`${w}${i}`} className="tag pb-2 text-smoke/70">
+          <p key={`${w}${i}`} className="tag pb-2 text-smoke">
             {w}
           </p>
         ))}
@@ -113,7 +150,7 @@ export function DropCalendar({
             <button
               key={d}
               type="button"
-              onClick={() => setOpenDay(d)}
+              onClick={(e) => openSheet(d, e)}
               aria-haspopup="dialog"
               aria-label={`${monthName} ${d} — ${dayDrops.length} ${dayDrops.length === 1 ? "drop" : "drops"}`}
               className="group flex min-h-14 cursor-pointer flex-col items-center gap-1 py-1.5"
@@ -137,12 +174,13 @@ export function DropCalendar({
           aria-label={`Drops on ${monthName} ${openDay}`}
         >
           <button
+            ref={closeBtnRef}
             type="button"
             aria-label="Close"
-            onClick={() => setOpenDay(null)}
+            onClick={closeSheet}
             className="absolute inset-0 w-full animate-[sheet-fade_.2s_ease-out] bg-ink/70 backdrop-blur-[2px]"
           />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-2xl animate-[sheet-up_.28s_cubic-bezier(.32,.72,0,1)] rounded-t-3xl border-x border-t border-edge bg-panel px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl">
+          <div ref={sheetRef} className="absolute inset-x-0 bottom-0 mx-auto max-w-2xl animate-[sheet-up_.28s_cubic-bezier(.32,.72,0,1)] rounded-t-3xl border-x border-t border-edge bg-panel px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl">
             <div className="mx-auto h-1 w-10 rounded-full bg-edge" aria-hidden />
             <div className="mt-3 flex items-baseline justify-between">
               <p className="display text-2xl text-white">
@@ -223,7 +261,7 @@ export function DropCalendar({
                   )}
                 </div>
               ))}
-              <p className="tag border-t border-edge/60 py-3 text-smoke/60">
+              <p className="tag border-t border-edge/60 py-3 text-smoke">
                 Some buy links pay the league a commission — never costs you extra.
               </p>
             </div>

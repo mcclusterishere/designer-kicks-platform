@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { merchantForUrl, tagUrl } from "@/lib/affiliates";
 import { isBot, visitorHash } from "@/lib/traffic";
+import { allowAttempt } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -25,17 +26,21 @@ export async function GET(req: NextRequest) {
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||
       "unknown";
-    // Fire-and-forget: a logging hiccup must never block the shopper.
-    prisma.outboundClick
-      .create({
-        data: {
-          merchant: merchant.key,
-          url: target.slice(0, 800),
-          ref,
-          visitorHash: visitorHash(ip, ua),
-        },
-      })
-      .catch(() => {});
+    // Cap click-logging per visitor so a scripted client can't bloat the
+    // table — the redirect below still happens either way.
+    if (allowAttempt("go", ip, 120, 60 * 1000)) {
+      // Fire-and-forget: a logging hiccup must never block the shopper.
+      prisma.outboundClick
+        .create({
+          data: {
+            merchant: merchant.key,
+            url: target.slice(0, 800),
+            ref,
+            visitorHash: visitorHash(ip, ua),
+          },
+        })
+        .catch(() => {});
+    }
   }
 
   return NextResponse.redirect(target, 302);

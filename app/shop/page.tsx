@@ -34,6 +34,11 @@ export default async function ShopPage() {
         through these links backs the league — same price for you, every
         time.
       </p>
+      <p className="mt-4 rounded-xl border border-edge bg-surface p-3 text-xs text-smoke">
+        Disclosure: links on this page are affiliate links. The Heat Chart may
+        earn a commission on qualifying purchases, at no additional cost to
+        you. Prices shown are approximate and set by the merchant.
+      </p>
 
       {featured.length > 0 && (
         <section className="mt-10">

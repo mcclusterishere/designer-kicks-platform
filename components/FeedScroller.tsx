@@ -172,8 +172,9 @@ function PostCard({
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submitComment()}
                   maxLength={500}
+                  aria-label="Write a comment"
                   placeholder="Say something…"
-                  className="min-w-0 flex-1 rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+                  className="min-w-0 flex-1 rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke focus:border-volt focus:outline-none"
                 />
                 <button type="button" onClick={submitComment} className="tag shrink-0 text-volt underline">
                   post

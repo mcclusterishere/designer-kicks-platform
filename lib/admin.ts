@@ -1,11 +1,38 @@
 import { cookies } from "next/headers";
-import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
 
 const ADMIN_COOKIE = "dk_admin";
 const SESSION_HOURS = 12;
 const MAX_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+const NONCE_KEY = "adminNonce";
+
+/**
+ * The admin-session nonce lives in the DB. Every admin cookie is signed
+ * with the CURRENT nonce; rotating it (on logout) instantly invalidates
+ * every cookie ever issued — real server-side revocation across all
+ * devices, and a copied/leaked cookie dies the moment the admin logs
+ * out. Created lazily on first login.
+ */
+async function currentNonce(): Promise<string> {
+  const row = await prisma.appSetting.upsert({
+    where: { key: NONCE_KEY },
+    update: {},
+    create: { key: NONCE_KEY, value: randomBytes(16).toString("hex") },
+  });
+  return row.value;
+}
+
+async function rotateNonce(): Promise<void> {
+  const value = randomBytes(16).toString("hex");
+  await prisma.appSetting.upsert({
+    where: { key: NONCE_KEY },
+    update: { value },
+    create: { key: NONCE_KEY, value },
+  });
+}
 
 /**
  * The "heatcheck" default exists for local development only. In
@@ -19,19 +46,26 @@ function adminPassword(): string | null {
 }
 
 function secret(): string {
-  return process.env.AUTH_SECRET || "dk-dev-secret";
+  const s = process.env.AUTH_SECRET;
+  if (s) return s;
+  // Never sign admin cookies with a public constant in a real deploy.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET must be set in production.");
+  }
+  return "dk-dev-secret";
 }
 
 function sha256(input: string): Buffer {
   return createHash("sha256").update(input).digest();
 }
 
-// Token = "<expiryMs>.<hmac>", where the HMAC covers the expiry and the
-// current password hash — so tokens expire on schedule and all sessions
-// die immediately when the password changes.
-function sign(expiry: number, pw: string): string {
+// Token = "<expiryMs>.<hmac>", where the HMAC covers the expiry, the
+// current password hash, and the current session nonce — so tokens
+// expire on schedule, die when the password changes, AND die when the
+// admin logs out (nonce rotation).
+function sign(expiry: number, pw: string, nonce: string): string {
   return createHmac("sha256", secret())
-    .update(`dk-admin:${expiry}:${sha256(pw).toString("hex")}`)
+    .update(`dk-admin:${expiry}:${sha256(pw).toString("hex")}:${nonce}`)
     .digest("hex");
 }
 
@@ -48,9 +82,21 @@ export function adminAllowlist(): string[] {
     .filter(Boolean);
 }
 
+/** A real, public deployment — a real https site URL is configured. */
+function isRealDeploy(): boolean {
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").toLowerCase();
+  return /^https:\/\//.test(site) && !site.includes("localhost");
+}
+
 export async function adminAccountOk(): Promise<boolean> {
   const list = adminAllowlist();
-  if (list.length === 0) return true;
+  if (list.length === 0) {
+    // Fail closed on the live site: a password alone is never enough.
+    // The owner MUST set ADMIN_EMAILS (their signed-in member account)
+    // so a leaked/guessed password can't reach the panel. Local + e2e
+    // (no real https host) stay password-only so dev and tests work.
+    return !isRealDeploy();
+  }
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
   return Boolean(email && list.includes(email));
@@ -94,8 +140,9 @@ export async function setAdminSession() {
   const pw = adminPassword();
   if (!pw) return;
   const expiry = Date.now() + SESSION_HOURS * 60 * 60 * 1000;
+  const nonce = await currentNonce();
   const jar = await cookies();
-  jar.set(ADMIN_COOKIE, `${expiry}.${sign(expiry, pw)}`, {
+  jar.set(ADMIN_COOKIE, `${expiry}.${sign(expiry, pw, nonce)}`, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -105,6 +152,9 @@ export async function setAdminSession() {
 }
 
 export async function clearAdminSession() {
+  // Real revocation: rotate the nonce so every issued admin cookie —
+  // this device and any other — stops verifying immediately.
+  await rotateNonce();
   const jar = await cookies();
   jar.delete(ADMIN_COOKIE);
 }
@@ -123,11 +173,12 @@ export async function isAdmin(): Promise<boolean> {
   const sig = raw.slice(dot + 1);
   if (!Number.isFinite(expiry) || expiry < Date.now()) return false;
 
-  const expected = sign(expiry, pw);
+  const nonce = await currentNonce();
+  const expected = sign(expiry, pw, nonce);
   if (sig.length !== expected.length) return false;
   if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
 
-  // Both locks: valid password session AND (when configured) the
-  // owner's signed-in account. Cookie replay without the account fails.
+  // Three locks: valid password session, the current nonce (killed on
+  // logout), AND (in prod) the owner's signed-in account.
   return adminAccountOk();
 }

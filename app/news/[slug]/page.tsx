@@ -76,7 +76,9 @@ export default async function ArticlePage({ params }: Props) {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // Escape < so an article title can never break out of the
+        // <script> block (JSON.stringify doesn't escape "</script>").
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <Link href="/news" className="tag text-smoke hover:text-white">
@@ -148,7 +150,7 @@ export default async function ArticlePage({ params }: Props) {
               </a>
             ))}
           </div>
-          <p className="mt-3 text-xs text-smoke/70">
+          <p className="mt-3 text-xs text-smoke">
             Some links are affiliate links — buying through them supports
             the league at no extra cost to you. Launch-day raffles run on
             the retailer&apos;s site.

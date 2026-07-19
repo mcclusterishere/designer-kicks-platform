@@ -1144,9 +1144,11 @@ export async function placeOffer(
     });
   }
 
-  // Ping the seller — offers nobody sees are offers nobody accepts.
+  // Ping the seller — but throttle PER SELLER (not just per buyer) so
+  // offers can't be weaponized to email-bomb a target or burn Resend
+  // quota: at most a handful of offer emails to any one seller per hour.
   const sellerEmail = submission.owner?.email ?? submission.artist?.user?.email;
-  if (sellerEmail) {
+  if (sellerEmail && allowAttempt("offermail", sellerEmail.toLowerCase(), 6, 60 * 60 * 1000)) {
     sendMail({
       to: sellerEmail,
       subject: `$${amount} offer on "${submission.title}" 💸`,
@@ -2155,17 +2157,22 @@ export async function clearQuizMiss(answerId: string): Promise<ClearMissResult> 
   const miss = await prisma.quizAnswer.findUnique({ where: { id: answerId } });
   if (!miss || miss.userId !== userId) return { ok: false, error: "Miss not found." };
   if (miss.correct || miss.cleared) return { ok: false, error: "Nothing to clear there." };
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } });
-  if ((user?.credits ?? 0) < 1) {
+  // Atomic spend: the conditional decrement (credits >= 1) and the
+  // cleared flip happen together, so two concurrent clears can't both
+  // pass a stale balance read and double-spend one credit.
+  const spent = await prisma.$transaction(async (tx) => {
+    const dec = await tx.user.updateMany({
+      where: { id: userId, credits: { gte: 1 } },
+      data: { credits: { decrement: 1 } },
+    });
+    if (dec.count === 0) return false;
+    await tx.creditTransaction.create({ data: { userId, delta: -1, reason: "iq-clear" } });
+    await tx.quizAnswer.update({ where: { id: answerId }, data: { cleared: true } });
+    return true;
+  });
+  if (!spent) {
     return { ok: false, error: "You need a credit — grab them on the Heat Check page." };
   }
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: userId }, data: { credits: { decrement: 1 } } }),
-    prisma.creditTransaction.create({
-      data: { userId, delta: -1, reason: "iq-clear" },
-    }),
-    prisma.quizAnswer.update({ where: { id: answerId }, data: { cleared: true } }),
-  ]);
   const { iq } = await cultureIQ(userId);
   const fresh = await prisma.user.findUnique({ where: { id: userId }, select: { credits: true } });
   return { ok: true, iq, credits: fresh?.credits ?? 0 };

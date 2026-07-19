@@ -29,6 +29,7 @@ await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await page.fill("#name", "League Tester");
 await page.fill("#email", EMAIL);
 await page.fill("#password", "supersecret1");
+await page.check("#age13");
 await page.getByRole("button", { name: "Create Account" }).click();
 await page.waitForURL("**/profile", { timeout: 15000 });
 check("fan account badge on profile", await page.getByText("Fan account").isVisible());
@@ -137,6 +138,7 @@ await buyerPage.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await buyerPage.fill("#name", "Collector Fan");
 await buyerPage.fill("#email", BUYER_EMAIL);
 await buyerPage.fill("#password", "supersecret2");
+await buyerPage.check("#age13");
 await buyerPage.getByRole("button", { name: "Create Account" }).click();
 await buyerPage.waitForURL("**/profile", { timeout: 15000 });
 

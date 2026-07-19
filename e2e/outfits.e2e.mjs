@@ -35,6 +35,7 @@ await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await page.fill("#name", "Outfit Fan");
 await page.fill("#email", FAN_EMAIL);
 await page.fill("#password", "fitcheck99");
+await page.check("#age13");
 await page.getByRole("button", { name: "Create Account" }).click();
 await page.waitForURL("**/profile", { timeout: 15000 });
 const fan = await prisma.user.findUnique({ where: { email: FAN_EMAIL } });

@@ -15,6 +15,20 @@ export async function POST(req: NextRequest) {
     const ua = req.headers.get("user-agent") ?? "";
     if (!ua || isBot(ua)) return ok;
 
+    // Same-origin only: our own pages fire this beacon. Reject beacons
+    // from other sites so nobody can script arbitrary pageview inserts.
+    const selfHostGuard = new URL(
+      process.env.NEXT_PUBLIC_SITE_URL || `http://${req.headers.get("host") || "localhost"}`
+    ).hostname.toLowerCase();
+    const origin = req.headers.get("origin");
+    if (origin) {
+      try {
+        if (new URL(origin).hostname.toLowerCase() !== selfHostGuard) return ok;
+      } catch {
+        return ok;
+      }
+    }
+
     const ip =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("x-real-ip") ||

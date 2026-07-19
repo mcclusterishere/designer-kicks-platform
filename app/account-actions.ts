@@ -31,11 +31,14 @@ export async function registerUser(
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const age13 = formData.get("age13") === "on";
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+  // COPPA: the service is 13+. The affirmation is required at signup.
+  if (!age13) return { ok: false, error: "You must confirm you're at least 13 to create an account." };
 
   if (!allowAttempt("register", await clientIp(), 10, HOUR)) {
     return { ok: false, error: "Too many sign-ups from this connection — try again later." };

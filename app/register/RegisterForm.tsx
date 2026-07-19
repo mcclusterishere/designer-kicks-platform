@@ -59,7 +59,14 @@ export default function RegisterForm() {
         <label htmlFor="password" className="tag text-smoke">Password (8+ characters)</label>
         <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
       </div>
-      {state?.error && <p className="text-sm text-heat">{state.error}</p>}
+      <label htmlFor="age13" className="flex items-start gap-2 text-sm text-smoke">
+        <input id="age13" name="age13" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#d9b96a]" />
+        <span>
+          I&apos;m at least 13 years old. The Heat Chart isn&apos;t for
+          children under 13.
+        </span>
+      </label>
+      {state?.error && <p role="alert" className="text-sm text-heat">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}

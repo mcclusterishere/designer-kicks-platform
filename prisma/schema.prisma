@@ -652,6 +652,15 @@ model Article {
   cultureQuestions QuizQuestion[]
 }
 
+// Tiny key/value store for server-side settings. Currently holds the
+// admin-session nonce: rotating it invalidates every issued admin
+// cookie at once, so logout is real revocation (all devices) and a
+// leaked/copied cookie dies the moment the admin logs out.
+model AppSetting {
+  key   String @id
+  value String
+}
+
 model Product {
   id           String  @id @default(cuid())
   // Stable key for the seed top-up: curated slate products upsert by

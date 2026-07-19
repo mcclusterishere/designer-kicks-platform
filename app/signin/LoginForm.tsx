@@ -33,7 +33,7 @@ export default function LoginForm() {
         <label htmlFor="password" className="tag text-smoke">Password</label>
         <input id="password" name="password" type="password" required autoComplete="current-password" className={inputClass} />
       </div>
-      {state?.error && <p className="text-sm text-heat">{state.error}</p>}
+      {state?.error && <p className="text-sm text-heat" role="alert">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}

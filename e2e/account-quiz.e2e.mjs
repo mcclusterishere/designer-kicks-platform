@@ -23,6 +23,7 @@ await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await page.fill("#name", "E2E Tester");
 await page.fill("#email", EMAIL);
 await page.fill("#password", "supersecret1");
+await page.check("#age13");
 await page.getByRole("button", { name: "Create Account" }).click();
 await page.waitForURL("**/profile", { timeout: 15000 });
 check("register creates account and signs in", true);

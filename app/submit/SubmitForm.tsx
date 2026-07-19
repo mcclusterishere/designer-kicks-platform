@@ -219,7 +219,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
       </div>
 
       {state?.error && (
-        <p className="rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
+        <p role="alert" className="rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
           {state.error}
         </p>
       )}

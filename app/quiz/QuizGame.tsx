@@ -269,6 +269,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
 
         {feedback && (
           <div
+            aria-live="polite"
             className={`mt-5 rounded-lg border p-4 text-sm ${
               feedback.correct
                 ? "border-volt/40 bg-volt/10 text-volt"

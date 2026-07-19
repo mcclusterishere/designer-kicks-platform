@@ -134,7 +134,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
         })}
       </div>
       {error && (
-        <p className="mt-4 rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
+        <p role="alert" className="mt-4 rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
           {error}
         </p>
       )}

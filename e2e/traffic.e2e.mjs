@@ -99,9 +99,27 @@ const legal = await ctx.newPage();
 await legal.goto(`${BASE}/privacy`, { waitUntil: "networkidle" });
 check("privacy explains cookie-free analytics", await legal.getByText("Analytics (cookie-free)").isVisible());
 check("privacy offers the opt-out switch", await legal.getByRole("button", { name: /Opt out of analytics/ }).isVisible());
+check("privacy carries a COPPA children's-data section", await legal.getByRole("heading", { name: "Children under 13" }).isVisible());
+check("privacy names its payment processor (Stripe)", (await legal.getByText(/Stripe/).count()) >= 1);
 await legal.goto(`${BASE}/rules`, { waitUntil: "networkidle" });
 check("giveaway rules carry the Meta release", await legal.getByText(/release Meta from any and all/).isVisible());
 check("no-purchase-necessary stays loud", await legal.getByText("NO PURCHASE NECESSARY", { exact: false }).isVisible());
+
+// COPPA age gate at registration: signup is refused without the 13+ box.
+await legal.goto(`${BASE}/register`, { waitUntil: "networkidle" });
+check("register shows the 13+ age gate", await legal.locator("#age13").isVisible());
+await legal.fill("#name", "Underage Attempt");
+await legal.fill("#email", "coppa-guard@test.example");
+await legal.fill("#password", "longenough9");
+await legal.getByRole("button", { name: "Create Account" }).click();
+check(
+  "registration refused without the 13+ affirmation",
+  await legal.getByText(/at least 13/).isVisible()
+);
+check(
+  "no account created without the age gate",
+  !(await prisma.user.findUnique({ where: { email: "coppa-guard@test.example" } })),
+);
 
 // ---------- /go affiliate redirect layer ----------
 await prisma.outboundClick.deleteMany({ where: { ref: "e2e-go" } });
@@ -157,6 +175,36 @@ if (dropArticle) {
 } else {
   check("article buy strip routes through /go", false, "no drop article found");
 }
+
+// ---------- Admin logout is real revocation (the "reuse the URL" test) ----------
+// Log in as admin in a throwaway context, capture the admin cookie, log
+// out, then replay the captured cookie — it must NOT get back in.
+const revCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+const rev = await revCtx.newPage();
+await rev.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await rev.fill("#password", ADMIN_PASSWORD);
+await rev.getByRole("button", { name: "Enter" }).click();
+await rev.getByRole("heading", { name: /Review Queue|Members|Broadcast/ }).first().waitFor({ timeout: 10000 });
+const adminCookie = (await revCtx.cookies()).find((c) => c.name === "dk_admin");
+check("admin session cookie issued on login", Boolean(adminCookie));
+await rev.getByRole("button", { name: "Log out" }).first().click();
+await rev.waitForTimeout(1000);
+// Replay the OLD cookie value into a clean context.
+const replayCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+if (adminCookie) await replayCtx.addCookies([adminCookie]);
+const replay = await replayCtx.newPage();
+await replay.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+check(
+  "replayed cookie after logout is rejected (login form shown)",
+  await replay.locator("#password").isVisible()
+);
+check(
+  "replayed cookie shows no admin data",
+  (await replay.getByRole("heading", { name: "Review Queue" }).count()) === 0
+);
+await revCtx.close();
+await replayCtx.close();
+
 
 await browser.close();
 await prisma.$disconnect();

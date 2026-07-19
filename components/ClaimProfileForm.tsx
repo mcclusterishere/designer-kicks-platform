@@ -345,7 +345,7 @@ export default function ClaimProfileForm({
                 type={current.type ?? "text"}
                 placeholder={current.placeholder}
                 aria-label={current.prompt}
-                className="min-w-0 flex-1 border-0 bg-transparent text-white caret-[#d9b96a] placeholder:text-smoke/40 focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-transparent bg-transparent text-white caret-[#d9b96a] placeholder:text-smoke/60 focus:border-volt/60 focus:outline-none"
               />
               {step > 0 && (
                 <button

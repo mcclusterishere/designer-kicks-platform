@@ -112,8 +112,9 @@ export default async function MarketPage({
           type="search"
           name="q"
           defaultValue={q}
+          aria-label="Search pieces, artists, silhouettes"
           placeholder="Search pieces, artists, silhouettes…"
-          className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke focus:border-volt focus:outline-none"
         />
         <select
           name="sort"

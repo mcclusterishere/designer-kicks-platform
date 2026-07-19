@@ -10,7 +10,9 @@
   --color-edge: #232321;
   --color-volt: #d9b96a;
   --color-heat: #c65a2e;
-  --color-smoke: #a3a096;
+  /* Muted text: lightened to clear WCAG AA (4.5:1) on the dark
+     surfaces for normal-size body copy. */
+  --color-smoke: #b9b6ac;
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
