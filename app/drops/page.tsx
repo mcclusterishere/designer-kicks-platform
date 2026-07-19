@@ -59,14 +59,13 @@ export default async function DropsPage({
       name: dropName(a.title),
       excerpt: a.excerpt,
       cover: a.coverImage ?? null,
+      dropAtISO: a.dropAt!.toISOString(),
       links: buyLinks(dropName(a.title), a.raffleUrl, "drops"),
     });
   }
 
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const leadingBlanks = monthStart.getUTCDay();
-  const todayDay =
-    year === now.getUTCFullYear() && month === now.getUTCMonth() ? now.getUTCDate() : null;
   const mParam = (dte: Date) =>
     `${dte.getUTCFullYear()}-${String(dte.getUTCMonth() + 1).padStart(2, "0")}`;
 
@@ -99,9 +98,10 @@ export default async function DropsPage({
       {/* The calendar — tap any marked day for that date's drop sheet */}
       <DropCalendar
         monthTitle={monthLabel(year, month)}
+        year={year}
+        month0={month}
         daysInMonth={daysInMonth}
         leadingBlanks={leadingBlanks}
-        todayDay={todayDay}
         dropDays={dropDays}
       />
 
@@ -172,7 +172,23 @@ export default async function DropsPage({
         </div>
       )}
 
-      <p className="mt-8 text-center text-xs text-smoke/70">
+      {/* The feature paid calendars charge for — subscribe once, every
+          drop lands in your own calendar app forever. */}
+      <div className="mt-8 rounded-2xl border border-edge bg-surface p-4 text-center">
+        <p className="tag text-volt">Never miss a drop</p>
+        <p className="mt-1 text-sm text-smoke">
+          Subscribe once — every release (and every date change) lands
+          in your calendar app automatically. No paywall, ever.
+        </p>
+        <a
+          href="/api/drops-ics"
+          className="btn-hard mt-3 inline-block rounded-xl px-6 py-2.5 tag font-bold"
+        >
+          Add All Drops To My Calendar
+        </a>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-smoke/70">
         Dates move — check the{" "}
         <Link href="/news" className="underline">
           story

@@ -1017,26 +1017,49 @@ async function main() {
     }
     let newArticles = 0;
     let refreshed = 0;
-    for (const { daysAgo, ...a } of articles) {
+    for (const { daysAgo, question, ...a } of articles) {
       const exists = await prisma.article.findUnique({ where: { slug: a.slug } });
+      let articleId = exists?.id ?? null;
+      let seedManaged = false;
       if (!exists) {
-        await prisma.article.create({
+        const created = await prisma.article.create({
           data: { ...a, status: "PUBLISHED", publishedAt: new Date(Date.now() - daysAgo * DAY) },
         });
+        articleId = created.id;
         newArticles++;
-        continue;
+        seedManaged = true;
+      } else {
+        // Refresh seed-managed articles the admin has never touched — any
+        // admin edit bumps updatedAt past createdAt and wins forever.
+        // Seed refreshes pin updatedAt back so they stay refreshable.
+        const untouched =
+          Math.abs(exists.updatedAt.getTime() - exists.createdAt.getTime()) < 5000;
+        if (untouched) {
+          await prisma.article.update({
+            where: { id: exists.id },
+            data: { ...a, publishedAt: exists.publishedAt, updatedAt: exists.createdAt },
+          });
+          refreshed++;
+          seedManaged = true;
+        }
       }
-      // Refresh seed-managed articles the admin has never touched — any
-      // admin edit bumps updatedAt past createdAt and wins forever.
-      // Seed refreshes pin updatedAt back so they stay refreshable.
-      const untouched =
-        Math.abs(exists.updatedAt.getTime() - exists.createdAt.getTime()) < 5000;
-      if (untouched) {
-        await prisma.article.update({
-          where: { id: exists.id },
-          data: { ...a, publishedAt: exists.publishedAt, updatedAt: exists.createdAt },
-        });
-        refreshed++;
+      // The culture question riding with the story — floats in the feed,
+      // feeds Culture IQ. Created with the article; refreshed only while
+      // the article is still seed-managed.
+      if (question && articleId) {
+        const qData = {
+          question: question.q,
+          options: JSON.stringify(question.options),
+          answerIndex: question.answer,
+          category: "culture",
+          explanation: question.explain ?? null,
+          articleId,
+          active: true,
+        };
+        const existingQ = await prisma.quizQuestion.findFirst({ where: { articleId } });
+        if (!existingQ) await prisma.quizQuestion.create({ data: qData });
+        else if (seedManaged)
+          await prisma.quizQuestion.update({ where: { id: existingQ.id }, data: qData });
       }
     }
     console.log(

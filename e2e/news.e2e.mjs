@@ -92,6 +92,23 @@ await page.keyboard.press("Escape");
 await sheet.waitFor({ state: "hidden", timeout: 5000 });
 check("sheet closes on Escape", true);
 
+// --- Calendar exports: the features paid calendars charge for ---
+const icsRes = await fetch(`${BASE}/api/drop-ics/${TEST_SLUG}`);
+const icsText = await icsRes.text();
+check(
+  "per-drop .ics serves a calendar event",
+  icsRes.ok && icsText.includes("BEGIN:VEVENT") && icsText.includes("E2E News Suite Article")
+);
+const feedIcs = await (await fetch(`${BASE}/api/drops-ics`)).text();
+check(
+  "subscribable feed carries every drop",
+  feedIcs.includes("X-WR-CALNAME:The Heat Chart") && feedIcs.includes("E2E News Suite Article")
+);
+check(
+  "calendar subscribe pitch on the drops page",
+  await page.getByText("Add All Drops To My Calendar").isVisible()
+);
+
 // Cleanup
 await prisma.article.deleteMany({ where: { slug: TEST_SLUG } });
 

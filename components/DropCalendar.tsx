@@ -5,33 +5,64 @@
 // (explanation + history) and raffle links. Pure client state, no deps.
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Countdown from "@/components/Countdown";
 
 export type DayDrop = {
   slug: string;
   name: string;
   excerpt: string;
   cover: string | null;
+  // ISO timestamp of the drop — countdowns and calendar exports.
+  dropAtISO: string | null;
   // Raffle first (if any), then the merchants that pay commission —
   // every href already routed through /go for tagging + click receipts.
   links: { label: string; href: string }[];
 };
 
+/** All-day Google Calendar template link for a drop. */
+function gcalHref(name: string, iso: string, slug: string): string {
+  const d = new Date(iso);
+  const ymd = (x: Date) =>
+    `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, "0")}${String(x.getUTCDate()).padStart(2, "0")}`;
+  const next = new Date(d.getTime() + 24 * 3600 * 1000);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `${name} — drop day`,
+    dates: `${ymd(d)}/${ymd(next)}`,
+    details: `The story + raffle links: ${typeof location !== "undefined" ? location.origin : ""}/news/${slug}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 export function DropCalendar({
   monthTitle,
+  year,
+  month0,
   daysInMonth,
   leadingBlanks,
-  todayDay,
   dropDays,
 }: {
   monthTitle: string; // "July 2026"
+  year: number;
+  month0: number; // 0-based month
   daysInMonth: number;
   leadingBlanks: number;
-  todayDay: number | null;
   dropDays: Record<number, DayDrop[]>;
 }) {
   const [openDay, setOpenDay] = useState<number | null>(null);
+  // "Today" in the VIEWER'S timezone, not the server's — computed on
+  // the client so the gold ring always matches the reader's clock.
+  const [todayDay, setTodayDay] = useState<number | null>(null);
+  const [tz, setTz] = useState<string | null>(null);
+  useEffect(() => {
+    const now = new Date();
+    setTodayDay(now.getFullYear() === year && now.getMonth() === month0 ? now.getDate() : null);
+    try {
+      setTz(Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " "));
+    } catch {}
+  }, [year, month0]);
   const monthName = monthTitle.split(" ")[0];
   const drops = openDay !== null ? (dropDays[openDay] ?? []) : [];
 
@@ -50,7 +81,10 @@ export function DropCalendar({
 
   return (
     <>
-      <div className="mt-5 grid grid-cols-7 text-center">
+      {tz && (
+        <p className="tag mt-4 text-center text-smoke/50">Your time · {tz}</p>
+      )}
+      <div className="mt-2 grid grid-cols-7 text-center">
         {WEEKDAYS.map((w, i) => (
           <p key={`${w}${i}`} className="tag pb-2 text-smoke/70">
             {w}
@@ -137,13 +171,36 @@ export function DropCalendar({
                       </p>
                     </div>
                   </div>
-                  <div className="mt-2.5">
+                  {dp.dropAtISO && new Date(dp.dropAtISO).getTime() > Date.now() && (
+                    <p className="mt-2 text-sm text-heat">
+                      Drops in <Countdown endsAt={dp.dropAtISO} />
+                    </p>
+                  )}
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-1.5">
                     <Link
                       href={`/news/${dp.slug}`}
                       className="tag text-volt underline underline-offset-4"
                     >
                       The story + history →
                     </Link>
+                    {dp.dropAtISO && (
+                      <>
+                        <a
+                          href={gcalHref(dp.name, dp.dropAtISO, dp.slug)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="tag text-smoke underline underline-offset-4 hover:text-white"
+                        >
+                          Google Cal
+                        </a>
+                        <a
+                          href={`/api/drop-ics/${dp.slug}`}
+                          className="tag text-smoke underline underline-offset-4 hover:text-white"
+                        >
+                          .ics
+                        </a>
+                      </>
+                    )}
                   </div>
                   {dp.links.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
