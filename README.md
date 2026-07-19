@@ -1,12 +1,33 @@
-# The Heat Chart — Custom Sneaker Battle Platform
+# The Heat Chart — Custom Sneaker Culture Platform
 
-Live at [theheatchart.com](https://theheatchart.com). The relaunch of the
-**Designer Kicks** Facebook page as a full platform: custom sneaker
-artists submit their work, go head-to-head in community vote battles,
-and climb **The Heat List**. Member accounts power voting, the Jordan
-Heat Check trivia game, and rare-shoe giveaway entries — and build your
-contact list. A newsroom pulls in search traffic; an affiliate shop
-monetizes it.
+Live at [theheatchart.com](https://theheatchart.com). Built and operated
+by **McCluster Corp** through its **Equity Uprise** program, The Heat
+Chart grew out of the **Designer Kicks** community into a full platform
+for custom-sneaker culture: independent artists submit their work, go
+head-to-head in community vote battles, and climb **The Heat List**.
+Member accounts power voting, the Heat Check culture game, and rare-shoe
+giveaway entries. A newsroom pulls in search traffic; an affiliate shop
+helps sustain the work.
+
+## About
+
+The Heat Chart is a project of **McCluster Corp**, developed through its
+**Equity Uprise** program — a mission-driven initiative that treats
+sneaker customization as both a cultural art form and a route to real
+economic opportunity. The platform is built to:
+
+- **celebrate and pass on the culture** — the Heat Check game turns the
+  history behind each silhouette into something people learn by playing;
+- **open doors for independent artists** — the League, closets, and
+  provenance tools give makers a place to build a name and earn from
+  their craft; and
+- **double as hands-on learning** — designing, building, and running the
+  platform is itself a real-world workshop in design, technology, and
+  creative entrepreneurship.
+
+We see custom sneakers as a vehicle for cultural exchange and for the
+kind of creative and workforce skill-building that meets people where
+their passion already is.
 
 ## What's on the site
 
@@ -247,3 +268,8 @@ fold. Post individual battle URLs (`/battles/<id>`) to the page — that's
 the page people can vote on directly, and battle voting is the
 share/return loop that builds the audience the affiliate programs want
 to see when they review your application.
+
+---
+
+The Heat Chart is a project of **McCluster Corp** / **Equity Uprise**.
+© 2026 McCluster Corp.

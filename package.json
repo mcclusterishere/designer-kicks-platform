@@ -1,7 +1,10 @@
 {
-  "name": "designer-kicks-platform",
+  "name": "the-heat-chart",
   "version": "0.1.0",
   "private": true,
+  "description": "The Heat Chart — a custom-sneaker culture platform for artists and fans, built by McCluster Corp's Equity Uprise program.",
+  "homepage": "https://theheatchart.com",
+  "author": "McCluster Corp",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

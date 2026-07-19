@@ -1,10 +1,11 @@
 # Affiliate Program Playbook — The Heat Chart
 
-This is your signup roadmap for monetizing every outbound buy link on
-the site — the Market page, the Where-to-Buy strips on drop sheets, and
-the buy links inside articles. All of them route through `/go`, which
-logs the click (see **Market Pulse** in /admin) and applies your
-affiliate tag automatically.
+Affiliate revenue is how the platform sustains itself and funds the
+program's work with artists — this is the signup roadmap for every
+outbound buy link on the site: the Market page, the Where-to-Buy strips
+on drop sheets, and the buy links inside articles. All of them route
+through `/go`, which logs the click (see **Market Pulse** in /admin) and
+applies your affiliate tag automatically.
 
 ## How links get paid (do this once per program)
 
@@ -139,3 +140,7 @@ for one-off cases, but the env template is the tool for the job.
 3. Paste the tagged link into the "Affiliate link" field → Update.
 
 That's it — the shop card now pays you.
+
+---
+
+_The Heat Chart is a project of McCluster Corp / Equity Uprise._

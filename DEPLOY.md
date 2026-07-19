@@ -156,3 +156,7 @@ Buttons appear automatically once the vars exist.
   index review before sharding anything.
 - Battle finalization is idempotent — cron + lazy finalization can
   coexist safely.
+
+---
+
+_The Heat Chart is a project of McCluster Corp / Equity Uprise._

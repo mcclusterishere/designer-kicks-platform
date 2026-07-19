@@ -148,3 +148,7 @@ Railway variables. Full program-by-program details live in
        upgrade site-wide instantly.
 8. [ ] When the slate looks right in /admin, flip `SHOP_LIVE` to true in
        lib/flags.ts (one word) and the Market goes public.
+
+---
+
+_The Heat Chart is a project of McCluster Corp / Equity Uprise._
