@@ -22,6 +22,51 @@ function ago(d: Date): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+// ---- Console building blocks (the distinct worker look) ----
+function StatTile({ value, label, tone = "volt" }: { value: React.ReactNode; label: string; tone?: "volt" | "heat" | "plain" }) {
+  const c = tone === "heat" ? "text-heat" : tone === "plain" ? "text-white" : "text-volt";
+  return (
+    <div className="rounded-lg border border-edge bg-surface px-3.5 py-3">
+      <p className={`font-mono text-2xl leading-none ${c}`}>{value}</p>
+      <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-smoke">{label}</p>
+    </div>
+  );
+}
+
+function Panel({
+  id, index, title, count, countTone, desc, children,
+}: {
+  id: string; index: string; title: string;
+  count?: number; countTone?: "heat" | "plain"; desc?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-20">
+      <div className="overflow-hidden rounded-2xl border border-edge bg-surface shadow-[0_1px_0_0_rgba(255,255,255,0.03)_inset]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-edge bg-panel/70 px-5 py-3">
+          <span className="font-mono text-xs text-volt">{index}</span>
+          <h2 className="display text-lg text-white">{title}</h2>
+          {count != null && (
+            <span className={`tag rounded-full border px-2 py-0.5 ${count && countTone === "heat" ? "border-heat/50 text-heat" : "border-edge text-smoke"}`}>
+              {count}
+            </span>
+          )}
+          {desc && <p className="ml-auto hidden max-w-md text-right text-xs text-smoke lg:block">{desc}</p>}
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+const NAV = [
+  { id: "content", label: "Content" },
+  { id: "crosspost", label: "Cross-post" },
+  { id: "stage", label: "Stage" },
+  { id: "onboard", label: "Onboard" },
+  { id: "office", label: "Office" },
+];
+
 export default async function EditorDesk({
   searchParams,
 }: {
@@ -35,21 +80,11 @@ export default async function EditorDesk({
     prisma.article.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
     editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
     me
-      ? prisma.outreachProspect.findMany({
-          where: { stagedById: me.id },
-          orderBy: { createdAt: "desc" },
-          take: 20,
-        })
+      ? prisma.outreachProspect.findMany({ where: { stagedById: me.id }, orderBy: { createdAt: "desc" }, take: 20 })
       : Promise.resolve([]),
     me
-      ? prisma.editorMessage.findMany({
-          where: { editorId: me.id },
-          orderBy: { createdAt: "asc" },
-          take: 50,
-        })
+      ? prisma.editorMessage.findMany({ where: { editorId: me.id }, orderBy: { createdAt: "asc" }, take: 50 })
       : Promise.resolve([]),
-    // The recruiting pipeline: approved pages nobody has claimed yet — the
-    // artists to onboard. Same source the admin's Outreach module uses.
     prisma.artistProfile.findMany({
       where: { status: "APPROVED", user: { passwordHash: null, accounts: { none: {} } } },
       orderBy: [{ invitedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
@@ -61,176 +96,162 @@ export default async function EditorDesk({
     return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
   };
 
-  const threadView = thread.map((m) => ({
-    id: m.id,
-    body: m.body,
-    fromAdmin: m.fromAdmin,
-    ago: ago(m.createdAt),
-  }));
+  const threadView = thread.map((m) => ({ id: m.id, body: m.body, fromAdmin: m.fromAdmin, ago: ago(m.createdAt) }));
+  const officeUnread = thread.filter((m) => m.fromAdmin && !m.readByEditor).length;
+  const published = articles.filter((a) => a.status === "PUBLISHED").length;
+  const openStaged = prospects.filter((p) => p.status === "STAGED" || p.status === "APPROVED").length;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="tag text-volt">Editor Desk</p>
-          <h1 className="display mt-1 text-4xl text-white">
-            {me?.name || me?.email || "Editor"}
-          </h1>
-          <p className="mt-1 text-sm text-smoke">
-            Content, cross-posting, and outreach — the office reviews what needs
-            reviewing. {admin && !me && <span className="text-heat">(viewing as admin)</span>}
-          </p>
-        </div>
-        <span className="tag rounded-full border border-volt/50 px-3 py-1 text-volt">Editor access</span>
-      </div>
-
-      {/* 1 · Content */}
-      <section className="mt-10">
-        <h2 className="display text-2xl text-white">
-          {editArticleRow ? "Edit article" : "Write / edit articles"}
-        </h2>
-        <p className="mt-1 text-sm text-smoke">
-          Publish stories, swap cover photos, add new ones. Pick one below to
-          edit, or write a fresh one.
-        </p>
-        {editArticleRow && (
-          <p className="mt-2 text-xs text-smoke">
-            Editing “{editArticleRow.title}” —{" "}
-            <Link href="/editor" className="text-volt underline">start a new one</Link>
-          </p>
-        )}
-        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
-          <ArticleForm
-            defaults={
-              editArticleRow
-                ? {
-                    id: editArticleRow.id,
-                    title: editArticleRow.title,
-                    slug: editArticleRow.slug,
-                    excerpt: editArticleRow.excerpt,
-                    content: editArticleRow.content,
-                    coverImage: editArticleRow.coverImage,
-                    tags: editArticleRow.tags,
-                    status: editArticleRow.status,
-                    dropAt: editArticleRow.dropAt,
-                    raffleUrl: editArticleRow.raffleUrl,
-                    sku: editArticleRow.sku,
-                    dropSource: editArticleRow.dropSource,
-                    dropCheckedAt: editArticleRow.dropCheckedAt,
-                  }
-                : undefined
-            }
-          />
-        </div>
-        <div className="mt-4 space-y-2">
-          {articles.map((a) => (
-            <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-surface px-4 py-2.5 text-sm">
-              <div className="min-w-0">
-                <Link href={`/news/${a.slug}`} className="font-bold text-white hover:text-volt">{a.title}</Link>{" "}
-                <span className={a.status === "PUBLISHED" ? "text-volt" : "text-heat"}>· {a.status.toLowerCase()}</span>
-              </div>
-              <Link href={`/editor?editArticle=${a.id}`} className="shrink-0 rounded border border-edge px-3 py-1.5 tag text-white hover:border-volt">
-                Edit
-              </Link>
+    <div className="bg-ink">
+      {/* Console bar — a distinct worker identity, not the public site */}
+      <div className="border-b border-edge bg-panel/80">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-volt" />
+            <span className="font-mono text-xs font-bold tracking-[0.25em] text-volt">THE&nbsp;DESK</span>
+          </div>
+          <nav className="flex flex-wrap items-center gap-1">
+            {NAV.map((n) => (
+              <a key={n.id} href={`#${n.id}`}
+                className="rounded px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-smoke transition hover:bg-white/5 hover:text-white">
+                {n.label}
+              </a>
+            ))}
+          </nav>
+          <div className="ml-auto flex items-center gap-2 text-right">
+            <div className="leading-tight">
+              <p className="text-sm font-bold text-white">{me?.name || me?.email || "Editor"}</p>
+              <p className="font-mono text-[10px] uppercase tracking-wider text-smoke">
+                editor{admin ? " · admin" : ""}
+              </p>
             </div>
-          ))}
+          </div>
         </div>
-      </section>
+      </div>
+      {/* Thin "powered on" accent */}
+      <div className="h-px bg-gradient-to-r from-transparent via-volt/40 to-transparent" />
 
-      {/* 2 · Cross-post */}
-      <section className="mt-12">
-        <h2 className="display text-2xl text-white">Cross-post</h2>
-        <p className="mt-1 text-sm text-smoke">
-          Posts land on our Feed first (the origin), then fan out to the free
-          channels the office has connected. A copy-paste block covers the rest.
-        </p>
-        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
-          <EditorBroadcastForm />
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-volt">Editor workstation</p>
+            <h1 className="display mt-1 text-3xl text-white sm:text-4xl">
+              {me?.name || me?.email || "Editor"}
+            </h1>
+          </div>
+          {admin && !me && <span className="tag rounded-full border border-heat/50 px-3 py-1 text-heat">viewing as admin</span>}
         </div>
-      </section>
 
-      {/* 3 · Stage outreach */}
-      <section className="mt-12">
-        <h2 className="display text-2xl text-white">Stage outreach</h2>
-        <p className="mt-1 text-sm text-smoke">
-          Line up prospects for the office — fill in who they are, drop a file,
-          add notes. The office reviews and sends.
-        </p>
-        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
-          <StageProspectForm />
+        {/* At-a-glance strip */}
+        <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatTile value={published} label="Published" />
+          <StatTile value={outreachLeads.length} label="To onboard" tone={outreachLeads.length ? "heat" : "volt"} />
+          <StatTile value={openStaged} label="Staged" tone="plain" />
+          <StatTile value={officeUnread} label="From office" tone={officeUnread ? "heat" : "plain"} />
         </div>
-        {prospects.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <p className="tag text-smoke">Your staged prospects</p>
-            {prospects.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-surface px-4 py-2.5 text-sm">
-                <div className="min-w-0">
-                  <span className="font-bold text-white">{p.name}</span>
-                  {p.platform && <span className="text-smoke"> · {p.platform}</span>}
-                  {p.handle && <span className="text-smoke"> · {p.handle}</span>}
-                </div>
-                <span className={`tag shrink-0 ${
-                  p.status === "SENT" ? "text-volt" : p.status === "ARCHIVED" ? "text-smoke" : p.status === "APPROVED" ? "text-volt" : "text-heat"
-                }`}>
-                  {p.status === "STAGED" ? "in review" : p.status.toLowerCase()}
-                </span>
+
+        <div className="mt-8 space-y-6">
+          {/* 01 · Content */}
+          <Panel id="content" index="01" title={editArticleRow ? "Edit article" : "Content"}
+            count={articles.length} desc="Publish stories, swap cover photos, add new ones.">
+            {editArticleRow && (
+              <p className="mb-3 text-xs text-smoke">
+                Editing “{editArticleRow.title}” —{" "}
+                <Link href="/editor" className="text-volt underline">start a new one</Link>
+              </p>
+            )}
+            <ArticleForm
+              defaults={
+                editArticleRow
+                  ? {
+                      id: editArticleRow.id, title: editArticleRow.title, slug: editArticleRow.slug,
+                      excerpt: editArticleRow.excerpt, content: editArticleRow.content,
+                      coverImage: editArticleRow.coverImage, tags: editArticleRow.tags, status: editArticleRow.status,
+                      dropAt: editArticleRow.dropAt, raffleUrl: editArticleRow.raffleUrl, sku: editArticleRow.sku,
+                      dropSource: editArticleRow.dropSource, dropCheckedAt: editArticleRow.dropCheckedAt,
+                    }
+                  : undefined
+              }
+            />
+            {articles.length > 0 && (
+              <div className="mt-4 divide-y divide-edge/60 rounded-lg border border-edge">
+                {articles.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                    <div className="min-w-0 truncate">
+                      <Link href={`/news/${a.slug}`} className="font-bold text-white hover:text-volt">{a.title}</Link>{" "}
+                      <span className={`font-mono text-[10px] uppercase tracking-wider ${a.status === "PUBLISHED" ? "text-volt" : "text-heat"}`}>
+                        {a.status.toLowerCase()}
+                      </span>
+                    </div>
+                    <Link href={`/editor?editArticle=${a.id}`}
+                      className="shrink-0 rounded border border-edge px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-white transition hover:border-volt">
+                      Edit
+                    </Link>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </Panel>
 
-      {/* 4 · Outreach pipeline — the artists to onboard */}
-      <section className="mt-12">
-        <h2 className="display text-2xl text-white">
-          Onboarding pipeline{" "}
-          <span className={outreachLeads.length ? "text-heat" : "text-smoke"}>
-            ({outreachLeads.length} to reach)
-          </span>
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-smoke">
-          Artist pages that are live but not claimed yet — these are your
-          onboardings. Move each through the pipeline, add notes, generate a
-          personalized DM, and send the claim link.
-        </p>
-        {outreachLeads.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-5 text-sm text-smoke">
-            Nobody waiting right now — new pages the office pre-loads show up here.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {outreachLeads.map((lead) => (
-              <OutreachRow
-                key={lead.id}
-                artistId={lead.id}
-                displayName={lead.displayName}
-                defaultEmail={lead.user.email}
-                invitedAgo={lead.invitedAt ? daysAgo(lead.invitedAt) : null}
-                pageSlug={lead.slug}
-                stage={lead.outreachStage}
-                notes={lead.outreachNotes}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          {/* 02 · Cross-post */}
+          <Panel id="crosspost" index="02" title="Cross-post"
+            desc="Site is the origin; the connected socials are feeders.">
+            <EditorBroadcastForm />
+          </Panel>
 
-      {/* 5 · Message the office */}
-      <section className="mt-12">
-        <h2 className="display text-2xl text-white">Message the office</h2>
-        <p className="mt-1 text-sm text-smoke">
-          Your private line to the admin — questions, ideas, anything. This is
-          the only inbox you can message.
-        </p>
-        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
-          <MessageOffice thread={threadView} />
+          {/* 03 · Stage outreach */}
+          <Panel id="stage" index="03" title="Stage outreach" count={openStaged}
+            desc="Line up prospects for the office to review and send.">
+            <StageProspectForm />
+            {prospects.length > 0 && (
+              <div className="mt-4 divide-y divide-edge/60 rounded-lg border border-edge">
+                {prospects.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                    <div className="min-w-0 truncate">
+                      <span className="font-bold text-white">{p.name}</span>
+                      {p.platform && <span className="text-smoke"> · {p.platform}</span>}
+                      {p.handle && <span className="text-smoke"> · {p.handle}</span>}
+                    </div>
+                    <span className={`shrink-0 font-mono text-[10px] uppercase tracking-wider ${
+                      p.status === "SENT" || p.status === "APPROVED" ? "text-volt" : p.status === "ARCHIVED" ? "text-smoke" : "text-heat"
+                    }`}>
+                      {p.status === "STAGED" ? "in review" : p.status.toLowerCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 04 · Onboarding pipeline */}
+          <Panel id="onboard" index="04" title="Onboarding pipeline" count={outreachLeads.length} countTone="heat"
+            desc="Unclaimed pages to reach — these are your onboardings.">
+            {outreachLeads.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-edge bg-panel/40 p-5 text-sm text-smoke">
+                Nobody waiting right now — new pages the office pre-loads show up here.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {outreachLeads.map((lead) => (
+                  <OutreachRow key={lead.id} artistId={lead.id} displayName={lead.displayName}
+                    defaultEmail={lead.user.email} invitedAgo={lead.invitedAt ? daysAgo(lead.invitedAt) : null}
+                    pageSlug={lead.slug} stage={lead.outreachStage} notes={lead.outreachNotes} />
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* 05 · Office */}
+          <Panel id="office" index="05" title="Message the office" count={officeUnread} countTone="heat"
+            desc="Your private line to the admin — the only inbox you can reach.">
+            <MessageOffice thread={threadView} />
+          </Panel>
         </div>
-      </section>
 
-      <p className="mt-10 text-center text-xs text-smoke/60">
-        The Editor Desk is scoped to content, cross-posting, and outreach — the
-        admin panel and everything sensitive stays off-limits.
-      </p>
+        <p className="mt-8 text-center font-mono text-[10px] uppercase tracking-wider text-smoke/50">
+          Editor scope · content · cross-post · outreach — admin stays off-limits
+        </p>
+      </div>
     </div>
   );
 }

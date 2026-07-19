@@ -336,13 +336,29 @@ export default async function AdminPage({
   const twoFactorOn = await totpEnabled();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
-      <div className="flex items-center justify-between">
-        <h1 className="display text-4xl text-white">Admin</h1>
-        <form action={adminLogout}>
-          <button className="tag text-smoke hover:text-white">Log out</button>
-        </form>
+    <div className="bg-ink">
+      {/* Console bar — the control room, distinct from the public site */}
+      <div className="border-b border-edge bg-panel/80">
+        <div className="mx-auto flex max-w-6xl items-center gap-x-5 gap-y-2 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-heat" />
+            <span className="font-mono text-xs font-bold tracking-[0.25em] text-heat">CONTROL&nbsp;ROOM</span>
+          </div>
+          <span className="hidden font-mono text-[10px] uppercase tracking-wider text-smoke sm:inline">
+            full access
+          </span>
+          <form action={adminLogout} className="ml-auto">
+            <button className="rounded border border-edge px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-smoke transition hover:border-heat hover:text-white">
+              Log out
+            </button>
+          </form>
+        </div>
       </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-heat/40 to-transparent" />
+
+      <div className="mx-auto max-w-6xl px-4 py-10">
+        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-heat">The Heat Chart</p>
+        <h1 className="display mt-1 text-4xl text-white">Admin</h1>
 
       {/* Account security */}
       <section className="mt-8">
@@ -1725,6 +1741,7 @@ export default async function AdminPage({
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }
