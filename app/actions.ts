@@ -348,13 +348,11 @@ export async function preloadArtist(
   }
 
   const inviteText = alreadyClaimed
-    ? `Yo ${artistName} — just added "${shoeTitle}" to your page on The Heat Chart 🔥\n\n` +
-      `${artistUrl}\n\n` +
-      `The culture's voting — come see where it lands.`
-    : `Yo ${artistName} — your customs are officially in the arena on The Heat Chart 🔥\n\n` +
-      `The culture votes on head-to-head custom battles, and "${shoeTitle}" is already live on your artist page:\n${artistUrl}\n\n` +
-      `Claim your account here (sets your password, takes 30 seconds):\n${claimUrl}\n\n` +
-      `Every battle builds your W–L record on the league table, fans can follow you, and when you sell a pair you can transfer it to the buyer's collector closet. Come defend your heat.`;
+    ? `Yo ${artistName} — just added "${shoeTitle}" to your page: ${artistUrl}\n\n` +
+      `The culture's voting on it now — come see where it lands.`
+    : `Yo ${artistName} — I put your ${shoeTitle} up in our battle league where people vote on heat head-to-head: ${artistUrl}\n\n` +
+      `Free page you can claim, no cost, one of one just like the pair. This link makes it yours in 30 seconds: ${claimUrl}\n\n` +
+      `Claim it and gain new fans from our page — you get a live rank, votes on every pair, and a record that follows your name. That's it, no strings.`;
 
   let emailSent = false;
   if (process.env.RESEND_API_KEY) {
@@ -807,12 +805,10 @@ export async function outreachInvite(
   const claimUrl = `${base}/reset-password/${token}`;
   const pageUrl = `${base}/artists/${profile.slug}`;
   const pitch =
-    `Yo ${profile.displayName} — your work is already live on The Heat Chart 🔥\n\n` +
-    `We built you an artist page in our customizer league: head-to-head vote battles, live rankings, a closet that tracks every sale of your work with receipts, and a market where buyers place offers.\n\n` +
-    `Your page (it's getting votes without you): ${pageUrl}\n\n` +
-    `Claim it here — takes 30 seconds, sets your password:\n${claimUrl}\n\n` +
-    `What it costs: nothing. When on-platform checkout opens, the seller fee is 1% — the other platforms take 10. Founding artists keep free access to the full artist dashboard forever.\n\n` +
-    `Come defend your heat.\n— Matt, The Heat Chart (formerly the Designer Kicks page)`;
+    `Yo ${profile.displayName} — I put your work up in our battle league where people vote on heat head-to-head: ${pageUrl}\n\n` +
+    `Free page you can claim, no cost, one of one just like your pairs. This link makes it yours in 30 seconds: ${claimUrl}\n\n` +
+    `Claim it and gain new fans from our page — you get a live rank, votes on every pair, and a record that follows your name. That's it, no strings.\n\n` +
+    `— Matt, The Heat Chart (the Designer Kicks page)`;
 
   let emailSent = false;
   if (process.env.RESEND_API_KEY) {
@@ -2225,8 +2221,8 @@ export async function outreachDmScript(artistId: string): Promise<DmScriptResult
     return {
       ok: true,
       script:
-        `Yo ${profile.displayName} — your Heat Chart page is yours already and the culture's been on it: ${pageUrl}\n\n` +
-        `Next move: hit your Studio, upload more angles of your work, and watch the feed — fans are rating everything and call-out battles are live. Come defend your heat.\n— Matt`,
+        `Yo ${profile.displayName} — your page is yours and the culture's already voting on your work: ${pageUrl}\n\n` +
+        `Next move: drop more photos from your Studio and watch your rank climb. Fans see your pairs head-to-head every day — every vote builds your record.`,
     };
   }
 
@@ -2247,14 +2243,13 @@ export async function outreachDmScript(artistId: string): Promise<DmScriptResult
     });
   }
   const claimUrl = `${base}/reset-password/${token}`;
-  const pieces = profile.submissions.map((s) => `"${s.title}"`).join(" and ");
+  const pieces = profile.submissions.map((s) => `your ${s.title}`).join(" and ");
   return {
     ok: true,
     script:
-      `Yo ${profile.displayName} — it's Matt from The Heat Chart. Your page is built and ` +
-      `${pieces ? `${pieces} is already on the wall getting votes` : "your work is already on the wall getting votes"}:\n${pageUrl}\n\n` +
-      `Make it yours in 30 seconds — set your password with this private link (good for 14 days):\n${claimUrl}\n\n` +
-      `From there: upload more photos, get called out, build your record. Costs nothing — founding artists ride free forever.\n— Matt`,
+      `Yo ${profile.displayName} — I put ${pieces || "your work"} up in our battle league where people vote on heat head-to-head: ${pageUrl}\n\n` +
+      `Free page you can claim, no cost, one of one just like the pair. This link makes it yours in 30 seconds: ${claimUrl}\n\n` +
+      `Claim it and gain new fans from our page — you get a live rank, votes on every pair, and a record that follows your name. That's it, no strings.`,
   };
 }
 
