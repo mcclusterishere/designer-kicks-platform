@@ -1664,6 +1664,38 @@ async function main() {
     });
     catalogAdded++;
   }
+
+  // One-time reconciliation of the owner-approved conflicts: overwrite
+  // each existing article (by slug) with the accurate spreadsheet
+  // version. Gated by an AppSetting flag so it runs ONCE on the first
+  // deploy after this change and never clobbers later admin edits.
+  let reconciled = 0;
+  const reconcileFlag = await prisma.appSetting.findUnique({ where: { key: "catalogConflictsV1" } });
+  if (!reconcileFlag) {
+    const conflictPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "catalog-conflicts.json");
+    let conflicts = [];
+    try {
+      conflicts = JSON.parse(readFileSync(conflictPath, "utf8"));
+    } catch {}
+    for (const c of conflicts) {
+      if (!c.slug) continue;
+      const existing = await prisma.article.findUnique({ where: { slug: c.slug } });
+      if (!existing) continue;
+      await prisma.article.update({
+        where: { slug: c.slug },
+        data: {
+          title: c.title,
+          excerpt: c.excerpt,
+          content: c.content,
+          dropAt: c.dropAt ? new Date(c.dropAt) : null,
+        },
+      });
+      reconciled++;
+    }
+    await prisma.appSetting.create({
+      data: { key: "catalogConflictsV1", value: new Date().toISOString() },
+    });
+  }
   const totalArticles = await prisma.article.count();
 
   // Community polls — get-to-know-you opinion questions that ride in the
@@ -1707,7 +1739,7 @@ async function main() {
   const totalPolls = await prisma.poll.count({ where: { active: true } });
 
   console.log(
-    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
+    `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog, ${reconciled} reconciled), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
   );
 }
 
