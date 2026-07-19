@@ -56,7 +56,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ edit?: string; editArticle?: string }>;
+  searchParams: Promise<{ edit?: string; editArticle?: string; tab?: string }>;
 }) {
   if (!(await isAdmin())) {
     const [accountOk, twoFactor] = await Promise.all([adminAccountOk(), totpEnabled()]);
@@ -342,6 +342,19 @@ export default async function AdminPage({
 
   const twoFactorOn = await totpEnabled();
 
+  // Tabs: the panel renders ONE room at a time instead of a forever
+  // scroll. Deep links still work — editing a product or article jumps
+  // straight to its tab.
+  const { tab: tabParam } = await searchParams;
+  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "team", "settings"];
+  const tab = editArticle ? "content" : edit ? "market" : TAB_IDS.includes(tabParam ?? "") ? (tabParam as string) : "pulse";
+  const show = (t: string) => tab === t;
+  const rosterAttention =
+    pending.length +
+    profileClaims.filter((c) => c.status === "PENDING").length +
+    artistApplications.length +
+    pendingDrops.length;
+
   return (
     <div className="bg-ink">
       {/* Console bar — the control room, distinct from the public site */}
@@ -367,12 +380,42 @@ export default async function AdminPage({
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-heat">The Heat Chart</p>
         <h1 className="display mt-1 text-4xl text-white">Admin</h1>
 
+        <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-xl border border-edge bg-surface p-1.5">
+          {[
+            { id: "pulse", label: "Pulse", n: 0 },
+            { id: "roster", label: "Roster", n: rosterAttention },
+            { id: "games", label: "Games", n: 0 },
+            { id: "content", label: "Content", n: 0 },
+            { id: "market", label: "Market", n: 0 },
+            { id: "team", label: "Team", n: 0 },
+            { id: "settings", label: "Settings", n: 0 },
+          ].map((t) => (
+            <Link
+              key={t.id}
+              href={`/admin?tab=${t.id}`}
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-mono text-[11px] uppercase tracking-wider transition ${
+                tab === t.id
+                  ? "bg-heat/15 text-white shadow-[inset_0_0_0_1px_rgba(198,90,46,0.4)]"
+                  : "text-smoke hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              {t.label}
+              {t.n > 0 && (
+                <span className="rounded-full bg-heat px-1.5 text-[10px] font-bold leading-4 text-white">{t.n}</span>
+              )}
+            </Link>
+          ))}
+        </nav>
+
       {/* Account security */}
+      {show("settings") && (
       <section className="mt-8">
         <TwoFactorPanel enabled={twoFactorOn} />
       </section>
+      )}
 
       {/* Team & Careers */}
+      {show("team") && (
       <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">
           Team &amp; Careers{" "}
@@ -536,8 +579,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Pending submissions */}
+      {show("roster") && (
       <section className="mt-10">
         <h2 className="display text-2xl text-white">
           Review Queue{" "}
@@ -581,8 +626,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Broadcast: post to The Feed + every social channel at once */}
+      {show("content") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">Broadcast</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -600,8 +647,10 @@ export default async function AdminPage({
           />
         </div>
       </section>
+      )}
 
       {/* Pre-load artist (onboarding accelerator) */}
+      {show("pulse") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Site <span className="text-gradient-volt">Pulse</span>
@@ -711,8 +760,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Traffic: first-party, cookieless — did the post actually send people? */}
+      {show("pulse") && (
       <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Traffic <span className="text-gradient-heat">Pulse</span>
@@ -823,7 +874,9 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
+      {show("roster") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Pre-load An Artist</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -837,8 +890,10 @@ export default async function AdminPage({
           <PreloadArtistForm />
         </div>
       </section>
+      )}
 
       {/* Outreach: cold leads with pre-loaded pages who never claimed */}
+      {show("roster") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Outreach{" "}
@@ -873,8 +928,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Store Scout (beta): verified-store prospecting by zip code */}
+      {show("roster") && (
       <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Store <span className="text-gradient-heat">Scout</span>{" "}
@@ -950,8 +1007,10 @@ export default async function AdminPage({
           </div>
         </details>
       </section>
+      )}
 
       {/* Group Scout (beta): FB group pipeline, hand-worked, tagged links */}
+      {show("roster") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Group <span className="text-gradient-volt">Scout</span>{" "}
@@ -974,8 +1033,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Artist applications */}
+      {show("roster") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Profile Claims{" "}
@@ -1042,7 +1103,9 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
+      {show("roster") && (
       <section className="mt-10 rounded-xl border border-edge bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Artist Applications{" "}
@@ -1094,7 +1157,9 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
+      {show("roster") && (
       <section className="mt-10 rounded-xl border border-edge bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Announced Drops{" "}
@@ -1154,8 +1219,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Create battle */}
+      {show("games") && (
       <section className="mt-12 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">Start A Battle</h2>
         <div className="mt-4">
@@ -1169,8 +1236,10 @@ export default async function AdminPage({
           />
         </div>
       </section>
+      )}
 
       {/* Battles */}
+      {show("games") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Battles</h2>
         <div className="mt-4 space-y-2">
@@ -1201,8 +1270,10 @@ export default async function AdminPage({
           {battles.length === 0 && <p className="text-sm text-smoke">No battles yet.</p>}
         </div>
       </section>
+      )}
 
       {/* Outfit Studio: assemble house fits, match fit battles */}
+      {show("games") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Outfit <span className="text-gradient-volt">Studio</span>
@@ -1306,8 +1377,10 @@ export default async function AdminPage({
           </div>
         )}
       </section>
+      )}
 
       {/* Tournaments */}
+      {show("games") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Tournaments</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1352,8 +1425,10 @@ export default async function AdminPage({
           {tournaments.length === 0 && <p className="text-sm text-smoke">No tournaments yet.</p>}
         </div>
       </section>
+      )}
 
       {/* Giveaways */}
+      {show("games") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Giveaways</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1390,8 +1465,10 @@ export default async function AdminPage({
           {giveaways.length === 0 && <p className="text-sm text-smoke">No giveaways yet.</p>}
         </div>
       </section>
+      )}
 
       {/* Quiz questions */}
+      {show("games") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Quiz Questions{" "}
@@ -1442,8 +1519,10 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
 
       {/* Users */}
+      {show("pulse") && (
       <section className="mt-12">
         <div className="flex items-center justify-between">
           <h2 className="display text-2xl text-white">
@@ -1490,8 +1569,10 @@ export default async function AdminPage({
           </table>
         </div>
       </section>
+      )}
 
       {/* Sales ledger */}
+      {show("market") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Sales Ledger <span className="text-smoke">({sales.length})</span>
@@ -1544,8 +1625,10 @@ export default async function AdminPage({
           {sales.length === 0 && <p className="text-sm text-smoke">No sales recorded yet.</p>}
         </div>
       </section>
+      )}
 
       {/* Newsroom */}
+      {show("content") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Newsroom <span className="text-smoke">({articles.length})</span>
@@ -1642,8 +1725,10 @@ export default async function AdminPage({
           {articles.length === 0 && <p className="text-sm text-smoke">No articles yet.</p>}
         </div>
       </section>
+      )}
 
       {/* Market Pulse: the affiliate money funnel */}
+      {show("market") && (
       <section className="mt-12" data-testid="market-pulse">
         <h2 className="display text-2xl text-white">Market Pulse</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -1702,8 +1787,10 @@ export default async function AdminPage({
           </div>
         </div>
       </section>
+      )}
 
       {/* Products */}
+      {show("market") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Shop Products <span className="text-smoke">({products.length})</span>
@@ -1767,6 +1854,7 @@ export default async function AdminPage({
           ))}
         </div>
       </section>
+      )}
       </div>
     </div>
   );
