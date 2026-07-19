@@ -103,21 +103,22 @@ export default async function ProfilePage() {
         </form>
       </div>
 
-      {/* First-visit welcome — dismissed once, never seen again */}
-      <Walkthrough />
-
       {user.role === "EDITOR" && (
         <Link
           href="/editor"
-          className="mt-6 flex items-center justify-between rounded-xl border border-volt/50 bg-surface p-4 transition hover:border-volt"
+          className="glow-volt mt-6 flex items-center justify-between gap-3 rounded-2xl border border-volt bg-volt/10 p-5 transition hover:bg-volt/15"
         >
           <div>
             <p className="tag text-volt">Editor access</p>
-            <p className="mt-0.5 text-sm text-white">Open your Editor Desk →</p>
+            <p className="display mt-0.5 text-2xl text-white">Open your Editor Desk →</p>
+            <p className="mt-0.5 text-sm text-smoke">Write, cross-post, stage outreach, message the office.</p>
           </div>
-          <span className="display text-2xl text-volt">✎</span>
+          <span className="display text-4xl text-volt">✎</span>
         </Link>
       )}
+
+      {/* First-visit welcome — dismissed once, never seen again */}
+      <Walkthrough />
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

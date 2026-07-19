@@ -87,41 +87,25 @@ function configuredAllowlist(): string[] {
 }
 
 /**
- * Second lock: the admin panel additionally requires being signed in as
- * one of these member accounts, so a leaked password alone is useless.
- * Explicit ADMIN_EMAILS wins; otherwise, on a real deploy we fall back to
- * the owner accounts (never leave prod password-only). Local/e2e with
- * nothing configured returns [] → password-only, so dev + tests work.
+ * Display/label helper only (e.g. the account name on the 2FA QR): the
+ * configured allowlist, or the owner accounts as a sensible default.
+ * NOT the access gate — see adminAccountOk.
  */
 export function adminAllowlist(): string[] {
   const configured = configuredAllowlist();
-  if (configured.length) return configured;
-  return isRealDeploy() ? [...OWNER_EMAILS] : [];
+  return configured.length ? configured : [...OWNER_EMAILS];
 }
 
 /**
- * A real, public deployment. True if a real https site URL is
- * configured OR we're running on Railway (env markers it injects) —
- * so a prod box that simply forgot to set NEXT_PUBLIC_SITE_URL still
- * fails closed instead of silently dropping to password-only admin.
- * Local + e2e (no https URL, no Railway markers) stay password-only.
+ * The optional "member account" second lock. It's OPT-IN: only when the
+ * owner sets ADMIN_EMAILS does the panel also require being signed in as
+ * one of those accounts. Unset (the default) = password-only, so the owner
+ * just needs the admin password — the recommended second factor is the
+ * authenticator-app 2FA, which layers on top when they turn it on.
  */
-function isRealDeploy(): boolean {
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").toLowerCase();
-  if (/^https:\/\//.test(site) && !site.includes("localhost")) return true;
-  return Boolean(
-    process.env.RAILWAY_ENVIRONMENT_NAME ||
-      process.env.RAILWAY_PROJECT_ID ||
-      process.env.RAILWAY_SERVICE_ID
-  );
-}
-
 export async function adminAccountOk(): Promise<boolean> {
-  const list = adminAllowlist();
-  // Empty only means "not a real deploy AND nothing configured" — local +
-  // e2e stay password-only so dev and tests work. Every real deploy has a
-  // non-empty list (configured or the owner fallback) and so fails closed.
-  if (list.length === 0) return true;
+  const list = configuredAllowlist();
+  if (list.length === 0) return true; // password-only unless the owner opts in
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
   return Boolean(email && list.includes(email));
