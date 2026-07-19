@@ -87,6 +87,21 @@ model ArtistProfile {
   feedPosts   FeedPost[]
 }
 
+// BETA (admin-only): Group Scout. Facebook groups worth pitching —
+// tracked by hand (no ToS-breaking automation), each with a tagged
+// link so Traffic Pulse and GA show which group actually converts.
+model GroupLead {
+  id        String   @id @default(cuid())
+  name      String
+  url       String?
+  adminName String?
+  members   String? // free text, e.g. "12K"
+  stage     String   @default("NEW") // NEW | CONTACTED | IN_TALKS | POSTED
+  notes     String?
+  campaign  String   @unique // utm_campaign slug for the tagged link
+  createdAt DateTime @default(now())
+}
+
 // BETA (admin-only): Store Scout. Local shoe stores prospected by zip
 // code — the targets are stores with NO website, pitched a free
 // "Heat Chart Verified Store" page. Pipeline: SCOUTED (found) →

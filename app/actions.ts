@@ -2190,3 +2190,124 @@ export async function throwCallOut(
   revalidatePath("/battles");
   return { ok: true, battleId: battle.id };
 }
+
+// ---------- Outreach DM scripts + Group Scout ----------
+
+export type DmScriptResult = { ok: true; script: string } | { ok: false; error: string };
+
+/**
+ * A personalized, paste-ready DM for a pre-loaded artist — the no-email
+ * path while Resend waits. Reuses any live claim link so a link already
+ * sitting in someone's DMs never dies.
+ */
+export async function outreachDmScript(artistId: string): Promise<DmScriptResult> {
+  await requireAdmin();
+  const profile = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    include: {
+      user: {
+        select: { id: true, passwordHash: true, _count: { select: { accounts: true } } },
+      },
+      submissions: {
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
+        select: { title: true },
+        take: 2,
+      },
+    },
+  });
+  if (!profile) return { ok: false, error: "Profile not found." };
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const pageUrl = `${base}/artists/${profile.slug}`;
+  const claimed = Boolean(profile.user.passwordHash) || profile.user._count.accounts > 0;
+
+  if (claimed) {
+    return {
+      ok: true,
+      script:
+        `Yo ${profile.displayName} — your Heat Chart page is yours already and the culture's been on it: ${pageUrl}\n\n` +
+        `Next move: hit your Studio, upload more angles of your work, and watch the feed — fans are rating everything and call-out battles are live. Come defend your heat.\n— Matt`,
+    };
+  }
+
+  let token = (
+    await prisma.passwordResetToken.findFirst({
+      where: { userId: profile.user.id, expires: { gt: new Date() } },
+    })
+  )?.token;
+  if (!token) {
+    token = randomBytes(32).toString("hex");
+    await prisma.passwordResetToken.deleteMany({ where: { userId: profile.user.id } });
+    await prisma.passwordResetToken.create({
+      data: {
+        token,
+        userId: profile.user.id,
+        expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+  const claimUrl = `${base}/reset-password/${token}`;
+  const pieces = profile.submissions.map((s) => `"${s.title}"`).join(" and ");
+  return {
+    ok: true,
+    script:
+      `Yo ${profile.displayName} — it's Matt from The Heat Chart. Your page is built and ` +
+      `${pieces ? `${pieces} is already on the wall getting votes` : "your work is already on the wall getting votes"}:\n${pageUrl}\n\n` +
+      `Make it yours in 30 seconds — set your password with this private link (good for 14 days):\n${claimUrl}\n\n` +
+      `From there: upload more photos, get called out, build your record. Costs nothing — founding artists ride free forever.\n— Matt`,
+  };
+}
+
+// Group Scout: hand-tracked Facebook groups, no automation, each with
+// a tagged link so the traffic tells you which group converts.
+
+export async function addGroupLead(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const url = String(formData.get("url") ?? "").trim() || null;
+  const adminName = String(formData.get("adminName") ?? "").trim() || null;
+  const members = String(formData.get("members") ?? "").trim() || null;
+  if (!name || name.length > 80) return { ok: false, error: "Group name is required." };
+  if (url && !/^https?:\/\//.test(url)) return { ok: false, error: "Group link must start with http(s)://" };
+
+  const baseSlug = slugify(name) || "group";
+  let campaign = baseSlug;
+  for (let i = 2; ; i++) {
+    const clash = await prisma.groupLead.findUnique({ where: { campaign } });
+    if (!clash) break;
+    campaign = `${baseSlug}-${i}`;
+  }
+  await prisma.groupLead.create({ data: { name, url, adminName, members, campaign } });
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function setGroupStage(id: string, stage: string) {
+  await requireAdmin();
+  if (!["NEW", "CONTACTED", "IN_TALKS", "POSTED"].includes(stage)) return;
+  await prisma.groupLead.update({ where: { id }, data: { stage } }).catch(() => {});
+  revalidatePath("/admin");
+}
+
+/** Working notes on a group — no revalidate, keeps the input mounted. */
+export async function saveGroupNotes(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("groupId") ?? "");
+  const notes = String(formData.get("notes") ?? "").trim().slice(0, 500);
+  const lead = await prisma.groupLead.findUnique({ where: { id } });
+  if (!lead) return { ok: false, error: "Group not found." };
+  await prisma.groupLead.update({ where: { id }, data: { notes: notes || null } });
+  return { ok: true };
+}
+
+export async function deleteGroupLead(id: string) {
+  await requireAdmin();
+  await prisma.groupLead.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin");
+}

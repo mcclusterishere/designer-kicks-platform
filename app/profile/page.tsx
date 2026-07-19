@@ -11,6 +11,7 @@ import ProfileForm from "./ProfileForm";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
 import IQPanel from "@/components/IQPanel";
+import Walkthrough from "@/components/Walkthrough";
 import { cultureIQ } from "@/lib/iq";
 import { respondOffer, withdrawOffer } from "@/app/actions";
 
@@ -102,6 +103,9 @@ export default async function ProfilePage() {
           <button className="tag text-smoke hover:text-white">Sign out</button>
         </form>
       </div>
+
+      {/* First-visit welcome — dismissed once, never seen again */}
+      <Walkthrough />
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

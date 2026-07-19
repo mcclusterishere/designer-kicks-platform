@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   createHouseOutfit,
   createOutfitBattleAction,
   outreachInvite,
+  outreachDmScript,
   setArtistStage,
   saveArtistNotes,
   type ActionResult,
@@ -153,6 +154,16 @@ export function OutreachRow({
     saveArtistNotes,
     null
   );
+  const [dm, setDm] = useState<string | null>(null);
+  const [dmBusy, setDmBusy] = useState(false);
+
+  async function loadDm() {
+    setDmBusy(true);
+    const res = await outreachDmScript(artistId);
+    setDm(res.ok ? res.script : res.error);
+    setDmBusy(false);
+  }
+
   return (
     <div className="rounded-xl border border-edge bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -191,7 +202,30 @@ export function OutreachRow({
             {notesState?.ok ? "saved ✓" : "save"}
           </button>
         </form>
+        <button
+          type="button"
+          onClick={loadDm}
+          disabled={dmBusy}
+          className="tag rounded border border-volt/50 px-2.5 py-1 text-volt transition hover:border-volt disabled:opacity-50"
+        >
+          {dmBusy ? "Writing…" : "DM script"}
+        </button>
       </div>
+
+      {/* Personalized paste-ready DM — the no-email path. Includes the
+          live claim link (reused, never rotated). */}
+      {dm && (
+        <div className="mt-2">
+          <textarea
+            readOnly
+            value={dm}
+            rows={6}
+            onFocus={(e) => e.target.select()}
+            data-testid="dm-script"
+            className="w-full rounded-lg border border-edge bg-panel px-3 py-2 font-mono text-xs text-volt"
+          />
+        </div>
+      )}
       {state?.ok ? (
         <div className="mt-2 space-y-1">
           <p className="text-sm text-volt">

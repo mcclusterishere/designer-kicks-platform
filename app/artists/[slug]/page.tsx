@@ -12,6 +12,7 @@ import { isAdmin } from "@/lib/admin";
 import { formatUsd } from "@/lib/market";
 import { categoryLabel } from "@/lib/categories";
 import HeatScore from "@/components/HeatScore";
+import ChallengeButton from "@/components/ChallengeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,15 @@ export default async function ArtistPage({ params }: Props) {
   // an admin can also curate galleries for pre-loaded artists.
   const isOwnPage = session?.user?.id === artist.userId;
   const admin = await isAdmin();
+  // A rival approved artist standing on this page can throw challenges.
+  const viewerProfile = session?.user?.id
+    ? await prisma.artistProfile.findUnique({
+        where: { userId: session.user.id },
+        select: { id: true, status: true },
+      })
+    : null;
+  const viewerCanChallenge =
+    viewerProfile?.status === "APPROVED" && viewerProfile.id !== artist.id;
   // Pre-loaded pages stay claimable until the artist sets a login.
   const claimable = !artist.user.passwordHash && artist.user._count.accounts === 0;
 
@@ -239,6 +249,7 @@ export default async function ArtistPage({ params }: Props) {
                     )}
                   </p>
                   <HeatScore stars={s.ratings.map((r) => r.stars)} />
+                  {viewerCanChallenge && <ChallengeButton targetSubmissionId={s.id} />}
                   {lastSale && (
                     <p className="mt-1 text-sm">
                       <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}

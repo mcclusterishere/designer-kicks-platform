@@ -30,6 +30,7 @@ import QuestionForm from "./QuestionForm";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import BroadcastForm from "./BroadcastForm";
+import { GroupForm, GroupLeadRow } from "./GroupScout";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
 import { placesConfigured } from "@/lib/stores";
@@ -195,6 +196,32 @@ export default async function AdminPage({
     orderBy: [{ createdAt: "desc" }],
     take: 150,
   });
+
+  // Group Scout: FB groups + 7-day clicks on each group's tagged link.
+  const [groupLeads, campaignHits] = await Promise.all([
+    prisma.groupLead.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+    prisma.pageView.groupBy({
+      by: ["campaign"],
+      where: {
+        campaign: { not: null },
+        createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      },
+      _count: true,
+    }),
+  ]);
+  const clicksByCampaign = new Map(campaignHits.map((c) => [c.campaign, c._count]));
+  const groupBase = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  const groupRows = groupLeads.map((g) => ({
+    id: g.id,
+    name: g.name,
+    url: g.url,
+    adminName: g.adminName,
+    members: g.members,
+    stage: g.stage,
+    notes: g.notes,
+    taggedLink: `${groupBase}/?utm_source=fbgroup&utm_medium=social&utm_campaign=${g.campaign}`,
+    clicks7: clicksByCampaign.get(g.campaign) ?? 0,
+  }));
   const leadRow = (l: (typeof storeLeads)[number]) => ({
     id: l.id,
     name: l.name,
@@ -638,6 +665,30 @@ export default async function AdminPage({
             <ManualStoreForm />
           </div>
         </details>
+      </section>
+
+      {/* Group Scout (beta): FB group pipeline, hand-worked, tagged links */}
+      <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Group <span className="text-gradient-volt">Scout</span>{" "}
+          <span className="sticker px-2 py-0.5 text-xs align-middle">Beta</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          The Facebook groups worth pitching, worked by hand — no
+          automation, no ToS trouble. Every group gets its own tagged
+          link; the clicks column and Traffic Pulse show which rooms
+          actually send people.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-4">
+          <GroupForm />
+        </div>
+        {groupRows.length > 0 && (
+          <div className="mt-4 space-y-3">
+            {groupRows.map((g) => (
+              <GroupLeadRow key={g.id} group={g} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Artist applications */}

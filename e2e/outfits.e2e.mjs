@@ -178,6 +178,22 @@ await leadRow.getByRole("button", { name: "save" }).click();
 await leadRow.getByText("saved ✓").waitFor({ timeout: 15000 });
 const noted = await prisma.artistProfile.findUnique({ where: { slug: LEAD_SLUG } });
 check("notes persist on the lead", noted?.outreachNotes === "DM'd on FB, replied interested");
+
+// The no-email path: a personalized paste-ready DM with the claim link
+await leadRow.getByRole("button", { name: "DM script" }).click();
+const dmBox = leadRow.locator("[data-testid=dm-script]");
+await dmBox.waitFor({ timeout: 15000 });
+const dmText = await dmBox.inputValue();
+check(
+  "DM script personalized with the claim link",
+  dmText.includes("Outreach Test Lead") && dmText.includes("/reset-password/")
+);
+// Asking again must reuse the same live link, never rotate it
+const tokenBefore = dmText.match(/reset-password\/(\w+)/)?.[1];
+await leadRow.getByRole("button", { name: "DM script" }).click();
+await admin.waitForTimeout(800);
+const tokenAfter = (await dmBox.inputValue()).match(/reset-password\/(\w+)/)?.[1];
+check("DM script never rotates a live claim link", Boolean(tokenBefore) && tokenBefore === tokenAfter);
 await leadRow.locator('input[name="email"]').fill(LEAD_EMAIL);
 await leadRow.getByRole("button", { name: "Send Invite" }).click();
 // RESEND_API_KEY is unset locally → manual-DM branch with the claim link.
