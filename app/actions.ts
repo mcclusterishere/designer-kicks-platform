@@ -45,6 +45,7 @@ import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
 import { isEditor, currentUserRole } from "@/lib/editor";
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
+import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -2034,6 +2035,117 @@ export async function removeArtistShop(id: string) {
     await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: null } });
   }
   revalidatePath("/studio");
+}
+
+// ---------- Onboarding Agent (research → preloaded profile) ----------
+
+export type ResearchResult =
+  | { ok: true; draft: ProfileDraft }
+  | { ok: false; dormant?: boolean; error: string };
+
+/** Editor/admin pastes links + hints; the agent returns a profile draft. */
+export async function researchProspect(
+  _prev: ResearchResult | null,
+  formData: FormData
+): Promise<ResearchResult> {
+  await requireEditor();
+  if (!onboardAgentConfigured()) {
+    return { ok: false, dormant: true, error: "The research agent is off — an admin adds GEMINI_API_KEY to switch it on." };
+  }
+  const me = await currentUserRole();
+  if (me && !allowAttempt("onboardagent", me.id, 40, 60 * 60 * 1000)) {
+    return { ok: false, error: "Slow down — too many lookups this hour." };
+  }
+  const links = String(formData.get("links") ?? "")
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const hints = String(formData.get("hints") ?? "").trim();
+  return researchProfile({ links, hints });
+}
+
+export type PreloadDraftResult = ActionResult & { artistUrl?: string; claimUrl?: string };
+
+/**
+ * Create a claimable, pre-loaded profile straight from the agent's draft —
+ * no photo required (it's an outreach lead, pieces come when they claim).
+ * Lands in the onboarding pipeline as a NEW lead.
+ */
+export async function createResearchedProfile(
+  _prev: PreloadDraftResult | null,
+  formData: FormData
+): Promise<PreloadDraftResult> {
+  await requireEditor();
+  const artistName = String(formData.get("artistName") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  const city = String(formData.get("city") ?? "").trim();
+  const bio = String(formData.get("bio") ?? "").trim();
+  const portfolioUrl = String(formData.get("portfolioUrl") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!artistName || artistName.length > 120) return { ok: false, error: "Artist name is required." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: "A valid email is required — it becomes their claimable account." };
+  }
+  if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) {
+    return { ok: false, error: "Portfolio must be a full http(s):// link." };
+  }
+
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { name: artistName, email },
+  });
+  let artist = await prisma.artistProfile.findUnique({ where: { userId: user.id } });
+  if (!artist) {
+    artist = await prisma.artistProfile.create({
+      data: {
+        userId: user.id,
+        slug: await uniqueArtistSlug(artistName),
+        displayName: artistName,
+        instagram: instagram || null,
+        city: city || null,
+        bio: bio || null,
+        portfolioUrl: portfolioUrl || null,
+        status: "APPROVED",
+        outreachStage: "NEW",
+        outreachNotes: notes || null,
+      },
+    });
+  } else {
+    artist = await prisma.artistProfile.update({
+      where: { id: artist.id },
+      data: {
+        status: "APPROVED",
+        ...(instagram ? { instagram } : {}),
+        ...(city ? { city } : {}),
+        ...(bio ? { bio } : {}),
+        ...(portfolioUrl ? { portfolioUrl } : {}),
+        ...(notes ? { outreachNotes: notes } : {}),
+      },
+    });
+  }
+
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+  let claimUrl: string | undefined;
+  if (!user.passwordHash) {
+    let token = (
+      await prisma.passwordResetToken.findFirst({ where: { userId: user.id, expires: { gt: new Date() } } })
+    )?.token;
+    if (!token) {
+      token = randomBytes(32).toString("hex");
+      await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      await prisma.passwordResetToken.create({
+        data: { token, userId: user.id, expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+      });
+    }
+    claimUrl = `${base}/reset-password/${token}`;
+  }
+  notifyAdmin("Researched profile preloaded", `${artistName} (${email}) was preloaded via the onboarding agent.`);
+  revalidatePath("/editor");
+  revalidatePath("/admin");
+  return { ok: true, note: `Preloaded ${artistName} — now in the onboarding pipeline.`, artistUrl: `${base}/artists/${artist.slug}`, claimUrl };
 }
 
 /** Artist says they don't sell anywhere yet → routes them to the portal. */

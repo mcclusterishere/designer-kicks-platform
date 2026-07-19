@@ -40,6 +40,7 @@ Railway; merging the open PR is the deploy trigger.
 | `CRON_SECRET` | guards `/api/cron/*` (finalize + drop-date sync) | recommended |
 | `KICKSDB_KEY` **or** `RAPIDAPI_STOCKX_KEY` **or** `APIFY_TOKEN` | drop-date auto-sync by SKU | optional |
 | `ANTHROPIC_API_KEY` (+ opt. `ADVISOR_MODEL`) | turns on the /sell AI Selling Advisor | optional |
+| `GEMINI_API_KEY` (+ opt. `GEMINI_MODEL`) | turns on the Onboarding Agent (links → drafted profile) | optional |
 | `REF_EBAY_URL` / `REF_SHOPIFY_URL` / `REF_ETSY_URL` / `REF_DEPOP_URL` / `REF_GRAILED_URL` / … | your referral sign-up links on /sell | optional |
 | `NEXT_PUBLIC_GA_ID` | GA override only — live property is built in | not needed |
 

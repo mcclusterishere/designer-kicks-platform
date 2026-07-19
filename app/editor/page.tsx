@@ -8,6 +8,7 @@ import { OutreachRow } from "@/app/admin/OutfitStudioForms";
 import EditorBroadcastForm from "./EditorBroadcastForm";
 import StageProspectForm from "./StageProspectForm";
 import MessageOffice from "./MessageOffice";
+import OnboardAgent from "./OnboardAgent";
 
 export const metadata = { title: "Editor Desk — The Heat Chart", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -225,7 +226,10 @@ export default async function EditorDesk({
 
           {/* 04 · Onboarding pipeline */}
           <Panel id="onboard" index="04" title="Onboarding pipeline" count={outreachLeads.length} countTone="heat"
-            desc="Unclaimed pages to reach — these are your onboardings.">
+            desc="Research a lead, preload the page, then work the pipeline.">
+            <div className="mb-5">
+              <OnboardAgent />
+            </div>
             {outreachLeads.length === 0 ? (
               <p className="rounded-lg border border-dashed border-edge bg-panel/40 p-5 text-sm text-smoke">
                 Nobody waiting right now — new pages the office pre-loads show up here.
