@@ -7,7 +7,7 @@ import Countdown from "@/components/Countdown";
 export const metadata = {
   title: "Rare Shoe Giveaway — The Heat Chart",
   description:
-    "Win rare kicks by passing the Jordan trivia Heat Check. No purchase necessary — free entries available daily.",
+    "Win rare kicks by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
 };
 export const dynamic = "force-dynamic";
 
@@ -92,10 +92,10 @@ export default async function GiveawayPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong>No purchase necessary, and purchases never affect your
-            odds.</strong> Giveaway entries are earned exclusively by passing
-            the Heat Check using free daily strikes. Purchased strike packs
-            apply only to leaderboard play and can never produce an entry or
-            change your chance of winning.
+            odds.</strong> Giveaway entries are earned exclusively by playing a
+            Heat Check run on free daily strikes. Purchased strike packs apply
+            only to leaderboard play and can never produce an entry or change
+            your chance of winning.
           </li>
           <li>Open to legal residents 18 years or older. Void where prohibited.</li>
           <li>One winner drawn at random from all entries after the end date.</li>

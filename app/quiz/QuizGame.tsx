@@ -104,8 +104,11 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             Payment received — your strikes are loaded.
           </p>
         )}
-        <p className="display text-2xl text-white">Think you know Jordans?</p>
-        <p className="mt-2 text-sm text-smoke">{questionCount} questions in the bank. No repeats within a run.</p>
+        <p className="display text-2xl text-white">How high is your Culture IQ?</p>
+        <p className="mt-2 text-sm text-smoke">
+          {questionCount} culture questions in the bank. Every one you nail lifts
+          your Culture IQ and climbs you up the board — no repeats, ever.
+        </p>
         <button
           onClick={() => run(startQuizRun)}
           disabled={pending}
@@ -118,59 +121,42 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
     );
   }
 
-  // ---------- Won ----------
-  if (state.status === "WON") {
+  // ---------- Run complete ----------
+  if (state.status === "OUT_OF_QUESTIONS") {
     return (
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
-        <p className="display text-4xl text-volt">Heat Check Passed</p>
+        <p className="display text-4xl text-volt">Run complete</p>
         <p className="mt-3 text-white">
-          {state.correctCount}/{state.target} correct
-          {feedback?.earnedEntry
-            ? " — your giveaway entry is locked in."
-            : state.usedPaidStrikes
-              ? " — leaderboard win!"
-              : "."}
+          {state.correctCount} correct this run · your Culture IQ is{" "}
+          <span className="text-volt">{state.iq}</span>
         </p>
-        {state.usedPaidStrikes && !feedback?.earnedEntry && (
-          <p className="mx-auto mt-2 max-w-md text-sm text-smoke">
-            This run used purchased strikes, so it counts for the
-            leaderboard but not the giveaway — entries only come from
-            free-strike runs. Run it back tomorrow on free strikes for an
-            entry.
+        <p className="mt-1 text-sm text-smoke">
+          {state.answered} answered all-time. The highest Culture IQ tops the
+          leaderboard — keep climbing.
+        </p>
+        {state.entryEarned ? (
+          <p className="mx-auto mt-3 max-w-md rounded border border-volt/40 bg-volt/10 p-3 text-sm text-volt">
+            Free run — your giveaway entry is locked in.
           </p>
-        )}
+        ) : state.usedPaidStrikes ? (
+          <p className="mx-auto mt-3 max-w-md text-sm text-smoke">
+            This run used purchased strikes, so it climbs the leaderboard but
+            doesn&apos;t earn a giveaway entry — entries come only from
+            free-strike runs. Run it back tomorrow on free strikes for one.
+          </p>
+        ) : null}
         <div className="mt-5 flex justify-center gap-3">
           <button
             onClick={() => run(() => abandonRun(state.runId))}
             disabled={pending}
             className="rounded-lg bg-heat px-6 py-3 tag font-bold text-white disabled:opacity-50"
           >
-            Run It Again
+            New Run
           </button>
           <Link href="/giveaway" className="rounded-lg border border-edge px-6 py-3 tag text-white hover:border-volt">
             View Giveaway
           </Link>
         </div>
-      </div>
-    );
-  }
-
-  // ---------- Out of questions ----------
-  if (state.status === "OUT_OF_QUESTIONS") {
-    return (
-      <div className="rounded-xl border border-edge bg-surface p-8 text-center">
-        <p className="display text-2xl text-white">Run over</p>
-        <p className="mt-2 text-smoke">
-          You went {state.correctCount}/{state.target} this run. Fresh questions tomorrow —
-          or run it back right now.
-        </p>
-        <button
-          onClick={() => run(() => abandonRun(state.runId))}
-          disabled={pending}
-          className="mt-5 rounded-lg bg-heat px-6 py-3 tag font-bold text-white disabled:opacity-50"
-        >
-          New Run
-        </button>
       </div>
     );
   }
@@ -181,14 +167,20 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
       <div className="rounded-xl border border-heat bg-surface p-8 text-center glow-heat">
         <p className="display text-2xl text-heat">Out of strikes</p>
         <p className="mt-2 text-smoke">
-          You&apos;re {state.correctCount}/{state.target} deep — don&apos;t lose the run.
-          Grab a credit pack and keep climbing.
+          {state.correctCount} correct this run — don&apos;t lose your streak.
+          Grab a credit pack and keep climbing the board.
         </p>
+        {state.entryEarned && (
+          <p className="mx-auto mt-3 max-w-md rounded border border-volt/40 bg-volt/10 p-3 text-xs text-volt">
+            You played this run on free strikes — your giveaway entry is already
+            locked in. Buying more just climbs the leaderboard.
+          </p>
+        )}
         <p className="mx-auto mt-3 max-w-md rounded border border-edge bg-panel p-3 text-xs text-smoke">
           Heads up: buying strikes keeps this run alive for the{" "}
           <strong className="text-white">leaderboard</strong>. Giveaway
-          entries only come from runs completed on free strikes — purchases
-          never affect your odds of winning.
+          entries only come from free-strike runs — purchases never affect your
+          odds of winning.
         </p>
         {purchasesEnabled ? (
           <>
@@ -242,19 +234,14 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
     <div>
       {/* Status bar */}
       <div className="flex items-center justify-between rounded-t-xl border border-b-0 border-edge bg-panel px-4 py-3">
-        <div className="flex items-center gap-2">
-          {Array.from({ length: state.target }, (_, i) => (
-            <div
-              key={i}
-              className={`h-2 w-2 rounded-full sm:w-4 ${i < state.correctCount ? "bg-volt" : "bg-edge"}`}
-            />
-          ))}
-        </div>
         <p className="tag text-smoke">
           {state.usedPaidStrikes && (
             <span className="mr-2 rounded bg-heat/20 px-1.5 py-0.5 text-heat">Leaderboard run</span>
           )}
-          <span className="text-white">{state.correctCount}</span>/{state.target} ·{" "}
+          <span className="text-white">{state.correctCount}</span> correct ·{" "}
+          <span className="text-volt">IQ {state.iq}</span>
+        </p>
+        <p className="tag text-smoke">
           <span className={strikesLeft <= 1 ? "text-heat" : "text-white"}>
             {state.strikes.freeLeft} free + {state.strikes.credits} credits
           </span>

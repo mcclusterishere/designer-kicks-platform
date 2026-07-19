@@ -613,7 +613,11 @@ model QuizRun {
   // count for the leaderboard but NEVER earn giveaway entries — paying
   // must not affect prize odds (sweepstakes law).
   usedPaidStrikes Boolean @default(false)
-  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | WON | ABANDONED | OUT_OF_QUESTIONS
+  // True once this run has minted its one free giveaway entry. Guards
+  // against a run granting more than one entry across its terminal
+  // transitions (finished the queue vs. struck out).
+  entryGranted Boolean   @default(false)
+  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | OUT_OF_QUESTIONS | ABANDONED
   startedAt    DateTime  @default(now())
   completedAt  DateTime?
 }

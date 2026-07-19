@@ -4,23 +4,20 @@ import { prisma } from "@/lib/db";
 import {
   getActiveGiveaway,
   getActiveRun,
-  getCurrentQuestion,
-  getStrikeState,
   getQuizLeaderboard,
   FREE_STRIKES_PER_DAY,
-  HEAT_CHECK_TARGET,
   PACK_SIZE,
   type LeaderboardEntry,
 } from "@/lib/quiz";
-import { verifyCheckoutSession } from "@/app/quiz-actions";
+import { verifyCheckoutSession, buildState } from "@/app/quiz-actions";
 import type { QuizState } from "@/app/quiz-actions";
 import QuizGame from "./QuizGame";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
-  title: "The Heat Check: Jordan Trivia — Win Rare Shoe Giveaways | The Heat Chart",
+  title: "The Heat Check: Culture IQ — Win Rare Shoe Giveaways | The Heat Chart",
   description:
-    "Answer 12 Jordan history questions to earn an entry into our rare shoe giveaway. 3 free strikes a day — how deep is your sneaker knowledge?",
+    "Build your Culture IQ on sneaker history and streetwear knowledge — the highest score tops the leaderboard. Play a free run to enter our rare-shoe giveaway.",
 };
 export const dynamic = "force-dynamic";
 
@@ -68,21 +65,8 @@ export default async function QuizPage({
   }
 
   const userId = session.user.id;
-  const [run, strikes] = await Promise.all([getActiveRun(userId), getStrikeState(userId)]);
-  const question = run ? await getCurrentQuestion(run) : null;
-
-  const initialState: QuizState | null = run
-    ? {
-        runId: run.id,
-        status: run.status as QuizState["status"],
-        correctCount: run.correctCount,
-        wrongCount: run.wrongCount,
-        usedPaidStrikes: run.usedPaidStrikes,
-        target: HEAT_CHECK_TARGET,
-        strikes,
-        question,
-      }
-    : null;
+  const run = await getActiveRun(userId);
+  const initialState: QuizState | null = run ? await buildState(userId, run) : null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -132,10 +116,11 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
         Culture IQ <span className="text-volt">Leaderboard</span>
       </h2>
       <p className="mt-1 text-sm text-smoke">
-        One score, every question on the site — feed quizzes and Heat
-        Checks write the same ledger. +2 a correct, −3 an uncleared miss,
-        everyone starts at 100. Paid runs count here — this is for
-        bragging rights, not giveaway odds.
+        This is the win — no magic number to hit. Feed polls-of-knowledge and
+        Heat Checks write one ledger: +2 a correct, −3 an uncleared miss,
+        everyone starts at 100. Highest Culture IQ takes the crown; answer the
+        most to break a tie. Paid runs count here too — this is for the crown,
+        not giveaway odds.
       </p>
       <ol className="mt-4 space-y-2">
         {entries.map((e, i) => (
@@ -156,7 +141,7 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
                 ))}
               </p>
               <p className="tag text-smoke">
-                {e.answered} answered · {e.accuracy}% accuracy · {e.wins} checks passed
+                {e.answered} answered · {e.accuracy}% accuracy
               </p>
             </div>
             <p className="display shrink-0 text-xl text-white">
@@ -173,20 +158,21 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
 function Hero({ giveawayTitle }: { giveawayTitle: string | null }) {
   return (
     <div>
-      <p className="tag text-heat">Jordan trivia</p>
+      <p className="tag text-heat">Culture IQ</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
         The Heat Check
       </h1>
       <p className="mt-3 text-smoke">
-        {HEAT_CHECK_TARGET} correct answers on Jordan history and release details
-        wins you an entry into the{" "}
+        Every question you answer on sneaker history and streetwear culture
+        moves your Culture IQ — the highest score tops the leaderboard, and
+        whoever answers the most breaks a tie. Play a run on your{" "}
+        {FREE_STRIKES_PER_DAY} free daily strikes to earn an entry into the{" "}
         {giveawayTitle ? (
           <span className="text-white">{giveawayTitle}</span>
         ) : (
-          "rare shoe"
+          "rare-shoe"
         )}{" "}
-        giveaway. Wrong answers cost strikes — you get {FREE_STRIKES_PER_DAY}{" "}
-        free a day.
+        giveaway.
       </p>
     </div>
   );
@@ -197,12 +183,12 @@ function Rules() {
     <div className="mt-10 rounded-xl border border-edge bg-surface p-5 text-sm text-smoke">
       <p className="tag text-volt">How it works</p>
       <ul className="mt-2 list-disc space-y-1 pl-5">
-        <li>Hit {HEAT_CHECK_TARGET} correct answers in a run to pass the Heat Check.</li>
-        <li>Wrong answers cost a strike and skip to the next question.</li>
-        <li>{FREE_STRIKES_PER_DAY} free strikes every day — resets at midnight UTC.</li>
+        <li>Every correct answer raises your Culture IQ; the highest score tops the leaderboard.</li>
+        <li>There&apos;s no number to hit — you climb by answering the most, and answering them right.</li>
+        <li>Wrong answers cost a strike and skip to the next question. {FREE_STRIKES_PER_DAY} free strikes every day — resets at midnight UTC.</li>
         <li>
-          <strong className="text-white">Giveaway entries come only from runs completed on free
-          strikes.</strong> Every free-strike pass earns an entry.
+          <strong className="text-white">Play a Heat Check run on free strikes and you earn one
+          giveaway entry</strong> — the winner is still drawn at random.
         </li>
         <li>
           Need more strikes? $1 gets you a pack of {PACK_SIZE}. Purchased

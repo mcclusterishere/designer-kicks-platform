@@ -48,18 +48,17 @@ export default async function CollectorPage({ params }: Props) {
   const session = await auth();
   const isOwnCloset = session?.user?.id === user.id;
 
-  const [heat, quizAgg, wonRuns] = await Promise.all([
+  const [heat, quizAgg] = await Promise.all([
     getHeatList(),
     prisma.quizRun.aggregate({
       where: { userId: user.id },
       _sum: { correctCount: true, wrongCount: true },
     }),
-    prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
-  const badges = computeBadges({ wins: wonRuns, answered, correct });
+  const badges = computeBadges({ answered, correct });
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">

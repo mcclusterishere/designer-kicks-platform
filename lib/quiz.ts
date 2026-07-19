@@ -3,7 +3,7 @@ import { iqFromCounts } from "./iq";
 
 // Game economy — tune these to taste.
 export const FREE_STRIKES_PER_DAY = 3; // free wrong answers per day
-export const HEAT_CHECK_TARGET = 12; // correct answers needed to win an entry
+export const MIN_RUN_POOL = 5; // fewest unburned questions needed to start a run
 export const RUN_QUEUE_SIZE = 30; // questions queued per run (no repeats within a run)
 export const PACK_SIZE = 4; // strikes per credit pack
 export const PACK_PRICE_CENTS = 100; // $1
@@ -64,35 +64,34 @@ export type QuizBadge = { key: string; label: string; emoji: string; description
 export type LeaderboardEntry = {
   userId: string;
   name: string;
-  iq: number; // Culture IQ — the ranking stat
-  wins: number;
+  iq: number; // Culture IQ — the ranking stat, and the win
   answered: number;
   correct: number;
   accuracy: number; // 0-100
   badges: QuizBadge[];
 };
 
-export function computeBadges(stats: { wins: number; answered: number; correct: number }): QuizBadge[] {
+export function computeBadges(stats: { answered: number; correct: number }): QuizBadge[] {
   const badges: QuizBadge[] = [];
   const accuracy = stats.answered > 0 ? (stats.correct / stats.answered) * 100 : 0;
-  if (stats.wins >= 1) badges.push({ key: "first", label: "Certified", emoji: "🏅", description: "Passed your first Heat Check" });
-  if (stats.wins >= 5) badges.push({ key: "five", label: "Heat Scholar", emoji: "🎓", description: "5 Heat Checks passed" });
-  if (stats.wins >= 10) badges.push({ key: "ten", label: "Encyclopedia", emoji: "📚", description: "10 Heat Checks passed" });
-  if (stats.answered >= 100) badges.push({ key: "grinder", label: "Grinder", emoji: "⚙️", description: "100+ questions answered" });
+  if (stats.answered >= 10) badges.push({ key: "certified", label: "Certified", emoji: "🏅", description: "Answered your first 10 culture questions" });
+  if (stats.answered >= 50) badges.push({ key: "scholar", label: "Heat Scholar", emoji: "🎓", description: "50 culture questions deep" });
+  if (stats.answered >= 150) badges.push({ key: "encyclopedia", label: "Encyclopedia", emoji: "📚", description: "150+ culture questions answered" });
   if (stats.answered >= 50 && accuracy >= 90) badges.push({ key: "sharp", label: "Sharpshooter", emoji: "🎯", description: "90%+ accuracy over 50+ answers" });
   return badges;
 }
 
 /**
- * The Culture IQ leaderboard: one score, every question on the site.
- * Feed quiz cards and Heat Check runs write into the same QuizAnswer
- * ledger, so the ranking stat is Culture IQ (100 + 2 per correct − 3
- * per uncleared miss). Checks passed and accuracy stay as the
- * tiebreakers and the flex line. Paid runs count here — this is for
- * bragging rights, not giveaway odds.
+ * The Culture IQ leaderboard IS the Heat Check — there's no fixed target
+ * to "pass." Feed polls-of-knowledge and Heat Check runs write into the
+ * same QuizAnswer ledger, and the champion is simply whoever sits
+ * highest: top Culture IQ (100 + 2 per correct − 3 per uncleared miss),
+ * with most-answered breaking ties. Answer the most, answer them right,
+ * and you climb. Paid runs count here — this is for the crown, not
+ * giveaway odds.
  */
 export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]> {
-  const [correctRows, missRows, runRows, wonRows] = await Promise.all([
+  const [correctRows, missRows, runRows] = await Promise.all([
     prisma.quizAnswer.groupBy({
       by: ["userId"],
       where: { correct: true },
@@ -107,15 +106,9 @@ export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]
       by: ["userId"],
       _sum: { correctCount: true, wrongCount: true },
     }),
-    prisma.quizRun.groupBy({
-      by: ["userId"],
-      where: { status: "WON" },
-      _count: { _all: true },
-    }),
   ]);
   const correctByUser = new Map(correctRows.map((r) => [r.userId, r._count._all]));
   const missByUser = new Map(missRows.map((r) => [r.userId, r._count._all]));
-  const winsByUser = new Map(wonRows.map((r) => [r.userId, r._count._all]));
   const runByUser = new Map(runRows.map((r) => [r.userId, r._sum]));
 
   const userIds = [
@@ -137,13 +130,11 @@ export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]
       const runAnswered = (runs?.correctCount ?? 0) + (runs?.wrongCount ?? 0);
       const answered = Math.max(ledgerCorrect + ledgerMisses, runAnswered);
       const correct = Math.max(ledgerCorrect, runs?.correctCount ?? 0);
-      const wins = winsByUser.get(userId) ?? 0;
-      const stats = { wins, answered, correct };
+      const stats = { answered, correct };
       return {
         userId,
         name: nameByUser.get(userId) ?? "Sneakerhead",
         iq: iqFromCounts(ledgerCorrect, ledgerMisses),
-        wins,
         answered,
         correct,
         accuracy: answered > 0 ? Math.round((correct / answered) * 100) : 0,
@@ -151,7 +142,8 @@ export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]
       };
     })
     .filter((e) => e.answered > 0)
-    .sort((a, b) => b.iq - a.iq || b.wins - a.wins || b.answered - a.answered)
+    // The win: highest Culture IQ, and whoever answered the most breaks a tie.
+    .sort((a, b) => b.iq - a.iq || b.answered - a.answered)
     .slice(0, limit);
 }
 

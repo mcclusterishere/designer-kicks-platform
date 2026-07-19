@@ -104,7 +104,7 @@ async function clickOption(index) {
     (prev) => {
       const headings = [...document.querySelectorAll(".display")].map((el) => el.textContent.trim());
       const blocked = headings.some((t) =>
-        t.startsWith("Out of strikes") || t.startsWith("Heat Check Passed") || t.startsWith("Run over")
+        t.startsWith("Out of strikes") || t.startsWith("Run complete")
       );
       const h2 = document.querySelector("[data-testid=quiz-question]");
       return blocked || (h2 && h2.textContent.trim() !== prev);
@@ -114,6 +114,9 @@ async function clickOption(index) {
   );
 }
 
+// Strike out on FREE strikes. The new win model has no target number —
+// playing a run on free strikes is what earns the entry, so this free
+// run mints exactly one giveaway entry as it strikes out.
 let sawNeedsCredits = false;
 for (let i = 0; i < 4; i++) {
   const q = await currentQuestion();
@@ -127,35 +130,36 @@ for (let i = 0; i < 4; i++) {
 check("3 free strikes then paywall appears", sawNeedsCredits);
 await page.screenshot({ path: `${SHOTS}/quiz-paywall.png`, fullPage: true });
 
+check(
+  "a free-strike run earns exactly one giveaway entry",
+  (await prisma.giveawayEntry.count({ where: { userId: dbUser.id } })) === 1
+);
+check(
+  "needs-credits screen confirms the free entry is locked in",
+  await page.getByText(/giveaway entry is already locked in/i).isVisible().catch(() => false)
+);
+
+// Buy strikes and keep playing. The run now spends purchased strikes, so
+// it must NOT mint a second entry — paying can never buy giveaway odds.
 await page.getByRole("button", { name: /Buy 4 Strikes/ }).click();
 await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 15000 });
 const afterBuy = await prisma.user.findUnique({ where: { email: EMAIL } });
 check("dev credit purchase grants strikes and resumes run", afterBuy.credits >= 3);
 
-async function winRun() {
+async function playToEnd() {
   for (let i = 0; i < 40; i++) {
-    if (await page.getByText("Heat Check Passed").isVisible().catch(() => false)) return true;
+    if (await page.locator(".display", { hasText: "Run complete" }).isVisible().catch(() => false)) return true;
     const q = await currentQuestion();
     if (!q) return false;
     await clickOption(q.answerIndex);
   }
-  return page.getByText("Heat Check Passed").isVisible().catch(() => false);
+  return page.locator(".display", { hasText: "Run complete" }).isVisible().catch(() => false);
 }
-
-check("answering 12 correct passes the heat check", await winRun());
-
-// Sweepstakes guard: this run consumed purchased strikes, so it must
-// count for the leaderboard but NOT create a giveaway entry.
-const paidEntry = await prisma.giveawayEntry.findFirst({ where: { userId: dbUser.id } });
-check("paid-strike win does NOT create a giveaway entry", !paidEntry);
-check("win screen explains leaderboard-only result", await page.getByText("leaderboard win").isVisible());
-
-// A fresh run with zero wrong answers (no strikes at all) earns the entry.
-await page.getByRole("button", { name: "Run It Again" }).click();
-await page.locator("[data-testid=quiz-question]").waitFor({ timeout: 15000 });
-check("flawless free run passes the heat check", await winRun());
-const freeEntry = await prisma.giveawayEntry.findFirst({ where: { userId: dbUser.id } });
-check("free-strike win creates the giveaway entry", Boolean(freeEntry));
+check("answering out the queue reaches the Run complete screen", await playToEnd());
+check(
+  "buying strikes to continue never mints a second entry",
+  (await prisma.giveawayEntry.count({ where: { userId: dbUser.id } })) === 1
+);
 
 // Leaderboard shows the player
 await page.goto(`${BASE}/quiz`, { waitUntil: "networkidle" });

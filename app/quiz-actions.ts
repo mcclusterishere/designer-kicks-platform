@@ -9,24 +9,27 @@ import {
   getCurrentQuestion,
   getStrikeState,
   grantCredits,
-  HEAT_CHECK_TARGET,
+  MIN_RUN_POOL,
   RUN_QUEUE_SIZE,
   PACK_SIZE,
   PACK_PRICE_CENTS,
   type PublicQuestion,
   type StrikeState,
 } from "@/lib/quiz";
+import { cultureIQ } from "@/lib/iq";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Stripe from "stripe";
 
 export type QuizState = {
   runId: string;
-  status: "ACTIVE" | "NEEDS_CREDITS" | "WON" | "OUT_OF_QUESTIONS";
-  correctCount: number;
-  wrongCount: number;
+  status: "ACTIVE" | "NEEDS_CREDITS" | "OUT_OF_QUESTIONS";
+  correctCount: number; // this run
+  wrongCount: number; // this run
   usedPaidStrikes: boolean;
-  target: number;
+  entryEarned: boolean; // this run has minted its free giveaway entry
+  iq: number; // all-time Culture IQ (the score you climb the board with)
+  answered: number; // all-time questions answered
   strikes: StrikeState;
   question: PublicQuestion | null;
 };
@@ -51,7 +54,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-async function buildState(
+export async function buildState(
   userId: string,
   run: {
     id: string;
@@ -59,15 +62,17 @@ async function buildState(
     correctCount: number;
     wrongCount: number;
     usedPaidStrikes: boolean;
+    entryGranted: boolean;
     questionIds: string;
     currentIndex: number;
   }
 ): Promise<QuizState> {
-  const [strikes, question] = await Promise.all([
+  const [strikes, question, iq] = await Promise.all([
     getStrikeState(userId),
     run.status === "ACTIVE" || run.status === "NEEDS_CREDITS"
       ? getCurrentQuestion(run)
       : null,
+    cultureIQ(userId),
   ]);
   return {
     runId: run.id,
@@ -75,10 +80,49 @@ async function buildState(
     correctCount: run.correctCount,
     wrongCount: run.wrongCount,
     usedPaidStrikes: run.usedPaidStrikes,
-    target: HEAT_CHECK_TARGET,
+    entryEarned: run.entryGranted,
+    iq: iq.iq,
+    answered: iq.correct + iq.misses + iq.cleared,
     strikes,
     question,
   };
+}
+
+/**
+ * Mint the run's ONE free giveaway entry, if it qualifies. Called at
+ * every terminal transition (the player finished the queue OR struck
+ * out). Free strikes only — a run that ever spent a purchased strike
+ * earns nothing, so paying can't buy entries (sweepstakes-law
+ * separation). The atomic entryGranted flip guarantees at most one entry
+ * per run no matter which terminal path fires or how requests race.
+ */
+async function maybeGrantEntry(run: {
+  id: string;
+  userId: string;
+  usedPaidStrikes: boolean;
+  entryGranted: boolean;
+  correctCount: number;
+  wrongCount: number;
+}): Promise<boolean> {
+  if (run.entryGranted || run.usedPaidStrikes) return false;
+  if (run.correctCount + run.wrongCount < 1) return false;
+  const giveaway = await getActiveGiveaway();
+  if (!giveaway) return false;
+  const claim = await prisma.quizRun.updateMany({
+    where: { id: run.id, entryGranted: false, usedPaidStrikes: false },
+    data: { entryGranted: true },
+  });
+  if (claim.count === 0) return false;
+  await prisma.giveawayEntry.create({
+    data: { giveawayId: giveaway.id, userId: run.userId, source: "quiz" },
+  });
+  // Reflect the flip on the caller's object so the state it builds next
+  // shows the entry as locked in without a re-fetch.
+  run.entryGranted = true;
+  revalidatePath("/giveaway");
+  revalidatePath("/profile");
+  revalidatePath("/quiz");
+  return true;
 }
 
 export async function startQuizRun(): Promise<QuizActionResult> {
@@ -105,7 +149,7 @@ export async function startQuizRun(): Promise<QuizActionResult> {
   ]);
   const burnedIds = new Set(burned.map((b) => b.questionId));
   const pool = questions.filter((q) => !burnedIds.has(q.id));
-  if (pool.length < HEAT_CHECK_TARGET) {
+  if (pool.length < MIN_RUN_POOL) {
     return {
       ok: false,
       error:
@@ -155,20 +199,21 @@ export async function answerQuestion(
 
   if (correct) {
     const newCorrect = run.correctCount + 1;
-    const won = newCorrect >= HEAT_CHECK_TARGET;
+    // Finishing the queue is the only way a right answer ends a run now
+    // — there's no target number to "win." Every correct answer just
+    // raises Culture IQ and climbs the leaderboard.
     // Atomically CLAIM this question's advance. The where-guard on
     // currentIndex + status means only ONE request (not a racing
     // forfeit or a double-tap) can process this question — the loser
     // gets count === 0 and does nothing. This is what stops a correct
-    // answer being flipped to a miss, a WON run reverting to ACTIVE,
-    // and a strike being burned twice.
+    // answer being flipped to a miss and a strike being burned twice.
     const claim = await prisma.quizRun.updateMany({
       where: { id: run.id, currentIndex: run.currentIndex, status: "ACTIVE" },
       data: {
         correctCount: newCorrect,
         currentIndex: run.currentIndex + 1,
-        status: won ? "WON" : "ACTIVE",
-        completedAt: won ? new Date() : null,
+        status: outOfQuestions ? "OUT_OF_QUESTIONS" : "ACTIVE",
+        completedAt: outOfQuestions ? new Date() : null,
       },
     });
     if (claim.count === 0) {
@@ -184,24 +229,9 @@ export async function answerQuestion(
     } catch {
       // Already answered in the feed — never rescore.
     }
-    let earnedEntry = false;
-    if (won) {
-      // Sweepstakes-law guard: giveaway entries come ONLY from runs
-      // completed without purchased strikes.
-      if (!run.usedPaidStrikes) {
-        const giveaway = await getActiveGiveaway();
-        if (giveaway) {
-          await prisma.giveawayEntry.create({
-            data: { giveawayId: giveaway.id, userId, source: "quiz" },
-          });
-          earnedEntry = true;
-        }
-      }
-      revalidatePath("/giveaway");
-      revalidatePath("/profile");
-      revalidatePath("/quiz");
-    }
     const updated = await prisma.quizRun.findUnique({ where: { id: run.id } });
+    // A completed free run mints its one giveaway entry.
+    const earnedEntry = outOfQuestions ? await maybeGrantEntry(updated ?? run) : false;
     return {
       ok: true,
       state: await buildState(userId, updated ?? run),
@@ -239,10 +269,15 @@ export async function answerQuestion(
     },
   });
 
+  // Striking out (NEEDS_CREDITS) or finishing the queue (OUT_OF_QUESTIONS)
+  // ends the free run — mint its giveaway entry if it earned one.
+  const terminal = updated.status === "NEEDS_CREDITS" || updated.status === "OUT_OF_QUESTIONS";
+  const earnedEntry = terminal ? await maybeGrantEntry(updated) : false;
+
   return {
     ok: true,
     state: await buildState(userId, updated),
-    feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry: false },
+    feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry },
   };
 }
 
@@ -306,6 +341,10 @@ export async function forfeitQuestion(
       completedAt: outOfQuestions && strike ? new Date() : null,
     },
   });
+  // A forfeit can also end a free run — mint the entry silently if earned.
+  if (updated.status === "NEEDS_CREDITS" || updated.status === "OUT_OF_QUESTIONS") {
+    await maybeGrantEntry(updated);
+  }
   // No feedback — the correct answer is never disclosed on a forfeit.
   return { ok: true, state: await buildState(userId, updated) };
 }
@@ -341,6 +380,7 @@ export async function resumeRun(runId: string): Promise<QuizActionResult> {
         usedPaidStrikes: run.usedPaidStrikes || strike === "paid",
       },
     });
+    if (done) await maybeGrantEntry(updated);
     return { ok: true, state: await buildState(userId, updated) };
   }
   return { ok: true, state: await buildState(userId, run) };

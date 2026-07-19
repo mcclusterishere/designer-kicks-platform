@@ -36,8 +36,7 @@ export default async function ProfilePage() {
   });
   if (!user) redirect("/signin");
 
-  const [wonRuns, quizAgg, pendingClaims, incomingOffers, myOffers, taste] = await Promise.all([
-    prisma.quizRun.count({ where: { userId: user.id, status: "WON" } }),
+  const [quizAgg, pendingClaims, incomingOffers, myOffers, taste] = await Promise.all([
     prisma.quizRun.aggregate({
       where: { userId: user.id },
       _sum: { correctCount: true, wrongCount: true },
@@ -76,7 +75,7 @@ export default async function ProfilePage() {
   ]);
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
-  const badges = computeBadges({ wins: wonRuns, answered, correct });
+  const badges = computeBadges({ answered, correct });
 
   // Culture IQ + the misses that can be cleared with credits.
   const [iqData, missRows, creditUser] = await Promise.all([
@@ -111,7 +110,7 @@ export default async function ProfilePage() {
         {[
           { label: "Votes cast", value: user._count.votes },
           { label: "Quiz runs", value: user._count.quizRuns },
-          { label: "Heat checks passed", value: wonRuns },
+          { label: "Culture IQ", value: iqData.iq },
           { label: "Giveaway entries", value: user._count.giveawayEntries },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-edge bg-surface p-4 text-center">
