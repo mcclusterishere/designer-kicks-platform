@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { currentUserRole } from "@/lib/editor";
 import { isAdmin } from "@/lib/admin";
 import ArticleForm from "@/app/admin/ArticleForm";
+import { OutreachRow } from "@/app/admin/OutfitStudioForms";
 import EditorBroadcastForm from "./EditorBroadcastForm";
 import StageProspectForm from "./StageProspectForm";
 import MessageOffice from "./MessageOffice";
@@ -30,7 +31,7 @@ export default async function EditorDesk({
   if (!(me?.role === "EDITOR" || admin)) redirect(me ? "/" : "/signin");
 
   const { editArticle } = await searchParams;
-  const [articles, editArticleRow, prospects, thread] = await Promise.all([
+  const [articles, editArticleRow, prospects, thread, outreachLeads] = await Promise.all([
     prisma.article.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
     editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
     me
@@ -47,7 +48,18 @@ export default async function EditorDesk({
           take: 50,
         })
       : Promise.resolve([]),
+    // The recruiting pipeline: approved pages nobody has claimed yet — the
+    // artists to onboard. Same source the admin's Outreach module uses.
+    prisma.artistProfile.findMany({
+      where: { status: "APPROVED", user: { passwordHash: null, accounts: { none: {} } } },
+      orderBy: [{ invitedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+      include: { user: { select: { email: true } } },
+    }),
   ]);
+  const daysAgo = (d: Date) => {
+    const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+    return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+  };
 
   const threadView = thread.map((m) => ({
     id: m.id,
@@ -168,7 +180,42 @@ export default async function EditorDesk({
         )}
       </section>
 
-      {/* 4 · Message the office */}
+      {/* 4 · Outreach pipeline — the artists to onboard */}
+      <section className="mt-12">
+        <h2 className="display text-2xl text-white">
+          Onboarding pipeline{" "}
+          <span className={outreachLeads.length ? "text-heat" : "text-smoke"}>
+            ({outreachLeads.length} to reach)
+          </span>
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Artist pages that are live but not claimed yet — these are your
+          onboardings. Move each through the pipeline, add notes, generate a
+          personalized DM, and send the claim link.
+        </p>
+        {outreachLeads.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-edge bg-surface p-5 text-sm text-smoke">
+            Nobody waiting right now — new pages the office pre-loads show up here.
+          </p>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {outreachLeads.map((lead) => (
+              <OutreachRow
+                key={lead.id}
+                artistId={lead.id}
+                displayName={lead.displayName}
+                defaultEmail={lead.user.email}
+                invitedAgo={lead.invitedAt ? daysAgo(lead.invitedAt) : null}
+                pageSlug={lead.slug}
+                stage={lead.outreachStage}
+                notes={lead.outreachNotes}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 5 · Message the office */}
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Message the office</h2>
         <p className="mt-1 text-sm text-smoke">

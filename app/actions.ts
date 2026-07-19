@@ -827,7 +827,7 @@ export async function outreachInvite(
   _prev: OutreachResult | null,
   formData: FormData
 ): Promise<OutreachResult> {
-  await requireAdmin();
+  await requireEditor(); // outreach/onboarding is the editor's job too
   const artistId = String(formData.get("artistId") ?? "");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -2411,7 +2411,7 @@ export async function sendStoreInvite(
 
 /** Move a pre-loaded artist through the recruiting pipeline. */
 export async function setArtistStage(artistId: string, stage: string): Promise<void> {
-  await requireAdmin();
+  await requireEditor();
   if (!["NEW", "CONTACTED", "IN_TALKS", "INVITED"].includes(stage)) return;
   await prisma.artistProfile
     .update({ where: { id: artistId }, data: { outreachStage: stage } })
@@ -2424,7 +2424,7 @@ export async function saveArtistNotes(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireAdmin();
+  await requireEditor();
   const artistId = String(formData.get("artistId") ?? "");
   const notes = String(formData.get("notes") ?? "").trim().slice(0, 1000);
   const lead = await prisma.artistProfile.findUnique({ where: { id: artistId } });
@@ -2850,7 +2850,7 @@ export type DmScriptResult = { ok: true; script: string } | { ok: false; error: 
  * sitting in someone's DMs never dies.
  */
 export async function outreachDmScript(artistId: string): Promise<DmScriptResult> {
-  await requireAdmin();
+  await requireEditor();
   const profile = await prisma.artistProfile.findUnique({
     where: { id: artistId },
     include: {
