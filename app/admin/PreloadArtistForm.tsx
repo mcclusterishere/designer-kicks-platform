@@ -7,7 +7,7 @@ import { preloadArtist, type PreloadResult } from "@/app/actions";
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
 
-export default function PreloadArtistForm() {
+export default function PreloadArtistForm({ homeHref = "/admin" }: { homeHref?: string }) {
   const [state, formAction, pending] = useActionState<PreloadResult | null, FormData>(
     preloadArtist,
     null
@@ -55,7 +55,7 @@ export default function PreloadArtistForm() {
             className="mt-1 w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white"
           />
         </div>
-        <a href="/admin" className="tag inline-block rounded border border-edge px-4 py-2 text-white hover:border-volt">
+        <a href={homeHref} className="tag inline-block rounded border border-edge px-4 py-2 text-white hover:border-volt">
           Pre-load another artist
         </a>
       </div>
@@ -132,7 +132,7 @@ export default function PreloadArtistForm() {
           className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-4 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
       </div>
       <div>
-        <label className="tag text-smoke" htmlFor="pl-more">More angles (up to 4 — voters swipe through these)</label>
+        <label className="tag text-smoke" htmlFor="pl-more">More angles (up to 5 — 5–6 photos total, voters swipe through these)</label>
         <input id="pl-more" name="morePhotos" type="file" multiple accept="image/jpeg,image/png,image/webp"
           className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
       </div>

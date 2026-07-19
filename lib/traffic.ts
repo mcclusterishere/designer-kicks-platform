@@ -48,16 +48,25 @@ const REFERRER_MAP: Array<{ match: RegExp; source: string }> = [
 const clean = (v: string | null | undefined, max = 60) =>
   (v ?? "").trim().toLowerCase().slice(0, max) || null;
 
+/** Editor tracked-link code → clean `?ref=` handle (letters/digits/-/_). */
+function refCode(v: string | null): string | null {
+  const c = (v ?? "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 40);
+  return c || null;
+}
+
 /**
- * Where a hit came from. UTM tags win (that's what the Facebook post
- * links carry); otherwise the referrer host is mapped to a channel;
- * no referrer (or our own domain) counts as direct.
+ * Where a hit came from. An editor's own `?ref=<code>` tracked link wins
+ * over everything (that's how the office knows "his people came from
+ * him"); then UTM tags (what the Facebook post links carry); otherwise
+ * the referrer host is mapped to a channel; no referrer (or our own
+ * domain) counts as direct.
  */
 export function classifyHit(search: string, referrer: string, selfHost: string) {
   const params = new URLSearchParams(search);
+  const ref = refCode(params.get("ref"));
   const utmSource = clean(params.get("utm_source"));
   const medium = clean(params.get("utm_medium"));
-  const campaign = clean(params.get("utm_campaign"), 80);
+  const campaign = clean(params.get("utm_campaign"), 80) ?? ref;
 
   let referrerHost: string | null = null;
   try {
@@ -71,7 +80,9 @@ export function classifyHit(search: string, referrer: string, selfHost: string) 
   if (!source && referrerHost) {
     source = REFERRER_MAP.find((r) => r.match.test(referrerHost!))?.source ?? referrerHost;
   }
-  return { source: source ?? "direct", medium, campaign, referrerHost };
+  // An editor's tracked link is the most specific attribution — it wins.
+  if (ref) source = `ref:${ref}`;
+  return { source: source ?? "direct", medium: medium ?? (ref ? "referral" : null), campaign, referrerHost };
 }
 
 /** Everything the admin Traffic board shows, in one trip. */

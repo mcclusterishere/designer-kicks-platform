@@ -93,12 +93,20 @@ model ArtistProfile {
   // true = has at least one shop linked.
   sellsOnline Boolean?
 
+  // Who staged this page. Set when an editor/admin pre-loads the profile
+  // so onboarding pay is attributed ($0.50 per artist they stage with ≥2
+  // pieces). Never changes once set — a claim doesn't erase who found them.
+  onboardedById String?
+  onboardedBy   User?   @relation("onboardedArtists", fields: [onboardedById], references: [id], onDelete: SetNull)
+
   submissions Submission[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
   drops       ArtistDrop[]
   shops       ArtistShop[]
+
+  @@index([onboardedById])
 }
 
 // An online shop an artist already sells through. v1 is capture + link
@@ -475,6 +483,11 @@ model User {
   // panel — admin stays a separate password + owner-account gate.
   role String @default("MEMBER") // MEMBER | EDITOR
 
+  // Personal tracking code for editors — their shareable ?ref=<code>
+  // link tags the traffic they send so the office sees "his people came
+  // from him." Minted when someone becomes an editor.
+  refCode String? @unique
+
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
@@ -519,6 +532,7 @@ model User {
 
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
+  onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
 }
 
 // A private thread between an editor and the league office. Editors can

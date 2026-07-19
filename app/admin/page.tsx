@@ -46,6 +46,7 @@ import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
+import { editorRefLink } from "@/lib/editor";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -137,7 +138,10 @@ export default async function AdminPage({
     prisma.user.findMany({
       where: { role: "EDITOR" },
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, email: true, passwordHash: true },
+      select: {
+        id: true, name: true, email: true, passwordHash: true, refCode: true,
+        _count: { select: { onboardedArtists: true } },
+      },
     }),
     prisma.editorMessage.findMany({
       orderBy: { createdAt: "asc" },
@@ -403,6 +407,17 @@ export default async function AdminPage({
                     <form action={revokeEditor.bind(null, ed.id)}>
                       <button className="rounded border border-heat px-3 py-1.5 tag text-heat">Remove editor</button>
                     </form>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    <span className="tag text-smoke">
+                      Staged <span className="font-bold text-volt">{ed._count.onboardedArtists}</span> pages
+                    </span>
+                    {editorRefLink(ed.refCode) && (
+                      <span className="tag text-smoke">
+                        Tracked link:{" "}
+                        <span className="font-mono text-volt">{editorRefLink(ed.refCode)}</span>
+                      </span>
+                    )}
                   </div>
                   {thread.length > 0 && (
                     <div className="mt-3 max-h-56 space-y-1.5 overflow-y-auto border-t border-edge pt-3">

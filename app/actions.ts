@@ -43,7 +43,7 @@ import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
-import { isEditor, currentUserRole } from "@/lib/editor";
+import { isEditor, currentUserRole, ensureRefCode, editorRefLink } from "@/lib/editor";
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
 
@@ -268,7 +268,8 @@ export async function preloadArtist(
   _prev: PreloadResult | null,
   formData: FormData
 ): Promise<PreloadResult> {
-  await requireAdmin();
+  await requireEditor(); // staging artists is the editor's paid job (admins too)
+  const me = await currentUserRole();
 
   const artistName = String(formData.get("artistName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -307,6 +308,8 @@ export async function preloadArtist(
         instagram: instagram || null,
         city: city || null,
         status: "APPROVED",
+        // Credit whoever staged the page (drives the $0.50/onboarding tally).
+        onboardedById: me?.id ?? null,
       },
     });
   } else if (artist.status !== "APPROVED") {
@@ -319,7 +322,8 @@ export async function preloadArtist(
   const fileName = `${randomUUID()}.${ext}`;
   const imageUrl = await saveUpload(Buffer.from(await image.arrayBuffer()), fileName, image.type);
 
-  const plExtra = await saveImageList(formData.getAll("morePhotos"), 4);
+  // Cover + up to 5 more = 6 photos per shoe (the intern shoots 5–6 each).
+  const plExtra = await saveImageList(formData.getAll("morePhotos"), 5);
   if (!Array.isArray(plExtra)) return { ok: false, error: plExtra.error };
 
   await prisma.submission.create({
@@ -1860,6 +1864,9 @@ export async function grantEditor(
     await prisma.user.update({ where: { id: user.id }, data: { role: "EDITOR", ...(name ? { name } : {}) } });
   }
 
+  // Mint their tracked ref link so the office can see the traffic they send.
+  const refCode = await ensureRefCode(user.id, name || email);
+
   // A set-password / claim link for accounts that can't sign in yet.
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
   let claimUrl: string | null = null;
@@ -1877,11 +1884,12 @@ export async function grantEditor(
     claimUrl = `${base}/reset-password/${token}`;
   }
   revalidatePath("/admin");
+  const refLink = editorRefLink(refCode);
   return {
     ok: true,
     note: claimUrl
-      ? `${email} is now an editor. Send them this set-password link: ${claimUrl}`
-      : `${email} is now an editor. They can sign in and open the Editor Desk.`,
+      ? `${email} is now an editor. Send them this set-password link: ${claimUrl} — their tracked link is ${refLink}`
+      : `${email} is now an editor. They can sign in and open the Editor Desk. Their tracked link is ${refLink}`,
   };
 }
 
@@ -2076,6 +2084,7 @@ export async function createResearchedProfile(
   formData: FormData
 ): Promise<PreloadDraftResult> {
   await requireEditor();
+  const me = await currentUserRole();
   const artistName = String(formData.get("artistName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
@@ -2111,6 +2120,8 @@ export async function createResearchedProfile(
         status: "APPROVED",
         outreachStage: "NEW",
         outreachNotes: notes || null,
+        // Credit the editor who researched + staged this lead.
+        onboardedById: me?.id ?? null,
       },
     });
   } else {
