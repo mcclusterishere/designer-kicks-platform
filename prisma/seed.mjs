@@ -1229,6 +1229,54 @@ async function main() {
       if (!imageUrl?.startsWith("/api/uploads/")) return true; // seed/external URLs: not ours to judge
       return existsSync(path.join(process.cwd(), "data", "uploads", path.basename(imageUrl)));
     };
+
+    // Re-attributions: pieces that were seeded under the wrong artist on
+    // an earlier deploy. The roster loop only ADDS pieces, so a stale
+    // copy on the live DB would never move — this heals it. Runs BEFORE
+    // the roster loop so the correct artist's create step sees the moved
+    // piece and doesn't make a duplicate. Idempotent: a no-op once fixed.
+    const REATTRIBUTIONS = [
+      // "We The People" Forces belongs to Crown City Kicks, not Gunnar.
+      { fromSlug: "gunnar-esquivel", toSlug: "crown-city-kicks", titleContains: "we the people" },
+    ];
+    for (const r of REATTRIBUTIONS) {
+      const [from, to] = await Promise.all([
+        prisma.artistProfile.findUnique({ where: { slug: r.fromSlug } }),
+        prisma.artistProfile.findUnique({ where: { slug: r.toSlug } }),
+      ]);
+      if (!from || !to) continue;
+      const strays = await prisma.submission.findMany({
+        where: { artistId: from.id, title: { contains: r.titleContains, mode: "insensitive" } },
+      });
+      for (const s of strays) {
+        const alreadyRight = await prisma.submission.findFirst({
+          where: {
+            artistId: to.id,
+            title: { contains: r.titleContains, mode: "insensitive" },
+            id: { not: s.id },
+          },
+        });
+        if (alreadyRight) {
+          // The correct artist already has it — remove the stray copy
+          // (and any battles referencing it, to satisfy the FK).
+          await prisma.battle.deleteMany({ where: { OR: [{ subAId: s.id }, { subBId: s.id }] } });
+          await prisma.submission.delete({ where: { id: s.id } }).catch(() => {});
+          console.log(`Re-attribution: removed stray "${s.title}" from ${from.displayName}.`);
+        } else {
+          await prisma.submission.update({
+            where: { id: s.id },
+            data: {
+              artistId: to.id,
+              artistName: to.displayName,
+              socialHandle: to.instagram,
+              email: `claim.${to.slug}@theheatchart.com`,
+            },
+          });
+          console.log(`Re-attribution: moved "${s.title}" from ${from.displayName} → ${to.displayName}.`);
+        }
+      }
+    }
+
     for (const pa of preloadArtists) {
       const claimEmail = pa.email ?? `claim.${pa.slug}@theheatchart.com`;
       let profile = await prisma.artistProfile.findUnique({ where: { slug: pa.slug } });
@@ -1330,20 +1378,34 @@ async function main() {
         `Roster: ${pa.displayName} ready (${newPieces} new pieces${repaired ? `, ${repaired} photos healed` : ""}).`
       );
     }
-    if (questionCount === 0) {
-      for (const q of loadQuestions()) {
-        await prisma.quizQuestion.create({
-          data: {
-            question: q.question,
-            options: JSON.stringify(q.options),
-            answerIndex: q.answerIndex,
-            difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
-            category: q.category || "history",
-            explanation: q.explanation || null,
-          },
-        });
-      }
+    // Trivia bank TOPS UP by question text on every deploy — not just
+    // into an empty table — so growing questions.json actually reaches
+    // the live game instead of freezing at whatever first seeded.
+    // (Culture questions come from articles above; these are the
+    // standalone trivia bank, keyed articleId = null.)
+    const bank = loadQuestions();
+    const existingTrivia = await prisma.quizQuestion.findMany({
+      where: { articleId: null },
+      select: { question: true },
+    });
+    const haveQ = new Set(existingTrivia.map((q) => q.question));
+    let newQuestions = 0;
+    for (const q of bank) {
+      if (haveQ.has(q.question)) continue;
+      await prisma.quizQuestion.create({
+        data: {
+          question: q.question,
+          options: JSON.stringify(q.options),
+          answerIndex: q.answerIndex,
+          difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
+          category: q.category || "history",
+          explanation: q.explanation || null,
+        },
+      });
+      newQuestions++;
     }
+    const totalQuestions = await prisma.quizQuestion.count({ where: { active: true } });
+    console.log(`Quiz bank: ${newQuestions} new trivia question(s); ${totalQuestions} active total.`);
     const activeGiveaway = await prisma.giveaway.findFirst({
       where: { status: "ACTIVE", endsAt: { gt: new Date() } },
     });
