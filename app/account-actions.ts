@@ -212,6 +212,7 @@ export async function updateProfile(
   const styleInterests = String(formData.get("styleInterests") ?? "").trim();
   const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
   const marketingOptIn = formData.get("marketingOptIn") === "on";
+  const battleAlerts = formData.get("battleAlerts") === "on";
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (
@@ -234,6 +235,7 @@ export async function updateProfile(
       styleInterests: styleInterests || null,
       instagram: instagram || null,
       marketingOptIn,
+      battleAlerts,
     },
   });
 

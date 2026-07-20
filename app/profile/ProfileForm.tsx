@@ -14,6 +14,7 @@ type Defaults = {
   styleInterests: string;
   instagram: string;
   marketingOptIn: boolean;
+  battleAlerts: boolean;
 };
 
 const inputClass =
@@ -67,6 +68,10 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
           <input id="p-style" name="styleInterests" maxLength={120} defaultValue={defaults.styleInterests} placeholder="Retro, Customs, Streetwear" className={inputClass} />
         </div>
       </div>
+      <label className="flex items-center gap-2 text-sm text-smoke">
+        <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#d9b96a]" />
+        Email me the moment a battle goes live
+      </label>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#d9b96a]" />
         Text/email me about drops, battles, and giveaways

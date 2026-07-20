@@ -497,6 +497,10 @@ model User {
   styleInterests     String? // comma-separated, e.g. "Retro, Customs, Streetwear"
   instagram          String?
   marketingOptIn     Boolean @default(false)
+  // Battle alerts: every member gets "a battle just started" emails by
+  // default, with a one-click unsubscribe in every send (and a profile
+  // toggle). Push/SMS ride this same flag when the app ships.
+  battleAlerts       Boolean @default(true)
 
   // Quiz economy
   credits         Int     @default(0) // purchased strikes

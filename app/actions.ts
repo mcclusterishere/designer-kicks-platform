@@ -48,6 +48,7 @@ import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
 import { geminiConfigured, geminiJson, imageParts } from "@/lib/gemini";
 import { importFromKicksDB } from "@/lib/catalog";
+import { notifyBattleStart } from "@/lib/battleAlerts";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -1528,7 +1529,7 @@ export async function createBattle(
     };
   }
 
-  await prisma.battle.create({
+  const battle = await prisma.battle.create({
     data: {
       subAId,
       subBId,
@@ -1536,6 +1537,17 @@ export async function createBattle(
       endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
     },
   });
+
+  // Ring the bell: every subscribed member hears a battle start.
+  // Fire-and-forget — a mail hiccup never blocks the battle.
+  notifyBattleStart({
+    battleId: battle.id,
+    aTitle: a.title,
+    aArtist: a.artistName,
+    bTitle: b.title,
+    bArtist: b.artistName,
+    endsAt: battle.endsAt,
+  }).catch(() => {});
 
   revalidatePath("/battles");
   revalidatePath("/admin");
