@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
+import AddToHomeScreen from "@/components/AddToHomeScreen";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -157,6 +158,7 @@ export default async function RootLayout({
           </div>
         </footer>
         <MobileTabBar />
+        <AddToHomeScreen />
       </body>
     </html>
   );
