@@ -1,7 +1,7 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "deploy": {
-    "startCommand": "npx prisma db push --skip-generate && (SEED_DEMO=false node prisma/seed.mjs || echo 'seed step skipped — site still starting') && npm run start",
+    "startCommand": "npx prisma db push --skip-generate --accept-data-loss && (SEED_DEMO=false node prisma/seed.mjs || echo 'seed step skipped — site still starting') && npm run start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

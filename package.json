@@ -13,7 +13,7 @@
     "test:e2e": "node e2e/run-all.mjs",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma db push --skip-generate",
+    "db:deploy": "prisma db push --skip-generate --accept-data-loss",
     "db:seed": "node prisma/seed.mjs",
     "postinstall": "prisma generate"
   },
