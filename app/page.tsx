@@ -6,7 +6,6 @@ import { getActiveGiveaway } from "@/lib/quiz";
 import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
-import HypeTicker from "@/components/HypeTicker";
 import FeedScroller from "@/components/FeedScroller";
 import { SHOP_LIVE } from "@/lib/flags";
 
@@ -42,6 +41,25 @@ export default async function HomePage() {
 
   return (
     <div>
+      {/* Masthead: who we are + the live giveaway, one calm bar at the top */}
+      <div className="border-b border-edge bg-surface">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2.5 px-4 py-3.5">
+          <p className="text-sm font-medium tracking-wide text-smoke">
+            Custom sneaker culture · An <span className="text-volt">Equity Uprise</span> project
+          </p>
+          {giveaway && (
+            <Link href="/quiz" className="group flex flex-wrap items-center gap-3 text-sm">
+              <span className="text-smoke">
+                Live giveaway — win <span className="font-bold text-white">{giveaway.prize}</span>
+              </span>
+              <span className="rounded-lg bg-volt px-4 py-1.5 tag font-bold text-ink transition group-hover:brightness-110">
+                Take The Heat Check →
+              </span>
+            </Link>
+          )}
+        </div>
+      </div>
+
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-edge">
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-volt/10 blur-3xl" />
@@ -60,34 +78,27 @@ export default async function HomePage() {
           }`}
         >
           <div>
-            <p className="tag inline-block -skew-x-6 border-l-4 border-volt bg-surface px-3 py-1.5 text-volt">
-              Custom sneaker culture · An Equity Uprise project
-            </p>
-            <h1 className="display mt-5 max-w-3xl text-6xl text-white sm:text-7xl">
-              Your customs.
-              <br />
-              Their votes.
-              <br />
+            <h1 className="display mt-2 max-w-3xl text-7xl sm:text-8xl">
               <span className="text-gradient-volt">The Heat List.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-smoke">
-              Submit the hardest custom kicks you&apos;ve painted, battle other
-              artists for votes, climb the Heat List, and grow your Culture IQ.
-              A community built to celebrate the craft — and put independent
-              artists on.
+              The proving ground for custom sneaker culture. Artists put their
+              hardest pairs up; the culture votes them into rank. Watch the
+              battles, back your favorite maker — or step in and defend your
+              own name.
             </p>
             <div className="mt-9 flex flex-wrap gap-5">
               <Link
-                href="/submit"
+                href="/battles"
                 className="btn-hard rounded-lg bg-volt px-7 py-3.5 tag font-bold text-ink"
               >
-                Submit Your Customs
+                Vote In Battles
               </Link>
               <Link
-                href="/battles"
+                href="/submit"
                 className="btn-hard-volt rounded-lg border-2 border-white/90 bg-ink px-7 py-3.5 tag font-bold text-white"
               >
-                Vote In Battles
+                Submit Your Customs
               </Link>
             </div>
             <p className="tag mt-8 text-smoke">
@@ -126,52 +137,6 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HypeTicker />
-
-      {/* Giveaway / quiz banner */}
-      {giveaway && (
-        <section className="border-b border-edge bg-surface">
-          <Link
-            href="/quiz"
-            className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 transition hover:opacity-90"
-          >
-            <div className="flex items-center gap-4">
-              <span className="display text-3xl text-volt">No.1</span>
-              <div>
-                <p className="tag text-heat">Live giveaway — play trivia to enter</p>
-                <p className="display text-xl text-white sm:text-2xl">
-                  Win: <span className="text-volt">{giveaway.prize}</span>
-                </p>
-              </div>
-            </div>
-            <span className="rounded-lg bg-heat px-6 py-3 tag font-bold text-white glow-heat">
-              Take The Heat Check →
-            </span>
-          </Link>
-        </section>
-      )}
-
-      {/* Now hiring — kept high on the page so the job is easy to find */}
-      <section className="border-b border-edge bg-surface">
-        <Link
-          href="/careers"
-          className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 transition hover:opacity-90"
-        >
-          <div className="flex items-center gap-4">
-            <span className="display text-3xl text-volt">✎</span>
-            <div>
-              <p className="tag text-heat">We&apos;re hiring — remote, paid</p>
-              <p className="display text-xl text-white sm:text-2xl">
-                Editor (Intern) — <span className="text-volt">50¢ per onboarding</span>
-              </p>
-            </div>
-          </div>
-          <span className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink">
-            See the job + apply →
-          </span>
-        </Link>
-      </section>
-
       {/* Live battles */}
       <section className="mx-auto max-w-6xl px-4 py-12">
         {tournament && (
@@ -183,7 +148,7 @@ export default async function HomePage() {
               <p className="tag text-heat">Championship bracket — live now</p>
               <p className="display text-xl text-white sm:text-2xl">{tournament.name}</p>
             </div>
-            <span className="rounded-lg bg-heat px-5 py-2.5 tag font-bold text-white glow-heat">
+            <span className="rounded-lg border border-heat px-5 py-2.5 tag font-bold text-white transition hover:bg-heat/10">
               View Bracket →
             </span>
           </Link>
