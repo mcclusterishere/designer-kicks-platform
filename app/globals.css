@@ -415,6 +415,23 @@ time, .tabular {
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* ── The Control Room: a gentle polish over the owner's panel. Keeps the
+   heat/gold brand and the magazine .display headings, but calms the
+   dozens of mono ALL-CAPS eyebrow labels so the admin reads friendly and
+   composed instead of like a machine readout. Scoped to .admin. ── */
+.admin .tag {
+  letter-spacing: 0.06em; /* was 0.2em — the wide tracking is what shouted */
+  font-size: 0.72rem;
+}
+.admin section {
+  scroll-margin-top: 5rem;
+}
+/* Section panels breathe a little more and share one soft radius. */
+.admin section > .rounded-xl,
+.admin > div > section.rounded-xl {
+  border-radius: 1rem;
+}
+
 /* Respect users who turn motion off */
 @media (prefers-reduced-motion: reduce) {
   .ticker-track,

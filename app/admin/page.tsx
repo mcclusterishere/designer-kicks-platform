@@ -390,52 +390,51 @@ export default async function AdminPage({
     pendingDrops.length;
 
   return (
-    <div className="bg-ink">
-      {/* Console bar — the control room, distinct from the public site */}
-      <div className="border-b border-edge bg-panel/80">
-        <div className="mx-auto flex max-w-6xl items-center gap-x-5 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-heat" />
-            <span className="font-mono text-xs font-bold tracking-[0.25em] text-heat">CONTROL&nbsp;ROOM</span>
-          </div>
-          <span className="hidden font-mono text-[10px] uppercase tracking-wider text-smoke sm:inline">
-            full access
+    <div className="admin bg-ink">
+      {/* Control room — a calm command bar, distinct from the storefront */}
+      <div className="border-b border-edge bg-panel/70">
+        <div className="mx-auto flex max-w-6xl items-center gap-x-4 px-4 py-3.5">
+          <span className="display text-lg text-white">
+            The<span className="text-heat">Heat</span>Chart
+          </span>
+          <span className="rounded-full border border-heat/40 px-2.5 py-0.5 text-[11px] font-medium tracking-wide text-heat">
+            Control Room
           </span>
           <form action={adminLogout} className="ml-auto">
-            <button className="rounded border border-edge px-3 py-1.5 font-mono text-[11px] uppercase tracking-wider text-smoke transition hover:border-heat hover:text-white">
+            <button className="rounded-lg border border-edge px-3.5 py-1.5 text-sm text-smoke transition hover:border-heat hover:text-white">
               Log out
             </button>
           </form>
         </div>
       </div>
-      <div className="h-px bg-gradient-to-r from-transparent via-heat/40 to-transparent" />
 
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-heat">The Heat Chart</p>
-        <h1 className="display mt-1 text-4xl text-white">Admin</h1>
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <h1 className="display text-4xl text-white">Command Center</h1>
+        <p className="mt-1.5 text-smoke">Everything that runs The Heat Chart, one room at a time.</p>
 
-        <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-xl border border-edge bg-surface p-1.5">
+        <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-2xl border border-edge bg-surface p-2">
           {[
-            { id: "pulse", label: "Pulse", n: 0 },
-            { id: "roster", label: "Roster", n: rosterAttention },
-            { id: "games", label: "Games", n: 0 },
-            { id: "content", label: "Content", n: 0 },
-            { id: "market", label: "Market", n: 0 },
-            { id: "team", label: "Team", n: 0 },
-            { id: "settings", label: "Settings", n: 0 },
+            { id: "pulse", label: "Pulse", icon: "📊", n: 0 },
+            { id: "roster", label: "Roster", icon: "👟", n: rosterAttention },
+            { id: "games", label: "Games", icon: "🎮", n: 0 },
+            { id: "content", label: "Content", icon: "📰", n: 0 },
+            { id: "market", label: "Market", icon: "💰", n: 0 },
+            { id: "team", label: "Team", icon: "👥", n: 0 },
+            { id: "settings", label: "Settings", icon: "⚙️", n: 0 },
           ].map((t) => (
             <Link
               key={t.id}
               href={`/admin?tab=${t.id}`}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-2 font-mono text-[11px] uppercase tracking-wider transition ${
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
                 tab === t.id
-                  ? "bg-heat/15 text-white shadow-[inset_0_0_0_1px_rgba(198,90,46,0.4)]"
+                  ? "bg-heat text-white shadow-[0_4px_14px_rgba(198,90,46,0.3)]"
                   : "text-smoke hover:bg-white/5 hover:text-white"
               }`}
             >
+              <span aria-hidden>{t.icon}</span>
               {t.label}
               {t.n > 0 && (
-                <span className="rounded-full bg-heat px-1.5 text-[10px] font-bold leading-4 text-white">{t.n}</span>
+                <span className={`rounded-full px-1.5 text-[10px] font-bold leading-4 ${tab === t.id ? "bg-white/25 text-white" : "bg-heat text-white"}`}>{t.n}</span>
               )}
             </Link>
           ))}
