@@ -63,6 +63,16 @@ export default async function DropsPage({
     }),
   ]);
 
+  // The radar: confirmed-coming drops whose dates aren't locked yet
+  // (dropAt null). They graduate onto the calendar automatically the
+  // moment a verified date lands (manual or the nightly SKU sync).
+  const radar = await prisma.article.findMany({
+    where: { status: "PUBLISHED", dropAt: null, tags: { contains: "Release Dates" } },
+    orderBy: { publishedAt: "desc" },
+    take: 12,
+    select: { id: true, slug: true, title: true, coverImage: true, excerpt: true },
+  });
+
   // Day → tap-sheet payload for the interactive grid.
   const dropDays: Record<number, DayDrop[]> = {};
   for (const a of monthDrops) {
@@ -233,6 +243,38 @@ export default async function DropsPage({
 
       {/* The feature paid calendars charge for — subscribe once, every
           drop lands in your own calendar app forever. */}
+      {/* On the radar — announced, dates not locked yet */}
+      {radar.length > 0 && (
+        <section id="radar" className="mt-10">
+          <h2 className="display text-2xl text-white">
+            On The <span className="text-gradient-volt">Radar</span>{" "}
+            <span className="text-smoke">({radar.length})</span>
+          </h2>
+          <p className="mt-1 text-sm text-smoke">
+            Confirmed coming — dates not locked yet. Each one jumps onto the
+            calendar automatically the moment its date is verified.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {radar.map((a) => (
+              <Link key={a.id} href={`/news/${a.slug}`}
+                className="card-lift group overflow-hidden rounded-xl border border-edge bg-surface">
+                {a.coverImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.coverImage} alt={a.title}
+                    className="aspect-square w-full object-cover" loading="lazy" />
+                )}
+                <div className="p-3">
+                  <p className="tag text-heat">Date TBC</p>
+                  <p className="mt-1 line-clamp-2 text-sm font-bold text-white transition group-hover:text-volt">
+                    {a.title}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       <div className="mt-8 rounded-2xl border border-edge bg-surface p-4 text-center">
         <p className="tag text-volt">Never miss a drop</p>
         <p className="mt-1 text-sm text-smoke">
