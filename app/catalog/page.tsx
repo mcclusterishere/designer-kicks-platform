@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
 export const metadata = {
@@ -10,6 +11,22 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 48;
 
+// Shopping lanes. A signed-in account's "who do you shop for?" preference
+// picks the default; the rail keeps every lane one tap away — it's a
+// personalized starting point, never a wall.
+const LANES = [
+  { key: "all", label: "Everyone" },
+  { key: "mens", label: "Men's" },
+  { key: "womens", label: "Women's" },
+  { key: "kids", label: "Kids" },
+] as const;
+type Lane = (typeof LANES)[number]["key"];
+
+function asLane(v: string | undefined | null): Lane | null {
+  const g = v?.trim().toLowerCase();
+  return LANES.some((l) => l.key === g) ? (g as Lane) : null;
+}
+
 function fmtDate(d: Date | null): string | null {
   return d
     ? d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" })
@@ -19,15 +36,31 @@ function fmtDate(d: Date | null): string | null {
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; brand?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; brand?: string; page?: string; g?: string }>;
 }) {
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().slice(0, 80);
   const brand = (sp.brand ?? "").trim().slice(0, 40);
   const page = Math.max(1, Number(sp.page) || 1);
 
+  // Lane resolution: an explicit ?g= tap wins; otherwise a signed-in
+  // account's shopFor preference sets the default; everyone else sees all.
+  const explicitLane = asLane(sp.g);
+  const session = await auth();
+  const signedIn = Boolean(session?.user?.id);
+  let accountLane: Lane | null = null;
+  if (!explicitLane && signedIn) {
+    const u = await prisma.user.findUnique({
+      where: { id: session!.user!.id! },
+      select: { shopFor: true },
+    });
+    accountLane = asLane(u?.shopFor);
+  }
+  const lane: Lane = explicitLane ?? accountLane ?? "all";
+
   const where = {
     imageUrl: { not: null },
+    ...(lane !== "all" ? { gender: lane } : {}),
     ...(brand ? { brand: { equals: brand, mode: "insensitive" as const } } : {}),
     ...(q
       ? {
@@ -54,7 +87,11 @@ export default async function CatalogPage({
     prisma.catalogShoe.count({ where }),
     prisma.catalogShoe.groupBy({
       by: ["brand"],
-      where: { imageUrl: { not: null }, brand: { not: null } },
+      where: {
+        imageUrl: { not: null },
+        brand: { not: null },
+        ...(lane !== "all" ? { gender: lane } : {}),
+      },
       _count: true,
       orderBy: { _count: { brand: "desc" } },
       take: 8,
@@ -70,8 +107,21 @@ export default async function CatalogPage({
   });
   const flameMap = new Map(flames.map((f) => [f.shoeId, f]));
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const qs = (p: number) =>
-    `/catalog?${new URLSearchParams({ ...(q ? { q } : {}), ...(brand ? { brand } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`.replace(/\?$/, "");
+
+  // One href builder so lane, brand, search, and page always travel together.
+  const catHref = (over: { g?: Lane; brand?: string | null; page?: number } = {}) => {
+    const g = over.g ?? lane;
+    const b = over.brand === undefined ? brand : over.brand ?? "";
+    const p = over.page ?? 1;
+    const params = new URLSearchParams({
+      ...(g !== "all" ? { g } : {}),
+      ...(q ? { q } : {}),
+      ...(b ? { brand: b } : {}),
+      ...(p > 1 ? { page: String(p) } : {}),
+    }).toString();
+    return params ? `/catalog?${params}` : "/catalog";
+  };
+  const laneLabel = LANES.find((l) => l.key === lane)!.label;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -84,8 +134,47 @@ export default async function CatalogPage({
         the flames land here.
       </p>
 
+      {/* Who you're shopping for — defaults to your lane once you set it */}
+      <div className="mt-6 flex flex-wrap items-center gap-1.5">
+        {LANES.map((l) => (
+          <Link
+            key={l.key}
+            href={catHref({ g: l.key })}
+            className={`tag rounded-full border px-4 py-2 font-bold transition ${
+              lane === l.key
+                ? "border-heat bg-heat/10 text-heat"
+                : "border-edge text-smoke hover:border-heat/50 hover:text-white"
+            }`}
+          >
+            {l.label}
+          </Link>
+        ))}
+        {!explicitLane && accountLane && accountLane !== "all" && (
+          <span className="tag ml-1 text-smoke">
+            your lane ·{" "}
+            <Link href="/profile" className="underline hover:text-white">change</Link>
+          </span>
+        )}
+      </div>
+
+      {/* Anonymous visitors get the pitch: sign in, get your lane by default */}
+      {!signedIn && (
+        <div className="mt-4 flex max-w-xl flex-wrap items-center justify-between gap-3 rounded-xl border border-volt/40 bg-volt/10 px-4 py-3">
+          <p className="text-sm text-white">
+            <span className="font-bold">Shopping for yourself?</span>{" "}
+            <span className="text-smoke">
+              Sign in and tell us who you shop for — we&apos;ll open your lane
+              first, every visit.
+            </span>
+          </p>
+          <Link href="/signin" className="btn-hard-volt shrink-0 rounded-lg px-4 py-2 tag font-bold">
+            Sign In
+          </Link>
+        </div>
+      )}
+
       {/* Search + brand rail */}
-      <form action="/catalog" className="mt-6 flex max-w-xl gap-2">
+      <form action="/catalog" className="mt-5 flex max-w-xl gap-2">
         <input
           name="q"
           defaultValue={q}
@@ -93,13 +182,14 @@ export default async function CatalogPage({
           placeholder="Search a shoe, SKU, or colorway…"
           className="w-full rounded-lg border border-edge bg-surface px-4 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
         />
+        {lane !== "all" && <input type="hidden" name="g" value={lane} />}
         {brand && <input type="hidden" name="brand" value={brand} />}
         <button className="btn-hard rounded-lg px-5 tag font-bold">Search</button>
       </form>
       {brands.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           <Link
-            href={q ? `/catalog?q=${encodeURIComponent(q)}` : "/catalog"}
+            href={catHref({ brand: null })}
             className={`tag rounded-full border px-3 py-1.5 transition ${!brand ? "border-volt text-volt" : "border-edge text-smoke hover:text-white"}`}
           >
             All
@@ -107,7 +197,7 @@ export default async function CatalogPage({
           {brands.map((b) => (
             <Link
               key={b.brand}
-              href={`/catalog?brand=${encodeURIComponent(b.brand!)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              href={catHref({ brand: b.brand! })}
               className={`tag rounded-full border px-3 py-1.5 transition ${
                 brand.toLowerCase() === b.brand!.toLowerCase()
                   ? "border-volt text-volt"
@@ -131,7 +221,9 @@ export default async function CatalogPage({
         </div>
       ) : (
         <>
-          <p className="mt-6 tag text-smoke">{total.toLocaleString()} shoes{brand && ` · ${brand}`}{q && ` · “${q}”`}</p>
+          <p className="mt-6 tag text-smoke">
+            {total.toLocaleString()} shoes{lane !== "all" && ` · ${laneLabel}`}{brand && ` · ${brand}`}{q && ` · “${q}”`}
+          </p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {shoes.map((s) => {
               const f = flameMap.get(s.id);
@@ -141,13 +233,14 @@ export default async function CatalogPage({
                   href={`/catalog/${encodeURIComponent(s.sku)}`}
                   className="card-lift group overflow-hidden rounded-xl border border-edge bg-surface"
                 >
-                  <div className="overflow-hidden bg-panel">
+                  {/* Product PNGs sit whole on a light plate — never square-cropped */}
+                  <div className="overflow-hidden bg-[#f2f1ee] p-4">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={s.imageUrl!}
                       alt={s.name}
                       loading="lazy"
-                      className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                      className="aspect-square w-full object-contain transition-transform duration-500 group-hover:scale-[1.04]"
                     />
                   </div>
                   <div className="p-3">
@@ -174,13 +267,13 @@ export default async function CatalogPage({
           {pages > 1 && (
             <div className="mt-8 flex items-center justify-center gap-3">
               {page > 1 && (
-                <Link href={qs(page - 1)} className="tag rounded-full border border-edge px-4 py-2 text-smoke hover:border-volt hover:text-white">
+                <Link href={catHref({ page: page - 1 })} className="tag rounded-full border border-edge px-4 py-2 text-smoke hover:border-volt hover:text-white">
                   ← Newer
                 </Link>
               )}
               <span className="tag text-smoke">Page {page} of {pages}</span>
               {page < pages && (
-                <Link href={qs(page + 1)} className="tag rounded-full border border-edge px-4 py-2 text-smoke hover:border-volt hover:text-white">
+                <Link href={catHref({ page: page + 1 })} className="tag rounded-full border border-edge px-4 py-2 text-smoke hover:border-volt hover:text-white">
                   Older →
                 </Link>
               )}

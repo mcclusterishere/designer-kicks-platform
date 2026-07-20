@@ -42,6 +42,12 @@ export default async function RatePage() {
   }
 
   const userId = session.user.id;
+  // Their shopping lane (profile → "Who do you shop for?"). Customs are
+  // art and stay unfiltered; only the retail side of the deck follows it.
+  const pref = (
+    await prisma.user.findUnique({ where: { id: userId }, select: { shopFor: true } })
+  )?.shopFor;
+  const lane = pref === "mens" || pref === "womens" || pref === "kids" ? pref : null;
   const [rawPool, retailPool, ratedBefore, ratedRetail, taste] = await Promise.all([
     prisma.submission.findMany({
       where: {
@@ -55,7 +61,11 @@ export default async function RatePage() {
     // Real retail shoes from the catalog — the culture fans' lane. Only
     // shoes with photos make the deck; battles stay customs-only.
     prisma.catalogShoe.findMany({
-      where: { imageUrl: { not: null }, ratings: { none: { userId } } },
+      where: {
+        imageUrl: { not: null },
+        ratings: { none: { userId } },
+        ...(lane ? { gender: lane } : {}),
+      },
       orderBy: { updatedAt: "desc" },
       take: 120,
       select: {

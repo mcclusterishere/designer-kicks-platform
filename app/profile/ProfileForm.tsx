@@ -15,6 +15,7 @@ type Defaults = {
   instagram: string;
   marketingOptIn: boolean;
   battleAlerts: boolean;
+  shopFor: string;
 };
 
 const inputClass =
@@ -67,6 +68,20 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
           <label htmlFor="p-style" className="tag text-smoke">Style interests</label>
           <input id="p-style" name="styleInterests" maxLength={120} defaultValue={defaults.styleInterests} placeholder="Retro, Customs, Streetwear" className={inputClass} />
         </div>
+      </div>
+      <div>
+        <label htmlFor="p-shopfor" className="tag text-smoke">Who do you shop for?</label>
+        <select id="p-shopfor" name="shopFor" defaultValue={defaults.shopFor} className={inputClass}>
+          <option value="">Pick a lane…</option>
+          <option value="mens">Men&apos;s</option>
+          <option value="womens">Women&apos;s</option>
+          <option value="kids">Kids</option>
+          <option value="all">Show me everything</option>
+        </select>
+        <p className="mt-1 text-xs text-smoke/70">
+          The catalog and Rate game open to your lane first. Never a wall — you
+          can flip lanes any time.
+        </p>
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#d9b96a]" />

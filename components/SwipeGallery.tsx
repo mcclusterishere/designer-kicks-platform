@@ -11,10 +11,14 @@ export default function SwipeGallery({
   images,
   alt,
   testId,
+  fit = "cover",
 }: {
   images: string[];
   alt: string;
   testId?: string;
+  /** "cover" crops to fill (photography); "contain" shows the whole product
+   *  on a light plate (catalog PNGs — never square-crop a product shot). */
+  fit?: "cover" | "contain";
 }) {
   const [idx, setIdx] = useState(0);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -26,7 +30,11 @@ export default function SwipeGallery({
   };
 
   return (
-    <div className="group/gallery relative aspect-square w-full bg-panel">
+    <div
+      className={`group/gallery relative aspect-square w-full ${
+        fit === "contain" ? "bg-[#f2f1ee]" : "bg-panel"
+      }`}
+    >
       <div
         ref={trackRef}
         data-testid={testId}
@@ -42,7 +50,9 @@ export default function SwipeGallery({
             key={src}
             src={src}
             alt={i === 0 ? alt : `${alt} — angle ${i + 1}`}
-            className="h-full w-full shrink-0 snap-center object-cover"
+            className={`h-full w-full shrink-0 snap-center ${
+              fit === "contain" ? "object-contain p-6" : "object-cover"
+            }`}
           />
         ))}
       </div>

@@ -1172,6 +1172,39 @@ async function retireContent() {
   });
 }
 
+// Shopping-lane backfill for catalog shoes imported before the gender
+// column existed. Reads the lane off the product name the way retail
+// writes it (Wmns/(W) = women's, GS/PS/TD/etc = kids, unmarked = men's) —
+// the same heuristic new imports use in lib/catalog.ts. Only touches rows
+// where gender IS NULL, so provider-supplied lanes are never overwritten.
+function laneFromShoeName(name) {
+  if (!name) return "mens";
+  if (/\b(?:GS|PS|TD|BG|BP|BT|GG)\b|\(GS\)|\(PS\)|\(TD\)|toddler|infant|little kids?|big kids?|younger kids?|older kids?|\bkids\b|\byouth\b|preschool|grade school/i.test(name)) return "kids";
+  if (/\bwmns\b|\(w\)|\bwomen'?s?\b|\(women'?s?\)/i.test(name)) return "womens";
+  return "mens";
+}
+
+async function backfillCatalogLanes() {
+  const unlaned = await prisma.catalogShoe.findMany({
+    where: { gender: null },
+    select: { id: true, name: true },
+  });
+  if (unlaned.length === 0) return;
+  const buckets = { mens: [], womens: [], kids: [] };
+  for (const shoe of unlaned) buckets[laneFromShoeName(shoe.name)].push(shoe.id);
+  for (const [lane, ids] of Object.entries(buckets)) {
+    for (let i = 0; i < ids.length; i += 500) {
+      await prisma.catalogShoe.updateMany({
+        where: { id: { in: ids.slice(i, i + 500) } },
+        data: { gender: lane },
+      });
+    }
+  }
+  console.log(
+    `Catalog lanes backfilled: ${buckets.mens.length} mens, ${buckets.womens.length} womens, ${buckets.kids.length} kids`
+  );
+}
+
 async function seedTeamAndCareers() {
   // First editor: passwordless account he claims via a set-password link
   // the owner sends him (Admin → Team → "Make editor" regenerates it).
@@ -1243,6 +1276,7 @@ async function main() {
   // Team + careers seed runs in every mode (idempotent top-up).
   await seedTeamAndCareers();
   await retireContent();
+  await backfillCatalogLanes();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.

@@ -496,6 +496,7 @@ export default async function ProfilePage() {
             instagram: user.instagram ?? "",
             marketingOptIn: user.marketingOptIn,
             battleAlerts: user.battleAlerts,
+            shopFor: user.shopFor ?? "",
           }}
         />
       </div>

@@ -127,8 +127,11 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
             testId="rate-gallery"
             images={card.images}
             alt={`${card.title} by ${card.artistName}`}
+            fit={card.kind === "retail" ? "contain" : "cover"}
           />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent" />
+          {card.kind !== "retail" && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent" />
+          )}
 
           <div className="p-4">
             <h2 className="display text-2xl text-white">{card.title}</h2>

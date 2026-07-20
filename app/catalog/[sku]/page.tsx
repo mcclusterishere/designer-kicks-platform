@@ -67,10 +67,11 @@ export default async function CatalogShoePage({
       <Link href="/catalog" className="tag text-smoke hover:text-white">← The Catalog</Link>
 
       <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start">
-        <div className="overflow-hidden rounded-2xl border border-edge bg-surface">
+        {/* Product PNG shown whole on a light plate — no square-crop butchery */}
+        <div className="overflow-hidden rounded-2xl border border-edge bg-[#f2f1ee] p-6 sm:p-8">
           {shoe.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shoe.imageUrl} alt={shoe.name} className="aspect-square w-full object-cover" />
+            <img src={shoe.imageUrl} alt={shoe.name} className="aspect-square w-full object-contain" />
           ) : (
             <div className="flex aspect-square items-center justify-center text-6xl">👟</div>
           )}
@@ -101,6 +102,14 @@ export default async function CatalogShoePage({
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Colorway</dt>
                 <dd className="text-white">{shoe.colorway}</dd>
+              </div>
+            )}
+            {shoe.gender && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-smoke">For</dt>
+                <dd className="text-white">
+                  {shoe.gender === "womens" ? "Women" : shoe.gender === "kids" ? "Kids" : "Men"}
+                </dd>
               </div>
             )}
             {shoe.retailPriceCents && (

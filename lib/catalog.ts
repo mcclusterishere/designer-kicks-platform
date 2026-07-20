@@ -39,6 +39,30 @@ function toDate(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Which shopping lane a pair belongs to, read off the product name the way
+ * the industry actually writes it: "Wmns" / "(W)" / "Women's" for women's
+ * pairs, "(GS)" / "(PS)" / "(TD)" / "Little Kids" etc. for kids. Anything
+ * unmarked is a men's/unisex release — that's the retail convention.
+ */
+export function genderFromName(name: string | null): "mens" | "womens" | "kids" {
+  if (!name) return "mens";
+  if (/\b(?:GS|PS|TD|BG|BP|BT|GG)\b|\(GS\)|\(PS\)|\(TD\)|toddler|infant|little kids?|big kids?|younger kids?|older kids?|\bkids\b|\byouth\b|preschool|grade school/i.test(name)) return "kids";
+  if (/\bwmns\b|\(w\)|\bwomen'?s?\b|\(women'?s?\)/i.test(name)) return "womens";
+  return "mens";
+}
+
+const LANES = new Set(["men", "mens", "women", "womens", "kids", "youth", "child", "children", "unisex", "gs", "ps", "td", "infant", "toddler", "preschool"]);
+
+/** Normalize a provider's gender field to our three lanes; null if unusable. */
+function laneFromProvider(v: string | null): "mens" | "womens" | "kids" | null {
+  const g = v?.trim().toLowerCase();
+  if (!g || !LANES.has(g)) return null;
+  if (g.startsWith("women")) return "womens";
+  if (g === "men" || g === "mens" || g === "unisex") return "mens";
+  return "kids";
+}
+
 /** Guess the silhouette from a product name ("Air Jordan 11 Retro Bred" → "Air Jordan 11"). */
 function guessSilhouette(name: string | null, brand: string | null): string | null {
   if (!name) return null;
@@ -103,6 +127,7 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
         imageUrl: dig(row, ["image", "imageUrl", "thumbnail", "media", "smallImageUrl"]),
         retailPriceCents: toCents(row["retailPrice"] ?? row["retail_price"] ?? row["price"] ?? row["msrp"]),
         releaseDate: toDate(row["releaseDate"] ?? row["release_date"] ?? row["releaseDateISO"]),
+        gender: laneFromProvider(dig(row, ["gender", "gender_type", "category"])) ?? genderFromName(name),
         source: "kicksdb",
       };
       const existing = await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } });

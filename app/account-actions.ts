@@ -213,6 +213,8 @@ export async function updateProfile(
   const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
   const marketingOptIn = formData.get("marketingOptIn") === "on";
   const battleAlerts = formData.get("battleAlerts") === "on";
+  const shopForRaw = String(formData.get("shopFor") ?? "").trim();
+  const shopFor = ["mens", "womens", "kids", "all"].includes(shopForRaw) ? shopForRaw : null;
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (
@@ -236,6 +238,7 @@ export async function updateProfile(
       instagram: instagram || null,
       marketingOptIn,
       battleAlerts,
+      shopFor,
     },
   });
 

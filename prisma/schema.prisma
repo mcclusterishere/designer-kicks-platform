@@ -488,6 +488,10 @@ model User {
   // from him." Minted when someone becomes an editor.
   refCode String? @unique
 
+  // "Who do you shop for?" — mens | womens | kids | all. Defaults the
+  // catalog and Rate deck to their lane; never a wall, always a toggle.
+  shopFor String?
+
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
@@ -897,6 +901,9 @@ model CatalogShoe {
   imageUrl         String?
   retailPriceCents Int?
   releaseDate      DateTime?
+  // Shopping lane: mens | womens | kids. From the provider when given,
+  // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.
+  gender           String?
   source           String // kicksdb | manual | ...
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
