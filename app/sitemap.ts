@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
 
-  const [articles, battles, tournaments, artists] = await Promise.all([
+  const [articles, battles, tournaments, artists, catalogShoes] = await Promise.all([
     prisma.article.findMany({
       where: { status: "PUBLISHED" },
       select: { slug: true, updatedAt: true },
@@ -15,6 +15,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.battle.findMany({ select: { id: true, createdAt: true } }),
     prisma.tournament.findMany({ select: { slug: true, createdAt: true } }),
     prisma.artistProfile.findMany({ select: { slug: true, createdAt: true } }),
+    // The SEO asset: every cataloged shoe is its own indexable page.
+    prisma.catalogShoe.findMany({
+      where: { imageUrl: { not: null } },
+      orderBy: { updatedAt: "desc" },
+      take: 2000,
+      select: { sku: true, updatedAt: true },
+    }),
   ]);
 
   return [
@@ -23,6 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/battles`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/heat-list`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/shop`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/catalog`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/submit`, changeFrequency: "monthly", priority: 0.6 },
     ...articles.map((a) => ({
       url: `${base}/news/${a.slug}`,
@@ -47,6 +55,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: a.createdAt,
       changeFrequency: "weekly" as const,
       priority: 0.6,
+    })),
+    ...catalogShoes.map((s) => ({
+      url: `${base}/catalog/${encodeURIComponent(s.sku)}`,
+      lastModified: s.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
     })),
   ];
 }

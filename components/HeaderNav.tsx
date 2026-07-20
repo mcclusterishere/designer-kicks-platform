@@ -12,6 +12,7 @@ const LINKS = [
     match: ["/battles", "/outfits", "/rate", "/tournaments", "/artists", "/heat-list", "/quiz", "/giveaway"],
   },
   { href: "/drops", label: "Drops", match: ["/drops", "/news"] },
+  { href: "/catalog", label: "Catalog", match: ["/catalog"] },
   { href: "/market", label: "Market", match: ["/market", "/collectors", "/shop"] },
 ];
 

@@ -275,6 +275,11 @@ export default async function DropsPage({
         </section>
       )}
 
+      <p className="mt-8 text-center text-sm text-smoke">
+        Hunting a specific pair?{" "}
+        <Link href="/catalog" className="text-volt underline">Browse the full shoe catalog →</Link>
+      </p>
+
       <div className="mt-8 rounded-2xl border border-edge bg-surface p-4 text-center">
         <p className="tag text-volt">Never miss a drop</p>
         <p className="mt-1 text-sm text-smoke">
