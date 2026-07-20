@@ -103,7 +103,7 @@ function archetypeFor(p: {
 
 /** Build a fan's taste profile from everything they've touched. */
 export async function getTasteProfile(userId: string): Promise<TasteProfile | null> {
-  const [user, votes, outfitVotes, ratings, offers, follows] = await Promise.all([
+  const [user, votes, outfitVotes, ratings, catalogRatings, offers, follows] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -131,6 +131,11 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
     prisma.designRating.findMany({
       where: { userId },
       select: { stars: true, submission: { select: PIECE_SELECT } },
+    }),
+    // Rate-game scores on REAL retail shoes — same taste signal, no artist.
+    prisma.catalogRating.findMany({
+      where: { userId },
+      select: { stars: true, shoe: { select: { brand: true, silhouette: true, colorway: true } } },
     }),
     prisma.offer.findMany({
       where: { buyerId: userId },
@@ -163,6 +168,15 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
 
   for (const v of votes) addPiece(v.submission, WEIGHTS.vote);
   for (const r of ratings) addPiece(r.submission, ratingWeight(r.stars));
+  for (const cr of catalogRatings) {
+    const w = ratingWeight(cr.stars);
+    if (w <= 0) continue;
+    signalCount++;
+    bump(brands, cr.shoe.brand, w);
+    bump(silhouettes, cr.shoe.silhouette, w);
+    bump(categories, "sneakers", w);
+    bump(colorways, cr.shoe.colorway, w);
+  }
   for (const p of user.ownedPieces) addPiece(p, WEIGHTS.owned);
   for (const o of offers) addPiece(o.submission, WEIGHTS.offer);
   for (const ov of outfitVotes) {
@@ -188,7 +202,7 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
     categories: ranked(categories, 3),
     artists: ranked(artists, 4),
     colorways: ranked(colorways, 4),
-    ratingsCount: ratings.length,
+    ratingsCount: ratings.length + catalogRatings.length,
   };
   return {
     signalCount,

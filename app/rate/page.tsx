@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { pieceTaxonomy } from "@/lib/taxonomy";
 import { categoryLabel } from "@/lib/categories";
 import RateDeck, { type RateCard } from "@/components/RateDeck";
+import { getTasteProfile } from "@/lib/taste";
 
 export const metadata = {
   title: "Rate the Heat — Score Designs Out of 5 | The Heat Chart",
@@ -41,7 +42,7 @@ export default async function RatePage() {
   }
 
   const userId = session.user.id;
-  const [rawPool, ratedBefore] = await Promise.all([
+  const [rawPool, retailPool, ratedBefore, ratedRetail, taste] = await Promise.all([
     prisma.submission.findMany({
       where: {
         status: "APPROVED",
@@ -51,15 +52,73 @@ export default async function RatePage() {
       take: 60,
       include: { artist: { select: { slug: true, displayName: true, userId: true } } },
     }),
+    // Real retail shoes from the catalog — the culture fans' lane. Only
+    // shoes with photos make the deck; battles stay customs-only.
+    prisma.catalogShoe.findMany({
+      where: { imageUrl: { not: null }, ratings: { none: { userId } } },
+      orderBy: { updatedAt: "desc" },
+      take: 120,
+      select: {
+        id: true, name: true, brand: true, silhouette: true, colorway: true,
+        imageUrl: true, retailPriceCents: true, releaseDate: true,
+      },
+    }),
     prisma.designRating.count({ where: { userId } }),
+    prisma.catalogRating.count({ where: { userId } }),
+    getTasteProfile(session.user.id),
   ]);
   // No rating your own work or your own closet — filtered here because
   // SQL NOT on nullable columns silently drops the NULL rows.
   const pool = rawPool.filter((s) => s.ownerId !== userId && s.artist?.userId !== userId);
 
-  // Shuffle so every session deals a different hand, then deal 12.
-  const deck = [...pool].sort(() => Math.random() - 0.5).slice(0, 12);
-  const cards: RateCard[] = deck.map((s) => {
+  // Taste-weighted retail picks: shoes matching the fan's top brands /
+  // silhouettes surface first, with a shuffle so it never feels canned.
+  const brandShare = new Map((taste?.brands ?? []).map((b) => [b.name, b.share]));
+  const silShare = new Map((taste?.silhouettes ?? []).map((x) => [x.name, x.share]));
+  const retailRanked = [...retailPool]
+    .map((r) => ({
+      r,
+      score:
+        (r.brand ? brandShare.get(r.brand) ?? 0 : 0) +
+        (r.silhouette ? silShare.get(r.silhouette) ?? 0 : 0) +
+        Math.random() * 25, // exploration keeps the deck surprising
+    }))
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.r);
+
+  // Deal 12: customs stay the heart (8), real heat rides along (4).
+  // Short pools backfill from the other side; a custom leads the deck.
+  const customsDeal = [...pool].sort(() => Math.random() - 0.5);
+  const retailDeal = retailRanked.slice(0, 4 + Math.max(0, 8 - customsDeal.length));
+  const customsPick = customsDeal.slice(0, 12 - Math.min(4, retailDeal.length));
+  const mixed = [...customsPick.slice(1), ...retailDeal.map((r) => ({ __retail: r }))]
+    .sort(() => Math.random() - 0.5);
+  const deck = [...customsPick.slice(0, 1), ...mixed].slice(0, 12);
+
+  const retailCard = (r: (typeof retailPool)[number]): RateCard => {
+    const chips: string[] = [];
+    if (r.brand) chips.push(r.brand);
+    if (r.silhouette && r.silhouette !== r.brand) chips.push(r.silhouette);
+    if (r.colorway) chips.push(`“${r.colorway}”`);
+    const bits: string[] = [];
+    if (r.retailPriceCents) bits.push(`Retail $${Math.round(r.retailPriceCents / 100)}`);
+    if (r.releaseDate)
+      bits.push(r.releaseDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }));
+    return {
+      id: r.id,
+      title: r.name,
+      artistName: r.brand ?? "Retail",
+      artistSlug: null,
+      images: [r.imageUrl!],
+      chips,
+      kind: "retail",
+      value: bits.join(" · ") || null,
+    };
+  };
+
+  const cards: RateCard[] = deck.map((entry) => {
+    if ("__retail" in entry) return retailCard(entry.__retail);
+    const s = entry;
     const tax = pieceTaxonomy(s);
     const chips: string[] = [];
     if (tax.brand) chips.push(tax.brand);
@@ -74,6 +133,7 @@ export default async function RatePage() {
       artistSlug: s.artist?.slug ?? null,
       images: [s.imageUrl, ...s.extraImages],
       chips,
+      kind: "custom" as const,
     };
   });
 
@@ -84,9 +144,9 @@ export default async function RatePage() {
           Rate The Heat
         </h1>
         <p className="mt-1 text-sm text-smoke">
-          {ratedBefore > 0
-            ? `${ratedBefore} rated so far — your taste profile is watching.`
-            : "Score designs out of five flames. Your taste profile starts now."}
+          {ratedBefore + ratedRetail > 0
+            ? `${ratedBefore + ratedRetail} rated so far — your taste profile is watching.`
+            : "Customs and real drops, five flames each. Your taste profile starts now."}
         </p>
       </div>
 

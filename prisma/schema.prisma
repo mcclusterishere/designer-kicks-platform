@@ -537,6 +537,7 @@ model User {
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
+  catalogRatings   CatalogRating[]
 }
 
 // A private thread between an editor and the league office. Editors can
@@ -900,7 +901,25 @@ model CatalogShoe {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  ratings CatalogRating[]
+
   @@index([brand])
   @@index([silhouette])
   @@index([name])
+}
+
+// Rate-game scores on REAL retail shoes from the catalog. Culture fans
+// rate actual releases alongside customs — same flames, same taste
+// engine. Battles stay customizers-only; this is the fans' lane.
+model CatalogRating {
+  id        String      @id @default(cuid())
+  shoeId    String
+  shoe      CatalogShoe @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stars     Int
+  createdAt DateTime    @default(now())
+
+  @@unique([shoeId, userId])
+  @@index([userId])
 }

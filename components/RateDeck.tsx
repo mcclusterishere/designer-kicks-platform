@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { rateDesign } from "@/app/actions";
+import { rateDesign, rateCatalogShoe } from "@/app/actions";
 import SwipeGallery from "@/components/SwipeGallery";
 
 export type RateCard = {
@@ -12,6 +12,10 @@ export type RateCard = {
   artistSlug: string | null;
   images: string[]; // cover first, then every extra angle — swipeable
   chips: string[];
+  // Retail cards are REAL shoes from the catalog — they rate through
+  // their own table and wear a market-value plate. Customs omit these.
+  kind?: "custom" | "retail";
+  value?: string | null;
 };
 
 // The Rate game deck — one design at a time, scored out of five
@@ -40,7 +44,7 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
     if (!card || pending || reveal || leaving) return;
     setError(null);
     startTransition(async () => {
-      const res = await rateDesign(card.id, stars);
+      const res = card.kind === "retail" ? await rateCatalogShoe(card.id, stars) : await rateDesign(card.id, stars);
       if (!res.ok) {
         setError(res.error ?? "Something went wrong.");
         return;
@@ -138,6 +142,11 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
                 card.artistName
               )}
             </p>
+            {card.value && (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-volt/50 bg-volt/10 px-3 py-1.5">
+                <span className="tag font-bold text-volt">{card.value}</span>
+              </div>
+            )}
             {card.chips.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {card.chips.map((chip) => (

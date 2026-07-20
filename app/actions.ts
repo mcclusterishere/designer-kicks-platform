@@ -821,6 +821,40 @@ export async function rateDesign(submissionId: string, stars: number): Promise<R
   };
 }
 
+/**
+ * Same flames, real shoe: a Rate-game score on a catalog (retail)
+ * sneaker. Shares the "rate" limiter with rateDesign so the deck has
+ * one budget, and feeds the same taste engine.
+ */
+export async function rateCatalogShoe(shoeId: string, stars: number): Promise<RateResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to rate designs." };
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+    return { ok: false, error: "Ratings run 1 to 5." };
+  }
+  if (!allowAttempt("rate", session.user.id, 60, 60 * 1000)) {
+    return { ok: false, error: "Whoa — let the flames cool for a second." };
+  }
+  const shoe = await prisma.catalogShoe.findUnique({ where: { id: shoeId }, select: { id: true } });
+  if (!shoe) return { ok: false, error: "That shoe isn't rateable." };
+
+  await prisma.catalogRating.upsert({
+    where: { shoeId_userId: { shoeId, userId: session.user.id } },
+    update: { stars },
+    create: { shoeId, userId: session.user.id, stars },
+  });
+  const agg = await prisma.catalogRating.aggregate({
+    where: { shoeId },
+    _avg: { stars: true },
+    _count: true,
+  });
+  return {
+    ok: true,
+    avg: Math.round((agg._avg.stars ?? stars) * 10) / 10,
+    count: agg._count,
+  };
+}
+
 // ---------- Outreach (cold leads with unclaimed pages) ----------
 
 export type OutreachResult = ActionResult & { emailSent?: boolean; claimUrl?: string };
