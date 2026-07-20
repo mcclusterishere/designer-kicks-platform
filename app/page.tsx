@@ -79,7 +79,7 @@ export default async function HomePage() {
         >
           <div>
             <h1 className="display mt-2 max-w-3xl text-7xl sm:text-8xl">
-              <span className="text-gradient-volt">The Heat List.</span>
+              <span className="text-gradient-volt">The Heat Chart.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-smoke">
               The proving ground for custom sneaker culture. Artists put their
