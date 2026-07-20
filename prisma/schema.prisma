@@ -488,9 +488,13 @@ model User {
   // from him." Minted when someone becomes an editor.
   refCode String? @unique
 
-  // "Who do you shop for?" — mens | womens | kids | all. Defaults the
-  // catalog and Rate deck to their lane; never a wall, always a toggle.
+  // "Who do you shop for?" — mens | womens | kids | all. Weights the
+  // catalog and Rate deck toward their lane (~2/3 lane, ~1/3 wild card);
+  // never a wall, always a toggle.
   shopFor String?
+  // "Only my lane" — kills the ~1/3 wild-card mix for people who
+  // specifically don't want cross-lane discovery.
+  laneStrict Boolean @default(false)
 
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
@@ -900,6 +904,9 @@ model CatalogShoe {
   colorway         String?
   imageUrl         String?
   retailPriceCents Int?
+  // Live resale value (avg/lowest ask) captured from the provider at
+  // import time — refreshes every re-import. The StockX-style number.
+  marketPriceCents Int?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.

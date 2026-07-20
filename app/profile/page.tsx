@@ -497,6 +497,7 @@ export default async function ProfilePage() {
             marketingOptIn: user.marketingOptIn,
             battleAlerts: user.battleAlerts,
             shopFor: user.shopFor ?? "",
+            laneStrict: user.laneStrict,
           }}
         />
       </div>

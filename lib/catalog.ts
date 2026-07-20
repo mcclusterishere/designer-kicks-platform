@@ -29,7 +29,52 @@ function dig(row: Row, keys: string[]): string | null {
 function toCents(v: unknown): number | null {
   const n = typeof v === "string" ? Number(v.replace(/[^0-9.]/g, "")) : Number(v);
   if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n < 1000 ? n * 100 : n); // dollars vs already-cents heuristic
+  // Decimals are always dollars; whole numbers under 5000 read as dollars
+  // (a $5,000+ retail is rarer than a provider already sending cents).
+  if (typeof v === "string" && v.includes(".")) return Math.round(n * 100);
+  if (!Number.isInteger(n)) return Math.round(n * 100);
+  return Math.round(n < 5000 ? n * 100 : n);
+}
+
+/**
+ * The live number — what the pair actually trades for. Providers spread
+ * it across many shapes: top-level avg/min/max, a nested market object,
+ * or per-size variants each carrying a lowest ask. Take the first that
+ * sticks; avg beats min so one hammered size doesn't set the price.
+ */
+function digMarketCents(row: Row): number | null {
+  const flat = toCents(
+    row["avg_price"] ?? row["avgPrice"] ?? row["average_price"] ??
+    row["min_price"] ?? row["minPrice"] ?? row["lowest_ask"] ?? row["lowestAsk"] ??
+    row["last_sale"] ?? row["lastSale"] ?? row["market_price"] ?? row["marketPrice"]
+  );
+  if (flat) return flat;
+  const market = row["market"];
+  if (market && typeof market === "object") {
+    const m = market as Row;
+    const nested = toCents(m["avg_price"] ?? m["averageDeadstockPrice"] ?? m["lowestAsk"] ?? m["lastSale"]);
+    if (nested) return nested;
+  }
+  const variants = row["variants"];
+  if (Array.isArray(variants) && variants.length > 0) {
+    const asks = variants
+      .map((v) => (v && typeof v === "object" ? toCents((v as Row)["lowest_ask"] ?? (v as Row)["lowestAsk"] ?? (v as Row)["price"]) : null))
+      .filter((n): n is number => n !== null);
+    if (asks.length > 0) return Math.min(...asks);
+  }
+  return null;
+}
+
+/** StockX-style traits array: [{trait: "Retail Price", value: 170}, …]. */
+function digTrait(row: Row, names: string[]): unknown {
+  const traits = row["traits"];
+  if (!Array.isArray(traits)) return null;
+  for (const t of traits) {
+    if (!t || typeof t !== "object") continue;
+    const label = s((t as Row)["trait"] ?? (t as Row)["name"])?.toLowerCase();
+    if (label && names.includes(label)) return (t as Row)["value"];
+  }
+  return null;
 }
 
 function toDate(v: unknown): Date | null {
@@ -79,6 +124,9 @@ export type ImportResult = {
   imported: number;
   updated: number;
   seen: number;
+  /** Rows that landed with a live market price — if this stays 0 while
+   *  seen climbs, the provider's price fields changed shape on us. */
+  priced: number;
   error?: string;
 };
 
@@ -89,10 +137,10 @@ export type ImportResult = {
  */
 export async function importFromKicksDB(query: string, pages = 1): Promise<ImportResult> {
   const key = process.env.KICKSDB_KEY;
-  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
+  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, priced: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
   const base = process.env.KICKSDB_API_URL || "https://api.kicks.dev";
 
-  let imported = 0, updated = 0, seen = 0;
+  let imported = 0, updated = 0, seen = 0, priced = 0;
   for (let page = 1; page <= Math.min(pages, 10); page++) {
     let json: unknown;
     try {
@@ -100,11 +148,11 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
         `${base}/v3/stockx/products?query=${encodeURIComponent(query)}&limit=50&page=${page}`,
         { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) }
       );
-      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
-      if (!res.ok) return { ok: seen > 0, imported, updated, seen, error: `KicksDB answered ${res.status} — check the key/plan.` };
+      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, priced, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
+      if (!res.ok) return { ok: seen > 0, imported, updated, seen, priced, error: `KicksDB answered ${res.status} — check the key/plan.` };
       json = await res.json();
     } catch {
-      return { ok: seen > 0, imported, updated, seen, error: "Couldn't reach KicksDB — network hiccup, run it again." };
+      return { ok: seen > 0, imported, updated, seen, priced, error: "Couldn't reach KicksDB — network hiccup, run it again." };
     }
 
     const o = (json ?? {}) as Row;
@@ -119,24 +167,33 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
       if (!sku || !name) continue;
       seen++;
       const brand = dig(row, ["brand", "brandName"]);
+      const marketPriceCents = digMarketCents(row);
       const data = {
         name,
         brand,
         silhouette: dig(row, ["silhouette", "model", "series"]) ?? guessSilhouette(name, brand),
-        colorway: dig(row, ["colorway", "color", "colorName"]),
+        colorway: dig(row, ["colorway", "color", "colorName"]) ?? s(digTrait(row, ["colorway"])),
         imageUrl: dig(row, ["image", "imageUrl", "thumbnail", "media", "smallImageUrl"]),
-        retailPriceCents: toCents(row["retailPrice"] ?? row["retail_price"] ?? row["price"] ?? row["msrp"]),
-        releaseDate: toDate(row["releaseDate"] ?? row["release_date"] ?? row["releaseDateISO"]),
+        retailPriceCents: toCents(
+          row["retailPrice"] ?? row["retail_price"] ?? row["price"] ?? row["msrp"] ??
+          digTrait(row, ["retail price", "retail"])
+        ),
+        marketPriceCents,
+        releaseDate: toDate(
+          row["releaseDate"] ?? row["release_date"] ?? row["releaseDateISO"] ??
+          digTrait(row, ["release date", "released"])
+        ),
         gender: laneFromProvider(dig(row, ["gender", "gender_type", "category"])) ?? genderFromName(name),
         source: "kicksdb",
       };
+      if (marketPriceCents) priced++;
       const existing = await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } });
       await prisma.catalogShoe.upsert({ where: { sku }, update: data, create: { sku, ...data } });
       existing ? updated++ : imported++;
     }
     if (rows.length < 50) break; // last page
   }
-  return { ok: true, imported, updated, seen };
+  return { ok: true, imported, updated, seen, priced };
 }
 
 export type CatalogMatch = {
@@ -146,6 +203,7 @@ export type CatalogMatch = {
   colorway: string | null;
   imageUrl: string | null;
   retailPriceCents: number | null;
+  marketPriceCents: number | null;
 };
 
 /**
@@ -167,7 +225,7 @@ export async function matchDonorShoe(input: {
       ...(input.brand ? { brand: { equals: input.brand, mode: "insensitive" } } : {}),
     },
     take: 40,
-    select: { sku: true, name: true, brand: true, colorway: true, imageUrl: true, retailPriceCents: true },
+    select: { sku: true, name: true, brand: true, colorway: true, imageUrl: true, retailPriceCents: true, marketPriceCents: true },
   });
   if (candidates.length === 0) return null;
   const cw = input.baseColorway?.toLowerCase().replace(/["']/g, "");
@@ -178,6 +236,37 @@ export async function matchDonorShoe(input: {
     if (exact) return exact;
   }
   return candidates[0];
+}
+
+export type RefreshSummary = {
+  ok: boolean;
+  brands: { brand: string; imported: number; updated: number; seen: number; priced: number; error?: string }[];
+  error?: string;
+};
+
+/**
+ * Scheduled price/lane refresher. Each run re-imports a few brands from
+ * the provider — market prices, photos, and lanes all update on the
+ * upsert. Brands rotate deterministically by day, so over a week or two
+ * the whole base cycles through without ever hammering the rate limit.
+ */
+export async function refreshCatalogPricing(brandsPerRun = 3, pages = 2): Promise<RefreshSummary> {
+  if (!catalogConfigured()) return { ok: false, brands: [], error: "Dormant — no KICKSDB_KEY." };
+  const groups = await prisma.catalogShoe.groupBy({ by: ["brand"], where: { brand: { not: null } } });
+  const all = groups.map((g) => g.brand!).sort();
+  if (all.length === 0) return { ok: true, brands: [] };
+
+  const day = Math.floor(Date.now() / 86_400_000);
+  const start = (day * brandsPerRun) % all.length;
+  const picks = Array.from({ length: Math.min(brandsPerRun, all.length) }, (_, i) => all[(start + i) % all.length]);
+
+  const brands: RefreshSummary["brands"] = [];
+  for (const brand of picks) {
+    const r = await importFromKicksDB(brand, pages);
+    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, error: r.error });
+    if (!r.ok) break; // rate-limited or provider down — let tomorrow's run continue
+  }
+  return { ok: true, brands };
 }
 
 /** Panel numbers: how big the base is and how well customs resolve to it. */

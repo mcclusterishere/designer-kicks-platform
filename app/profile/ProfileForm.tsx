@@ -16,6 +16,7 @@ type Defaults = {
   marketingOptIn: boolean;
   battleAlerts: boolean;
   shopFor: string;
+  laneStrict: boolean;
 };
 
 const inputClass =
@@ -79,10 +80,15 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
           <option value="all">Show me everything</option>
         </select>
         <p className="mt-1 text-xs text-smoke/70">
-          The catalog and Rate game open to your lane first. Never a wall — you
-          can flip lanes any time.
+          Who you shop <em>for</em> — yourself, your partner, whoever. We deal
+          about two-thirds from your lane and sprinkle in wild cards from the
+          rest, so you never miss heat. Flip lanes any time.
         </p>
       </div>
+      <label className="flex items-center gap-2 text-sm text-smoke">
+        <input type="checkbox" name="laneStrict" defaultChecked={defaults.laneStrict} className="h-4 w-4 accent-[#d9b96a]" />
+        Only my lane — skip the wild cards
+      </label>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#d9b96a]" />
         Email me the moment a battle goes live

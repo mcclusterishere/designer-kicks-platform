@@ -32,11 +32,14 @@ export default async function DonorShoe({
 
   const modelName = match?.name || silhouette || baseShoe;
   const retail = match?.retailPriceCents ? `$${Math.round(match.retailPriceCents / 100)}` : null;
+  const market = match?.marketPriceCents ? `~$${Math.round(match.marketPriceCents / 100)}` : null;
 
   return (
     <div className={`rounded-lg border border-edge bg-panel/40 p-3 ${compact ? "mt-3" : "mt-4"}`}>
       <p className="tag text-smoke">
-        Shop the base pair{retail && <span> · retail {retail}</span>}
+        Shop the base pair
+        {retail && <span> · retail {retail}</span>}
+        {market && <span> · resale {market}</span>}
       </p>
       {!compact && modelName && <p className="mt-0.5 text-sm font-bold text-white">{modelName}</p>}
       <div className="mt-2 flex flex-wrap gap-1.5">

@@ -43,11 +43,15 @@ export default async function RatePage() {
 
   const userId = session.user.id;
   // Their shopping lane (profile → "Who do you shop for?"). Customs are
-  // art and stay unfiltered; only the retail side of the deck follows it.
-  const pref = (
-    await prisma.user.findUnique({ where: { id: userId }, select: { shopFor: true } })
-  )?.shopFor;
+  // art and stay unfiltered; the retail side deals ~2/3 from their lane
+  // with ~1/3 wild cards — unless they flipped on "only my lane".
+  const prefRow = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { shopFor: true, laneStrict: true },
+  });
+  const pref = prefRow?.shopFor;
   const lane = pref === "mens" || pref === "womens" || pref === "kids" ? pref : null;
+  const strict = Boolean(prefRow?.laneStrict);
   const [rawPool, retailPool, ratedBefore, ratedRetail, taste] = await Promise.all([
     prisma.submission.findMany({
       where: {
@@ -59,18 +63,20 @@ export default async function RatePage() {
       include: { artist: { select: { slug: true, displayName: true, userId: true } } },
     }),
     // Real retail shoes from the catalog — the culture fans' lane. Only
-    // shoes with photos make the deck; battles stay customs-only.
+    // shoes with photos make the deck; battles stay customs-only. Pulled
+    // unfiltered, then weighted by lane below.
     prisma.catalogShoe.findMany({
       where: {
         imageUrl: { not: null },
         ratings: { none: { userId } },
-        ...(lane ? { gender: lane } : {}),
+        ...(lane && strict ? { gender: lane } : {}),
       },
       orderBy: { updatedAt: "desc" },
-      take: 120,
+      take: 150,
       select: {
         id: true, name: true, brand: true, silhouette: true, colorway: true,
-        imageUrl: true, retailPriceCents: true, releaseDate: true,
+        imageUrl: true, retailPriceCents: true, marketPriceCents: true,
+        releaseDate: true, gender: true,
       },
     }),
     prisma.designRating.count({ where: { userId } }),
@@ -85,16 +91,33 @@ export default async function RatePage() {
   // silhouettes surface first, with a shuffle so it never feels canned.
   const brandShare = new Map((taste?.brands ?? []).map((b) => [b.name, b.share]));
   const silShare = new Map((taste?.silhouettes ?? []).map((x) => [x.name, x.share]));
-  const retailRanked = [...retailPool]
-    .map((r) => ({
-      r,
-      score:
-        (r.brand ? brandShare.get(r.brand) ?? 0 : 0) +
-        (r.silhouette ? silShare.get(r.silhouette) ?? 0 : 0) +
-        Math.random() * 25, // exploration keeps the deck surprising
-    }))
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.r);
+  const rankByTaste = (pool: typeof retailPool) =>
+    [...pool]
+      .map((r) => ({
+        r,
+        score:
+          (r.brand ? brandShare.get(r.brand) ?? 0 : 0) +
+          (r.silhouette ? silShare.get(r.silhouette) ?? 0 : 0) +
+          Math.random() * 25, // exploration keeps the deck surprising
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.r);
+
+  // The 66/33 deal: two lane picks, then a wild card, repeating. Strict
+  // mode (or no preference) collapses to a single ranked stream.
+  let retailRanked: typeof retailPool;
+  if (lane && !strict) {
+    const laneRanked = rankByTaste(retailPool.filter((r) => r.gender === lane));
+    const wildRanked = rankByTaste(retailPool.filter((r) => r.gender !== lane));
+    retailRanked = [];
+    let li = 0, wi = 0;
+    while (li < laneRanked.length || wi < wildRanked.length) {
+      for (let k = 0; k < 2 && li < laneRanked.length; k++) retailRanked.push(laneRanked[li++]);
+      if (wi < wildRanked.length) retailRanked.push(wildRanked[wi++]);
+    }
+  } else {
+    retailRanked = rankByTaste(retailPool);
+  }
 
   // Deal 12: customs stay the heart (8), real heat rides along (4).
   // Short pools backfill from the other side; a custom leads the deck.
@@ -111,6 +134,7 @@ export default async function RatePage() {
     if (r.silhouette && r.silhouette !== r.brand) chips.push(r.silhouette);
     if (r.colorway) chips.push(`“${r.colorway}”`);
     const bits: string[] = [];
+    if (r.marketPriceCents) bits.push(`Market ≈$${Math.round(r.marketPriceCents / 100)}`);
     if (r.retailPriceCents) bits.push(`Retail $${Math.round(r.retailPriceCents / 100)}`);
     if (r.releaseDate)
       bits.push(r.releaseDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }));

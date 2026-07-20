@@ -112,10 +112,18 @@ export default async function CatalogShoePage({
                 </dd>
               </div>
             )}
+            {shoe.marketPriceCents && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-smoke">Market value</dt>
+                <dd className="font-bold text-volt">≈ ${Math.round(shoe.marketPriceCents / 100)}</dd>
+              </div>
+            )}
             {shoe.retailPriceCents && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Retail</dt>
-                <dd className="font-bold text-volt">${Math.round(shoe.retailPriceCents / 100)}</dd>
+                <dd className={shoe.marketPriceCents ? "text-white" : "font-bold text-volt"}>
+                  ${Math.round(shoe.retailPriceCents / 100)}
+                </dd>
               </div>
             )}
             {released && (

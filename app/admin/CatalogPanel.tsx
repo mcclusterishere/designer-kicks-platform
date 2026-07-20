@@ -39,9 +39,16 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
       {state && !state.ok && <p className="mt-2 text-sm text-heat">{state.error}</p>}
       {state?.ok && (
         <p className="mt-2 text-sm text-volt">
-          +{state.imported} new, {state.updated} refreshed ({state.seen} scanned).
+          +{state.imported} new, {state.updated} refreshed ({state.seen} scanned
+          {typeof state.priced === "number" && `, ${state.priced} with live pricing`}).
           {state.note && <span className="text-heat"> {state.note}</span>}{" "}
           Run more queries brand-by-brand to grow the base.
+        </p>
+      )}
+      {state?.ok && state.priced === 0 && (state.seen ?? 0) > 0 && (
+        <p className="mt-1 text-xs text-heat">
+          0 live prices came back — the provider may not include market data on
+          this plan/endpoint. Retail prices and photos still land.
         </p>
       )}
     </div>

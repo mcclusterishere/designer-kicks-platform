@@ -215,6 +215,7 @@ export async function updateProfile(
   const battleAlerts = formData.get("battleAlerts") === "on";
   const shopForRaw = String(formData.get("shopFor") ?? "").trim();
   const shopFor = ["mens", "womens", "kids", "all"].includes(shopForRaw) ? shopForRaw : null;
+  const laneStrict = formData.get("laneStrict") === "on";
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (
@@ -239,6 +240,7 @@ export async function updateProfile(
       marketingOptIn,
       battleAlerts,
       shopFor,
+      laneStrict,
     },
   });
 
