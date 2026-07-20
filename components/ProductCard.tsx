@@ -27,7 +27,7 @@ export default function ProductCard({ product }: Props) {
     <a
       href={goHref(product.affiliateUrl, `shop:${product.category}`)}
       target="_blank"
-      rel="noopener noreferrer sponsored"
+      rel="noopener noreferrer nofollow sponsored"
       className={`card-lift group flex flex-col overflow-hidden rounded-xl border bg-surface ${
         product.featured ? "border-volt/50" : "border-edge"
       }`}
