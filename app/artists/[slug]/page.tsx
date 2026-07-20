@@ -14,6 +14,7 @@ import { platformLabel } from "@/lib/sellPlatforms";
 import { categoryLabel } from "@/lib/categories";
 import HeatScore from "@/components/HeatScore";
 import ChallengeButton from "@/components/ChallengeButton";
+import DonorShoe from "@/components/DonorShoe";
 
 export const dynamic = "force-dynamic";
 
@@ -271,6 +272,16 @@ export default async function ArtistPage({ params }: Props) {
                     )}
                   </p>
                   <HeatScore stars={s.ratings.map((r) => r.stars)} />
+                  {s.category === "sneakers" && (
+                    <DonorShoe
+                      brand={s.brand}
+                      silhouette={s.silhouette}
+                      baseShoe={s.baseShoe}
+                      baseColorway={s.baseColorway}
+                      refTag={`piece:${s.id}`}
+                      compact
+                    />
+                  )}
                   {viewerCanChallenge && <ChallengeButton targetSubmissionId={s.id} />}
                   {lastSale && (
                     <p className="mt-1 text-sm">

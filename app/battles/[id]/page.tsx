@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { finalizeExpiredBattles, getBattleWithVotes } from "@/lib/battles";
 import VotePanel from "@/components/VotePanel";
 import Countdown from "@/components/Countdown";
+import DonorShoe from "@/components/DonorShoe";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,33 @@ export default async function BattlePage({
           }}
         />
       </div>
+
+      {(battle.subA.category === "sneakers" || battle.subB.category === "sneakers") && (
+        <div className="mt-8">
+          <div className="rule w-16" />
+          <h2 className="display mt-2 text-2xl text-white">Cop The Base Pairs</h2>
+          <p className="mt-1 text-sm text-smoke">
+            Love the blueprint? Grab the donor shoe these customs were built on.
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {[battle.subA, battle.subB].map(
+              (s) =>
+                s.category === "sneakers" && (
+                  <div key={s.id} className="rounded-xl border border-edge bg-surface p-4">
+                    <p className="tag text-white">{s.title}</p>
+                    <DonorShoe
+                      brand={s.brand}
+                      silhouette={s.silhouette}
+                      baseShoe={s.baseShoe}
+                      baseColorway={s.baseColorway}
+                      refTag={`battle:${battle.id}`}
+                    />
+                  </div>
+                )
+            )}
+          </div>
+        </div>
+      )}
 
       {(battle.subA.description || battle.subB.description) && (
         <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2">
