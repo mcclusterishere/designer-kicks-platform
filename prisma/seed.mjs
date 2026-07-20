@@ -145,41 +145,6 @@ const retiredStarterNames = [
 // promoting a post.
 const articles = [
   {
-    slug: "nigel-sylvester-air-jordan-4-shock-drop-rumor",
-    title: "Nigel Sylvester AJ4 'Shock Drop Today'? Here's What's Actually Confirmed",
-    excerpt:
-      "Alert graphics are flying claiming a SNKRS shock drop for the Nigel Sylvester Air Jordan 4 today. We checked. Here's what's real, what's recycled, and the date to actually watch.",
-    tags: "Jordan, Release Dates, Rumor Check",
-    coverImage: "/seed/nigel-aj4-bike-air.jpeg",
-    raffleUrl: "https://www.nike.com/launch",
-    daysAgo: 0,
-    question: {
-      q: "Nigel Sylvester's Air Jordan 4 collabs replace the Nike Air heel branding with what?",
-      options: ["Bike Air", "Ride Air", "Air BMX", "Pedal Air"],
-      answer: 0,
-      explain: "The BMX legend's whole line carries 'Bike Air' branding — a nod to how he made his name.",
-    },
-    content: [
-      "## The rumor",
-      "",
-      "Alert pages are pushing a **'SNKRS shock drop today'** for the Nigel Sylvester x Air Jordan 4 — usually over the photo of the white-and-red 'Bike Air' pair from the original run. As of this morning, **no major outlet and nothing on SNKRS confirms a drop today**. Treat it as noise until Nike's app says otherwise — shock drops are only ever real when the notification hits.",
-      "",
-      "## The receipts",
-      "",
-      "What's actually happened with this line: the **'Brick by Brick'** (firewood orange, HF4340-800) ran in spring 2025, and the **'Brick After Brick'** (IQ8055-100) released **May 22, 2026 for $230** as a SNKRS LEO — and evaporated. The white/red 'Bike Air' in the viral photo is the original pair, long gone at retail.",
-      "",
-      "## The date to actually watch",
-      "",
-      "Third-party leakers point to **August 23 — Nigel's birthday — for a rumored restock or shock drop** of the Bike Air collection. That's unconfirmed too, but it's the credible one. Our move: SNKRS notifications on, and this page updates the second anything goes official — we keep the calendar honest, so a date only lands there when it's real.",
-      "",
-      "- **Claim:** shock drop today — **unverified, likely recycled bait**",
-      "- **Confirmed:** 'Brick After Brick' dropped May 22, 2026 ($230, SNKRS)",
-      "- **Watch:** August 23 birthday restock rumor",
-      "",
-      "*Image: Jordan Brand campaign photo of the original 'Bike Air' AJ4.*",
-    ].join("\n"),
-  },
-  {
     slug: "air-jordan-4-laser-pack-2027-release-date",
     title: "Air Jordan 4 'Laser' Pack Returns February 2027 — Both 2005 Grails, One $500 Box",
     excerpt:
@@ -1197,6 +1162,16 @@ function loadQuestions() {
 // Team + careers seed — idempotent, runs every deploy in both modes.
 // Creates the first editor (Seth) so he can claim + sign in, and posts
 // the Editor role on /careers. Never overwrites live edits.
+// Retired content: pulled on every deploy so it disappears from prod too.
+async function retireContent() {
+  await prisma.quizQuestion.deleteMany({
+    where: { article: { slug: "nigel-sylvester-air-jordan-4-shock-drop-rumor" } },
+  });
+  await prisma.article.deleteMany({
+    where: { slug: "nigel-sylvester-air-jordan-4-shock-drop-rumor" },
+  });
+}
+
 async function seedTeamAndCareers() {
   // First editor: passwordless account he claims via a set-password link
   // the owner sends him (Admin → Team → "Make editor" regenerates it).
@@ -1267,6 +1242,7 @@ async function main() {
 
   // Team + careers seed runs in every mode (idempotent top-up).
   await seedTeamAndCareers();
+  await retireContent();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
