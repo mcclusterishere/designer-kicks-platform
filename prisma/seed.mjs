@@ -144,6 +144,44 @@ const retiredStarterNames = [
 // Kicks, Sneaker News, House of Heat) — dates shift, re-verify before
 // promoting a post.
 const articles = [
+  {
+    slug: "air-jordan-4-laser-pack-2027-release-date",
+    title: "Air Jordan 4 'Laser' Pack Returns February 2027 — Both 2005 Grails, One $500 Box",
+    excerpt:
+      "Jordan Brand is bringing the laser-etched 2005 duo back: the 'White Laser' and 'Black Laser' AJ4s return together as a $500 two-pair pack in February 2027, in a Michael Jordan face box.",
+    tags: "Jordan, Release Dates, Packs",
+    coverImage: "/seed/aj4-laser-pack-2027.jpeg",
+    sku: "IR2070-100",
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    question: {
+      q: "Who created the laser-etched artwork on the original 2005 Air Jordan 4 'Laser'?",
+      options: ["Tinker Hatfield", "Mark Smith", "Peter Moore", "Virgil Abloh"],
+      answer: 1,
+      explain: "Nike designer Mark Smith pioneered the laser-etching project; Tinker Hatfield designed the original AJ4 silhouette itself.",
+    },
+    content: [
+      "## The drop",
+      "",
+      "Jordan Brand is reviving one of the most coveted 4s ever made. The **Air Jordan 4 'Laser' Pack** is expected **February 2027** — the **'White Laser' and 'Black Laser' together in one two-pair set for $500**, reportedly packaged in a **Michael Jordan face box**. It's the first true return of the 2005 duo, and early word is quantities will be very limited.",
+      "",
+      "## Why these two matter",
+      "",
+      "The originals dropped in 2005 for the Air Jordan line's **20th anniversary**, with laser-etched artwork burned across the uppers — a technique Nike designer **Mark Smith** pioneered, tying the 4 into the storytelling language of the Air Jordan XX. The **White Laser** runs a white leather base with Fire Red-style blocking, black accents, and etched graphics head to toe. The **Black Laser** flips it: black leather, red laces and lining, grey heel and midsole hits, and light green eyelets. The 2005 'Black Laser' in particular barely released at all — it's been a grail for twenty years.",
+      "",
+      "## The details",
+      "",
+      "- **What:** Air Jordan 4 'Laser' Pack — 'White Laser' + 'Black Laser'",
+      "- **When:** expected February 2027 (exact date not yet confirmed)",
+      "- **Price:** $500 for the two-pair pack",
+      "- **Style codes:** IR2070-100 (White) / IR2070-001 (Black)",
+      "- **Extras:** Michael Jordan face box; updated AJ4 fit is reported",
+      "",
+      "We'll pin the exact date on the calendar the moment it firms up — check the drop sheet below for where to buy and set your reminder.",
+      "",
+      "*Photo via @xcverum on IG.*",
+    ].join("\n"),
+  },
   // The rest-of-2026 drop slate — one article per release, each with a
   // culture question (see seed-drops-2026.mjs).
   ...drops2026,
