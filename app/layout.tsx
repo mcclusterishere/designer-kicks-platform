@@ -204,6 +204,11 @@ export default async function RootLayout({
               © 2026 McCluster Corp · The Heat Chart is a McCluster Corp /
               Equity Uprise project supporting creative opportunity and
               culture education.
+              {/* Deploy truth-teller: which commit is this page actually
+                  running? Ends every "did it deploy?" debate in 2 seconds. */}
+              <span className="ml-2 text-smoke/50">
+                build {(process.env.RAILWAY_GIT_COMMIT_SHA ?? "local").slice(0, 7)}
+              </span>
             </p>
           </div>
         </footer>
