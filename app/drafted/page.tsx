@@ -134,7 +134,7 @@ export default async function DraftedPage() {
       {/* Watch it instead of reading it — the closet film */}
       <div className="mt-12 grid items-center gap-6 rounded-2xl border border-edge bg-surface p-6 sm:grid-cols-[200px_1fr] sm:p-8">
         <video
-          src="https://d8j0ntlcm91z4.cloudfront.net/user_3G3F7jiUHPTPLSNf3XP0bAYtQmG/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
+          src="/ad-videos/artist.mp4"
           poster="/ad-refs/artist.png"
           autoPlay
           muted

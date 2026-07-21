@@ -6,13 +6,13 @@
  * /dk/{slug}?utm_content={slug} and every CTA on the page deep-links
  * into the funnel it advertises.
  *
- * Videos live on Higgsfield's CDN (generated from real app screenshots
- * in public/ad-refs/, which double as posters). The five face bumpers
- * from the earlier batch are intentionally NOT here — wrong identity
- * source, rejected.
+ * Videos are SELF-HOSTED in public/ad-videos (pulled off Higgsfield's
+ * CDN once by .github/workflows/fetch-ad-videos.yml) — hotlinking
+ * their CDN didn't play outside their app. Posters are the real app
+ * screenshots in public/ad-refs/. The five face bumpers from the
+ * earlier batch are intentionally NOT here — wrong identity source,
+ * rejected.
  */
-
-const CDN = "https://d8j0ntlcm91z4.cloudfront.net/user_3G3F7jiUHPTPLSNf3XP0bAYtQmG";
 
 export type DkBeat = {
   at: number; // seconds into the video where this moment starts
@@ -42,7 +42,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "market",
     name: "The Market",
-    video: `${CDN}/hf_20260721_213415_8219ffeb-c069-4f5e-9cdd-144df450bd91.mp4`,
+    video: "/ad-videos/market.mp4",
     poster: "/ad-refs/market.png",
     duration: "6s",
     headline: "The stock market for custom sneakers.",
@@ -86,7 +86,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "arena",
     name: "The Arena",
-    video: `${CDN}/hf_20260721_213424_de7e88e7-30d2-4d56-8e43-3fb0a17cb45c.mp4`,
+    video: "/ad-videos/arena.mp4",
     poster: "/ad-refs/arena.png",
     duration: "6s",
     headline: "Sneakers battle. You crown the winner.",
@@ -130,7 +130,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "heatlist",
     name: "The Heat List",
-    video: `${CDN}/hf_20260721_213434_71fb44b4-38d4-4c07-a69c-e74eadf4fc69.mp4`,
+    video: "/ad-videos/heatlist.mp4",
     poster: "/ad-refs/heatlist.png",
     duration: "6s",
     headline: "Every artist ranked. One list. Real stakes.",
@@ -174,7 +174,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "artist",
     name: "The Artist Closet",
-    video: `${CDN}/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4`,
+    video: "/ad-videos/artist.mp4",
     poster: "/ad-refs/artist.png",
     duration: "6s",
     headline: "Your closet is a portfolio now.",
@@ -218,7 +218,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "home",
     name: "The Home Page",
-    video: `${CDN}/hf_20260721_213455_b9dcb529-faca-4eb8-a3da-ea765c971fac.mp4`,
+    video: "/ad-videos/home.mp4",
     poster: "/ad-refs/home.png",
     duration: "6s",
     headline: "Designer Kicks grew into a league.",
@@ -262,7 +262,7 @@ export const DK_VARIANTS: DkVariant[] = [
   {
     slug: "sting",
     name: "The Sting",
-    video: `${CDN}/hf_20260721_212336_7c9c9ca9-b771-4e97-b5a5-158e0814ded0.mp4`,
+    video: "/ad-videos/sting.mp4",
     poster: null,
     duration: "4s",
     headline: "New name. Same culture.",
