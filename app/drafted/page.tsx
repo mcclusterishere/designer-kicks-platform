@@ -1,80 +1,93 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { formatUsd } from "@/lib/market";
+import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
 import CultureVerified from "@/components/CultureVerified";
 
 /**
- * The draft-day letter. This is the page the outreach campaign points
- * at — every "somebody draft him to the league" comment thread ends
- * here. It has one job: make a customizer feel SEEN, explain what the
- * league actually does for them, and hand them the pen.
- * Share it with a tracked link (/drafted?ref=yourcode) and the traffic
- * layer credits the drafter automatically.
+ * The draft-day letter, rebuilt for the artists who already made it.
+ * Every "draft him to the league" comment thread ends here — and the
+ * reader it's written for has followers, a full order book, and zero
+ * patience for another platform asking for content. So the page opens
+ * by conceding all of that, then makes the one pitch nobody else can:
+ * every other app sells them MORE LABOR; the league turns the work
+ * they already did into an asset that keeps paying. Tracked links
+ * (/drafted?ref=code) credit the drafter automatically.
  */
 export const metadata = {
   title: "You Got Drafted — The Heat Chart League",
   description:
-    "The culture called your name. The Heat Chart is the custom-sneaker battle league: your own artist page, battles the culture votes on, the Heat List, buyers sent straight to your shop — free for artists, forever.",
+    "You already won social media. The league is the part nobody offered: royalties on every resale of your work, a live market that prices it, and the paper trail that turns customs into capital. Free, no exclusivity.",
   openGraph: {
     title: "You Got Drafted — The Heat Chart League",
     description:
-      "Somebody drafted you to the league. Here's what that means — and what happens next.",
+      "Commissions feed you today. Assets feed you forever. Here's what the league actually does for artists who already have the orders.",
     type: "website",
   },
 };
 export const dynamic = "force-dynamic";
 
-const GIVES = [
+// The movement pitch — each one a thing NO other platform offers a
+// customizer. Ordered by how fast the money shows up.
+const ORIGINALS = [
   {
     n: "01",
-    title: "Your own page in the league",
-    body: "A pro artist profile: your pieces, your story, your followers, your Heat Score. Claim it and it wears the Culture Verified stamp — proof there's a real maker behind the work.",
+    title: `${RESALE_ARTIST_ROYALTY_PCT}% royalty on every resale — forever`,
+    body: "When a piece you made re-trades on our market, you get paid again. And again. Etsy doesn't do this. eBay doesn't. StockX doesn't. Instagram definitely doesn't. Your 2022 work becomes 2026 income, and every collector flipping your pieces is working for you.",
   },
   {
     n: "02",
-    title: "Battles the culture votes on",
-    body: "Your hardest pairs go head-to-head with other makers. Real votes, real rankings, no judges' table. Winning climbs you up the Heat List — the league table of custom sneaker culture.",
+    title: "A live market prices your work",
+    body: "Standing bids, a Heat Index that moves with votes and sales, verified comps. Stop guessing what to charge in DMs — post the ask, watch the bids, sell at the high one with one tap. Price discovery is what turned sneakers into a market; now it's pointed at YOUR work.",
   },
   {
     n: "03",
-    title: "Buyers sent to YOUR shop",
-    body: "Your Etsy, your site, your DMs — we link buyers straight to wherever you already sell. Your money stays your money. We're the stage, not the middleman.",
+    title: "Your old work becomes new money",
+    body: "Consignment relists: a pair you sold for short money years ago comes back, relists with its history on the record, and resells at what you're worth NOW — split with your collector so they win too. Your back catalog is inventory you forgot you had.",
   },
   {
     n: "04",
-    title: "Your drops on the calendar",
-    body: "Announce a release and it goes on the same drop calendar our readers check for Jordan and Nike dates. Your custom drop, listed next to the big dogs.",
+    title: "Customs as capital",
+    body: "Provenance ledger, portfolio statement, valuation methodology, an independent USPAP appraiser network. This is the paper trail fine artists use to insure, appraise, and borrow against their work — built for customizers for the first time anywhere.",
   },
   {
     n: "05",
-    title: "The selling playbook",
-    body: "Pricing help, listing help, how-to-sell education in the artist portal — built for makers who are great with paint and tired of guessing on business.",
+    title: "A commission inbox with budgets attached",
+    body: "Fans pick the base pair, name a budget, pitch the idea — you accept or pass with one tap. The base ships to you. No more twelve-message DM negotiations that die at the price.",
   },
   {
     n: "06",
-    title: "The content machine",
-    body: "Winners and standout pieces get pushed across our channels — articles, socials, the feed. The league's whole job is making its artists famous.",
+    title: "Distribution you don't have to run",
+    body: "Every piece you post auto-publishes to the league's feed and social channels the moment it clears review. Your drops go on the same calendar our readers check for Jordan dates. The league's whole job is making its artists bigger.",
   },
 ];
 
 const STEPS = [
-  { n: "1", t: "You got drafted", b: "Someone in the culture called your name — that's how everyone gets here. No applications from us, no gatekeepers. The culture scouts." },
-  { n: "2", t: "Your first pieces go up", b: "Send us 2 of your hardest pairs (5–6 angles each) — or we may have already staged your page from your public work. Either way, you approve everything." },
-  { n: "3", t: "You claim your page", b: "One tap, you own it: your bio, your links, your shop. The Culture Verified stamp goes on when it's really you." },
-  { n: "4", t: "First battle", b: "We match you against another maker in your division. The culture votes. Win or lose, thousands of sneakerheads meet your work." },
-  { n: "5", t: "Climb", b: "Heat List rank, tournaments, followers, buyers. The artists at the top aren't lucky — they kept posting pairs." },
+  { n: "1", t: "You got drafted", b: "Someone in the culture called your name. No applications, no gatekeepers — the culture scouts." },
+  { n: "2", t: "Claim your page", b: "Your page may already be staged from your public work. Five minutes: bio, links, your shops connected. Culture Verified stamp when it's really you." },
+  { n: "3", t: "Post pieces, set asks", b: "Your hardest pairs go up priced. Battles put them in front of voters; the market puts bids under them." },
+  { n: "4", t: "Get paid on every layer", b: "Commissions in the inbox, sales at your ask or the high bid, royalties when your work re-trades, and a portfolio that compounds underneath it all." },
 ];
 
 export default async function DraftedPage() {
-  // Social proof: the newest names on the roster — the draft class wall.
-  const roster = await prisma.submission.findMany({
-    where: { status: "APPROVED", category: "sneakers" },
-    orderBy: { createdAt: "desc" },
-    take: 6,
-    select: {
-      id: true, title: true, imageUrl: true, artistName: true,
-      artist: { select: { slug: true } },
-    },
-  });
+  // Live receipts + the draft-class wall — proof the league is real,
+  // pulled fresh on every load.
+  const [artists, pieces, votes, verifiedSales, roster] = await Promise.all([
+    prisma.artistProfile.count({ where: { status: "APPROVED" } }),
+    prisma.submission.count({ where: { status: "APPROVED" } }),
+    prisma.vote.count(),
+    prisma.sale.aggregate({ where: { status: "CONFIRMED", verified: true }, _sum: { priceCents: true } }),
+    prisma.submission.findMany({
+      where: { status: "APPROVED", category: "sneakers" },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      select: {
+        id: true, title: true, imageUrl: true, artistName: true,
+        artist: { select: { slug: true } },
+      },
+    }),
+  ]);
+  const verifiedVolume = verifiedSales._sum.priceCents ?? 0;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -85,39 +98,46 @@ export default async function DraftedPage() {
           You Got <span className="text-gradient-volt">Drafted.</span>
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-smoke">
-          Somebody saw your work and called your name. That&apos;s how it starts
-          here — no applications, no gatekeepers. The culture scouts, the
-          culture votes, and right now the culture is telling us{" "}
+          Somebody saw your work and called your name. That&apos;s how it
+          starts here — no applications, no gatekeepers. The culture scouts,
+          and right now it&apos;s telling us{" "}
           <span className="font-bold text-white">you belong in the league</span>.
         </p>
       </div>
 
-      {/* What the league is */}
+      {/* Level with them first — this reader already won */}
       <div className="mt-12 rounded-2xl border border-edge bg-surface p-6 sm:p-8">
         <div className="rule w-16" />
-        <h2 className="display mt-3 text-3xl text-white">What The League Is</h2>
+        <h2 className="display mt-3 text-3xl text-white">
+          Let&apos;s be honest about what you already have
+        </h2>
         <p className="mt-3 text-smoke">
-          The Heat Chart is the <span className="text-white">custom-sneaker battle league</span> —
-          the place where independent customizers stop being &quot;a page with
-          nice pictures&quot; and start having a record. Artists put their
-          hardest pairs up, the culture votes them into rank on the Heat List,
-          and the winners get the spotlight, the followers, and the buyers.
+          The following. The full order book. The pricing you fought your way
+          to. You built that without us, and nothing on this page pretends
+          otherwise. Another app promising &quot;exposure&quot; is an insult —
+          exposure is the one thing you&apos;re not short on.
         </p>
         <p className="mt-3 text-smoke">
-          The purpose is simple: <span className="text-white">custom sneaker
-          culture deserves a major league</span> — one that belongs to the
-          makers, not to a brand. Built by McCluster Corp&apos;s Equity Uprise
-          project; grown out of the Designer Kicks community.
+          So here&apos;s the actual pitch:{" "}
+          <span className="font-bold text-white">
+            commissions feed you today. Assets feed you forever.
+          </span>{" "}
+          Every platform you&apos;re on sells you more orders — more labor,
+          more hours, more paint. The league is the first one built to make
+          the work you <span className="text-white">already did</span> keep
+          paying you: royalties, resale, provenance, capital. That layer
+          doesn&apos;t exist anywhere else in this culture. That&apos;s the
+          movement.
         </p>
       </div>
 
-      {/* What we do for you */}
+      {/* The originals — what nobody else offers */}
       <div className="mt-12">
         <h2 className="display text-center text-3xl text-white">
-          What The League Does <span className="text-gradient-volt">For You</span>
+          Six Things <span className="text-gradient-volt">Nobody Else Offers You</span>
         </h2>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          {GIVES.map((g) => (
+          {ORIGINALS.map((g) => (
             <div key={g.n} className="rounded-2xl border border-edge bg-surface p-5">
               <p className="tag text-volt">{g.n}</p>
               <h3 className="display mt-1 text-xl text-white">{g.title}</h3>
@@ -125,13 +145,42 @@ export default async function DraftedPage() {
             </div>
           ))}
         </div>
-        <p className="mt-4 rounded-xl border border-volt/40 bg-volt/10 p-4 text-center text-sm text-white">
-          <span className="font-bold">What it costs you: nothing.</span>{" "}
-          <span className="text-smoke">
-            Free for artists, forever. When our own checkout opens, the seller
-            fee is 1% — until then we just point buyers at your shop.
-          </span>
-        </p>
+      </div>
+
+      {/* The terms — kill the catch before they look for it */}
+      <div className="mt-8 rounded-xl border border-volt/40 bg-volt/10 p-5">
+        <h3 className="display text-center text-xl text-white">And the catch is — there isn&apos;t one</h3>
+        <ul className="mx-auto mt-3 max-w-xl space-y-1.5 text-sm text-smoke">
+          <li>
+            <span className="font-bold text-white">No exclusivity.</span> Keep the Etsy, the site,
+            the DMs — we link buyers straight to them. The league is a stage, not a cage.
+          </li>
+          <li>
+            <span className="font-bold text-white">Free for artists, forever.</span> When on-platform
+            checkout opens, the primary fee is 1%. Elsewhere you&apos;re paying 8–13%.
+          </li>
+          <li>
+            <span className="font-bold text-white">Your work stays yours.</span> Copyright, images,
+            client list — all yours. We record provenance; we don&apos;t own product.
+          </li>
+        </ul>
+      </div>
+
+      {/* Live receipts */}
+      <div className="mt-12 overflow-x-auto rounded-lg border border-edge bg-surface">
+        <div className="flex min-w-max divide-x divide-edge text-center">
+          {[
+            { label: "Artists On The Chart", value: artists.toLocaleString("en-US") },
+            { label: "Pieces Catalogued", value: pieces.toLocaleString("en-US") },
+            { label: "Votes Cast", value: votes.toLocaleString("en-US") },
+            { label: "Verified Volume", value: verifiedVolume > 0 ? formatUsd(verifiedVolume) : "Opening" },
+          ].map((s) => (
+            <div key={s.label} className="flex-1 px-5 py-3">
+              <p className="text-lg font-bold tabular-nums text-white">{s.value}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">{s.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* How draft day works */}
@@ -183,15 +232,21 @@ export default async function DraftedPage() {
       <div className="mt-12 rounded-3xl border border-volt/40 bg-surface p-8 text-center shadow-2xl">
         <h2 className="display text-3xl text-white">Accept The Draft</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-smoke">
-          Send your two hardest pairs and take your spot. Five minutes,
-          your phone&apos;s camera roll, done.
+          Claim your page or post your two hardest pairs. Five minutes, your
+          phone&apos;s camera roll — and your catalog starts compounding.
         </p>
         <div className="mx-auto mt-6 grid max-w-sm gap-2">
-          <Link href="/submit" className="btn-hard block rounded-xl py-3.5 tag font-bold">
+          <Link href="/artists" className="btn-hard block rounded-xl py-3.5 tag font-bold">
+            My Page Is Already Up — Claim It
+          </Link>
+          <Link href="/submit" className="btn-hard-volt block rounded-xl py-3.5 tag font-bold">
             Accept — Submit My Pairs
           </Link>
-          <Link href="/artists" className="btn-hard-volt block rounded-xl py-3.5 tag font-bold">
-            My Page Is Already Up — Claim It
+          <Link
+            href="/art-capital"
+            className="block rounded-xl border border-edge py-3.5 tag text-smoke transition hover:border-volt hover:text-white"
+          >
+            Read The Art-Capital Program First
           </Link>
         </div>
         <p className="mt-4 text-xs text-smoke/70">
