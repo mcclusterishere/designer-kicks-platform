@@ -703,6 +703,24 @@ model Sale {
   createdAt DateTime @default(now())
 }
 
+// Independent appraisers applying to the network — the arm's-length
+// signatures that turn Portfolio Statements into bankable paper. The
+// platform routes members to them and licenses them the data; their
+// independence is the product, so they are never platform employees.
+model AppraiserApplication {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  org         String? // ISA / AAA / ASA + designation, e.g. "ISA AM"
+  specialty   String? // what they appraise today
+  links       String? // site / LinkedIn / sample report
+  note        String?
+  status      String   @default("NEW") // NEW | CONTACTED | ACTIVE | PASSED
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+}
+
 // A fan asking an artist to build on a specific base: the marketplace
 // repurposed for customizing. The fan proposes base + budget; the
 // artist accepts or passes. On accept, the fan buys the base pair

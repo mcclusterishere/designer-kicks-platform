@@ -183,6 +183,10 @@ export default async function AdminPage({
   });
 
   // Team: editors, their message threads, staged prospects, and careers.
+  const appraiserApplications = await prisma.appraiserApplication.findMany({
+    where: { status: "NEW" },
+    orderBy: { createdAt: "asc" },
+  });
   const [editors, editorThread, stagedProspects, jobPostings, jobApplications] = await Promise.all([
     prisma.user.findMany({
       where: { role: "EDITOR" },
@@ -637,6 +641,28 @@ export default async function AdminPage({
             <div className="mt-3"><NewJobForm /></div>
           </details>
         </div>
+
+        {appraiserApplications.length > 0 && (
+          <div className="mt-6">
+            <p className="tag text-smoke">
+              Appraiser network applications ({appraiserApplications.length})
+            </p>
+            <div className="mt-2 space-y-2">
+              {appraiserApplications.map((ap) => (
+                <div key={ap.id} className="rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                  <p>
+                    <span className="font-bold text-white">{ap.name}</span>{" "}
+                    <a href={`mailto:${ap.email}`} className="text-volt underline">{ap.email}</a>
+                    {ap.org && <span className="text-smoke"> · {ap.org}</span>}
+                  </p>
+                  {ap.specialty && <p className="mt-0.5 text-xs text-smoke">Specialty: {ap.specialty}</p>}
+                  {ap.links && <p className="mt-0.5 truncate text-xs text-smoke">{ap.links}</p>}
+                  {ap.note && <p className="mt-0.5 text-xs text-smoke">{ap.note}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {jobApplications.length > 0 && (
           <div className="mt-6">

@@ -125,3 +125,58 @@ estimate surface in the app already carries the disclaimer.
   their bid, it never stacks the book or pumps HX.
 - Estimates always print their basis and the disclaimer, including in
   the API.
+
+## 7. Becoming the appraiser — the USPAP ladder
+
+Personal-property appraisal is NOT state-licensed (that's real estate
+only), so the path is education + designation + practice:
+
+1. **15-Hour National USPAP Course + exam** (~$400-600, about a week,
+   online) → can legitimately write USPAP-compliant reports and say
+   "USPAP-trained." Then the 7-Hour Update every two years.
+2. **ISA designation** — Core Course in Appraisal Studies + peer-
+   reviewed reports → Accredited Member, with a custom-sneaker/
+   streetwear specialty. Realistically 6-12 months. (AAA and ASA are
+   the alternative recognized bodies.)
+3. **IRS "qualified appraiser"** — designation from a recognized org
+   OR documented education + 2+ years regularly appraising this
+   property type for pay. Platform-referred paid reports start that
+   clock.
+
+**Independence policy (binding on the house):**
+- The in-house appraiser MAY sign: insurance schedules, estate and
+  donation appraisals for third parties, artist portfolio reviews,
+  paid appraisal reports for members — each with a written disclosure
+  of the platform relationship.
+- The in-house appraiser MAY NOT sign: any appraisal supporting the
+  founder's or the platform's own financing (parties to the
+  transaction are excluded from IRS "qualified appraiser" status and
+  lenders reject them), or any assignment with a fee contingent on a
+  predetermined value (USPAP Ethics Rule).
+- Lending appraisals route to the independent network (/appraisers)
+  exclusively — independence is what makes the paper bankable.
+- Every in-house report carries: "The appraiser is affiliated with The
+  Heat Chart, which operates the marketplace on which the subject
+  property may trade and earns fees on such trades."
+
+## 8. USPAP course — booking shortlist (July 2026)
+
+Ready to book; checkout needs the founder's card:
+
+1. **McKissock Learning** — mckissock.com/appraisal/uspap/ — the sole
+   asynchronous (on-demand) host of the official 2026-27 15-Hour
+   National USPAP Course. Book tonight, start tonight. RECOMMENDED
+   first move.
+2. **Appraisers Association of America** — appraisersassociation.org —
+   15-Hour USPAP Online taught for PERSONAL PROPERTY specifically.
+   $500 member / $600 non-member, includes the USPAP book + manuals.
+3. **ISA (isa-appraisers.org)** — live-online 15-Hour USPAP cohorts +
+   the Core Course in Appraisal Studies (the designation ladder;
+   historically ~$1,345 member / ~$1,620 non-member; join ISA first
+   for member pricing). Check the current cohort calendar — live
+   cohorts run periodically; the Core Course also runs self-paced
+   through their Online Learning Center.
+
+Sequence: McKissock 15-hour now → join ISA → Core Course next cohort →
+Accredited Member with a custom-sneaker/streetwear specialty → two
+years of paid reports (platform referrals count) → IRS-qualified.

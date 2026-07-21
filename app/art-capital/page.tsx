@@ -135,8 +135,12 @@ export default function ArtCapitalPage() {
           Take the statement to a qualified appraiser for a formal
           valuation, then to lenders. Art-secured lending is a real,
           established industry — what it demands is exactly the paper this
-          platform builds. As partner institutions come aboard, we&apos;ll
-          route introductions through the program.
+          platform builds. The house is climbing the USPAP credential
+          ladder itself, and lending appraisals stay with the{" "}
+          <Link href="/appraisers" className="text-volt underline">
+            independent appraiser network
+          </Link>{" "}
+          by design — independence is what makes the paper bankable.
         </li>
       </ol>
 
@@ -149,8 +153,12 @@ export default function ArtCapitalPage() {
             public API
           </Link>{" "}
           — pieces, provenance, pricing, and the published estimate
-          methodology. To talk partnerships, reach the administration
-          through the platform&apos;s contact channels.
+          methodology. USPAP-credentialed appraisers:{" "}
+          <Link href="/appraisers" className="text-volt underline">
+            the independent network is open
+          </Link>
+          . For everything else, reach the administration through the
+          platform&apos;s contact channels.
         </p>
       </div>
 

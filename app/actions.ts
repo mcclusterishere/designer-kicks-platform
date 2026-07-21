@@ -3785,3 +3785,52 @@ export async function respondCommissionRequest(id: string, accept: boolean): Pro
   }
   revalidatePath("/studio");
 }
+
+// ---------- Independent appraiser network ----------
+
+/**
+ * Intake for independent appraisers joining the network. Public form
+ * (appraisers aren't members yet), rate-limited by IP. Independence is
+ * the product: they never become platform employees, and the platform
+ * never touches their conclusions - it feeds them data and clients.
+ */
+export async function applyAppraiser(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const org = String(formData.get("org") ?? "").trim();
+  const specialty = String(formData.get("specialty") ?? "").trim();
+  const links = String(formData.get("links") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!name || name.length > 80) return { ok: false, error: "Your name is required." };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  if (org.length > 120 || specialty.length > 160 || links.length > 300 || note.length > 600) {
+    return { ok: false, error: "One of the fields is too long." };
+  }
+
+  const hdrs = await headers();
+  const ip = (hdrs.get("x-forwarded-for") ?? "local").split(",")[0].trim();
+  if (!allowAttempt("appraiser-apply", ip, 5, 60 * 60 * 1000)) {
+    return { ok: false, error: "Too many applications from this connection - try again in an hour." };
+  }
+
+  await prisma.appraiserApplication.create({
+    data: {
+      name,
+      email,
+      org: org || null,
+      specialty: specialty || null,
+      links: links || null,
+      note: note || null,
+    },
+  });
+
+  notifyAdmin(
+    "Appraiser network application",
+    `${name} <${email}>\nCredentials: ${org || "-"}\nSpecialty: ${specialty || "-"}\nLinks: ${links || "-"}\n\n${note || ""}`
+  );
+  return { ok: true };
+}
