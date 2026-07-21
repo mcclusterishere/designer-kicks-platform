@@ -64,21 +64,23 @@ export default async function RatePage() {
     }),
     // Real retail shoes from the catalog — the culture fans' lane. Only
     // shoes with photos make the deck; battles stay customs-only. Pulled
-    // unfiltered, then weighted by lane below.
-    prisma.catalogShoe.findMany({
-      where: {
-        imageUrl: { not: null },
-        ratings: { none: { userId } },
-        ...(lane && strict ? { gender: lane } : {}),
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 150,
-      select: {
-        id: true, name: true, brand: true, silhouette: true, colorway: true,
-        imageUrl: true, retailPriceCents: true, marketPriceCents: true,
-        releaseDate: true, gender: true,
-      },
-    }),
+    // unfiltered, then weighted by lane below. Sampled ORDER BY random()
+    // — recency ordering dealt a wall of whatever brand imported last.
+    prisma.$queryRaw<
+      {
+        id: string; name: string; brand: string | null; silhouette: string | null;
+        colorway: string | null; imageUrl: string | null; retailPriceCents: number | null;
+        marketPriceCents: number | null; releaseDate: Date | null; gender: string | null;
+      }[]
+    >`
+      SELECT id, name, brand, silhouette, colorway, "imageUrl",
+             "retailPriceCents", "marketPriceCents", "releaseDate", gender
+      FROM "CatalogShoe"
+      WHERE "imageUrl" IS NOT NULL
+        AND id NOT IN (SELECT "shoeId" FROM "CatalogRating" WHERE "userId" = ${userId})
+        AND (${lane && strict ? lane : null}::text IS NULL OR gender = ${lane && strict ? lane : null}::text)
+      ORDER BY random()
+      LIMIT 150`,
     prisma.designRating.count({ where: { userId } }),
     prisma.catalogRating.count({ where: { userId } }),
     getTasteProfile(session.user.id),

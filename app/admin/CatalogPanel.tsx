@@ -51,6 +51,30 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
           this plan/endpoint. Retail prices and photos still land.
         </p>
       )}
+
+      {/* Research exports — feed the base to NotebookLM/Gemini, bring back
+          article angles. One CSV per brand, or the whole knowledge base. */}
+      <div className="mt-4 border-t border-edge pt-3">
+        <p className="tag text-smoke">Export the knowledge base (CSV)</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <a href="/api/catalog-export" className="tag rounded-full border border-edge px-3 py-1.5 text-smoke transition hover:border-volt hover:text-white">
+            Everything
+          </a>
+          {["Jordan", "Nike", "adidas", "New Balance"].map((b) => (
+            <a
+              key={b}
+              href={`/api/catalog-export?brand=${encodeURIComponent(b)}`}
+              className="tag rounded-full border border-edge px-3 py-1.5 text-smoke transition hover:border-volt hover:text-white"
+            >
+              {b}
+            </a>
+          ))}
+        </div>
+        <p className="mt-1.5 text-xs text-smoke/70">
+          Any brand works: <span className="font-mono">/api/catalog-export?brand=Asics</span> —
+          or <span className="font-mono">?q=dunk</span> for a search slice.
+        </p>
+      </div>
     </div>
   );
 }
