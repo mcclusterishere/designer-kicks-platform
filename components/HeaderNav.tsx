@@ -9,7 +9,7 @@ const LINKS = [
   {
     href: "/battles",
     label: "Arena",
-    match: ["/battles", "/outfits", "/rate", "/tournaments", "/artists", "/heat-list", "/quiz", "/giveaway"],
+    match: ["/battles", "/outfits", "/rate", "/games", "/tournaments", "/artists", "/heat-list", "/quiz", "/giveaway"],
   },
   { href: "/drops", label: "Drops", match: ["/drops", "/news"] },
   { href: "/catalog", label: "Catalog", match: ["/catalog"] },
