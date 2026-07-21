@@ -9,7 +9,7 @@ import { formatUsd } from "@/lib/market";
 import MiniBars from "@/components/MiniBars";
 import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
-import { removeArtistShop, markSellsNowhere } from "@/app/actions";
+import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
 import { siteUrl } from "@/lib/articles";
@@ -27,11 +27,16 @@ export default async function StudioPage() {
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat, myDrops, myShops] = await Promise.all([
+  const [data, heat, myDrops, myShops, commissions] = await Promise.all([
     getStudioData(profile.id),
     getHeatList(),
     prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
     prisma.artistShop.findMany({ where: { artistId: profile.id }, orderBy: { createdAt: "asc" } }),
+    prisma.commissionRequest.findMany({
+      where: { artistId: profile.id, status: "PENDING" },
+      orderBy: { createdAt: "asc" },
+      include: { user: { select: { name: true } } },
+    }),
   ]);
   if (!data) redirect("/submit");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
@@ -97,6 +102,44 @@ export default async function StudioPage() {
           </div>
         ))}
       </div>
+
+      {/* Commission inbox — fans proposing builds. Accepting emails the
+          fan their next steps (buy the base, arrange shipping by email). */}
+      {commissions.length > 0 && (
+        <div className="mt-8 rounded-xl border border-volt/40 bg-volt/5 p-5">
+          <h2 className="display text-lg text-white">
+            Commission requests <span className="text-volt">({commissions.length})</span>
+          </h2>
+          <div className="mt-3 space-y-2">
+            {commissions.map((c) => (
+              <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                <div className="min-w-0">
+                  <p className="font-bold text-white">
+                    {c.baseName}
+                    {c.budgetCents && (
+                      <span className="ml-2 tabular-nums text-volt">{formatUsd(c.budgetCents)} budget</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-smoke">
+                    from {c.user.name ?? "a fan"}
+                    {c.note && ` — "${c.note}"`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <form action={respondCommissionRequest.bind(null, c.id, true)}>
+                    <button className="rounded border border-volt px-3 py-1.5 tag font-bold text-volt transition hover:bg-volt/10">
+                      Accept
+                    </button>
+                  </form>
+                  <form action={respondCommissionRequest.bind(null, c.id, false)}>
+                    <button className="rounded border border-edge px-3 py-1.5 tag text-smoke">Pass</button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Momentum */}
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">

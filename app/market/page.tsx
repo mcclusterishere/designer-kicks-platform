@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { getMarketBoard, getOgBoard, formatUsd, type MarketItem, type OgItem } from "@/lib/market";
+import { getMarketBoard, getOgBoard, getHotBases, formatUsd, type MarketItem, type OgItem, type HotBase } from "@/lib/market";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
+import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
 
 export const metadata = {
   title: "Market — Custom Heat & OG Drops, Priced Live | The Heat Chart",
@@ -101,6 +102,11 @@ function CustomTile({
             Consigned
           </span>
         )}
+        {item.ownerName && item.askCents && (
+          <span className="absolute bottom-2 right-2 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            Resale
+          </span>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-3">
         <p className="truncate text-sm font-semibold text-white" title={item.title}>
@@ -134,6 +140,11 @@ function CustomTile({
               ? ` — prior sale ${formatUsd(item.consignment.priorSaleCents)}`
               : ""}{" "}
             · proceeds split with a private collector
+          </p>
+        )}
+        {item.ownerName && item.askCents && (
+          <p className="mt-1 text-[11px] leading-relaxed text-smoke">
+            Collector resale — {RESALE_ARTIST_ROYALTY_PCT}% royalty goes back to the artist
           </p>
         )}
 
@@ -231,10 +242,22 @@ function OgTile({ item }: { item: OgItem }) {
             {item.premiumPct !== null && <Delta pct={item.premiumPct} />}
           </div>
         </div>
-        <p className="mt-1.5 text-[11px] tabular-nums text-smoke">
-          Retail: <span className="text-white">{item.retailCents ? formatUsd(item.retailCents) : "—"}</span>
-          {item.premiumPct !== null && <span className="ml-1">vs retail</span>}
-        </p>
+        {/* The spread: retail → eBay new → eBay used. Live medians from
+            the auto-matcher; dashes until the eBay keys connect. */}
+        <div className="mt-1.5 space-y-0.5 text-[11px] tabular-nums text-smoke">
+          <p className="flex justify-between">
+            <span>Retail</span>
+            <span className="text-white">{item.retailCents ? formatUsd(item.retailCents) : "—"}</span>
+          </p>
+          <p className="flex justify-between">
+            <span>eBay new</span>
+            <span className="text-white">{item.ebayNewCents ? formatUsd(item.ebayNewCents) : "—"}</span>
+          </p>
+          <p className="flex justify-between">
+            <span>eBay used</span>
+            <span className="text-white">{item.ebayUsedCents ? formatUsd(item.ebayUsedCents) : "—"}</span>
+          </p>
+        </div>
       </div>
     </Link>
   );
@@ -252,11 +275,12 @@ export default async function MarketPage({
   const og = board === "og";
   const needle = q.trim().toLowerCase();
 
-  const [session, customsBoard, ogBoard, heat] = await Promise.all([
+  const [session, customsBoard, ogBoard, heat, hotBases] = await Promise.all([
     auth(),
     og ? null : getMarketBoard(),
     og ? getOgBoard() : null,
     og ? Promise.resolve([]) : getHeatList(),
+    og ? getHotBases() : Promise.resolve([]),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
 
@@ -303,7 +327,7 @@ export default async function MarketPage({
       </div>
 
       {og && ogBoard ? (
-        <OgBoardView board={ogBoard} q={q} needle={needle} sort={sort} brand={brand} />
+        <OgBoardView board={ogBoard} hotBases={hotBases} q={q} needle={needle} sort={sort} brand={brand} />
       ) : customsBoard ? (
         <CustomsBoardView
           board={customsBoard}
@@ -445,12 +469,14 @@ function CustomsBoardView({
 
 function OgBoardView({
   board,
+  hotBases,
   q,
   needle,
   sort,
   brand,
 }: {
   board: Awaited<ReturnType<typeof getOgBoard>>;
+  hotBases: HotBase[];
   q: string;
   needle: string;
   sort: string;
@@ -471,6 +497,35 @@ function OgBoardView({
 
   return (
     <>
+      {/* Hot Bases — what the culture is actually building on. Price
+          feeds say what a pair costs; this says what pairs get CHOSEN,
+          and what the work turns them into. */}
+      {hotBases.length > 0 && (
+        <div className="mt-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">
+            Hot bases — most customized in the league
+          </p>
+          <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            {hotBases.map((hb) => (
+              <Link
+                key={hb.silhouette}
+                href={`/market?board=og&q=${encodeURIComponent(hb.silhouette)}`}
+                className="shrink-0 rounded-lg border border-edge bg-surface px-3 py-2 transition hover:border-volt/50"
+              >
+                <p className="text-xs font-bold text-white">{hb.silhouette}</p>
+                <p className="mt-0.5 text-[11px] tabular-nums text-smoke">
+                  {hb.customsBuilt} custom{hb.customsBuilt === 1 ? "" : "s"}
+                  {hb.recentBuilds > 0 && <span className="text-volt"> · {hb.recentBuilds} this month</span>}
+                  {hb.avgCustomAskCents && (
+                    <span> · avg ask {formatUsd(hb.avgCustomAskCents)}</span>
+                  )}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <StatStrip
         stats={[
           { label: "Pairs Tracked", value: stats.tracked.toLocaleString("en-US") },

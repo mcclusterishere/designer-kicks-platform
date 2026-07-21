@@ -62,10 +62,12 @@ const TABS: Tab[] = [
     ),
   },
   {
-    href: "/quiz",
-    label: "Heat Check",
-    match: ["/quiz", "/giveaway"],
-    icon: null, // center flame renders specially
+    // The exchange takes the center throne — Heat Check lives on in the
+    // home feed's game loop (and /quiz still works from there).
+    href: "/market",
+    label: "Market",
+    match: ["/market", "/catalog", "/quiz", "/giveaway", "/collectors", "/shop"],
+    icon: null, // center chart renders specially
   },
   {
     href: "/drops",
@@ -114,26 +116,34 @@ export default function MobileTabBar() {
       <div className="mx-auto flex max-w-lg items-end justify-around px-2">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
-          if (tab.label === "Heat Check") {
+          if (tab.label === "Market") {
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                aria-label="Heat Check quiz"
+                aria-label="The Market — live prices"
                 aria-current={active ? "page" : undefined}
                 className="relative -top-4 flex flex-col items-center"
               >
                 <span
-                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 text-2xl transition ${
+                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition ${
                     active
                       ? "border-volt bg-volt text-ink glow-volt"
-                      : "border-heat bg-panel glow-heat"
+                      : "border-heat bg-panel text-heat glow-heat"
                   }`}
                 >
-                  🔥
+                  {/* Candlestick chart mark — the exchange. */}
+                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                    <path d="M6 4v3M6 13v3" />
+                    <rect x="4.5" y="7" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+                    <path d="M12 7v2M12 15v2" />
+                    <rect x="10.5" y="9" width="3" height="6" rx="0.8" />
+                    <path d="M18 3v3M18 12v3" />
+                    <rect x="16.5" y="6" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+                  </svg>
                 </span>
                 <span className={`tag mt-0.5 ${active ? "text-volt" : "text-smoke"}`}>
-                  Heat Check
+                  Market
                 </span>
               </Link>
             );

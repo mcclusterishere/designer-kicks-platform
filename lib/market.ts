@@ -142,6 +142,9 @@ export type OgItem = {
   retailCents: number | null;
   marketCents: number;
   premiumPct: number | null; // resale vs retail, e.g. +142 / -12
+  // The eBay legs of the spread — live medians from the auto-matcher.
+  ebayNewCents: number | null;
+  ebayUsedCents: number | null;
   releaseDate: Date | null;
 };
 
@@ -164,6 +167,7 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
     select: {
       sku: true, name: true, brand: true, imageUrl: true,
       retailPriceCents: true, marketPriceCents: true, releaseDate: true,
+      ebayNewCents: true, ebayUsedCents: true,
     },
   });
 
@@ -178,6 +182,8 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
       s.retailPriceCents && s.retailPriceCents > 0
         ? Math.round(((s.marketPriceCents! - s.retailPriceCents) / s.retailPriceCents) * 100)
         : null,
+    ebayNewCents: s.ebayNewCents,
+    ebayUsedCents: s.ebayUsedCents,
     releaseDate: s.releaseDate,
   }));
 
@@ -194,4 +200,49 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
 
   const brands = [...new Set(items.map((i) => i.brand).filter((b): b is string => Boolean(b)))].sort();
   return { items, stats, brands };
+}
+
+export type HotBase = {
+  silhouette: string;
+  customsBuilt: number;
+  recentBuilds: number; // last 30 days — what's popping NOW
+  avgCustomAskCents: number | null;
+};
+
+/**
+ * The Hot Bases rail — which silhouettes the CULTURE is actually
+ * building on. Base-model demand data (eBay/KicksDB prices) says what
+ * pairs cost; this says what pairs get chosen. The blend is the
+ * algorithm: customs-built count ranks it, recent builds break ties,
+ * and the average custom ask shows what the work turns the base into.
+ */
+export async function getHotBases(limit = 8): Promise<HotBase[]> {
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const pieces = await prisma.submission.findMany({
+    where: { status: "APPROVED", silhouette: { not: null }, category: "sneakers" },
+    select: { silhouette: true, createdAt: true, askingPriceCents: true },
+  });
+
+  const bySilhouette = new Map<string, { total: number; recent: number; asks: number[] }>();
+  for (const p of pieces) {
+    const key = p.silhouette!.trim();
+    if (!key) continue;
+    const entry = bySilhouette.get(key) ?? { total: 0, recent: 0, asks: [] };
+    entry.total += 1;
+    if (p.createdAt >= monthAgo) entry.recent += 1;
+    if (p.askingPriceCents) entry.asks.push(p.askingPriceCents);
+    bySilhouette.set(key, entry);
+  }
+
+  return [...bySilhouette.entries()]
+    .map(([silhouette, e]) => ({
+      silhouette,
+      customsBuilt: e.total,
+      recentBuilds: e.recent,
+      avgCustomAskCents: e.asks.length
+        ? Math.round(e.asks.reduce((s, a) => s + a, 0) / e.asks.length)
+        : null,
+    }))
+    .sort((a, b) => b.customsBuilt - a.customsBuilt || b.recentBuilds - a.recentBuilds)
+    .slice(0, limit);
 }

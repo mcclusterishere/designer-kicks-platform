@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refreshCatalogPricing } from "@/lib/catalog";
+import { syncEbayPrices } from "@/lib/ebay";
 
 /**
  * Scheduled catalog refresher. Re-imports a rotating handful of brands
@@ -17,5 +18,9 @@ export async function GET(req: NextRequest) {
   }
 
   const summary = await refreshCatalogPricing();
-  return NextResponse.json(summary);
+  // Same tick keeps the eBay legs of the spread matched — a rotating
+  // batch per run covers the whole catalog across days. Dormant
+  // without eBay keys.
+  const ebay = await syncEbayPrices().catch(() => ({ configured: true, checked: 0, matched: 0 }));
+  return NextResponse.json({ ...summary, ebay });
 }

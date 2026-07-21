@@ -8,6 +8,8 @@ import { computeBadges } from "@/lib/quiz";
 import { formatUsd } from "@/lib/market";
 import AskForm from "@/components/AskForm";
 import RecordSaleForm from "@/components/RecordSaleForm";
+import ShippingQuote from "@/components/ShippingQuote";
+import { resaleSplitLabel } from "@/lib/resale";
 
 export const dynamic = "force-dynamic";
 
@@ -167,9 +169,16 @@ export default async function CollectorPage({ params }: Props) {
                   {isOwnCloset && !pendingSale && (
                     <>
                       <AskForm submissionId={s.id} currentAskCents={s.askingPriceCents} />
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-smoke/80">
+                        Reconsignment terms: relisting unlocks once your
+                        purchase is verified (receipt or admin check). When it
+                        sells, {resaleSplitLabel()} — the artist eats on every
+                        resale of their work, and so does the house.
+                      </p>
                       <RecordSaleForm submissionId={s.id} />
                     </>
                   )}
+                  {isOwnCloset && pendingSale && <ShippingQuote />}
                 </div>
               </div>
             );

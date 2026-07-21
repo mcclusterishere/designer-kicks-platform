@@ -125,6 +125,7 @@ model ArtistProfile {
   submissions Submission[]
   collabs      Submission[]  @relation("collabPieces")
   consignments Consignment[]
+  commissionRequests CommissionRequest[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
@@ -532,6 +533,8 @@ model User {
   // hasn't agreed yet.
   pmaAcceptedAt DateTime?
 
+  commissionRequests CommissionRequest[]
+
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
@@ -698,6 +701,29 @@ model Sale {
   verifiedBy String? // "evidence" | "admin"
 
   createdAt DateTime @default(now())
+}
+
+// A fan asking an artist to build on a specific base: the marketplace
+// repurposed for customizing. The fan proposes base + budget; the
+// artist accepts or passes. On accept, the fan buys the base pair
+// (eBay affiliate link) and the two arrange delivery to the artist —
+// addresses move through email, never the public site.
+model CommissionRequest {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artistId String
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  baseName    String // e.g. "Air Jordan 1 Mid, white"
+  catalogSku  String? // set when the fan started from a catalog page
+  budgetCents Int?
+  note        String?
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt   DateTime @default(now())
+
+  @@index([artistId, status])
+  @@index([userId])
 }
 
 // A disclosed consignment relist: a previously-sold piece comes back to
@@ -967,6 +993,12 @@ model CatalogShoe {
   // Live resale value (avg/lowest ask) captured from the provider at
   // import time — refreshes every re-import. The StockX-style number.
   marketPriceCents Int?
+  // The eBay legs of the spread: what the pair actually moves for new
+  // and used on the open secondary market. Auto-matched by the eBay
+  // Browse API sync (no manual uploads) — median of live listings.
+  ebayNewCents  Int?
+  ebayUsedCents Int?
+  ebayCheckedAt DateTime?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.

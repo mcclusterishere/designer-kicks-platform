@@ -19,6 +19,9 @@ import DonorShoe from "@/components/DonorShoe";
 import SellNowButton from "@/components/SellNowButton";
 import ShippingQuote from "@/components/ShippingQuote";
 import ConsignForm from "@/components/ConsignForm";
+import CommissionForm from "@/components/CommissionForm";
+import ClaimLinkShare from "@/components/ClaimLinkShare";
+import { siteUrl } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +126,9 @@ export default async function ArtistPage({ params }: Props) {
             {artist.city}
           </p>
           {artist.bio && <p className="mt-3 max-w-xl text-smoke">{artist.bio}</p>}
+          {!isOwnPage && session?.user && (
+            <CommissionForm artistId={artist.id} artistName={artist.displayName} />
+          )}
         </div>
         <div className="flex flex-col items-end gap-2">
           {isOwnPage && (
@@ -370,7 +376,12 @@ export default async function ArtistPage({ params }: Props) {
                   {isOwnPage && !pendingSale && !s.owner && s.consignment?.status !== "OPEN" && (
                     <ConsignForm submissionId={s.id} />
                   )}
-                  {isOwnPage && pendingSale && <ShippingQuote />}
+                  {isOwnPage && pendingSale && (
+                    <>
+                      <ClaimLinkShare saleId={pendingSale.id} siteUrl={siteUrl()} />
+                      <ShippingQuote />
+                    </>
+                  )}
                 </div>
               </div>
             );

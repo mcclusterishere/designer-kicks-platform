@@ -38,6 +38,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomUUID, randomInt, randomBytes } from "crypto";
 import { saveUpload } from "@/lib/storage";
+import { resaleSplitLabel } from "@/lib/resale";
 import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
@@ -667,9 +668,28 @@ export async function setAskingPrice(
   const submissionId = String(formData.get("submissionId") ?? "");
   const priceRaw = String(formData.get("price") ?? "").replace(/[$,\s]/g, "");
 
-  const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: {
+      sales: {
+        where: { status: "CONFIRMED", buyerId: session.user.id },
+        orderBy: { soldAt: "desc" },
+        take: 1,
+      },
+    },
+  });
   if (!submission || submission.ownerId !== session.user.id) {
     return { ok: false, error: "Only the current owner can set an ask." };
+  }
+  // Reconsignment gate: relisting requires the acquiring sale to be
+  // VERIFIED — evidence or admin review proving the pair is physically
+  // in the collector's hands. Keeps ghost inventory off the board.
+  if (!submission.sales[0]?.verified) {
+    return {
+      ok: false,
+      error:
+        "Relisting unlocks once your purchase is verified — add a receipt or payment evidence to the sale (or ask the admin to verify) proving the piece is in your hands.",
+    };
   }
 
   let askingPriceCents: number | null = null;
@@ -1380,7 +1400,9 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
         priceCents: offer.amountCents,
         note: activeConsignment
           ? `Accepted platform offer — consignment relist, ${activeConsignment.splitPct}% of proceeds to the consignor`
-          : "Accepted platform offer",
+          : offer.submission.ownerId
+            ? `Accepted platform offer — collector resale under the reconsignment program (${resaleSplitLabel()})`
+            : "Accepted platform offer",
       },
     }),
     prisma.offer.update({ where: { id: offerId }, data: { status: "ACCEPTED" } }),
@@ -3663,4 +3685,103 @@ export async function deleteGroupLead(id: string) {
   await requireAdmin();
   await prisma.groupLead.delete({ where: { id } }).catch(() => {});
   revalidatePath("/admin");
+}
+
+// ---------- Commission requests (the marketplace, repurposed for customizing) ----------
+
+/**
+ * A fan proposes a build: base pair + budget + the idea. The artist
+ * accepts or passes from the Studio. On accept, both sides get mail —
+ * the fan buys the base (eBay link included when the affiliate rail is
+ * up) and ships it to the artist; addresses trade over email, never on
+ * the public site.
+ */
+export async function submitCommissionRequest(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to commission a custom." };
+
+  const artistId = String(formData.get("artistId") ?? "");
+  const baseName = String(formData.get("baseName") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  const budgetRaw = String(formData.get("budget") ?? "").replace(/[$,\s]/g, "");
+
+  if (!baseName || baseName.length > 120) {
+    return { ok: false, error: "Name the base pair (e.g. Air Force 1 Triple White, size 10)." };
+  }
+  if (note.length > 500) return { ok: false, error: "Keep the idea under 500 characters." };
+  let budgetCents: number | null = null;
+  if (budgetRaw) {
+    const budget = Number(budgetRaw);
+    if (!Number.isFinite(budget) || budget < 1 || budget > 100000) {
+      return { ok: false, error: "Budget should be 1-100,000 dollars." };
+    }
+    budgetCents = Math.round(budget * 100);
+  }
+  if (!allowAttempt("commission", session.user.id, 10, 24 * 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of commission requests for one day - try tomorrow." };
+  }
+
+  const artist = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    select: { id: true, status: true, userId: true, displayName: true, user: { select: { email: true } } },
+  });
+  if (!artist || artist.status !== "APPROVED") return { ok: false, error: "Artist not found." };
+  if (artist.userId === session.user.id) {
+    return { ok: false, error: "That's your own page - fans commission YOU here." };
+  }
+
+  await prisma.commissionRequest.create({
+    data: { userId: session.user.id, artistId: artist.id, baseName, budgetCents, note: note || null },
+  });
+
+  if (artist.user?.email) {
+    sendMail({
+      to: artist.user.email,
+      subject: `Commission request: ${baseName} 🎨`,
+      text:
+        `A fan wants you to build on a ${baseName}` +
+        (budgetCents ? ` with a $${Math.round(budgetCents / 100)} budget` : "") +
+        `.\n\n${note ? `Their idea: ${note}\n\n` : ""}` +
+        `Accept or pass from your Studio: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/studio`,
+    }).catch(() => {});
+  }
+  return { ok: true };
+}
+
+export async function respondCommissionRequest(id: string, accept: boolean): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const request = await prisma.commissionRequest.findUnique({
+    where: { id },
+    include: {
+      artist: { select: { userId: true, displayName: true } },
+      user: { select: { email: true } },
+    },
+  });
+  if (!request || request.status !== "PENDING") return;
+  if (request.artist.userId !== session.user.id) return;
+
+  await prisma.commissionRequest.update({
+    where: { id },
+    data: { status: accept ? "ACCEPTED" : "DECLINED" },
+  });
+
+  if (accept && request.user.email) {
+    const ebaySearch = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(request.baseName)}`;
+    sendMail({
+      to: request.user.email,
+      subject: `${request.artist.displayName} accepted your commission 🔥`,
+      text:
+        `${request.artist.displayName} is in on your ${request.baseName} build.\n\n` +
+        `Next steps:\n` +
+        `1. Get the base pair - grab it on eBay: ${ebaySearch}\n` +
+        `2. The artist will email you from this thread to trade shipping details (never posted publicly).\n` +
+        `3. When the piece is done it goes up on your artist's page - and into your closet on the chart.\n\n` +
+        `Price and payment settle between you two directly.`,
+    }).catch(() => {});
+  }
+  revalidatePath("/studio");
 }
