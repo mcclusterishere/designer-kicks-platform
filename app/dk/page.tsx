@@ -2,18 +2,18 @@ import Link from "next/link";
 import { DK_VARIANTS } from "./variants";
 
 export const metadata = {
-  title: "DK × Heat Chart — Campaign HQ",
+  title: "DK × Heat Chart — Asset Landing Pages",
   description:
-    "Every ad creative, its landing page, and its copy-paste Facebook copy in one place.",
+    "Every generated asset, its own landing page, and its copy in one place.",
   robots: { index: false, follow: false },
 };
 
 /**
- * The campaign control page for the Designer Kicks rebrand buy: every
- * creative, its landing page, its exact ad URL (utm-tagged per variant
- * so results read per-creative), and the copy to paste into Ads
- * Manager. Not linked from anywhere public and noindexed — this page
- * exists so the ad buy is a copy-paste job, not a memory test.
+ * The index for the Designer Kicks rebrand assets: every generated
+ * video has its own landing page with its copy, and this page is the
+ * one place to see them all — preview link, the asset itself, the
+ * copy that pairs with it, and the tagged URL to use anywhere the
+ * asset runs. Not linked from anywhere public and noindexed.
  */
 
 const SITE = "https://theheatchart.com";
@@ -22,42 +22,16 @@ const UTM = "utm_source=facebook&utm_medium=paid&utm_campaign=dk_rebrand";
 export default function DkCampaignPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <p className="tag text-heat">Campaign HQ · Designer Kicks Rebrand</p>
+      <p className="tag text-heat">Designer Kicks × The Heat Chart</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Six creatives. One <span className="text-gradient-volt">$20 shot.</span>
+        Every asset. Its own <span className="text-gradient-volt">landing page.</span>
       </h1>
       <p className="mt-3 max-w-2xl text-smoke">
-        Each creative has its own landing page and its own utm-tagged URL, so
-        every click and signup reads per-creative. Paste the copy below
-        straight into Ads Manager.
+        Each video generated for the rebrand has its own landing page with the
+        asset embedded and copy built around it. Preview each one below; the
+        tagged URL under it is the one to run anywhere the asset posts, so
+        clicks and signups read per-asset.
       </p>
-
-      {/* The buy, step by step */}
-      <div className="mt-8 rounded-2xl border border-volt/40 bg-volt/5 p-5">
-        <h2 className="display text-xl text-white">The $20 buy — one pass</h2>
-        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-smoke">
-          <li>
-            Download the six videos below (open link → ⋮ → download), then in
-            Meta <span className="text-white">Ads Manager</span>: one campaign,
-            objective <span className="text-white">Traffic</span>.
-          </li>
-          <li>
-            One ad set: budget <span className="text-white">$20, run 1 day</span>.
-            Audience: <span className="text-white">People who like the Designer
-            Kicks Page</span> (+ engaged in last 365 days). Placements: manual —
-            Facebook Feed + Reels only (the creatives are 9:16).
-          </li>
-          <li>
-            Six ads in that ad set — one video each, with its landing URL below.
-            Meta shifts spend to whichever creative wins: that IS the A/B test.
-          </li>
-          <li>
-            Reading results: Ads Manager shows clicks per ad; signups per
-            creative show in the site analytics by landing path (/dk/…) and
-            registration ref.
-          </li>
-        </ol>
-      </div>
 
       {/* The creatives */}
       <div className="mt-10 space-y-6">
@@ -108,7 +82,7 @@ export default function DkCampaignPage() {
                     </div>
                   </div>
                   <div>
-                    <p className="tag text-smoke">Ad destination URL</p>
+                    <p className="tag text-smoke">Landing page URL (tagged)</p>
                     <p className="mt-1 break-all rounded-lg border border-edge bg-ink/40 p-3 font-mono text-xs text-volt">
                       {adUrl}
                     </p>
@@ -117,7 +91,6 @@ export default function DkCampaignPage() {
                     <a href={v.video} target="_blank" rel="noopener noreferrer" className="tag text-volt underline underline-offset-4">
                       Open video file →
                     </a>
-                    <span className="tag text-smoke">CTA button: Sign Up</span>
                   </div>
                 </div>
               </div>
@@ -129,11 +102,11 @@ export default function DkCampaignPage() {
       {/* The announcement post — free, pin it before the paid buy */}
       <div className="mt-10 rounded-2xl border border-edge bg-surface p-5">
         <h2 className="display text-xl text-white">
-          Pin this first — the free rebrand post
+          The rebrand post — pin it on the Designer Kicks page
         </h2>
         <p className="mt-2 text-sm text-smoke">
-          Post organically on the Designer Kicks page before the ads run, so
-          paid clicks that check the page see the announcement:
+          The announcement copy, ready to post, so anyone who checks the page
+          sees where it all went:
         </p>
         <blockquote className="mt-3 rounded-lg border border-edge bg-ink/40 p-4 text-sm leading-relaxed text-white">
           Designer Kicks has a new home. 🔥
