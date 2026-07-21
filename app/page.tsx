@@ -7,6 +7,7 @@ import BattleCard from "@/components/BattleCard";
 import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
 import FeedScroller from "@/components/FeedScroller";
+import AdReel from "@/components/AdReel";
 import { SHOP_LIVE } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
@@ -137,8 +138,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Live battles */}
+      {/* The reels — the campaign videos living in the feed */}
       <section className="mx-auto max-w-6xl px-4 py-12">
+        <AdReel />
+      </section>
+
+      {/* Live battles */}
+      <section className="mx-auto max-w-6xl border-t border-edge px-4 py-12">
         {tournament && (
           <Link
             href={`/tournaments/${tournament.slug}`}

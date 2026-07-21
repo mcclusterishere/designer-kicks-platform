@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import AdPlayer from "@/components/AdPlayer";
 import {
   DK_VARIANTS,
   getDkVariant,
@@ -45,23 +46,14 @@ export default async function DkLandingPage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
       <div className="grid items-start gap-8 md:grid-cols-2">
-        {/* The creative — same video as the ad, autoplaying like the feed did */}
-        <div className="mx-auto w-full max-w-sm">
-          <video
-            src={v.video}
-            poster={v.poster ?? undefined}
-            autoPlay
-            muted
-            loop
-            playsInline
-            controls
-            preload="metadata"
-            className="aspect-[9/16] w-full rounded-2xl border border-edge bg-black object-cover shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
-          />
+        {/* The creative, playable beat by beat — tap a moment, the video
+            jumps there, and the copy below narrates what's on screen */}
+        <div>
+          <AdPlayer src={v.video} poster={v.poster ?? undefined} beats={v.beats} />
         </div>
 
         {/* The pitch */}
-        <div>
+        <div className="md:sticky md:top-20">
           <p className="tag text-heat">Designer Kicks × The Heat Chart</p>
           <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
             {v.headline.split(v.accent).map((part, i, arr) => (

@@ -131,6 +131,35 @@ export default async function DraftedPage() {
         </p>
       </div>
 
+      {/* Watch it instead of reading it — the closet film */}
+      <div className="mt-12 grid items-center gap-6 rounded-2xl border border-edge bg-surface p-6 sm:grid-cols-[200px_1fr] sm:p-8">
+        <video
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_3G3F7jiUHPTPLSNf3XP0bAYtQmG/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
+          poster="/ad-refs/artist.png"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="mx-auto aspect-[9/16] w-40 rounded-xl border border-edge bg-black object-cover sm:w-full"
+        />
+        <div>
+          <p className="tag text-volt">Watch: your closet, as a portfolio</p>
+          <p className="mt-2 text-smoke">
+            That&apos;s an artist page on the league — every piece cataloged,
+            heat-rank badges earned in battle, and a standing bid pulsing on
+            the work. This is what &quot;assets feed you forever&quot; looks
+            like on screen.
+          </p>
+          <Link
+            href="/dk/artist"
+            className="tag mt-3 inline-block text-volt underline underline-offset-4"
+          >
+            The shot-by-shot breakdown →
+          </Link>
+        </div>
+      </div>
+
       {/* The originals — what nobody else offers */}
       <div className="mt-12">
         <h2 className="display text-center text-3xl text-white">
