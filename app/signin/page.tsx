@@ -40,9 +40,13 @@ export default async function SignInPage() {
                 await signIn("facebook", { redirectTo: "/profile" });
               }}
             >
-              <button className="w-full rounded-lg border border-edge bg-surface py-3 tag text-white transition hover:border-volt">
+              <button className="w-full rounded-lg border border-[#1877F2]/50 bg-surface py-3 tag text-white transition hover:border-[#1877F2]">
                 Continue with Facebook
               </button>
+              <p className="mt-1.5 text-center text-xs text-smoke/70">
+                Coming from Instagram? Use the Facebook account linked to it —
+                one tap, no new password.
+              </p>
             </form>
           )}
           <div className="flex items-center gap-3 py-1">

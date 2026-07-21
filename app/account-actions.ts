@@ -7,7 +7,7 @@ import { allowAttempt } from "@/lib/ratelimit";
 import { hash } from "bcryptjs";
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { AuthError } from "next-auth";
 import type { ActionResult } from "./actions";
 
@@ -75,13 +75,20 @@ export async function registerUser(
         error: `This email is attached to the ${existing.artistProfile.displayName} page, which hasn't been claimed yet. Head to that page and hit "Claim This Page" — the league verifies every claim by hand, then this email unlocks the account.`,
       };
     }
+  }
+
+  // First-touch attribution: the campaign cookie set when they landed on
+  // a tagged link (?ref= / utm_source). Stamped once at creation only.
+  const signupSource = (await cookies()).get("hc_src")?.value?.slice(0, 60) || null;
+
+  if (existing) {
     await prisma.user.update({
       where: { id: existing.id },
-      data: { name, passwordHash: await hash(password, 10) },
+      data: { name, passwordHash: await hash(password, 10), ...(existing.signupSource ? {} : { signupSource }) },
     });
   } else {
     await prisma.user.create({
-      data: { name, email, passwordHash: await hash(password, 10) },
+      data: { name, email, passwordHash: await hash(password, 10), signupSource },
     });
   }
 

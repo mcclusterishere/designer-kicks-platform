@@ -11,6 +11,8 @@ import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
 import { removeArtistShop, markSellsNowhere } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
+import ShareMyPage from "@/components/ShareMyPage";
+import { siteUrl } from "@/lib/articles";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -306,6 +308,9 @@ export default async function StudioPage() {
           )}
         </div>
       </div>
+
+      {/* The artist's distribution kit — tracked link + captions */}
+      <ShareMyPage slug={artist.slug} displayName={artist.displayName} siteUrl={siteUrl()} />
 
       {/* The future paid tier, primed honestly */}
       <div className="mt-12 rounded-xl border border-volt/40 bg-surface p-6">

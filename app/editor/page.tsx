@@ -88,6 +88,7 @@ function FreeSocials({ fb, ig }: { fb: boolean; ig: boolean }) {
     { name: "The Feed (on-site)", state: "Live — one click", tone: "on" },
     { name: "Facebook Page", state: fb ? "Connected — one click" : "Office adds a token", tone: fb ? "on" : "off" },
     { name: "Instagram", state: ig ? "Connected — one click (add a photo)" : "Office adds a token", tone: ig ? "on" : "off" },
+    { name: "YouTube Shorts", state: "Free — copy & paste", tone: "paste" },
     { name: "X / Twitter", state: "Free — copy & paste", tone: "paste" },
     { name: "TikTok", state: "Free — copy & paste", tone: "paste" },
     { name: "Threads · Reddit · anywhere", state: "Free — copy & paste", tone: "paste" },

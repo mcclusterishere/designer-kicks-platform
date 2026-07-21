@@ -37,6 +37,10 @@ import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
+import { facebookConfigured, instagramConfigured } from "@/lib/social";
+import { oauthProviders } from "@/auth";
+import { siteUrl } from "@/lib/articles";
+import UtmBuilder from "./UtmBuilder";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
@@ -155,6 +159,15 @@ export default async function AdminPage({
 
   const pulse = await getSiteAnalytics();
   const traffic = await getTrafficPulse();
+  // Which campaigns actually create accounts — the number that matters
+  // more than pageviews. Stamped at signup from tagged links.
+  const signupSources = await prisma.user.groupBy({
+    by: ["signupSource"],
+    where: { signupSource: { not: null } },
+    _count: true,
+    orderBy: { _count: { signupSource: "desc" } },
+    take: 10,
+  });
 
   const artistApplications = await prisma.artistProfile.findMany({
     where: { status: "PENDING" },
@@ -1596,6 +1609,66 @@ export default async function AdminPage({
       )}
 
       {/* Users */}
+      {/* Social HQ — the platforms, the pipes, the proof */}
+      {show("pulse") && (
+      <section className="mt-12 rounded-xl border border-edge bg-surface p-5">
+        <h2 className="display text-2xl text-white">Social HQ</h2>
+        <p className="mt-1 text-sm text-smoke">
+          Every pipe between the socials and the site, one board. Tag every
+          link you post — tagged visitors who sign up are credited to the
+          campaign forever.
+        </p>
+
+        {/* Connections */}
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {[
+            { name: "Facebook Page posting", on: facebookConfigured(), fix: "FB_PAGE_ID + FB_PAGE_ACCESS_TOKEN" },
+            { name: "Instagram posting", on: instagramConfigured(), fix: "IG_USER_ID + FB_PAGE_ACCESS_TOKEN" },
+            { name: "Facebook / Instagram login", on: oauthProviders.facebook, fix: "FACEBOOK_CLIENT_ID + FACEBOOK_CLIENT_SECRET" },
+            { name: "Google login", on: oauthProviders.google, fix: "GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET" },
+            { name: "Footer socials", on: Boolean(process.env.NEXT_PUBLIC_INSTAGRAM_URL || process.env.NEXT_PUBLIC_FACEBOOK_URL || process.env.NEXT_PUBLIC_YOUTUBE_URL), fix: "NEXT_PUBLIC_INSTAGRAM_URL / _FACEBOOK_URL / _YOUTUBE_URL" },
+          ].map((c) => (
+            <div key={c.name} className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-panel/40 px-4 py-3">
+              <span className="text-sm text-white">{c.name}</span>
+              {c.on ? (
+                <span className="tag font-bold text-volt">Connected</span>
+              ) : (
+                <span className="tag text-smoke" title={c.fix}>Add {c.fix.split(" ")[0]}…</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Tracked-link factory */}
+        <div className="mt-6">
+          <p className="tag text-volt">Build a tracked link</p>
+          <div className="mt-2">
+            <UtmBuilder siteUrl={siteUrl()} />
+          </div>
+        </div>
+
+        {/* Signups by campaign */}
+        <div className="mt-6">
+          <p className="tag text-volt">Accounts created by campaign</p>
+          {signupSources.length === 0 ? (
+            <p className="mt-2 text-sm text-smoke">
+              None attributed yet — every account created after arriving on a
+              tagged link lands here automatically.
+            </p>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {signupSources.map((r) => (
+                <div key={r.signupSource} className="flex items-center justify-between rounded-lg border border-edge bg-panel/40 px-4 py-2.5">
+                  <span className="font-mono text-sm text-white">{r.signupSource}</span>
+                  <span className="tag font-bold text-volt">{r._count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      )}
+
       {show("pulse") && (
       <section className="mt-12">
         <div className="flex items-center justify-between">

@@ -34,6 +34,17 @@ export const metadata: Metadata = {
   description:
     "Showcase your custom kicks, battle other artists in community vote-offs, climb the Heat List, and build your Culture IQ. A home for custom-sneaker culture — a project of McCluster Corp's Equity Uprise program.",
   manifest: "/manifest.webmanifest",
+  // Branded link unfurls everywhere a URL gets dropped — FB, IG DMs,
+  // WhatsApp, iMessage. Pages with their own image (articles) override.
+  openGraph: {
+    type: "website",
+    siteName: "The Heat Chart",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The Heat Chart — Custom Sneaker Battles" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og.png"],
+  },
   appleWebApp: {
     capable: true,
     title: "Heat Chart",
@@ -142,6 +153,29 @@ export default async function RootLayout({
                 <Link href="/careers" className="hover:text-white">Careers</Link>
               </div>
             </div>
+            {/* Official channels — set NEXT_PUBLIC_INSTAGRAM_URL /
+                _FACEBOOK_URL / _YOUTUBE_URL in Railway; unset = hidden */}
+            {(process.env.NEXT_PUBLIC_INSTAGRAM_URL ||
+              process.env.NEXT_PUBLIC_FACEBOOK_URL ||
+              process.env.NEXT_PUBLIC_YOUTUBE_URL) && (
+              <div className="mt-4 flex flex-wrap gap-4">
+                {process.env.NEXT_PUBLIC_INSTAGRAM_URL && (
+                  <a href={process.env.NEXT_PUBLIC_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="tag text-smoke transition hover:text-volt">
+                    Instagram
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_FACEBOOK_URL && (
+                  <a href={process.env.NEXT_PUBLIC_FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className="tag text-smoke transition hover:text-volt">
+                    Facebook
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_YOUTUBE_URL && (
+                  <a href={process.env.NEXT_PUBLIC_YOUTUBE_URL} target="_blank" rel="noopener noreferrer" className="tag text-smoke transition hover:text-volt">
+                    YouTube
+                  </a>
+                )}
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap gap-4 text-xs">
               <Link href="/terms" className="hover:text-white">Terms</Link>
               <Link href="/privacy" className="hover:text-white">Privacy</Link>
