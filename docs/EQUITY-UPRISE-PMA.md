@@ -33,7 +33,7 @@ comes from doing the formation properly, not from the words alone.
    database is your member roll — the admin export hub can produce it),
    and minutes of any decisions.
 6. **Professional review** — have a lawyer familiar with unincorporated
-   associations in **Georgia** (the operating LLC's state) review
+   associations in **the state you physically operate from** review
    the articles and the member
    agreement. PMA claims have limits (they don't shield against fraud,
    public-safety law, taxes, or minors' protections), and a professional
@@ -99,7 +99,7 @@ new nonprofit gets formed at the top:
 McCluster Corp  (Connecticut nonprofit — registered CT public charity; the parent)
         │  sole member / 100% owner
         ▼
-Equity Uprise LLC  (Georgia LLC — the business; runs The Heat Chart)
+Equity Uprise LLC  (Wyoming LLC — the business; runs The Heat Chart)
         │  operates
         ▼
 Equity Uprise PMA  (the membership program members actually join)
@@ -135,39 +135,70 @@ The only work left at the parent level is housekeeping:
    who are not household family — the self-dealing guardrails in 4c
    need directors who aren't you to sign off on your compensation.
 
-### 4b. The one entity to form — Equity Uprise LLC (Georgia)
+### 4b. The one entity to form — Equity Uprise LLC (Wyoming)
 
-Georgia is the cheaper, easier state ($110 to file vs Connecticut's
-$120; $60/yr vs $80/yr after), so the operating company forms there
-and carries the program's name. One rule keeps that choice honest:
-**an LLC belongs in the state where the work actually happens.** Run
-the operation from Georgia and this is both the cheapest and the
-correct answer; if day-to-day operations ever move to another state,
-the LLC registers there as a foreign LLC on top — at which point the
-savings invert. (The parent merely *owning* a Georgia LLC does not
-require McCluster Corp to register in Georgia.)
+The 50-state sweep, scored on what this structure needs — cheap to
+keep alive, and maximum protection around a single-member LLC whose
+sole member is a nonprofit:
 
-1. **Name check** — search "Equity Uprise LLC" on the Georgia
-   Secretary of State's eCorp portal (ecorp.sos.ga.gov) before filing.
-2. **File Articles of Organization** online at eCorp (**$110**).
-   Registered agent: a Georgia street address (can be you). Georgia
-   does not list members in the articles — ownership lives in the
-   operating agreement, where **McCluster Corp is the sole member**:
-   the nonprofit owns the LLC outright; you manage it, you don't own it.
-3. The LLC holds the operating life: theheatchart.com, the platform,
+| State | Form | Per year (all-in) | The verdict |
+|---|---|---|---|
+| **Wyoming** | $100 | ~$85–110 ($60 report + agent) | **The pick** — sole-remedy charging-order protection *even for single-member LLCs* by statute, members off the public record, no state income/franchise tax |
+| New Mexico | $50 | ~$35–50 (agent only, no annual report) | Cheapest alive, but the protection statutes are ordinary — saves ~$50/yr by giving up the best shield in the country |
+| Georgia | $110 | $60 (self-agent) | Fine, ordinary; right answer only as the *operating-state registration*, not the protection layer |
+| Connecticut | $120 | $80 (self-agent) | Matches the parent's home; nothing else going for it |
+| Delaware | ~$110 | $300 + agent | Chancery-court prestige for VC-backed corps — paying triple for nothing this structure uses |
+| Nevada | ~$425 | ~$350 + agent | Strong statutes at four times Wyoming's price |
+
+Why Wyoming complements *this* structure specifically: the sole member
+is McCluster Corp, so the shield that matters is the one around the
+membership interest — if the charity is ever sued, a Wyoming creditor's
+**only** remedy is a charging order against distributions; they cannot
+seize the LLC, its assets (the platform, the brand, the inventory), or
+its management. Wyoming is one of the only states whose statute extends
+that sole-remedy rule to single-member LLCs. Ownership stays off the
+public record, and there's no state income or franchise tax at the
+entity level.
+
+1. **Name check** — search "Equity Uprise LLC" on the Wyoming Secretary
+   of State's business portal (wyobiz.wyo.gov) before filing.
+2. **Hire a Wyoming registered agent** (commercial agents run
+   ~$25–50/yr — required, since nobody's physically in Wyoming).
+3. **File Articles of Organization** online (**$100** + ~$4 online
+   fee). Wyoming does not list members publicly — ownership lives in
+   the operating agreement, where **McCluster Corp is the sole
+   member**: the nonprofit owns the LLC outright; you manage it, you
+   don't own it.
+4. The LLC holds the operating life: theheatchart.com, the platform,
    marketplace fees, consignment revenue, contracts, and (later)
    payment processing. Contracts and invoices sign as
    *"Equity Uprise LLC."*
-4. **Operating agreement** (one document): McCluster Corp is sole
+5. **Operating agreement** (one document): McCluster Corp is sole
    member; you are manager; all distributions go to the sole member —
    i.e., every dollar of profit flows up to the nonprofit and gets
    redeployed under its purpose clause.
-5. Own EIN (free, IRS online), own bank account. **Never mix the two
+6. Own EIN (free, IRS online), own bank account. **Never mix the two
    accounts or pay personal expenses from either** — commingling is
    how courts pierce the veil and reach you personally.
-6. **Georgia annual registration** every year, January 1 – April 1
-   (**$60**, $25 late penalty) — same calendar habit as the parent's
-   filings; a lapsed registration dissolves the shield.
+7. **Wyoming annual report** every year on the first day of the
+   anniversary month (**$60** minimum license tax) — a lapsed report
+   dissolves the shield.
+
+Two honest rules that no formation state changes:
+
+- **Taxes and mandatory registration follow the work, not the filing.**
+  Wherever the platform's physical operations actually live (painting,
+  shipping, shoots), that state can require the LLC to register as a
+  foreign LLC (Georgia's certificate of authority, for example, runs
+  ~$225 + $60/yr) and will tax the income earned there. Wyoming's "no
+  state tax" applies to Wyoming — it is not a tax escape for work done
+  elsewhere. The Wyoming layer buys *protection and privacy*, not tax
+  avoidance.
+- **Wyoming doesn't armor the LLC against its own liabilities.** A
+  customer or contract dispute sues the LLC where the business
+  happened; that's what insurance and clean books are for. Wyoming's
+  shield points the other direction — it keeps outside creditors from
+  reaching *into* the company.
 
 ### 4c. Why this protects you (and its honest limits)
 
@@ -195,9 +226,10 @@ require McCluster Corp to register in Georgia.)
 - **Sequence**: board resolution first, LLC filing second, operating
   agreement + LLC bank account third, then a one-page resolution
   adopting the PMA program and the platform's membership agreement as
-  the LLC's operating program. State cost ≈ **$110** + an attorney
-  review (one comfortable with Georgia LLCs and Connecticut nonprofits;
-  budget a few hundred dollars — worth it here).
+  the LLC's operating program. State cost ≈ **$105** + ~$25–50/yr
+  registered agent + an attorney review (one comfortable with Wyoming
+  LLCs and Connecticut nonprofits; budget a few hundred dollars —
+  worth it here).
 
 ## 5. Honest limits to know
 
