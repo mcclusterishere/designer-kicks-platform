@@ -21,6 +21,25 @@ function ratingWeight(stars: number) {
   return Math.max(0, stars - 2); // 5→3, 4→2, 3→1, 1–2→0
 }
 
+// Brand mentions inside free text (quiz questions, mostly). Yeezy rolls
+// into adidas to match how the catalog brands those imports.
+const BRAND_PATTERNS: [string, RegExp][] = [
+  ["Jordan", /\bjordan\b|\bjumpman\b/i],
+  ["Nike", /\bnike\b|\bdunk\b|\bair force\b|\bkobe\b/i],
+  ["adidas", /\badidas\b|\byeezy\b/i],
+  ["New Balance", /\bnew balance\b/i],
+  ["Asics", /\basics\b/i],
+  ["Puma", /\bpuma\b/i],
+  ["Vans", /\bvans\b/i],
+  ["Converse", /\bconverse\b/i],
+  ["Reebok", /\breebok\b/i],
+];
+
+/** Which catalog brands a piece of text talks about. */
+export function brandsInText(text: string): string[] {
+  return BRAND_PATTERNS.filter(([, re]) => re.test(text)).map(([name]) => name);
+}
+
 type Ranked = { name: string; weight: number; share: number };
 
 export type TasteProfile = {
@@ -146,6 +165,13 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
       select: { artist: { select: { displayName: true } } },
     }),
   ]);
+  // Culture IQ answers are taste signals too: playing questions about a
+  // brand — right OR wrong — is interest. Light weight (1) so knowledge
+  // never outvotes what someone actually rates and buys.
+  const quizAnswers = await prisma.quizAnswer.findMany({
+    where: { userId },
+    select: { question: { select: { question: true } } },
+  });
   if (!user) return null;
 
   const brands = new Map<string, number>();
@@ -190,6 +216,15 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
   // Stated taste from the passport — a light prior, not the verdict.
   for (const b of (user.favoriteBrands ?? "").split(",")) bump(brands, b.trim() || null, WEIGHTS.stated);
   if (user.favoriteSilhouette?.trim()) bump(silhouettes, user.favoriteSilhouette.trim(), WEIGHTS.stated);
+
+  // Quiz answers → brand interest. Weight 1 per brand mention so a
+  // heavy Culture IQ habit colors the profile without dominating it.
+  for (const qa of quizAnswers) {
+    const mentioned = brandsInText(qa.question.question);
+    if (mentioned.length === 0) continue;
+    signalCount++;
+    for (const b of mentioned) bump(brands, b, 1);
+  }
 
   // Ratings count even when low-star (they're signals, not taste weight).
   signalCount += ratings.filter((r) => ratingWeight(r.stars) === 0).length;

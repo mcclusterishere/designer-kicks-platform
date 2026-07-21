@@ -17,6 +17,7 @@ import {
   type StrikeState,
 } from "@/lib/quiz";
 import { cultureIQ } from "@/lib/iq";
+import { getTasteProfile, brandsInText } from "@/lib/taste";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Stripe from "stripe";
@@ -137,15 +138,16 @@ export async function startQuizRun(): Promise<QuizActionResult> {
   // The pool excludes every question this player has EVER answered —
   // in the feed or in past runs. Answered is answered; questions never
   // come back (that's the Culture IQ ledger rule).
-  const [questions, burned] = await Promise.all([
+  const [questions, burned, taste] = await Promise.all([
     prisma.quizQuestion.findMany({
       where: { active: true },
-      select: { id: true },
+      select: { id: true, question: true },
     }),
     prisma.quizAnswer.findMany({
       where: { userId },
       select: { questionId: true },
     }),
+    getTasteProfile(userId),
   ]);
   const burnedIds = new Set(burned.map((b) => b.questionId));
   const pool = questions.filter((q) => !burnedIds.has(q.id));
@@ -159,7 +161,30 @@ export async function startQuizRun(): Promise<QuizActionResult> {
     };
   }
 
-  const picked = shuffle(pool.map((q) => q.id)).slice(0, RUN_QUEUE_SIZE);
+  // Taste-aware deal: ~2/3 questions about the player's top brands,
+  // ~1/3 wild cards from everything else — the same weighted-never-
+  // walled pattern the catalog and Rate deck use. No taste yet (or no
+  // matches) → plain shuffle, exactly as before.
+  const topBrands = (taste?.brands ?? []).slice(0, 3).map((b) => b.name);
+  let picked: string[];
+  if (topBrands.length > 0) {
+    const matched: string[] = [];
+    const rest: string[] = [];
+    for (const q of pool) {
+      (brandsInText(q.question).some((b) => topBrands.includes(b)) ? matched : rest).push(q.id);
+    }
+    const m = shuffle(matched);
+    const r = shuffle(rest);
+    const woven: string[] = [];
+    let mi = 0, ri = 0;
+    while ((mi < m.length || ri < r.length) && woven.length < RUN_QUEUE_SIZE) {
+      for (let k = 0; k < 2 && mi < m.length && woven.length < RUN_QUEUE_SIZE; k++) woven.push(m[mi++]);
+      if (ri < r.length && woven.length < RUN_QUEUE_SIZE) woven.push(r[ri++]);
+    }
+    picked = woven;
+  } else {
+    picked = shuffle(pool.map((q) => q.id)).slice(0, RUN_QUEUE_SIZE);
+  }
   const run = await prisma.quizRun.create({
     data: { userId, questionIds: JSON.stringify(picked) },
   });

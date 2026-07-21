@@ -1163,6 +1163,42 @@ function loadQuestions() {
 // Creates the first editor (Seth) so he can claim + sign in, and posts
 // the Editor role on /careers. Never overwrites live edits.
 // Retired content: pulled on every deploy so it disappears from prod too.
+
+// Icon stories — evergreen deep-dives on the most significant shoes in
+// the catalog, each carrying its real style code so the article links to
+// the shoe's catalog page and buy links. Runs in EVERY mode (launch mode
+// returns early, so this must be called before that return): create by
+// slug, never overwrite admin edits. Facts cross-checked against the
+// Culture IQ bank so the articles and the quiz tell one story.
+async function seedIconArticles() {
+  const iconPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "icon-articles.json");
+  let iconArticles = [];
+  try {
+    iconArticles = JSON.parse(readFileSync(iconPath, "utf8"));
+  } catch {}
+  let iconAdded = 0;
+  for (const a of iconArticles) {
+    if (!a.slug) continue;
+    const exists = await prisma.article.findUnique({ where: { slug: a.slug } });
+    if (exists) continue;
+    await prisma.article.create({
+      data: {
+        slug: a.slug,
+        title: a.title,
+        excerpt: a.excerpt,
+        content: a.content,
+        coverImage: a.coverImage ?? null,
+        tags: a.tags ?? null,
+        sku: a.sku ?? null,
+        status: a.status ?? "PUBLISHED",
+        publishedAt: new Date(),
+      },
+    });
+    iconAdded++;
+  }
+  if (iconAdded > 0) console.log(`Icon stories: ${iconAdded} new.`);
+}
+
 async function retireContent() {
   await prisma.quizQuestion.deleteMany({
     where: { article: { slug: "nigel-sylvester-air-jordan-4-shock-drop-rumor" } },
@@ -1611,6 +1647,7 @@ async function main() {
         },
       });
     }
+    await seedIconArticles();
     console.log("Seeded launch content only (no demo artists/battles): products, articles, quiz bank, giveaway.");
     return;
   }
@@ -1815,6 +1852,8 @@ async function main() {
     });
     catalogAdded++;
   }
+
+  await seedIconArticles();
 
   // One-time reconciliation of the owner-approved conflicts: overwrite
   // each existing article (by slug) with the accurate spreadsheet
