@@ -50,6 +50,11 @@ model Submission {
   size             String? // e.g. "US 10.5", "L", "7 3/8" — buyers need this
   askingPriceCents Int?
 
+  // Collab pieces: co-artists beyond the primary submitter. The piece
+  // lives in the primary artist's closet and shows on every
+  // collaborator's page under Collabs — one piece, all names on it.
+  collaborators ArtistProfile[] @relation("collabPieces")
+
   sales       Sale[]
   offers      Offer[]
   outfitItems OutfitItem[]
@@ -109,6 +114,7 @@ model ArtistProfile {
   onboardedBy   User?   @relation("onboardedArtists", fields: [onboardedById], references: [id], onDelete: SetNull)
 
   submissions Submission[]
+  collabs     Submission[]   @relation("collabPieces")
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
@@ -509,6 +515,12 @@ model User {
   // account was created (e.g. "ref:seth", "instagram", "facebook").
   // Stamped once at signup (password or OAuth), never updated after.
   signupSource String?
+
+  // Equity Uprise PMA: when this member accepted the Private Member
+  // Association membership agreement. Required at email signup; OAuth
+  // and pre-existing accounts accept via the site-wide gate. Null =
+  // hasn't agreed yet.
+  pmaAcceptedAt DateTime?
 
   // Profile / contact info (the "Sneaker Passport")
   phone              String?

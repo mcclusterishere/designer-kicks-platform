@@ -125,7 +125,15 @@ export async function getArtistBySlug(slug: string) {
           owner: { select: { name: true, collectorSlug: true } },
           sales: { orderBy: { soldAt: "desc" } },
           ratings: { select: { stars: true } },
+          collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
         },
+      },
+      // Pieces this artist co-built on someone else's page — the
+      // Collabs shelf. Primary credit stays with the submitting artist.
+      collabs: {
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
+        include: { artist: { select: { slug: true, displayName: true, status: true } } },
       },
     },
   });

@@ -66,6 +66,16 @@ export default function RegisterForm() {
           children under 13.
         </span>
       </label>
+      <label htmlFor="pma" className="flex items-start gap-2 text-sm text-smoke">
+        <input id="pma" name="pma" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
+        <span>
+          I&apos;ve read and agree to the{" "}
+          <a href="/equity-uprise" target="_blank" className="text-volt underline">
+            Equity Uprise Private Member Association Membership Agreement
+          </a>{" "}
+          and I&apos;m joining as a private member.
+        </span>
+      </label>
       {state?.error && <p role="alert" className="text-sm text-heat">{state.error}</p>}
       <button
         type="submit"

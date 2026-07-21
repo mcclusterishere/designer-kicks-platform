@@ -205,6 +205,45 @@ export default function SubmitForm({ artistDefaults }: Props) {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div>
+          <label htmlFor="askingPrice" className="tag text-smoke">
+            Asking price <span className="normal-case">(USD — lists it on the Market)</span>
+          </label>
+          <input
+            id="askingPrice"
+            name="askingPrice"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={100000}
+            step={1}
+            placeholder="e.g. 450"
+            className={inputClass}
+          />
+          <p className="mt-1.5 text-xs text-smoke/70">
+            The Market runs on real numbers — price your work. You can
+            change it any time from your studio.
+          </p>
+        </div>
+        <div>
+          <label htmlFor="collabWith" className="tag text-smoke">
+            Collab piece? <span className="normal-case">(co-artist&apos;s name or @handle)</span>
+          </label>
+          <input
+            id="collabWith"
+            name="collabWith"
+            maxLength={120}
+            placeholder="e.g. Justin Dekota, @dekota_customz"
+            className={inputClass}
+          />
+          <p className="mt-1.5 text-xs text-smoke/70">
+            Built it with another artist on the chart? Tag them — the piece
+            carries both names and shows on both pages.
+          </p>
+        </div>
+      </div>
+
       <div>
         <label htmlFor="description" className="tag text-smoke">
           The story (technique, materials, inspiration)

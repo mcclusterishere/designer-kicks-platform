@@ -10,6 +10,8 @@ import { siteUrl } from "@/lib/articles";
 import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
+import PmaGate from "@/components/PmaGate";
+import { prisma } from "@/lib/db";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -69,6 +71,15 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+  // Equity Uprise PMA: members who joined through a door with no
+  // checkbox (OAuth, pre-association accounts) accept via the gate.
+  let needsPma = false;
+  if (session?.user?.id) {
+    const member = await prisma.user
+      .findUnique({ where: { id: session.user.id }, select: { pmaAcceptedAt: true } })
+      .catch(() => null);
+    needsPma = Boolean(member && !member.pmaAcceptedAt);
+  }
   return (
     <html
       lang="en"
@@ -119,6 +130,7 @@ export default async function RootLayout({
         </header>
 
         <main id="main" className="flex-1 pb-24 md:pb-0">{children}</main>
+        {needsPma && <PmaGate />}
 
         <footer className="border-t border-edge bg-surface">
           <div className="h-1.5 stripes opacity-60" />

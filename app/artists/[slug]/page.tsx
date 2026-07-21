@@ -280,6 +280,19 @@ export default async function ArtistPage({ params }: Props) {
                 <div className="p-4">
                   <p className="tag text-smoke">{categoryLabel(s.category)} · {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
+                  {s.collaborators.length > 0 && (
+                    <p className="mt-0.5 text-sm text-smoke">
+                      with{" "}
+                      {s.collaborators.map((c, i) => (
+                        <span key={c.slug}>
+                          {i > 0 && " × "}
+                          <Link href={`/artists/${c.slug}`} className="text-volt underline">
+                            {c.displayName}
+                          </Link>
+                        </span>
+                      ))}
+                    </p>
+                  )}
                   <p className="mt-1 text-sm text-smoke">
                     {s._count.battlesWon}W–{shoeBattles - s._count.battlesWon}L ·{" "}
                     {s._count.votes} votes
@@ -333,6 +346,40 @@ export default async function ArtistPage({ params }: Props) {
             );
           })}
         </div>
+      )}
+
+      {/* Collabs — pieces co-built with other artists on the chart.
+          The piece lives on the primary artist's page; this shelf makes
+          sure the co-signer's page shows the work too. */}
+      {artist.collabs.length > 0 && (
+        <>
+          <h2 className="display mt-14 text-3xl text-white">Collabs</h2>
+          <p className="mt-1 text-sm text-smoke">
+            Built with other artists in the league — two names, one piece.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {artist.collabs.map((c) => (
+              <Link
+                key={c.id}
+                href={c.artist?.status === "APPROVED" ? `/artists/${c.artist.slug}` : "/heat-list"}
+                className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={c.imageUrl}
+                  alt={`${c.title} — collab piece`}
+                  className="aspect-square w-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                />
+                <div className="p-3">
+                  <p className="truncate text-sm font-bold text-white">{c.title}</p>
+                  <p className="mt-0.5 truncate text-xs text-smoke">
+                    with {c.artist?.displayName ?? c.artistName}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

@@ -32,6 +32,7 @@ export async function registerUser(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const age13 = formData.get("age13") === "on";
+  const pma = formData.get("pma") === "on";
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
@@ -39,6 +40,11 @@ export async function registerUser(
   if (pwErr) return { ok: false, error: pwErr };
   // COPPA: the service is 13+. The affirmation is required at signup.
   if (!age13) return { ok: false, error: "You must confirm you're at least 13 to create an account." };
+  // Membership is the door: every account is an Equity Uprise PMA
+  // member, and joining requires agreeing to the membership agreement.
+  if (!pma) {
+    return { ok: false, error: "Joining requires agreeing to the Equity Uprise membership agreement." };
+  }
 
   // Generous per-IP: a viral post pulls many real signups through one
   // carrier-grade NAT / shared mobile gateway. Email uniqueness + the
@@ -84,11 +90,16 @@ export async function registerUser(
   if (existing) {
     await prisma.user.update({
       where: { id: existing.id },
-      data: { name, passwordHash: await hash(password, 10), ...(existing.signupSource ? {} : { signupSource }) },
+      data: {
+        name,
+        passwordHash: await hash(password, 10),
+        pmaAcceptedAt: new Date(),
+        ...(existing.signupSource ? {} : { signupSource }),
+      },
     });
   } else {
     await prisma.user.create({
-      data: { name, email, passwordHash: await hash(password, 10), signupSource },
+      data: { name, email, passwordHash: await hash(password, 10), signupSource, pmaAcceptedAt: new Date() },
     });
   }
 
@@ -252,5 +263,22 @@ export async function updateProfile(
   });
 
   revalidatePath("/profile");
+  return { ok: true };
+}
+
+/**
+ * Equity Uprise PMA acceptance for accounts that came in through a door
+ * with no checkbox — OAuth signups and accounts created before the
+ * association existed. The gate in the layout calls this; acceptance is
+ * stamped once and never re-asked.
+ */
+export async function acceptPma(): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { pmaAcceptedAt: new Date() },
+  });
+  revalidatePath("/");
   return { ok: true };
 }

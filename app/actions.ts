@@ -122,6 +122,47 @@ export async function createSubmission(
     };
   }
 
+  // Pricing at upload — the Market runs on the artists' own numbers.
+  const askingRaw = String(formData.get("askingPrice") ?? "").trim();
+  let askingPriceCents: number | null = null;
+  if (askingRaw) {
+    const dollars = Number(askingRaw);
+    if (!Number.isFinite(dollars) || dollars < 1 || dollars > 100000) {
+      return { ok: false, error: "Asking price should be a number between $1 and $100,000." };
+    }
+    askingPriceCents = Math.round(dollars * 100);
+  }
+
+  // Collab tagging: resolve the co-artist by name, slug, or IG handle.
+  // Comma-separate for three-way builds. A tag that matches nobody is
+  // an error, not a silent drop — credit is the whole point.
+  const collabRaw = String(formData.get("collabWith") ?? "").trim();
+  const collaboratorIds: string[] = [];
+  if (collabRaw) {
+    for (const tag of collabRaw.split(",").map((t) => t.trim()).filter(Boolean)) {
+      const handle = tag.replace(/^@/, "");
+      const match = await prisma.artistProfile.findFirst({
+        where: {
+          status: "APPROVED",
+          id: { not: artist.id },
+          OR: [
+            { slug: handle.toLowerCase().replace(/\s+/g, "-") },
+            { displayName: { equals: tag, mode: "insensitive" } },
+            { instagram: { equals: handle, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!match) {
+        return {
+          ok: false,
+          error: `Couldn't find "${tag}" on the chart — check the spelling, or have them claim their page first.`,
+        };
+      }
+      if (!collaboratorIds.includes(match.id)) collaboratorIds.push(match.id);
+    }
+  }
+
   // Optional 15-second clip. One per artist per day (UTC) — a scale
   // guard while video hosting is small; photos stay unlimited.
   const video = formData.get("video");
@@ -167,11 +208,15 @@ export async function createSubmission(
       ...taxonomy,
       category,
       videoUrl,
+      askingPriceCents,
       size: size || null,
       description: description || null,
       imageUrl,
       extraImages: extra,
       artistId: artist.id,
+      ...(collaboratorIds.length > 0
+        ? { collaborators: { connect: collaboratorIds.map((id) => ({ id })) } }
+        : {}),
     },
   });
 
