@@ -49,6 +49,7 @@ import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/li
 import { geminiConfigured, geminiJson, imageParts } from "@/lib/gemini";
 import { importFromKicksDB } from "@/lib/catalog";
 import { notifyBattleStart } from "@/lib/battleAlerts";
+import { autopostSubmission } from "@/lib/autopost";
 
 // note: an FYI that rides along with success — e.g. "your duplicate
 // claim was merged" — for forms that want to surface it.
@@ -1461,8 +1462,15 @@ export async function adminLogout() {
 export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJECTED") {
   await requireAdmin();
   await prisma.submission.update({ where: { id }, data: { status } });
+  // First approval turns the upload into posts — site Feed + connected
+  // socials — with nobody at the keyboard. Fire-and-forget: a Meta
+  // outage must never make the approve button feel broken.
+  if (status === "APPROVED") {
+    autopostSubmission(id).catch((e) => console.error("[autopost]", e));
+  }
   revalidatePath("/admin");
   revalidatePath("/heat-list");
+  revalidatePath("/");
 }
 
 /**

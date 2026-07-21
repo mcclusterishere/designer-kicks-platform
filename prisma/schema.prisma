@@ -23,6 +23,10 @@ model Submission {
   description  String?
   imageUrl     String
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  // When this piece was auto-posted to the site feed + connected socials
+  // (fires once, on first approval). Null = not yet / created before
+  // autopost existed / staged in bulk.
+  autopostedAt DateTime?
   createdAt    DateTime @default(now())
 
   // Gallery beyond the cover shot — voters swipe through these inline.

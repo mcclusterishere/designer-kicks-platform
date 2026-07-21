@@ -14,7 +14,9 @@ import { siteUrl } from "./articles";
  * composer can fall back to copy-paste.
  */
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+// GRAPH_API_URL override exists for tests (a local mock stands in for
+// Meta) — production always talks to the real Graph API.
+const GRAPH = process.env.GRAPH_API_URL || "https://graph.facebook.com/v21.0";
 
 export type SocialResult = { ok: boolean; detail: string };
 
