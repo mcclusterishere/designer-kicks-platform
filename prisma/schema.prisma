@@ -496,6 +496,11 @@ model User {
   // specifically don't want cross-lane discovery.
   laneStrict Boolean @default(false)
 
+  // Where this account came from — the traffic ref/utm active when the
+  // account was created (e.g. "ref:seth", "instagram", "facebook").
+  // Stamped once at signup (password or OAuth), never updated after.
+  signupSource String?
+
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
   city               String?
