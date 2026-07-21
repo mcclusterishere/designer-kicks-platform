@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { computeHeatIndex, pieceHeatEvents, type HeatIndexValue } from "./heatIndex";
 
 export type MarketItem = {
   id: string;
@@ -18,6 +19,8 @@ export type MarketItem = {
   lastSaleAt: Date | null;
   askCents: number | null;
   topOfferCents: number | null;
+  bidCount: number;
+  hx: HeatIndexValue;
 };
 
 export type MarketStats = {
@@ -56,14 +59,17 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         owner: { select: { name: true, collectorSlug: true } },
         sales: {
           where: { status: "CONFIRMED" },
-          orderBy: { soldAt: "desc" },
-          take: 2, // last + previous — the delta arrow needs both
+          orderBy: { soldAt: "desc" }, // [0]=last, [1]=previous; all feed the HX
         },
         offers: {
           where: { status: "OPEN" },
-          orderBy: { amountCents: "desc" },
-          take: 1,
+          orderBy: { amountCents: "desc" }, // full open book — count + high bid + HX demand points
         },
+        // Timestamped activity that moves the Heat Index.
+        votes: { select: { createdAt: true } },
+        battlesWon: { select: { createdAt: true } },
+        tournamentsWon: { select: { createdAt: true } },
+        ratings: { select: { stars: true, createdAt: true } },
       },
     }),
     prisma.sale.findMany({ where: { status: "CONFIRMED" } }),
@@ -90,6 +96,17 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         lastSaleAt: last?.soldAt ?? null,
         askCents: p.askingPriceCents,
         topOfferCents: p.offers[0]?.amountCents ?? null,
+        bidCount: p.offers.length,
+        hx: computeHeatIndex(
+          pieceHeatEvents({
+            votes: p.votes,
+            battlesWon: p.battlesWon,
+            tournamentsWon: p.tournamentsWon,
+            ratings: p.ratings,
+            openOffers: p.offers,
+            confirmedSales: p.sales,
+          })
+        ),
       };
     })
     .sort(

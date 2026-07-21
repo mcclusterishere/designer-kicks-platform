@@ -126,6 +126,8 @@ export async function getArtistBySlug(slug: string) {
           sales: { orderBy: { soldAt: "desc" } },
           ratings: { select: { stars: true } },
           collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
+          // The open bid book, high bid first — powers Sell Now.
+          offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" } },
         },
       },
       // Pieces this artist co-built on someone else's page — the

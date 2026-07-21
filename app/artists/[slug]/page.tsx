@@ -16,6 +16,8 @@ import { categoryLabel } from "@/lib/categories";
 import HeatScore from "@/components/HeatScore";
 import ChallengeButton from "@/components/ChallengeButton";
 import DonorShoe from "@/components/DonorShoe";
+import SellNowButton from "@/components/SellNowButton";
+import ShippingQuote from "@/components/ShippingQuote";
 
 export const dynamic = "force-dynamic";
 
@@ -337,10 +339,24 @@ export default async function ArtistPage({ params }: Props) {
                       )}
                     </p>
                   )}
+                  {s.offers.length > 0 && (
+                    <p className="mt-1.5 text-sm tabular-nums text-smoke">
+                      {s.offers.length} standing bid{s.offers.length === 1 ? "" : "s"} · high{" "}
+                      <span className="font-bold text-emerald-400">{formatUsd(s.offers[0].amountCents)}</span>
+                    </p>
+                  )}
                   {(isOwnPage || admin) && (
                     <AddPhotosForm submissionId={s.id} photoCount={1 + s.extraImages.length} />
                   )}
+                  {isOwnPage && !pendingSale && !s.owner && s.offers.length > 0 && (
+                    <SellNowButton
+                      submissionId={s.id}
+                      highBidCents={s.offers[0].amountCents}
+                      bidCount={s.offers.length}
+                    />
+                  )}
                   {isOwnPage && !pendingSale && !s.owner && <RecordSaleForm submissionId={s.id} />}
+                  {isOwnPage && pendingSale && <ShippingQuote />}
                 </div>
               </div>
             );

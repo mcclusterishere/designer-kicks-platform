@@ -122,7 +122,27 @@ function CustomTile({
           {item.size && ` · ${item.size}`}
         </p>
 
-        <div className="mt-3 border-t border-edge pt-2.5">
+        {/* The proprietary number: Heat Index + its 7-day move */}
+        <div className="mt-2 flex items-center justify-between rounded bg-ink/60 px-2 py-1">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-heat">
+            HX <span className="text-sm font-bold tabular-nums text-white">{item.hx.value}</span>
+          </span>
+          <span
+            className={`text-[11px] font-semibold tabular-nums ${
+              item.hx.weekDelta > 0
+                ? "text-emerald-400"
+                : item.hx.weekDelta < 0
+                  ? "text-red-400"
+                  : "text-smoke"
+            }`}
+            title="Heat Index points moved in the last 7 days"
+          >
+            {item.hx.weekDelta > 0 ? "▲ +" : item.hx.weekDelta < 0 ? "▼ " : ""}
+            {item.hx.weekDelta === 0 ? "flat" : `${item.hx.weekDelta} wk`}
+          </span>
+        </div>
+
+        <div className="mt-2.5 border-t border-edge pt-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">{headlineLabel}</p>
           <div className="flex items-baseline justify-between">
             <p className="text-xl font-bold tabular-nums text-white">
@@ -140,11 +160,18 @@ function CustomTile({
             )}
           </span>
           <span>
-            Offer: <span className="text-white">{item.topOfferCents ? formatUsd(item.topOfferCents) : "—"}</span>
+            {item.bidCount > 0 ? (
+              <>
+                {item.bidCount} bid{item.bidCount === 1 ? "" : "s"} · high{" "}
+                <span className="font-bold text-emerald-400">{formatUsd(item.topOfferCents!)}</span>
+              </>
+            ) : (
+              "No bids yet"
+            )}
           </span>
         </div>
         <div className="mt-auto">
-          <OfferForm submissionId={item.id} signedIn={signedIn} />
+          <OfferForm submissionId={item.id} signedIn={signedIn} highBidCents={item.topOfferCents} />
         </div>
       </div>
     </div>
@@ -270,7 +297,7 @@ export default async function MarketPage({
       <p className="mt-10 rounded-lg border border-edge bg-surface px-4 py-3 text-xs leading-relaxed text-smoke">
         {og
           ? "Market values are live resale figures (average / lowest ask) captured from our pricing providers and refreshed on re-import. Premium is resale vs retail. Figures are informational, not quotes."
-          : "Sales are recorded by sellers and confirmed by buyers on their own accounts. ✓ means the sale was substantiated with a receipt or payment evidence (or verified by an admin). Unverified prices are self-reported — weigh them accordingly. Seller fee here is 1% when on-platform checkout opens; recording sales, asks, and offers is free forever."}
+          : "HX is the Heat Index — our proprietary score per piece. Votes, battle wins, standing bids, and sales push it up; cold ratings pull it down. The arrow is the last 7 days of movement. Bids are standing orders: the seller can execute at the high bid any time (Sell Now), which records the sale for the buyer to confirm — payment settles directly between members. ✓ means a sale was substantiated with evidence. Seller fee is 1% when on-platform checkout opens; the book is free forever."}
       </p>
     </div>
   );

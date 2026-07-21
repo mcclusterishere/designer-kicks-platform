@@ -31,7 +31,10 @@ export async function GET(req: NextRequest) {
       previousSaleUsd: i.prevSaleCents !== null ? i.prevSaleCents / 100 : null,
       lastSaleVerified: i.lastSaleVerified,
       lastSaleAt: i.lastSaleAt,
-      topOpenOfferUsd: i.topOfferCents !== null ? i.topOfferCents / 100 : null,
+      openBids: i.bidCount,
+      highBidUsd: i.topOfferCents !== null ? i.topOfferCents / 100 : null,
+      // The proprietary index: activity-driven score + 7-day movement.
+      heatIndex: { value: i.hx.value, weekDelta: i.hx.weekDelta },
     })),
   });
 }

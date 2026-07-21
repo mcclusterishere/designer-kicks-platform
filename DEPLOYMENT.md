@@ -39,6 +39,7 @@ Railway; merging the open PR is the deploy trigger.
 | `FB_PAGE_ID` / `FB_PAGE_ACCESS_TOKEN` / `IG_USER_ID` | Broadcast auto-posting | optional |
 | `CRON_SECRET` | guards `/api/cron/*` (finalize + drop-date sync) | recommended |
 | `KICKSDB_KEY` **or** `RAPIDAPI_STOCKX_KEY` **or** `APIFY_TOKEN` | drop-date auto-sync by SKU | optional |
+| `EASYPOST_API_KEY` | live shipping quotes on pending sales (the rail before payments) | optional |
 | `ANTHROPIC_API_KEY` (+ opt. `ADVISOR_MODEL`) | turns on the /sell AI Selling Advisor | optional |
 | `GEMINI_API_KEY` (+ opt. `GEMINI_MODEL`) | turns on ALL the AI assists: Onboarding Agent (links → drafted profile), photo → staging-form autofill, artist scout, personalized outreach DMs, caption drafts, quiz-question drafts (arrive inactive for review), the admin weekly brief, and a free release-date fallback in the drop-sync waterfall | optional |
 | `REF_EBAY_URL` / `REF_SHOPIFY_URL` / `REF_ETSY_URL` / `REF_DEPOP_URL` / `REF_GRAILED_URL` / … | your referral sign-up links on /sell | optional |

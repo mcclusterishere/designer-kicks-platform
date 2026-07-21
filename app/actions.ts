@@ -1377,6 +1377,28 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
   revalidatePath("/profile");
 }
 
+/**
+ * Market order, StockX-style: the seller taps once and the piece sells
+ * to the highest standing bid. Thin wrapper over respondOffer, which
+ * re-verifies the caller is the seller, creates the PENDING sale,
+ * marks the winning bid ACCEPTED, and closes the rest of the book.
+ */
+export async function acceptHighestBid(submissionId: string): Promise<ActionResult> {
+  const top = await prisma.offer.findFirst({
+    where: { submissionId, status: "OPEN" },
+    orderBy: { amountCents: "desc" },
+  });
+  if (!top) return { ok: false, error: "No open bids on this piece yet." };
+  await respondOffer(top.id, true);
+  const sale = await prisma.sale.findFirst({
+    where: { submissionId, status: "PENDING" },
+    select: { id: true },
+  });
+  return sale
+    ? { ok: true }
+    : { ok: false, error: "Couldn't execute — the bid may have just been withdrawn." };
+}
+
 export async function toggleFollowArtist(artistId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Sign in to follow artists." };
