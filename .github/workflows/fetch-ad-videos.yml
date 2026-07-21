@@ -1,0 +1,31 @@
+# One-shot: pull the campaign videos off Higgsfield's CDN and commit
+# them into public/ad-videos so the site serves them itself. Run
+# manually from the Actions tab (or via API) — the CI runner has open
+# egress, which the dev sandbox doesn't.
+name: Fetch ad videos
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download campaign videos
+        run: |
+          mkdir -p public/ad-videos
+          base="https://d8j0ntlcm91z4.cloudfront.net/user_3G3F7jiUHPTPLSNf3XP0bAYtQmG"
+          curl -fSLo public/ad-videos/market.mp4   "$base/hf_20260721_213415_8219ffeb-c069-4f5e-9cdd-144df450bd91.mp4"
+          curl -fSLo public/ad-videos/arena.mp4    "$base/hf_20260721_213424_de7e88e7-30d2-4d56-8e43-3fb0a17cb45c.mp4"
+          curl -fSLo public/ad-videos/heatlist.mp4 "$base/hf_20260721_213434_71fb44b4-38d4-4c07-a69c-e74eadf4fc69.mp4"
+          curl -fSLo public/ad-videos/artist.mp4   "$base/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
+          curl -fSLo public/ad-videos/home.mp4     "$base/hf_20260721_213455_b9dcb529-faca-4eb8-a3da-ea765c971fac.mp4"
+          curl -fSLo public/ad-videos/sting.mp4    "$base/hf_20260721_212336_7c9c9ca9-b771-4e97-b5a5-158e0814ded0.mp4"
+          ls -la public/ad-videos
+      - name: Commit the videos
+        run: |
+          git config user.name "McCluster Corp"
+          git config user.email "mattmccluster@gmail.com"
+          git add public/ad-videos
+          git commit -m "Self-host campaign videos in public/ad-videos"
+          git push
