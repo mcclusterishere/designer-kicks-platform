@@ -33,7 +33,8 @@ comes from doing the formation properly, not from the words alone.
    database is your member roll — the admin export hub can produce it),
    and minutes of any decisions.
 6. **Professional review** — have a lawyer familiar with unincorporated
-   associations in **Georgia** review the articles and the member
+   associations in **Connecticut** (McCluster Corp's home state) review
+   the articles and the member
    agreement. PMA claims have limits (they don't shield against fraud,
    public-safety law, taxes, or minors' protections), and a professional
    will size those correctly.
@@ -90,10 +91,12 @@ comes from doing the formation properly, not from the words alone.
 
 The unincorporated PMA above is the membership program. To get real
 liability protection and a structure where "the business reinvests all
-the money into itself," put two formal entities around it:
+the money into itself," hang the business under the nonprofit that
+**already exists**. McCluster Corp is the nonprofit — the only one; no
+new nonprofit gets formed at the top:
 
 ```
-Equity Uprise, Inc.  (Georgia nonprofit corporation — the parent)
+McCluster Corp  (Connecticut nonprofit — registered CT public charity; the parent)
         │  sole member / 100% owner
         ▼
 Heat Chart Operations LLC  (the business — runs the platform)
@@ -102,36 +105,44 @@ Heat Chart Operations LLC  (the business — runs the platform)
 Equity Uprise PMA  (the membership program members actually join)
 ```
 
-### 4a. Entity 1 — Equity Uprise, Inc. (Georgia nonprofit corporation)
+### 4a. The parent already exists — keep McCluster Corp in good standing
 
-1. **File Articles of Incorporation** with the Georgia Secretary of
-   State as a **nonprofit corporation** (O.C.G.A. Title 14, Chapter 3).
-   Online filing ≈ **$100**. State a purpose tracking Article II above
-   (advance and reward creative work in sneaker/streetwear culture;
-   education; economic opportunity for artists) and add: *"No part of
-   the net earnings shall inure to the benefit of any private
-   individual; all revenue shall be applied to the corporation's
-   purposes."* That sentence is the legal form of "reinvests everything
-   into itself."
-2. **Publish notice of intent to incorporate** in the county's official
-   legal organ within one business day of filing (**≈ $40**, Georgia
-   requirement).
-3. **Registered agent** — a street address in Georgia (can be you).
-4. **Board** — Georgia allows one director; **three is far stronger**
-   (see the self-dealing guardrails below). You as chair plus two
-   people you trust who are not family in the same household.
-5. **Bylaws + organizational minutes** — adopt bylaws, elect officers,
-   authorize the bank account and the LLC in the first minutes.
-6. **EIN** (free, IRS online) → **bank account** in the nonprofit's name.
-7. **Georgia annual registration** every year (≈ **$30**) — miss it and
-   the state administratively dissolves the entity, which unwinds the
-   whole shield.
+McCluster Corp already carries the credentials a new entity would take
+years to build:
 
-### 4b. Entity 2 — Heat Chart Operations LLC (the business)
+- **Connecticut Public Charity registration** (Dept. of Consumer
+  Protection, Reg. CHR.0069693, effective 10/28/2025) — authorizes
+  soliciting charitable donations in Connecticut. **Renews by
+  09/30/2026**; fiscal year ends October 31. Calendar both — a lapsed
+  registration is the fastest way to weaken the whole structure.
+- **Recognized operating history** — an official citation from the
+  Connecticut General Assembly (October 2025) for the Equity
+  Rise/Uprise programs and their public benefit.
+- **Rights-holding infrastructure already in its name** — SoundExchange
+  rights-owner registrant, DDEX party ID, US ISRC registrant prefix.
+  The parent is already the IP- and rights-holding entity of record,
+  which is exactly the role it plays in this structure.
 
-1. **File Articles of Organization** for a Georgia LLC (≈ **$100**),
-   **sole member: Equity Uprise, Inc.** — the nonprofit owns the LLC
-   outright; you manage it, you don't own it.
+The only work left at the parent level is housekeeping:
+
+1. Confirm the **Connecticut annual report** with the Secretary of the
+   State is current, and keep the charity-registration renewal on the
+   calendar.
+2. **Board resolution + minutes** adopting The Heat Chart / Equity
+   Uprise as a program of McCluster Corp and authorizing formation of
+   the operating LLC below.
+3. If the board is currently just you, add **two directors** you trust
+   who are not household family — the self-dealing guardrails in 4c
+   need directors who aren't you to sign off on your compensation.
+
+### 4b. The one entity to form — Heat Chart Operations LLC (the business)
+
+1. **File Articles of Organization** for the LLC with **sole member:
+   McCluster Corp** — the nonprofit owns the LLC outright; you manage
+   it, you don't own it. Form it in Connecticut, the parent's home
+   state (filing ≈ **$120**, annual report ≈ $80/yr); if the platform
+   ends up with real physical operations in another state, register
+   there as a foreign LLC at that point.
 2. The LLC holds the operating life: theheatchart.com, the platform,
    marketplace fees, consignment revenue, contracts, and (later)
    payment processing. Contracts and invoices sign as
@@ -147,30 +158,32 @@ Equity Uprise PMA  (the membership program members actually join)
 ### 4c. Why this protects you (and its honest limits)
 
 - **Liability**: platform disputes, marketplace claims, and contract
-  problems stop at the LLC; the nonprofit parent is insulated above it;
-  you personally sit outside both. The unincorporated PMA alone gives
-  none of this — in Georgia, members of an unincorporated association
-  can be personally exposed. The corporate shell is what actually
-  protects you.
-- **Nonprofit ≠ tax-exempt.** Incorporating as a Georgia nonprofit does
-  NOT make it a 501(c)(3) — that's a separate IRS application
-  (Form 1023), and a sneaker marketplace will struggle to qualify as
-  charitable. The honest default: a **taxable nonprofit** — it files
-  returns and pays tax on net income like any business, but its charter
-  binds every dollar to the mission instead of to an owner. If a real
-  educational/charitable program grows inside it (the curriculum,
-  artist grants), a lawyer can carve that into a 501(c)(3) later.
+  problems stop at the LLC; McCluster Corp is insulated above it; you
+  personally sit outside both. The unincorporated PMA alone gives none
+  of this — members of an unincorporated association can be personally
+  exposed. The corporate shell is what actually protects you.
+- **Charity registration ≠ tax-exempt.** The Connecticut registration
+  authorizes fundraising — the certificate itself says the IRS, not the
+  state, decides whether donations are deductible. Unless and until
+  McCluster Corp holds an IRS determination letter (Form 1023 →
+  501(c)(3)), donations aren't tax-deductible and the org pays tax on
+  net income like a business — its charter just binds every dollar to
+  the mission instead of to an owner. And if a determination letter IS
+  in hand, profit flowing up from a sneaker marketplace is likely
+  **unrelated business income** (UBIT) — not a crisis, but a real line
+  on the tax return the accountant needs to know about.
 - **Self-dealing guardrails** — the structure only holds if the paper
   matches the behavior: you can draw a **reasonable, board-approved,
-  minuted salary** for running the LLC; you cannot borrow from it, take
-  its assets personally, or have it overpay McCluster Corp. Any
-  contract between the entities and you/McCluster Corp gets written
-  down, priced at market, and approved by the directors who aren't you.
-- **Sequence**: nonprofit first, LLC second (it needs the nonprofit as
-  member), then a one-page resolution adopting the PMA program and the
-  platform's membership agreement as the LLC's operating program.
-  Total state cost ≈ **$270** + a Georgia business/nonprofit attorney
-  review (budget a few hundred dollars — worth it here).
+  minuted salary** for running the LLC; you cannot borrow from it or
+  take its assets personally. Any contract between the entities and
+  you gets written down, priced at market, and approved by the
+  directors who aren't you.
+- **Sequence**: board resolution first, LLC filing second, operating
+  agreement + LLC bank account third, then a one-page resolution
+  adopting the PMA program and the platform's membership agreement as
+  the LLC's operating program. State cost ≈ **$120** + a Connecticut
+  nonprofit attorney review (budget a few hundred dollars — worth it
+  here).
 
 ## 5. Honest limits to know
 
