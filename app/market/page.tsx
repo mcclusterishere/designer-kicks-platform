@@ -96,6 +96,11 @@ function CustomTile({
             Collab
           </span>
         )}
+        {item.consignment && (
+          <span className="absolute bottom-2 left-2 rounded bg-heat px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            Consigned
+          </span>
+        )}
       </div>
       <div className="flex flex-1 flex-col p-3">
         <p className="truncate text-sm font-semibold text-white" title={item.title}>
@@ -120,7 +125,17 @@ function CustomTile({
           {" · "}
           {categoryLabel(item.category)}
           {item.size && ` · ${item.size}`}
+          {item.provenanceType === "COMMISSION" && " · Commission"}
         </p>
+        {item.consignment && (
+          <p className="mt-1 text-[11px] leading-relaxed text-heat">
+            Consignment relist
+            {item.consignment.priorSaleCents
+              ? ` — prior sale ${formatUsd(item.consignment.priorSaleCents)}`
+              : ""}{" "}
+            · proceeds split with a private collector
+          </p>
+        )}
 
         {/* The proprietary number: Heat Index + its 7-day move */}
         <div className="mt-2 flex items-center justify-between rounded bg-ink/60 px-2 py-1">
@@ -165,13 +180,20 @@ function CustomTile({
                 {item.bidCount} bid{item.bidCount === 1 ? "" : "s"} · high{" "}
                 <span className="font-bold text-emerald-400">{formatUsd(item.topOfferCents!)}</span>
               </>
+            ) : item.consignment ? (
+              <>Bids from <span className="font-bold text-white">{formatUsd(item.consignment.floorCents)}</span></>
             ) : (
               "No bids yet"
             )}
           </span>
         </div>
         <div className="mt-auto">
-          <OfferForm submissionId={item.id} signedIn={signedIn} highBidCents={item.topOfferCents} />
+          <OfferForm
+            submissionId={item.id}
+            signedIn={signedIn}
+            highBidCents={item.topOfferCents}
+            floorCents={item.consignment?.floorCents ?? null}
+          />
         </div>
       </div>
     </div>

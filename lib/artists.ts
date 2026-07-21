@@ -128,6 +128,7 @@ export async function getArtistBySlug(slug: string) {
           collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
           // The open bid book, high bid first — powers Sell Now.
           offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" } },
+          consignment: true,
         },
       },
       // Pieces this artist co-built on someone else's page — the

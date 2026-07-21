@@ -122,6 +122,11 @@ export async function createSubmission(
     };
   }
 
+  // Origin: open-market original vs commissioned-to-order. Feeds the
+  // valuation engine — the two kinds of first price mean different things.
+  const provenanceType =
+    String(formData.get("provenanceType") ?? "ORIGINAL") === "COMMISSION" ? "COMMISSION" : "ORIGINAL";
+
   // Pricing at upload — the Market runs on the artists' own numbers.
   const askingRaw = String(formData.get("askingPrice") ?? "").trim();
   let askingPriceCents: number | null = null;
@@ -209,6 +214,7 @@ export async function createSubmission(
       category,
       videoUrl,
       askingPriceCents,
+      provenanceType,
       size: size || null,
       description: description || null,
       imageUrl,
@@ -1258,11 +1264,22 @@ export async function placeOffer(
       artist: { select: { userId: true, user: { select: { email: true } } } },
       owner: { select: { id: true, email: true } },
       sales: { where: { status: "PENDING" }, select: { id: true } },
+      consignment: { select: { status: true, floorCents: true } },
     },
   });
   if (!submission || submission.status !== "APPROVED") return { ok: false, error: "Piece not found." };
   if (submission.sales.length > 0) {
     return { ok: false, error: "This piece has a sale pending — offers reopen if it falls through." };
+  }
+  // Consignment floor: the disclosed minimum. Below it, the bid bounces.
+  if (
+    submission.consignment?.status === "OPEN" &&
+    Math.round(amount * 100) < submission.consignment.floorCents
+  ) {
+    return {
+      ok: false,
+      error: `Bids on this consignment start at $${Math.round(submission.consignment.floorCents / 100)}.`,
+    };
   }
 
   // The current seller can't bid on their own piece (owner if sold on,
@@ -1346,6 +1363,14 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
   const sellerId = sellerUserId ?? offer.submission.artist?.userId;
   if (!sellerId || sellerId === offer.buyer.id) return;
 
+  // A consigned piece selling closes its consignment — the sale note
+  // carries the disclosure so the provenance chain reads clean.
+  const consignment = await prisma.consignment.findUnique({
+    where: { submissionId: offer.submissionId },
+    select: { id: true, status: true, splitPct: true },
+  });
+  const activeConsignment = consignment?.status === "OPEN" ? consignment : null;
+
   await prisma.$transaction([
     prisma.sale.create({
       data: {
@@ -1353,7 +1378,9 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
         sellerId,
         buyerEmail: offer.buyer.email.toLowerCase(),
         priceCents: offer.amountCents,
-        note: "Accepted platform offer",
+        note: activeConsignment
+          ? `Accepted platform offer — consignment relist, ${activeConsignment.splitPct}% of proceeds to the consignor`
+          : "Accepted platform offer",
       },
     }),
     prisma.offer.update({ where: { id: offerId }, data: { status: "ACCEPTED" } }),
@@ -1362,6 +1389,9 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
       where: { submissionId: offer.submissionId, status: "OPEN", id: { not: offerId } },
       data: { status: "DECLINED" },
     }),
+    ...(activeConsignment
+      ? [prisma.consignment.update({ where: { id: activeConsignment.id }, data: { status: "SOLD" } })]
+      : []),
   ]);
 
   sendMail({
@@ -1375,6 +1405,91 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
   if (offer.submission.artist) revalidatePath(`/artists/${offer.submission.artist.slug}`);
   revalidatePath("/market");
   revalidatePath("/profile");
+}
+
+/**
+ * Consignment relist: a piece the artist previously sold comes back
+ * and re-enters the market with its history disclosed — prior price,
+ * consignor split, bid floor. The disclosure is what makes the relist
+ * legitimate market data instead of an engineered price: anyone
+ * reading the board (including a lender's diligence team) sees the
+ * related-party relationship on the record.
+ */
+export async function createConsignment(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const priorSaleRaw = String(formData.get("priorSale") ?? "").replace(/[$,\s]/g, "");
+  const floorRaw = String(formData.get("floor") ?? "").replace(/[$,\s]/g, "");
+  const splitRaw = String(formData.get("split") ?? "75").trim();
+  const consignorName = String(formData.get("consignorName") ?? "").trim().slice(0, 80);
+
+  const floor = Number(floorRaw);
+  if (!Number.isFinite(floor) || floor < 1 || floor > 100000) {
+    return { ok: false, error: "Set a bid floor between $1 and $100,000." };
+  }
+  const priorSale = priorSaleRaw ? Number(priorSaleRaw) : null;
+  if (priorSale !== null && (!Number.isFinite(priorSale) || priorSale < 1 || priorSale > 100000)) {
+    return { ok: false, error: "Prior sale price should be between $1 and $100,000." };
+  }
+  const split = Number(splitRaw);
+  if (!Number.isInteger(split) || split < 0 || split > 100) {
+    return { ok: false, error: "The consignor's split should be 0–100%." };
+  }
+
+  const piece = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: {
+      artist: { select: { id: true, userId: true, slug: true } },
+      consignment: { select: { id: true, status: true } },
+      sales: { where: { status: "PENDING" }, select: { id: true } },
+      owner: { select: { id: true } },
+    },
+  });
+  if (!piece || piece.status !== "APPROVED") return { ok: false, error: "Piece not found." };
+  if (piece.artist?.userId !== session.user.id) {
+    return { ok: false, error: "Only the artist can open a consignment on their piece." };
+  }
+  if (piece.owner) {
+    return {
+      ok: false,
+      error:
+        "This piece is in a collector's closet on-platform — they sell it from their side. Consignment relists are for pieces that came back to you from off-platform sales.",
+    };
+  }
+  if (piece.sales.length > 0) return { ok: false, error: "This piece has a sale pending." };
+  if (piece.consignment && piece.consignment.status === "OPEN") {
+    return { ok: false, error: "This piece already has an open consignment." };
+  }
+
+  const data = {
+    artistId: piece.artist.id,
+    priorSaleCents: priorSale !== null ? Math.round(priorSale * 100) : null,
+    consignorName: consignorName || null,
+    splitPct: split,
+    floorCents: Math.round(floor * 100),
+    status: "OPEN",
+  };
+  if (piece.consignment) {
+    await prisma.consignment.update({ where: { id: piece.consignment.id }, data });
+  } else {
+    await prisma.consignment.create({ data: { ...data, submissionId } });
+  }
+  // A floor implies an ask if none is set — the board needs a number.
+  if (!piece.askingPriceCents) {
+    await prisma.submission.update({
+      where: { id: submissionId },
+      data: { askingPriceCents: Math.round(floor * 100) },
+    });
+  }
+
+  if (piece.artist.slug) revalidatePath(`/artists/${piece.artist.slug}`);
+  revalidatePath("/market");
+  return { ok: true };
 }
 
 /**

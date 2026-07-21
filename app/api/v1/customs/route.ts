@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { apiResponse, apiOptions, paging, mediaUrl } from "@/lib/publicApi";
 import { siteUrl } from "@/lib/articles";
+import { estimateValue, VALUATION_DISCLAIMER } from "@/lib/valuation";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +33,9 @@ export async function GET(req: NextRequest) {
       include: {
         artist: { select: { slug: true, displayName: true, status: true } },
         collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
-        sales: { where: { status: "CONFIRMED" }, orderBy: { soldAt: "desc" }, take: 1 },
+        sales: { where: { status: "CONFIRMED" }, orderBy: { soldAt: "desc" } },
         offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" }, take: 1 },
+        consignment: { select: { status: true, floorCents: true, priorSaleCents: true, splitPct: true } },
       },
     }),
   ]);
@@ -67,6 +69,19 @@ export async function GET(req: NextRequest) {
         },
         size: s.size,
         description: s.description,
+        // ORIGINAL price-discovers on the open market; COMMISSION's
+        // first price is a contracted fee. Consumers of this feed
+        // should weigh them differently — our estimates do.
+        provenance: s.provenanceType,
+        consignment:
+          s.consignment?.status === "OPEN"
+            ? {
+                floorUsd: s.consignment.floorCents / 100,
+                priorSaleUsd:
+                  s.consignment.priorSaleCents !== null ? s.consignment.priorSaleCents / 100 : null,
+                consignorSplitPct: s.consignment.splitPct,
+              }
+            : null,
         images: [mediaUrl(s.imageUrl), ...s.extraImages.map(mediaUrl)].filter(Boolean),
         video: mediaUrl(s.videoUrl),
         pricing: {
@@ -76,6 +91,23 @@ export async function GET(req: NextRequest) {
           lastSaleAt: s.sales[0]?.soldAt ?? null,
           topOpenOfferUsd: s.offers[0] ? s.offers[0].amountCents / 100 : null,
         },
+        valueEstimate: (() => {
+          const est = estimateValue({
+            provenanceType: s.provenanceType,
+            askingPriceCents: s.askingPriceCents,
+            verifiedSales: s.sales.filter((x) => x.verified),
+            unverifiedSales: s.sales.filter((x) => !x.verified),
+            priorConsignmentSaleCents: s.consignment?.priorSaleCents ?? null,
+            highBidCents: s.offers[0]?.amountCents ?? null,
+          });
+          return {
+            lowUsd: est.lowCents !== null ? est.lowCents / 100 : null,
+            highUsd: est.highCents !== null ? est.highCents / 100 : null,
+            confidence: est.confidence,
+            basis: est.basis,
+            disclaimer: VALUATION_DISCLAIMER,
+          };
+        })(),
         url: artistUrl ?? `${siteUrl()}/heat-list`,
         createdAt: s.createdAt,
       };

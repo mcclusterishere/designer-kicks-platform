@@ -73,12 +73,20 @@ export default async function StudioPage() {
             Plan: <span className="text-volt">{artist.plan === "PRO" ? "Pro" : "Free — founding artist"}</span>
           </p>
         </div>
-        <Link
-          href={`/artists/${artist.slug}`}
-          className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-volt hover:text-white"
-        >
-          Public page →
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/studio/portfolio"
+            className="tag rounded-full border border-heat/60 px-4 py-2 text-heat transition hover:bg-heat/10"
+          >
+            Portfolio Statement →
+          </Link>
+          <Link
+            href={`/artists/${artist.slug}`}
+            className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-volt hover:text-white"
+          >
+            Public page →
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">

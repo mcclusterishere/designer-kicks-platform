@@ -15,10 +15,12 @@ export default function OfferForm({
   submissionId,
   signedIn,
   highBidCents = null,
+  floorCents = null,
 }: {
   submissionId: string;
   signedIn: boolean;
   highBidCents?: number | null;
+  floorCents?: number | null; // consignment floor — bids start here
 }) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -57,9 +59,15 @@ export default function OfferForm({
     );
   }
 
-  // Thumb-first amounts: beat the high bid in one tap, or open the book.
+  // Thumb-first amounts: beat the high bid in one tap, open the book,
+  // or start at a consignment's disclosed floor.
   const high = highBidCents ? Math.round(highBidCents / 100) : null;
-  const quicks = high ? [high + 25, high + 50, high + 100] : [50, 100, 250];
+  const floor = floorCents ? Math.round(floorCents / 100) : null;
+  const quicks = high
+    ? [high + 25, high + 50, high + 100]
+    : floor
+      ? [floor, floor + 50, floor + 100]
+      : [50, 100, 250];
 
   return (
     <form action={formAction} className="mt-3 space-y-2">
@@ -88,7 +96,7 @@ export default function OfferForm({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           aria-label="Your bid in dollars"
-          placeholder={high ? `beat $${high}` : "your bid $"}
+          placeholder={high ? `beat $${high}` : floor ? `from $${floor}` : "your bid $"}
           className="w-full min-w-0 rounded-md border border-edge bg-panel px-3 py-2.5 text-sm tabular-nums text-white placeholder:text-smoke/60 focus:border-volt focus:outline-none"
         />
         <button

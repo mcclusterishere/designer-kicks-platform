@@ -21,6 +21,8 @@ export type MarketItem = {
   topOfferCents: number | null;
   bidCount: number;
   hx: HeatIndexValue;
+  provenanceType: string;
+  consignment: { floorCents: number; priorSaleCents: number | null } | null;
 };
 
 export type MarketStats = {
@@ -70,6 +72,7 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         battlesWon: { select: { createdAt: true } },
         tournamentsWon: { select: { createdAt: true } },
         ratings: { select: { stars: true, createdAt: true } },
+        consignment: { select: { status: true, floorCents: true, priorSaleCents: true } },
       },
     }),
     prisma.sale.findMany({ where: { status: "CONFIRMED" } }),
@@ -97,6 +100,11 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
         askCents: p.askingPriceCents,
         topOfferCents: p.offers[0]?.amountCents ?? null,
         bidCount: p.offers.length,
+        provenanceType: p.provenanceType,
+        consignment:
+          p.consignment?.status === "OPEN"
+            ? { floorCents: p.consignment.floorCents, priorSaleCents: p.consignment.priorSaleCents }
+            : null,
         hx: computeHeatIndex(
           pieceHeatEvents({
             votes: p.votes,

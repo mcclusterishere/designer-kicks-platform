@@ -50,6 +50,15 @@ model Submission {
   size             String? // e.g. "US 10.5", "L", "7 3/8" — buyers need this
   askingPriceCents Int?
 
+  // How the piece came to exist — it changes what its first price MEANS.
+  // ORIGINAL work price-discovers on the open market (strong comp);
+  // COMMISSION work's first price is a contracted fee (income evidence,
+  // weak market comp). Appraisers and lenders treat the two differently,
+  // so the valuation engine does too.
+  provenanceType String @default("ORIGINAL") // ORIGINAL | COMMISSION
+
+  consignment Consignment?
+
   // Collab pieces: co-artists beyond the primary submitter. The piece
   // lives in the primary artist's closet and shows on every
   // collaborator's page under Collabs — one piece, all names on it.
@@ -114,7 +123,8 @@ model ArtistProfile {
   onboardedBy   User?   @relation("onboardedArtists", fields: [onboardedById], references: [id], onDelete: SetNull)
 
   submissions Submission[]
-  collabs     Submission[]   @relation("collabPieces")
+  collabs      Submission[]  @relation("collabPieces")
+  consignments Consignment[]
   followers   ArtistFollow[]
   claims      ArtistClaim[]
   feedPosts   FeedPost[]
@@ -688,6 +698,30 @@ model Sale {
   verifiedBy String? // "evidence" | "admin"
 
   createdAt DateTime @default(now())
+}
+
+// A disclosed consignment relist: a previously-sold piece comes back to
+// the artist and re-enters the market with its history ON the record —
+// prior sale price, the consignor's cut, and a bid floor. Disclosure is
+// the whole point: an appraiser or lender reading this piece's history
+// sees a transparent consignment, not a mystery price jump. Related-
+// party relists that HIDE the relationship are what gets people charged
+// with fraud; this model exists so nothing needs hiding.
+model Consignment {
+  id           String     @id @default(cuid())
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  artistId     String
+  artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  priorSaleCents Int? // what it sold for the first time (self-reported unless a Sale record backs it)
+  consignorName  String? // kept private — shown publicly as "a private collector"
+  splitPct       Int     @default(75) // consignor's share of the resale
+  floorCents     Int // bids below this bounce
+  status         String  @default("OPEN") // OPEN | SOLD | CLOSED
+  createdAt      DateTime @default(now())
+
+  @@index([artistId, status])
 }
 
 model Account {

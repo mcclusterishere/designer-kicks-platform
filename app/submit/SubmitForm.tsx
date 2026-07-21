@@ -205,7 +205,20 @@ export default function SubmitForm({ artistDefaults }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <div>
+          <label htmlFor="provenanceType" className="tag text-smoke">
+            Origin *
+          </label>
+          <select id="provenanceType" name="provenanceType" className={inputClass} defaultValue="ORIGINAL">
+            <option value="ORIGINAL">Original — made for the open market</option>
+            <option value="COMMISSION">Commission — made to order for a client</option>
+          </select>
+          <p className="mt-1.5 text-xs text-smoke/70">
+            Matters for your portfolio: open-market sales are stronger
+            value evidence than commission fees.
+          </p>
+        </div>
         <div>
           <label htmlFor="askingPrice" className="tag text-smoke">
             Asking price <span className="normal-case">(USD — lists it on the Market)</span>

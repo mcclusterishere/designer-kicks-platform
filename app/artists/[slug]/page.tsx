@@ -18,6 +18,7 @@ import ChallengeButton from "@/components/ChallengeButton";
 import DonorShoe from "@/components/DonorShoe";
 import SellNowButton from "@/components/SellNowButton";
 import ShippingQuote from "@/components/ShippingQuote";
+import ConsignForm from "@/components/ConsignForm";
 
 export const dynamic = "force-dynamic";
 
@@ -345,6 +346,16 @@ export default async function ArtistPage({ params }: Props) {
                       <span className="font-bold text-emerald-400">{formatUsd(s.offers[0].amountCents)}</span>
                     </p>
                   )}
+                  {s.consignment?.status === "OPEN" && (
+                    <p className="mt-1.5 text-xs leading-relaxed text-heat">
+                      Consignment relist
+                      {s.consignment.priorSaleCents
+                        ? ` — previously sold at ${formatUsd(s.consignment.priorSaleCents)}`
+                        : ""}
+                      {" · bids from "}
+                      {formatUsd(s.consignment.floorCents)} · proceeds split with a private collector
+                    </p>
+                  )}
                   {(isOwnPage || admin) && (
                     <AddPhotosForm submissionId={s.id} photoCount={1 + s.extraImages.length} />
                   )}
@@ -356,6 +367,9 @@ export default async function ArtistPage({ params }: Props) {
                     />
                   )}
                   {isOwnPage && !pendingSale && !s.owner && <RecordSaleForm submissionId={s.id} />}
+                  {isOwnPage && !pendingSale && !s.owner && s.consignment?.status !== "OPEN" && (
+                    <ConsignForm submissionId={s.id} />
+                  )}
                   {isOwnPage && pendingSale && <ShippingQuote />}
                 </div>
               </div>
