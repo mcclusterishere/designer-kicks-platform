@@ -447,6 +447,47 @@ export default async function AdminPage({
       </section>
       )}
 
+      {/* Data exports — the whole database, one CSV at a time */}
+      {show("settings") && (
+      <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
+        <h2 className="display text-2xl text-white">Data Exports</h2>
+        <p className="mt-1 text-sm text-smoke">
+          Download any slice of the database as a CSV — feed it to
+          NotebookLM or a spreadsheet, build article slates, run the
+          numbers. Everything here is admin-locked.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {[
+            { set: "catalog", label: "Shoe catalog", note: "Every shoe: SKU, prices, lane, flames" },
+            { set: "artists", label: "Artist roster", note: "Profiles, piece + follower counts" },
+            { set: "pieces", label: "Custom pieces", note: "Every submission with its ratings" },
+            { set: "battles", label: "Battles", note: "Matchups, vote counts, winners" },
+            { set: "articles", label: "Articles", note: "The newsroom index" },
+            { set: "quiz", label: "Quiz bank", note: "Every Culture IQ question" },
+            { set: "flames", label: "Flame scores", note: "Catalog rating aggregates" },
+            { set: "members", label: "Members", note: "Accounts + contact prefs — PII, keep internal" },
+          ].map((e) => (
+            <a
+              key={e.set}
+              href={`/api/export?set=${e.set}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-edge bg-panel/40 px-4 py-3 transition hover:border-volt"
+            >
+              <span>
+                <span className="block text-sm font-bold text-white">{e.label}</span>
+                <span className="block text-xs text-smoke">{e.note}</span>
+              </span>
+              <span className="tag shrink-0 font-bold text-volt">CSV ↓</span>
+            </a>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-smoke/70">
+          Research sets (catalog, artists, pieces, battles, articles, quiz,
+          flames) carry no member data — safe for outside tools. The Members
+          file is for your own mailings only; never upload it anywhere.
+        </p>
+      </section>
+      )}
+
       {/* Team & Careers */}
       {show("team") && (
       <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
