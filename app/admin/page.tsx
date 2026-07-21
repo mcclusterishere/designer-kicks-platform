@@ -5,6 +5,7 @@ import { finalizeExpiredOutfitBattles } from "@/lib/outfits";
 import {
   adminLogout,
   setSubmissionStatus,
+  setAmbassadorStatus,
   endBattleNow,
   deleteProduct,
   deleteArticle,
@@ -186,6 +187,11 @@ export default async function AdminPage({
   const appraiserApplications = await prisma.appraiserApplication.findMany({
     where: { status: "NEW" },
     orderBy: { createdAt: "asc" },
+  });
+  const ambassadorApplications = await prisma.ambassadorApplication.findMany({
+    where: { status: { in: ["NEW", "AMBASSADOR"] } },
+    orderBy: [{ iqAtApply: "desc" }],
+    include: { user: { select: { name: true, email: true } } },
   });
   const [editors, editorThread, stagedProspects, jobPostings, jobApplications] = await Promise.all([
     prisma.user.findMany({
@@ -641,6 +647,55 @@ export default async function AdminPage({
             <div className="mt-3"><NewJobForm /></div>
           </details>
         </div>
+
+        {ambassadorApplications.length > 0 && (
+          <div className="mt-6">
+            <p className="tag text-smoke">
+              Ambassador class ({ambassadorApplications.length}) — sorted by Culture IQ
+            </p>
+            <div className="mt-2 space-y-2">
+              {ambassadorApplications.map((am) => (
+                <div key={am.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <p>
+                      <span className="font-bold text-white">{am.user.name ?? am.user.email}</span>{" "}
+                      <a
+                        href={`https://instagram.com/${am.igHandle}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-volt underline"
+                      >
+                        @{am.igHandle}
+                      </a>
+                      <span className="text-smoke"> · {am.city} · IQ </span>
+                      <span className="font-bold tabular-nums text-volt">{am.iqAtApply}</span>
+                      <span className={`tag ml-2 ${am.status === "AMBASSADOR" ? "text-volt" : "text-heat"}`}>
+                        {am.status.toLowerCase()}
+                      </span>
+                    </p>
+                    {am.links && <p className="mt-0.5 truncate text-xs text-smoke">{am.links}</p>}
+                    {am.note && <p className="mt-0.5 text-xs text-smoke">{am.note}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-1.5">
+                    {am.status === "NEW" && (
+                      <form action={setAmbassadorStatus.bind(null, am.id, "AMBASSADOR")}>
+                        <button className="rounded border border-volt px-2.5 py-1 tag text-volt">Make Ambassador</button>
+                      </form>
+                    )}
+                    {am.status === "AMBASSADOR" && (
+                      <form action={setAmbassadorStatus.bind(null, am.id, "CURATOR")}>
+                        <button className="rounded border border-heat px-2.5 py-1 tag text-heat">Promote to Curator</button>
+                      </form>
+                    )}
+                    <form action={setAmbassadorStatus.bind(null, am.id, "PASSED")}>
+                      <button className="rounded border border-edge px-2.5 py-1 tag text-smoke">Pass</button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {appraiserApplications.length > 0 && (
           <div className="mt-6">

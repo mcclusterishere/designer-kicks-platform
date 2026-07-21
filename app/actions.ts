@@ -3834,3 +3834,73 @@ export async function applyAppraiser(
   );
   return { ok: true };
 }
+
+// ---------- Ambassador program (models -> curators) ----------
+
+/**
+ * Models apply to the ambassador class. The door is the Culture IQ -
+ * fashion knowledge is the prerequisite, and the quiz is the proof.
+ * Applying below the bar returns them to the quiz instead of a form.
+ * The ladder after approval: AMBASSADOR (booked for shoots) -> CURATOR
+ * (superuser - first pick of shoots, drops, events).
+ */
+export async function applyAmbassador(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Create an account first - the program runs through the app." };
+
+  const igHandle = String(formData.get("igHandle") ?? "").trim().replace(/^@/, "");
+  const city = String(formData.get("city") ?? "").trim();
+  const links = String(formData.get("links") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+
+  if (!igHandle || igHandle.length > 40) return { ok: false, error: "Your Instagram handle is required." };
+  if (!city || city.length > 60) return { ok: false, error: "Your city is required - shoots are booked by city." };
+  if (links.length > 300 || note.length > 600) return { ok: false, error: "One of the fields is too long." };
+
+  const { cultureIQ } = await import("@/lib/iq");
+  const { AMBASSADOR_MIN_IQ } = await import("@/lib/iq");
+  const { iq } = await cultureIQ(session.user.id);
+  if (iq < AMBASSADOR_MIN_IQ) {
+    return {
+      ok: false,
+      error: `The culture check is the door: you're at ${iq} IQ and the bar is ${AMBASSADOR_MIN_IQ}. Run the Heat Check quiz - every right answer is +2.`,
+    };
+  }
+
+  const existing = await prisma.ambassadorApplication.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (existing) {
+    await prisma.ambassadorApplication.update({
+      where: { id: existing.id },
+      data: { igHandle, city, links: links || null, note: note || null, iqAtApply: iq },
+    });
+  } else {
+    await prisma.ambassadorApplication.create({
+      data: {
+        userId: session.user.id,
+        igHandle,
+        city,
+        links: links || null,
+        note: note || null,
+        iqAtApply: iq,
+      },
+    });
+  }
+
+  notifyAdmin(
+    "Ambassador application",
+    `${session.user.name ?? "A member"} - @${igHandle} - ${city} - IQ ${iq}\nLinks: ${links || "-"}\n\n${note || ""}`
+  );
+  return { ok: true };
+}
+
+export async function setAmbassadorStatus(id: string, status: string): Promise<void> {
+  if (!(await isAdmin())) return;
+  if (!["NEW", "AMBASSADOR", "CURATOR", "PASSED"].includes(status)) return;
+  await prisma.ambassadorApplication.update({ where: { id }, data: { status } });
+  revalidatePath("/admin");
+}

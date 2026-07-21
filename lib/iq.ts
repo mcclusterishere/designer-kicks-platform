@@ -21,3 +21,9 @@ export async function cultureIQ(
   ]);
   return { iq: iqFromCounts(correct, misses), correct, misses, cleared };
 }
+
+// The fashion-knowledge bar for the ambassador program: 120 IQ = at
+// least ten questions answered right with no unpaid misses. High
+// enough to prove they know fashion, low enough that a real one
+// clears it in two quiz runs — and every applicant becomes a player.
+export const AMBASSADOR_MIN_IQ = 120;

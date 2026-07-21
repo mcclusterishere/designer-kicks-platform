@@ -100,3 +100,22 @@ with object storage. Cloudflare R2 (free 10GB) or AWS S3:
 - Meta: approve any pending piece → it appears on the FB page.
 - EasyPost: open a pending sale → quote a lane → real rates.
 - S3: upload a piece → the image URL points at your bucket.
+
+## 9. Threads autoposter — THREADS_USER_ID + THREADS_ACCESS_TOKEN (20 min)
+
+The daily "Day N" recruitment post, automated (it pulled 20-40
+engagements per post when run by hand).
+1. developers.facebook.com → your Meta app → add the "Threads API"
+   use case (or create a Threads app).
+2. Authorize @kickequipped with threads_basic +
+   threads_content_publish; exchange for a LONG-LIVED token (60 days,
+   refreshable).
+3. `THREADS_USER_ID` = the numeric Threads user id from the token
+   response; `THREADS_ACCESS_TOKEN` = the long-lived token.
+4. cron-job.org: ONE daily job (pick your peak hour) →
+   https://theheatchart.com/api/cron/threads-daily with the same
+   `Authorization: Bearer <CRON_SECRET>` header.
+5. Test: hit the URL once by hand — the response echoes the day
+   number and the exact text it posted.
+Note: refresh the long-lived token before the 60-day expiry
+(calendar reminder — takes one curl).

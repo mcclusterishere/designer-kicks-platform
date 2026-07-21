@@ -534,6 +534,7 @@ model User {
   pmaAcceptedAt DateTime?
 
   commissionRequests CommissionRequest[]
+  ambassadorApplication AmbassadorApplication?
 
   // Profile / contact info (the "Sneaker Passport")
   phone              String?
@@ -701,6 +702,26 @@ model Sale {
   verifiedBy String? // "evidence" | "admin"
 
   createdAt DateTime @default(now())
+}
+
+// Models applying to the ambassador program. Applying requires an
+// account AND a passing Culture IQ — the fashion-knowledge
+// prerequisite is the quiz, which is exactly why it exists. The
+// ladder: NEW (applied) → AMBASSADOR (booked for shoots) → CURATOR
+// (superuser — first pick of shoots, drops, events).
+model AmbassadorApplication {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  igHandle  String
+  city      String
+  links     String? // portfolio / reels
+  note      String?
+  iqAtApply Int // Culture IQ snapshot when they applied
+  status    String   @default("NEW") // NEW | AMBASSADOR | CURATOR | PASSED
+  createdAt DateTime @default(now())
+
+  @@index([status])
 }
 
 // Independent appraisers applying to the network — the arm's-length
