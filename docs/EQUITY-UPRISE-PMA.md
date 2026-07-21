@@ -33,7 +33,7 @@ comes from doing the formation properly, not from the words alone.
    database is your member roll — the admin export hub can produce it),
    and minutes of any decisions.
 6. **Professional review** — have a lawyer familiar with unincorporated
-   associations in **Connecticut** (McCluster Corp's home state) review
+   associations in **Georgia** (the operating LLC's state) review
    the articles and the member
    agreement. PMA claims have limits (they don't shield against fraud,
    public-safety law, taxes, or minors' protections), and a professional
@@ -99,7 +99,7 @@ new nonprofit gets formed at the top:
 McCluster Corp  (Connecticut nonprofit — registered CT public charity; the parent)
         │  sole member / 100% owner
         ▼
-Heat Chart Operations LLC  (the business — runs the platform)
+Equity Uprise LLC  (Georgia LLC — the business; runs The Heat Chart)
         │  operates
         ▼
 Equity Uprise PMA  (the membership program members actually join)
@@ -135,25 +135,39 @@ The only work left at the parent level is housekeeping:
    who are not household family — the self-dealing guardrails in 4c
    need directors who aren't you to sign off on your compensation.
 
-### 4b. The one entity to form — Heat Chart Operations LLC (the business)
+### 4b. The one entity to form — Equity Uprise LLC (Georgia)
 
-1. **File Articles of Organization** for the LLC with **sole member:
-   McCluster Corp** — the nonprofit owns the LLC outright; you manage
-   it, you don't own it. Form it in Connecticut, the parent's home
-   state (filing ≈ **$120**, annual report ≈ $80/yr); if the platform
-   ends up with real physical operations in another state, register
-   there as a foreign LLC at that point.
-2. The LLC holds the operating life: theheatchart.com, the platform,
+Georgia is the cheaper, easier state ($110 to file vs Connecticut's
+$120; $60/yr vs $80/yr after), so the operating company forms there
+and carries the program's name. One rule keeps that choice honest:
+**an LLC belongs in the state where the work actually happens.** Run
+the operation from Georgia and this is both the cheapest and the
+correct answer; if day-to-day operations ever move to another state,
+the LLC registers there as a foreign LLC on top — at which point the
+savings invert. (The parent merely *owning* a Georgia LLC does not
+require McCluster Corp to register in Georgia.)
+
+1. **Name check** — search "Equity Uprise LLC" on the Georgia
+   Secretary of State's eCorp portal (ecorp.sos.ga.gov) before filing.
+2. **File Articles of Organization** online at eCorp (**$110**).
+   Registered agent: a Georgia street address (can be you). Georgia
+   does not list members in the articles — ownership lives in the
+   operating agreement, where **McCluster Corp is the sole member**:
+   the nonprofit owns the LLC outright; you manage it, you don't own it.
+3. The LLC holds the operating life: theheatchart.com, the platform,
    marketplace fees, consignment revenue, contracts, and (later)
    payment processing. Contracts and invoices sign as
-   *"Heat Chart Operations LLC."*
-3. **Operating agreement** (one document): nonprofit is sole member;
-   you are manager; all distributions go to the sole member — i.e.,
-   every dollar of profit flows up to the nonprofit and gets redeployed
-   under its purpose clause.
-4. Own EIN, own bank account. **Never mix the two accounts or pay
-   personal expenses from either** — commingling is how courts pierce
-   the veil and reach you personally.
+   *"Equity Uprise LLC."*
+4. **Operating agreement** (one document): McCluster Corp is sole
+   member; you are manager; all distributions go to the sole member —
+   i.e., every dollar of profit flows up to the nonprofit and gets
+   redeployed under its purpose clause.
+5. Own EIN (free, IRS online), own bank account. **Never mix the two
+   accounts or pay personal expenses from either** — commingling is
+   how courts pierce the veil and reach you personally.
+6. **Georgia annual registration** every year, January 1 – April 1
+   (**$60**, $25 late penalty) — same calendar habit as the parent's
+   filings; a lapsed registration dissolves the shield.
 
 ### 4c. Why this protects you (and its honest limits)
 
@@ -181,9 +195,9 @@ The only work left at the parent level is housekeeping:
 - **Sequence**: board resolution first, LLC filing second, operating
   agreement + LLC bank account third, then a one-page resolution
   adopting the PMA program and the platform's membership agreement as
-  the LLC's operating program. State cost ≈ **$120** + a Connecticut
-  nonprofit attorney review (budget a few hundred dollars — worth it
-  here).
+  the LLC's operating program. State cost ≈ **$110** + an attorney
+  review (one comfortable with Georgia LLCs and Connecticut nonprofits;
+  budget a few hundred dollars — worth it here).
 
 ## 5. Honest limits to know
 
