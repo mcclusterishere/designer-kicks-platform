@@ -685,8 +685,14 @@ export default async function AdminPage({
               <div key={s.id} className="overflow-hidden rounded-xl border border-edge bg-surface">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s.imageUrl} alt={s.title} className="aspect-square w-full object-cover" />
+                {s.videoUrl && (
+                  // Watch before you approve — approval fires the autopost,
+                  // and this clip goes out as the FB video / IG Reel.
+                  <video src={s.videoUrl} controls preload="metadata" playsInline className="w-full border-t border-edge bg-ink" />
+                )}
                 <div className="p-3">
                   <p className="font-bold text-white">{s.title}</p>
+                  {s.videoUrl && <p className="tag text-volt">Has video — it posts on approval</p>}
                   <p className="text-sm text-smoke">
                     {categoryEmoji(s.category)} {s.baseShoe} · {s.artistName}
                     {s.socialHandle && ` · @${s.socialHandle}`}

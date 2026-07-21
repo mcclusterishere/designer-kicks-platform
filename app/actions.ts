@@ -61,6 +61,14 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
+// 15-second clips: duration is gated in the browser (no ffprobe on the
+// server) — the 40MB cap is the hard backstop, sized for ~15s of 1080p.
+const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
+const VIDEO_TYPES: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+};
 
 // ---------- Submissions ----------
 
@@ -114,6 +122,31 @@ export async function createSubmission(
     };
   }
 
+  // Optional 15-second clip. One per artist per day (UTC) — a scale
+  // guard while video hosting is small; photos stay unlimited.
+  const video = formData.get("video");
+  let videoUrl: string | null = null;
+  if (video instanceof File && video.size > 0) {
+    const vext = VIDEO_TYPES[video.type];
+    if (!vext) return { ok: false, error: "Video must be an MP4, MOV, or WebM." };
+    if (video.size > MAX_VIDEO_BYTES) {
+      return { ok: false, error: "Video must be under 40MB — 15 seconds is the sweet spot (it's also the limit)." };
+    }
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const todaysVideos = await prisma.submission.count({
+      where: { artistId: artist.id, createdAt: { gte: dayStart }, videoUrl: { not: null } },
+    });
+    if (todaysVideos >= 1) {
+      return { ok: false, error: "One video a day per artist while we scale up hosting — this piece can still go up with photos, or save the clip for tomorrow." };
+    }
+    videoUrl = await saveUpload(
+      Buffer.from(await video.arrayBuffer()),
+      `${randomUUID()}.${vext}`,
+      video.type
+    );
+  }
+
   const fileName = `${randomUUID()}.${ext}`;
   const imageUrl = await saveUpload(
     Buffer.from(await image.arrayBuffer()),
@@ -133,6 +166,7 @@ export async function createSubmission(
       baseShoe,
       ...taxonomy,
       category,
+      videoUrl,
       size: size || null,
       description: description || null,
       imageUrl,

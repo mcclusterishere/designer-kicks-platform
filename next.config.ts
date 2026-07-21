@@ -17,6 +17,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Submissions carry a cover photo + up to 4 extras (6MB each) and an
+  // optional 15-second clip (40MB) in one server-action FormData.
+  experimental: {
+    serverActions: { bodySizeLimit: "80mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

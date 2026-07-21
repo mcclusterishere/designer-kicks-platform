@@ -17,6 +17,47 @@ export default function SubmitForm({ artistDefaults }: Props) {
     null
   );
   const [preview, setPreview] = useState<string | null>(null);
+  const [videoCheck, setVideoCheck] = useState<
+    { status: "ok"; seconds: number } | { status: "bad"; message: string } | null
+  >(null);
+
+  // The 15-second rule, enforced where the duration is actually knowable:
+  // the browser reads the clip's metadata before it ever leaves the phone.
+  // (The server can't probe duration — it backstops with a 40MB cap.)
+  // A little headroom past 15 because phone encoders round up.
+  function checkVideo(input: HTMLInputElement) {
+    const f = input.files?.[0];
+    if (!f) {
+      setVideoCheck(null);
+      return;
+    }
+    if (f.size > 40 * 1024 * 1024) {
+      input.value = "";
+      setVideoCheck({ status: "bad", message: "That file is over 40MB. Trim or compress it — 15 seconds should land well under that." });
+      return;
+    }
+    const url = URL.createObjectURL(f);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      if (probe.duration > 16) {
+        input.value = "";
+        setVideoCheck({
+          status: "bad",
+          message: `That clip runs ${Math.round(probe.duration)}s — the limit is 15. Short hits harder anyway: one slow pan, done.`,
+        });
+      } else {
+        setVideoCheck({ status: "ok", seconds: Math.round(probe.duration) });
+      }
+    };
+    probe.onerror = () => {
+      URL.revokeObjectURL(url);
+      input.value = "";
+      setVideoCheck({ status: "bad", message: "Couldn't read that video. Use an MP4, MOV, or WebM." });
+    };
+    probe.src = url;
+  }
 
   if (state?.ok) {
     return (
@@ -216,6 +257,34 @@ export default function SubmitForm({ artistDefaults }: Props) {
           accept="image/jpeg,image/png,image/webp"
           className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink"
         />
+      </div>
+
+      <div>
+        <label htmlFor="video" className="tag text-smoke">
+          Video <span className="normal-case">(optional — 15 seconds max, one video a day)</span>
+        </label>
+        <input
+          id="video"
+          name="video"
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm"
+          onChange={(e) => checkVideo(e.currentTarget)}
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink"
+        />
+        <p className="mt-1.5 text-xs text-smoke/70">
+          15 seconds is the sweet spot — one slow pan of the piece. Clips go
+          out with the piece when it hits the chart.
+        </p>
+        {videoCheck?.status === "ok" && (
+          <p className="mt-1 text-xs text-volt">
+            Clip looks good — {videoCheck.seconds}s.
+          </p>
+        )}
+        {videoCheck?.status === "bad" && (
+          <p role="alert" className="mt-1 rounded border border-heat/40 bg-heat/10 px-3 py-2 text-xs text-heat">
+            {videoCheck.message}
+          </p>
+        )}
       </div>
 
       {state?.error && (

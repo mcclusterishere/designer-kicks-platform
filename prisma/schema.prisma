@@ -32,6 +32,11 @@ model Submission {
   // Gallery beyond the cover shot — voters swipe through these inline.
   extraImages String[] @default([])
 
+  // Optional 15-second clip of the piece. Duration is gated client-side
+  // (no ffprobe on the server); the hard backstop is the 40MB size cap.
+  // One video per artist per day — scale guard while hosting is small.
+  videoUrl String?
+
   artistId String?
   artist   ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: SetNull)
 

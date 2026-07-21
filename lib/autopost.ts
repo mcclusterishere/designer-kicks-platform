@@ -5,7 +5,9 @@ import {
   facebookConfigured,
   instagramConfigured,
   postToFacebookPage,
+  postToFacebookVideo,
   postToInstagram,
+  postToInstagramReel,
 } from "./social";
 
 /**
@@ -30,7 +32,7 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
   const s = await prisma.submission.findUnique({
     where: { id: submissionId },
     select: {
-      title: true, artistName: true, imageUrl: true, baseShoe: true,
+      title: true, artistName: true, imageUrl: true, videoUrl: true, baseShoe: true,
       artist: { select: { id: true, slug: true, displayName: true } },
     },
   });
@@ -52,16 +54,21 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
   });
 
   // 2. The connected socials — tagged links so Social HQ sees what
-  // each channel brings back.
+  // each channel brings back. A piece with a clip leads with the clip
+  // (FB video post + IG Reel); photo-only pieces post as photos.
   const photo = absoluteMediaUrl(s.imageUrl);
   const fbLink = `${siteUrl()}${pagePath}?utm_source=facebook&utm_medium=autopost&utm_campaign=new-heat`;
   const igCaption = `${body}\n\nVote at theheatchart.com — link in bio.`;
   const results = await Promise.allSettled([
     facebookConfigured()
-      ? postToFacebookPage(body, { imageUrl: photo, link: fbLink })
+      ? s.videoUrl
+        ? postToFacebookVideo(s.videoUrl, `${body}\n\n${fbLink}`)
+        : postToFacebookPage(body, { imageUrl: photo, link: fbLink })
       : Promise.resolve(null),
     instagramConfigured()
-      ? postToInstagram(photo, igCaption)
+      ? s.videoUrl
+        ? postToInstagramReel(s.videoUrl, igCaption)
+        : postToInstagram(photo, igCaption)
       : Promise.resolve(null),
   ]);
   for (const [i, r] of results.entries()) {

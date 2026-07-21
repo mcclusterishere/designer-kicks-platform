@@ -267,6 +267,16 @@ export default async function ArtistPage({ params }: Props) {
                     </span>
                   )}
                 </div>
+                {s.videoUrl && (
+                  <video
+                    src={s.videoUrl}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    className="w-full border-t border-edge bg-ink"
+                    aria-label={`Video of ${s.title}`}
+                  />
+                )}
                 <div className="p-4">
                   <p className="tag text-smoke">{categoryLabel(s.category)} · {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
