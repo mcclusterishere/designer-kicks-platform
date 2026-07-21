@@ -96,7 +96,7 @@ export default function TournamentForm({ options }: { options: Option[] }) {
                   checked={checked.has(o.id)}
                   disabled={walledOut}
                   onChange={() => toggle(o.id)}
-                  className="h-4 w-4 accent-[#d9b96a]"
+                  className="h-4 w-4 accent-[#f04e45]"
                 />
                 <span className="truncate">
                   {categoryEmoji(o.category)} {o.title} <span className="text-smoke">— {o.artistName}</span>

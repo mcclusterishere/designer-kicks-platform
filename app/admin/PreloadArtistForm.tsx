@@ -164,12 +164,12 @@ export default function PreloadArtistForm({ homeHref = "/admin" }: { homeHref?: 
       <div>
         <label className="tag text-smoke" htmlFor="pl-img">Photo * (use their photo with permission)</label>
         <input id="pl-img" name="image" type="file" required accept="image/jpeg,image/png,image/webp"
-          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-4 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-4 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink" />
       </div>
       <div>
         <label className="tag text-smoke" htmlFor="pl-more">More angles (up to 5 — 5–6 photos total, voters swipe through these)</label>
         <input id="pl-more" name="morePhotos" type="file" multiple accept="image/jpeg,image/png,image/webp"
-          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink" />
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink" />
       </div>
       <div className="rounded-lg border border-edge bg-panel/40 p-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -185,7 +185,7 @@ export default function PreloadArtistForm({ homeHref = "/admin" }: { homeHref?: 
       </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}
-        className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+        className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Creating…" : "Pre-load Artist + Piece"}
       </button>
     </form>

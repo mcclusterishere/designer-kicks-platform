@@ -15,7 +15,7 @@ export default function Error({ reset }: { error: Error & { digest?: string }; r
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
           onClick={reset}
-          className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink"
+          className="rounded-lg btn-hard px-6 py-3 tag font-bold"
         >
           Try Again
         </button>

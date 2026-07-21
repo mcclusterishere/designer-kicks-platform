@@ -50,7 +50,7 @@ export default async function QuizPage({
             Your entries, strikes, and credits live on your account.
           </p>
           <div className="mt-5 flex justify-center gap-3">
-            <Link href="/signin" className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink">
+            <Link href="/signin" className="rounded-lg btn-hard px-6 py-3 tag font-bold">
               Sign In
             </Link>
             <Link href="/register" className="rounded-lg border border-edge px-6 py-3 tag text-white hover:border-volt">

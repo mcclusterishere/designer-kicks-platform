@@ -37,7 +37,7 @@ export default function RegisterForm() {
             router.push("/profile");
             router.refresh();
           }}
-          className="w-full rounded-lg bg-volt py-3 tag font-bold text-ink"
+          className="w-full rounded-lg btn-hard py-3 tag font-bold"
         >
           Take Me To My Profile →
         </button>
@@ -60,7 +60,7 @@ export default function RegisterForm() {
         <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
       </div>
       <label htmlFor="age13" className="flex items-start gap-2 text-sm text-smoke">
-        <input id="age13" name="age13" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#d9b96a]" />
+        <input id="age13" name="age13" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
         <span>
           I&apos;m at least 13 years old. The Heat Chart isn&apos;t for
           children under 13.
@@ -70,7 +70,7 @@ export default function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-volt py-3 tag font-bold text-ink disabled:opacity-50"
+        className="w-full rounded-lg btn-hard py-3 tag font-bold disabled:opacity-50"
       >
         {pending ? "Creating…" : "Create Account"}
       </button>

@@ -47,14 +47,14 @@ export default function RecordSaleForm({ submissionId }: { submissionId: string 
           name="evidence"
           type="file"
           accept="image/jpeg,image/png,image/webp"
-          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-panel px-2 py-2 text-xs text-smoke file:mr-2 file:rounded file:border-0 file:bg-volt file:px-2 file:py-1 file:text-xs file:font-bold file:text-ink"
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-panel px-2 py-2 text-xs text-smoke file:mr-2 file:rounded file:border-0 file:btn-hard file:px-2 file:py-1 file:text-xs file:font-bold file:text-ink"
         />
       </div>
       {state?.error && <p className="text-xs text-heat">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="tag w-full rounded bg-volt py-2 font-bold text-ink disabled:opacity-50"
+        className="tag w-full rounded btn-hard py-2 font-bold disabled:opacity-50"
       >
         {pending ? "Recording…" : "Record Sale (buyer claims it)"}
       </button>

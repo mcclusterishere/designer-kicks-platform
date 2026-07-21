@@ -86,15 +86,15 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
         </p>
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
-        <input type="checkbox" name="laneStrict" defaultChecked={defaults.laneStrict} className="h-4 w-4 accent-[#d9b96a]" />
+        <input type="checkbox" name="laneStrict" defaultChecked={defaults.laneStrict} className="h-4 w-4 accent-[#f04e45]" />
         Only my lane — skip the wild cards
       </label>
       <label className="flex items-center gap-2 text-sm text-smoke">
-        <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#d9b96a]" />
+        <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#f04e45]" />
         Email me the moment a battle goes live
       </label>
       <label className="flex items-center gap-2 text-sm text-smoke">
-        <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#d9b96a]" />
+        <input type="checkbox" name="marketingOptIn" defaultChecked={defaults.marketingOptIn} className="h-4 w-4 accent-[#f04e45]" />
         Text/email me about drops, battles, and giveaways
       </label>
       {state?.error && <p className="text-sm text-heat" role="alert">{state.error}</p>}
@@ -102,7 +102,7 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-volt px-6 py-3 tag font-bold text-ink disabled:opacity-50"
+        className="rounded-lg btn-hard px-6 py-3 tag font-bold disabled:opacity-50"
       >
         {pending ? "Saving…" : "Save Profile"}
       </button>

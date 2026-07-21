@@ -64,14 +64,14 @@ export default function BroadcastForm({ recent }: { recent: RecentPost[] }) {
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-smoke">
-          <input type="checkbox" name="pinned" className="h-4 w-4 accent-[#d9b96a]" />
+          <input type="checkbox" name="pinned" className="h-4 w-4 accent-[#f04e45]" />
           Pin to the top of The Feed
         </label>
         {state && !state.ok && <p className="text-sm text-heat">{state.error}</p>}
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50"
+          className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50"
         >
           {pending ? "Broadcasting…" : "Broadcast"}
         </button>

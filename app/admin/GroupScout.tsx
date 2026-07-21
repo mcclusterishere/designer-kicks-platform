@@ -63,7 +63,7 @@ export function GroupForm() {
       </div>
       {state?.error && <p className="text-sm text-heat sm:col-span-4">{state.error}</p>}
       <div className="sm:col-span-4">
-        <button disabled={pending} className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+        <button disabled={pending} className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
           {pending ? "Adding…" : "Track This Group"}
         </button>
       </div>

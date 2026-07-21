@@ -62,7 +62,7 @@ export default function OfferForm({
       <button
         type="submit"
         disabled={pending}
-        className="tag shrink-0 rounded bg-volt px-3 py-2 font-bold text-ink disabled:opacity-50"
+        className="tag shrink-0 rounded btn-hard px-3 py-2 font-bold disabled:opacity-50"
       >
         {pending ? "…" : "Offer"}
       </button>

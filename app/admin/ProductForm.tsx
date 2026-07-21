@@ -55,7 +55,7 @@ export default function ProductForm({ defaults }: { defaults?: Defaults }) {
         </div>
         <div className="flex items-end pb-2">
           <label className="flex items-center gap-2 text-sm text-smoke">
-            <input type="checkbox" name="featured" defaultChecked={defaults?.featured} className="h-4 w-4 accent-[#d9b96a]" />
+            <input type="checkbox" name="featured" defaultChecked={defaults?.featured} className="h-4 w-4 accent-[#f04e45]" />
             Featured on homepage
           </label>
         </div>
@@ -77,7 +77,7 @@ export default function ProductForm({ defaults }: { defaults?: Defaults }) {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50"
+        className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50"
       >
         {pending ? "Saving…" : editing ? "Update Product" : "Add Product"}
       </button>

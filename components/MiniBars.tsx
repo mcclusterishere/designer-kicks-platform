@@ -11,7 +11,7 @@ export default function MiniBars({
   const gap = 4;
   const h = 48;
   const width = series.length * (w + gap) - gap;
-  const fill = accent === "volt" ? "#d9b96a" : "#c65a2e";
+  const fill = accent === "volt" ? "#f04e45" : "#d9b96a";
   return (
     <svg
       viewBox={`0 0 ${width} ${h}`}

@@ -42,7 +42,7 @@ export default function DropSyncControls({
           <button
             type="submit"
             disabled={pending || !live}
-            className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-40"
+            className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-40"
           >
             {pending ? "Syncing…" : "Refresh dates now"}
           </button>

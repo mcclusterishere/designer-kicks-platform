@@ -192,7 +192,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
             const f = e.target.files?.[0];
             setPreview(f ? URL.createObjectURL(f) : null);
           }}
-          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-6 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink"
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-6 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink"
         />
         {preview && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -214,7 +214,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:bg-volt file:px-4 file:py-2 file:font-bold file:text-ink"
+          className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-3 text-sm text-smoke file:mr-4 file:rounded file:border-0 file:btn-hard file:px-4 file:py-2 file:font-bold file:text-ink"
         />
       </div>
 
@@ -227,7 +227,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-volt py-3.5 tag font-bold text-ink glow-volt transition hover:opacity-90 disabled:opacity-50"
+        className="w-full rounded-lg btn-hard py-3.5 tag font-bold glow-volt transition hover:opacity-90 disabled:opacity-50"
       >
         {pending ? "Uploading…" : "Submit To The Arena"}
       </button>

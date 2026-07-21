@@ -45,7 +45,7 @@ export default function ApplyForm({ jobId, jobTitle }: { jobId: string; jobTitle
       </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}
-        className="rounded-lg bg-volt px-6 py-2.5 tag font-bold text-ink disabled:opacity-50">
+        className="rounded-lg btn-hard px-6 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Sending…" : "Apply"}
       </button>
     </form>

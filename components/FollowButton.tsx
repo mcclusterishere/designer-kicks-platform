@@ -17,7 +17,7 @@ export default function FollowButton({ artistId, initialFollowing, isAuthed }: P
     return (
       <a
         href="/signin"
-        className="rounded-lg border border-volt px-5 py-2.5 tag font-bold text-volt transition hover:bg-volt hover:text-ink"
+        className="rounded-lg border border-volt px-5 py-2.5 tag font-bold text-volt transition hover:btn-hard hover:text-ink"
       >
         Sign In To Follow
       </a>

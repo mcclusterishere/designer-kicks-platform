@@ -21,7 +21,7 @@ export default function ClaimSaleButton({ saleId }: { saleId: string }) {
             else setError(res.error ?? "Something went wrong.");
           })
         }
-        className="tag rounded bg-volt px-4 py-2 font-bold text-ink disabled:opacity-50"
+        className="tag rounded btn-hard px-4 py-2 font-bold disabled:opacity-50"
       >
         {pending ? "Claiming…" : "Claim This Piece"}
       </button>

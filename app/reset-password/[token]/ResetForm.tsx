@@ -17,7 +17,7 @@ export default function ResetForm({ token }: { token: string }) {
         <p className="text-white">Password updated. 🔐</p>
         <Link
           href="/signin"
-          className="mt-4 inline-block rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink"
+          className="mt-4 inline-block rounded-lg btn-hard px-5 py-2.5 tag font-bold"
         >
           Sign In
         </Link>
@@ -44,7 +44,7 @@ export default function ResetForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-volt py-3 tag font-bold text-ink disabled:opacity-50"
+        className="w-full rounded-lg btn-hard py-3 tag font-bold disabled:opacity-50"
       >
         {pending ? "Saving…" : "Set New Password"}
       </button>

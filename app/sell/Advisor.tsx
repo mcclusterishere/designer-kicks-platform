@@ -65,7 +65,7 @@ export default function Advisor() {
           className="flex-1 rounded-lg border border-edge bg-panel px-3 py-2.5 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
         />
         <button type="submit" disabled={pending || !input.trim()}
-          className="rounded-lg bg-volt px-5 tag font-bold text-ink disabled:opacity-50">
+          className="rounded-lg btn-hard px-5 tag font-bold disabled:opacity-50">
           {pending ? "…" : "Ask"}
         </button>
       </form>

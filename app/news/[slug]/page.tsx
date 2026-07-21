@@ -164,7 +164,7 @@ export default async function ArticlePage({ params }: Props) {
         </p>
         <Link
           href="/submit"
-          className="mt-3 inline-block rounded-lg bg-volt px-6 py-2.5 tag font-bold text-ink"
+          className="mt-3 inline-block rounded-lg btn-hard px-6 py-2.5 tag font-bold"
         >
           Enter The Battle Arena
         </Link>

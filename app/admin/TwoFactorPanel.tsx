@@ -72,7 +72,7 @@ export default function TwoFactorPanel({ enabled }: { enabled: boolean }) {
           type="button"
           onClick={beginSetup}
           disabled={starting}
-          className="mt-4 rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50"
+          className="mt-4 rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50"
         >
           {starting ? "Generating…" : "Set up 2FA"}
         </button>
@@ -109,7 +109,7 @@ export default function TwoFactorPanel({ enabled }: { enabled: boolean }) {
               <button
                 type="submit"
                 disabled={confirming}
-                className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50"
+                className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50"
               >
                 {confirming ? "Checking…" : "Turn on 2FA"}
               </button>

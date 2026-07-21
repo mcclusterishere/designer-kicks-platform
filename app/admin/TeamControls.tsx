@@ -20,7 +20,7 @@ export function GrantEditorForm() {
           <input id="ge-name" name="name" maxLength={80} placeholder="Their name" className={inputClass} />
         </div>
         <button type="submit" disabled={pending}
-          className="h-[42px] rounded-lg bg-volt px-5 tag font-bold text-ink disabled:opacity-50">
+          className="h-[42px] rounded-lg btn-hard px-5 tag font-bold disabled:opacity-50">
           {pending ? "…" : "Make editor"}
         </button>
       </form>
@@ -64,7 +64,7 @@ export function NewJobForm() {
       </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button type="submit" disabled={pending}
-        className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+        className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Posting…" : "Post job"}
       </button>
     </form>

@@ -52,7 +52,7 @@ export default async function HomePage() {
               <span className="text-smoke">
                 Live giveaway — win <span className="font-bold text-white">{giveaway.prize}</span>
               </span>
-              <span className="rounded-lg bg-volt px-4 py-1.5 tag font-bold text-ink transition group-hover:brightness-110">
+              <span className="rounded-lg btn-hard px-4 py-1.5 tag font-bold transition group-hover:brightness-110">
                 Take The Heat Check →
               </span>
             </Link>
@@ -90,7 +90,7 @@ export default async function HomePage() {
             <div className="mt-9 flex flex-wrap gap-5">
               <Link
                 href="/battles"
-                className="btn-hard rounded-lg bg-volt px-7 py-3.5 tag font-bold text-ink"
+                className="btn-hard rounded-lg btn-hard px-7 py-3.5 tag font-bold"
               >
                 Vote In Battles
               </Link>

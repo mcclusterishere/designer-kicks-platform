@@ -27,7 +27,7 @@ export default function QuestionForm() {
               value={i}
               required
               aria-label={`Option ${String.fromCharCode(65 + i)} is correct`}
-              className="h-4 w-4 accent-[#d9b96a]"
+              className="h-4 w-4 accent-[#f04e45]"
             />
             <input
               name={`option${i}`}
@@ -65,7 +65,7 @@ export default function QuestionForm() {
       </div>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       {state?.ok && <p className="text-sm text-volt">Question added.</p>}
-      <button type="submit" disabled={pending} className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+      <button type="submit" disabled={pending} className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Adding…" : "Add Question"}
       </button>
     </form>

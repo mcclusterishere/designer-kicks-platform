@@ -68,7 +68,7 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
             …or upload a photo <span className="normal-case">(beats the URL — e.g. the official press shot)</span>
           </label>
           <input id="a-cover-file" name="cover" type="file" accept="image/jpeg,image/png,image/webp"
-            className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-2 text-xs text-smoke file:mr-2 file:rounded file:border-0 file:bg-volt file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-ink" />
+            className="mt-1 w-full rounded-lg border border-dashed border-edge bg-surface px-3 py-2 text-xs text-smoke file:mr-2 file:rounded file:border-0 file:btn-hard file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-ink" />
         </div>
         <div>
           <label className="tag text-smoke" htmlFor="a-tags">Tags (comma-separated)</label>
@@ -130,13 +130,13 @@ export default function ArticleForm({ defaults }: { defaults?: Defaults }) {
       </div>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="publish" defaultChecked={defaults?.status === "PUBLISHED"}
-          className="h-4 w-4 accent-[#d9b96a]" />
+          className="h-4 w-4 accent-[#f04e45]" />
         Published (unchecked = draft, hidden from the site)
       </label>
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       {state?.ok && <p className="text-sm text-volt">Saved.</p>}
       <button type="submit" disabled={pending}
-        className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+        className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Saving…" : editing ? "Update Article" : "Save Article"}
       </button>
     </form>

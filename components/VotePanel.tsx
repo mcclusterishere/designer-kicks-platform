@@ -65,7 +65,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
               }`}
             >
               {isWinner && (
-                <div className="absolute left-3 top-3 z-10 rounded bg-volt px-2 py-1 tag font-bold text-ink">
+                <div className="absolute left-3 top-3 z-10 rounded btn-hard px-2 py-1 tag font-bold">
                   Winner
                 </div>
               )}
@@ -116,14 +116,14 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                   <button
                     onClick={() => vote(side.submissionId)}
                     disabled={pending}
-                    className="mt-4 w-full rounded-lg bg-volt py-3 tag font-bold text-ink transition hover:opacity-90 disabled:opacity-50"
+                    className="mt-4 w-full rounded-lg btn-hard py-3 tag font-bold transition hover:opacity-90 disabled:opacity-50"
                   >
                     {pending ? "Counting…" : "Vote This Piece"}
                   </button>
                 ) : (
                   <a
                     href="/signin"
-                    className="mt-4 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:bg-volt hover:text-ink"
+                    className="mt-4 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:btn-hard hover:text-ink"
                   >
                     Sign In To Vote
                   </a>

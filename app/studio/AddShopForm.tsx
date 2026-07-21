@@ -29,7 +29,7 @@ export default function AddShopForm() {
         <input id="shop-url" name="url" required maxLength={400} placeholder="https://…" className={inputClass} />
       </div>
       <button type="submit" disabled={pending}
-        className="h-[42px] rounded-lg bg-volt px-5 tag font-bold text-ink disabled:opacity-50">
+        className="h-[42px] rounded-lg btn-hard px-5 tag font-bold disabled:opacity-50">
         {pending ? "Adding…" : "Add shop"}
       </button>
       {state?.error && <p className="text-sm text-heat sm:col-span-3">{state.error}</p>}

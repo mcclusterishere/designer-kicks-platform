@@ -92,7 +92,7 @@ export function ManualStoreForm() {
       </div>
       {state?.ok && <p className="text-sm text-volt">Store added to the board ✓</p>}
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
-      <button type="submit" disabled={pending} className="tag rounded-lg bg-volt px-5 py-2.5 font-bold text-ink disabled:opacity-50">
+      <button type="submit" disabled={pending} className="tag rounded-lg btn-hard px-5 py-2.5 font-bold disabled:opacity-50">
         {pending ? "Adding…" : "Add Store By Hand"}
       </button>
     </form>

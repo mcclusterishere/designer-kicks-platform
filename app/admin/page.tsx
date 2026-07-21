@@ -517,7 +517,7 @@ export default async function AdminPage({
                     <input type="hidden" name="editorId" value={ed.id} />
                     <input name="body" required maxLength={2000} placeholder="Reply…"
                       className="flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none" />
-                    <button className="rounded-lg bg-volt px-4 tag font-bold text-ink">Send</button>
+                    <button className="rounded-lg btn-hard px-4 tag font-bold">Send</button>
                   </form>
                 </div>
               );
@@ -643,7 +643,7 @@ export default async function AdminPage({
                   )}
                   <div className="mt-3 flex gap-2">
                     <form action={setSubmissionStatus.bind(null, s.id, "APPROVED")} className="flex-1">
-                      <button className="w-full rounded bg-volt py-2 tag font-bold text-ink">
+                      <button className="w-full rounded btn-hard py-2 tag font-bold">
                         Approve
                       </button>
                     </form>
@@ -1119,7 +1119,7 @@ export default async function AdminPage({
                   {c.status === "PENDING" && (
                     <div className="flex shrink-0 gap-2">
                       <form action={respondArtistClaim.bind(null, c.id, true)}>
-                        <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                        <button className="rounded btn-hard px-4 py-2 tag font-bold">
                           Verify &amp; Hand Over
                         </button>
                       </form>
@@ -1174,7 +1174,7 @@ export default async function AdminPage({
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <form action={setArtistStatus.bind(null, a.id, "APPROVED")}>
-                      <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                      <button className="rounded btn-hard px-4 py-2 tag font-bold">
                         Approve
                       </button>
                     </form>
@@ -1236,7 +1236,7 @@ export default async function AdminPage({
                   </div>
                   <div className="flex shrink-0 gap-2">
                     <form action={setDropAnnouncementStatus.bind(null, d.id, "APPROVED")}>
-                      <button className="rounded bg-volt px-4 py-2 tag font-bold text-ink">
+                      <button className="rounded btn-hard px-4 py-2 tag font-bold">
                         Approve
                       </button>
                     </form>
@@ -1563,7 +1563,7 @@ export default async function AdminPage({
           </h2>
           <a
             href="/api/admin/users.csv"
-            className="rounded-lg border border-volt px-4 py-2 tag text-volt hover:bg-volt hover:text-ink"
+            className="rounded-lg border border-volt px-4 py-2 tag text-volt hover:btn-hard hover:text-ink"
           >
             Export CSV
           </a>

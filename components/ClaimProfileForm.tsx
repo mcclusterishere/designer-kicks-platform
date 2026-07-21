@@ -288,7 +288,7 @@ export default function ClaimProfileForm({
       {/* Terminal chrome */}
       <div className="flex items-center gap-2 border-b border-edge bg-panel px-4 py-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-heat/70" />
-        <span className="h-2.5 w-2.5 rounded-full bg-[#d9b96a]/70" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#f04e45]/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-volt/70" />
         <p className="ml-2 truncate text-xs text-smoke">
           theheatchart — claim@{displayName.toLowerCase().replace(/\s+/g, "-")}
@@ -345,7 +345,7 @@ export default function ClaimProfileForm({
                 type={current.type ?? "text"}
                 placeholder={current.placeholder}
                 aria-label={current.prompt}
-                className="min-w-0 flex-1 rounded border border-transparent bg-transparent text-white caret-[#d9b96a] placeholder:text-smoke/60 focus:border-volt/60 focus:outline-none"
+                className="min-w-0 flex-1 rounded border border-transparent bg-transparent text-white caret-[#f04e45] placeholder:text-smoke/60 focus:border-volt/60 focus:outline-none"
               />
               {step > 0 && (
                 <button

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getArtistBySlug, getArtistTrophies } from "@/lib/artists";
+import CultureVerified from "@/components/CultureVerified";
 import FollowButton from "@/components/FollowButton";
 import RecordSaleForm from "@/components/RecordSaleForm";
 import AddPhotosForm from "@/components/AddPhotosForm";
@@ -99,6 +100,11 @@ export default async function ArtistPage({ params }: Props) {
           <h1 className="display mt-1 text-4xl text-white sm:text-5xl">
             {artist.displayName}
           </h1>
+          {artist.userId && (
+            <div className="mt-2">
+              <CultureVerified detail="Claimed" />
+            </div>
+          )}
           <p className="mt-2 text-sm text-smoke">
             {artist.instagram && (
               <a

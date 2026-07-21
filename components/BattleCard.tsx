@@ -46,7 +46,7 @@ function SideThumb({
         }`}
       />
       {isWinner && (
-        <span className="absolute left-2 top-2 rounded bg-volt px-1.5 py-0.5 tag font-bold text-ink">
+        <span className="absolute left-2 top-2 rounded btn-hard px-1.5 py-0.5 tag font-bold">
           W
         </span>
       )}

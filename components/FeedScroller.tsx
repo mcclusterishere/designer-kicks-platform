@@ -103,7 +103,7 @@ function PostCard({
             {item.artistName}
           </Link>
         ) : (
-          <span className="tag rounded bg-volt px-2 py-0.5 font-bold text-ink">The Heat Chart</span>
+          <span className="tag rounded btn-hard px-2 py-0.5 font-bold">The Heat Chart</span>
         )}
         <span className="tag text-smoke">{timeAgo(item.createdAt)}</span>
       </div>

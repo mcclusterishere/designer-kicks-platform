@@ -56,7 +56,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
               )}
               {group.pieces.map((p) => (
                 <label key={p.id} className="flex cursor-pointer items-center gap-2 text-sm text-smoke hover:text-white">
-                  <input type="checkbox" name="pieces" value={p.id} className="h-4 w-4 accent-[#d9b96a]" />
+                  <input type="checkbox" name="pieces" value={p.id} className="h-4 w-4 accent-[#f04e45]" />
                   <span className="min-w-0 truncate">
                     {p.rank && p.rank <= 3 && <span className="text-volt">#{p.rank} </span>}
                     {p.title} <span className="opacity-60">— {p.artistName}</span>
@@ -69,7 +69,7 @@ export function HouseOutfitForm({ pieces }: { pieces: PieceOption[] }) {
       </div>
       {state?.ok && <p className="text-sm text-volt">Fit created ✓ — match it below.</p>}
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
-      <button type="submit" disabled={pending} className="rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink disabled:opacity-50">
+      <button type="submit" disabled={pending} className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
         {pending ? "Creating…" : "Create House Fit (one per category)"}
       </button>
     </form>
@@ -265,7 +265,7 @@ export function OutreachRow({
           <button
             type="submit"
             disabled={pending}
-            className="tag shrink-0 rounded bg-volt px-4 py-2 font-bold text-ink disabled:opacity-50"
+            className="tag shrink-0 rounded btn-hard px-4 py-2 font-bold disabled:opacity-50"
           >
             {pending ? "Sending…" : "Send Invite"}
           </button>

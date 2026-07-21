@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
-/* Luxury dark system: onyx base, champagne-gold primary, burnt-copper
-   urgency. "volt"/"heat" keep their names so every page re-skins from
-   here without markup churn. */
+/* Luxury dark system, elite-red edition: onyx base, lacquered signal
+   red as the primary voice, champagne kept as the rare metal detail.
+   Highest-echelon energy — tuxedo black, red bottoms, gold cufflinks.
+   "volt"/"heat" keep their names so every page re-skins from here
+   without markup churn. */
 @theme {
   --color-ink: #0b0b0c;
   --color-surface: #131314;
   --color-panel: #19191b;
   --color-edge: #232321;
-  --color-volt: #d9b96a;
-  --color-heat: #c65a2e;
+  --color-volt: #f04e45;
+  --color-heat: #d9b96a;
   /* Muted text: lightened to clear WCAG AA (4.5:1) on the dark
      surfaces for normal-size body copy. */
   --color-smoke: #b9b6ac;
@@ -50,7 +52,7 @@ html {
   background: #3d3d3a;
 }
 :focus-visible {
-  outline: 2px solid rgba(217, 185, 106, 0.65);
+  outline: 2px solid rgba(240, 78, 69, 0.7);
   outline-offset: 2px;
 }
 
@@ -62,8 +64,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60rem 40rem at 80% -10%, rgba(217, 185, 106, 0.07), transparent 60%),
-    radial-gradient(50rem 35rem at -10% 110%, rgba(198, 90, 46, 0.05), transparent 60%),
+    radial-gradient(60rem 40rem at 80% -10%, rgba(240, 78, 69, 0.06), transparent 60%),
+    radial-gradient(50rem 35rem at -10% 110%, rgba(217, 185, 106, 0.04), transparent 60%),
     radial-gradient(70rem 30rem at 50% -5%, rgba(236, 229, 211, 0.03), transparent 55%);
 }
 
@@ -96,14 +98,14 @@ body::after {
 
 /* Gradient ink for hero keywords — polished metal, not neon */
 .text-gradient-volt {
-  background: linear-gradient(100deg, #f4e5b8 0%, var(--color-volt) 45%, #a8853d 100%);
+  background: linear-gradient(100deg, #ff8a7a 0%, var(--color-volt) 45%, #9c1017 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .text-gradient-heat {
-  background: linear-gradient(100deg, #e0955e 0%, var(--color-heat) 55%, #93401f 100%);
+  background: linear-gradient(100deg, #f4e5b8 0%, var(--color-heat) 55%, #a8853d 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -111,11 +113,11 @@ body::after {
 
 /* Soft halo for CTAs — glossy, not neon */
 .glow-volt {
-  box-shadow: 0 0 30px rgba(217, 185, 106, 0.18);
+  box-shadow: 0 0 30px rgba(240, 78, 69, 0.22);
 }
 
 .glow-heat {
-  box-shadow: 0 0 30px rgba(198, 90, 46, 0.2);
+  box-shadow: 0 0 30px rgba(217, 185, 106, 0.18);
 }
 
 /* Giant outlined word floating behind heroes — pure attitude, no ink */
@@ -130,29 +132,29 @@ body::after {
   -webkit-text-stroke: 1.5px rgba(245, 245, 245, 0.07);
 }
 
-/* Champagne-metal primary CTA — machined, glossy, catches the light */
+/* Lacquered-red primary CTA — red-bottom gloss, ivory type */
 .btn-hard {
-  background: linear-gradient(180deg, #efdca4 0%, var(--color-volt) 45%, #b3924a 100%) !important;
-  color: var(--color-ink) !important;
-  border: 1px solid rgba(244, 229, 184, 0.6);
+  background: linear-gradient(180deg, #ff7f72 0%, #e23227 45%, #9c1017 100%) !important;
+  color: #fff6f1 !important;
+  border: 1px solid rgba(255, 138, 122, 0.55);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 8px 24px rgba(217, 185, 106, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 8px 24px rgba(226, 50, 39, 0.28);
   transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 .btn-hard:hover {
   transform: translateY(-1px);
   filter: brightness(1.06);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    0 12px 32px rgba(217, 185, 106, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 12px 32px rgba(226, 50, 39, 0.36);
 }
 
-/* Quiet-luxury secondary CTA — hairline gold on glass */
+/* Quiet-luxury secondary CTA — hairline red on glass */
 .btn-hard-volt {
   background: rgba(255, 255, 255, 0.02) !important;
-  border: 1px solid rgba(217, 185, 106, 0.45) !important;
-  color: #ece5d3 !important;
+  border: 1px solid rgba(240, 78, 69, 0.5) !important;
+  color: #f5ece7 !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -161,7 +163,7 @@ body::after {
   border-color: var(--color-volt) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 24px rgba(217, 185, 106, 0.15);
+    0 8px 24px rgba(240, 78, 69, 0.16);
 }
 
 /* Cards that answer the cursor — glass sheen + gold hairline on hover */
@@ -171,7 +173,7 @@ body::after {
 }
 .card-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(217, 185, 106, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(240, 78, 69, 0.4);
 }
 
 /* Engraved plate for ranks and badges */
@@ -179,17 +181,17 @@ body::after {
   display: inline-block;
   font-family: var(--font-display), Georgia, serif;
   text-transform: uppercase;
-  background: linear-gradient(180deg, #efdca4 0%, var(--color-volt) 60%, #b3924a 100%);
+  background: linear-gradient(180deg, #efdca4 0%, var(--color-heat) 60%, #b3924a 100%);
   color: var(--color-ink);
   border: 1px solid rgba(11, 11, 12, 0.9);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-/* Section rule — a quiet gold hairline that replaces the old skewed
-   stripe. One pixel of gold does what a shape used to shout. */
+/* Section rule — one red hairline. A pixel of red does what a shape
+   used to shout. */
 .rule {
   height: 1px;
-  background: linear-gradient(90deg, var(--color-volt), rgba(217, 185, 106, 0.15));
+  background: linear-gradient(90deg, var(--color-volt), rgba(240, 78, 69, 0.12));
 }
 
 /* Gilded hairline divider (was a hazard stripe — too loud for the tux) */

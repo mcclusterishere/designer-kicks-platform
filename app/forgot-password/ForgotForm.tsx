@@ -49,7 +49,7 @@ export default function ForgotForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-lg bg-volt py-3 tag font-bold text-ink disabled:opacity-50"
+        className="w-full rounded-lg btn-hard py-3 tag font-bold disabled:opacity-50"
       >
         {pending ? "Sending…" : "Send Reset Link"}
       </button>

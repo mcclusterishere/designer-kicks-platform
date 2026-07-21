@@ -222,7 +222,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
         <p className="text-smoke">Loading question…</p>
         <button
           onClick={() => run(() => resumeRun(state.runId))}
-          className="mt-4 rounded-lg bg-volt px-5 py-2.5 tag font-bold text-ink"
+          className="mt-4 rounded-lg btn-hard px-5 py-2.5 tag font-bold"
         >
           Continue
         </button>
@@ -324,7 +324,7 @@ function BuyPanel({
         <button
           onClick={() => onBuy(packs)}
           disabled={pending}
-          className="flex-1 rounded-lg bg-volt px-5 py-3 tag font-bold text-ink disabled:opacity-50"
+          className="flex-1 rounded-lg btn-hard px-5 py-3 tag font-bold disabled:opacity-50"
         >
           {pending ? "Processing…" : `Buy ${packs * 4} Strikes`}
         </button>

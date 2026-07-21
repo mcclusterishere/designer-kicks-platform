@@ -79,15 +79,15 @@ export default async function RootLayout({
         <GoogleAnalytics />
         <a
           href="#main"
-          className="sr-only z-[100] rounded bg-volt px-4 py-2 tag font-bold text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+          className="sr-only z-[100] rounded btn-hard px-4 py-2 tag font-bold focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
         >
           Skip to content
         </a>
         <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="display text-xl text-white">
-              The<span className="text-heat">Heat</span>
-              <span className="text-volt">Chart</span>
+              The<span className="text-volt">Heat</span>
+              Chart
             </Link>
             <HeaderNav
               account={{
@@ -115,8 +115,12 @@ export default async function RootLayout({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="display text-lg text-white">
-                  The<span className="text-heat">Heat</span>
-                  <span className="text-volt">Chart</span>
+                  The<span className="text-volt">Heat</span>
+                  Chart
+                </p>
+                <p className="tag mt-2 inline-flex items-center gap-1.5 rounded border border-white/20 px-2.5 py-1 text-white/80">
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-volt" />
+                  Culture Verified · 1 of 1
                 </p>
                 <p className="mt-1 max-w-md">
                   Custom-sneaker culture: vote battles, the Heat List, the

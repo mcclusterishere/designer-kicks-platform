@@ -371,7 +371,7 @@ export default async function ProfilePage() {
                 </div>
                 <div className="flex gap-2">
                   <form action={respondOffer.bind(null, o.id, true)}>
-                    <button className="tag rounded bg-volt px-4 py-2 font-bold text-ink">
+                    <button className="tag rounded btn-hard px-4 py-2 font-bold">
                       Accept
                     </button>
                   </form>
