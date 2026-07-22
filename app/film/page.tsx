@@ -24,12 +24,14 @@ export const metadata = {
 const SCENES: FilmScene[] = [
   {
     src: "/ad-videos/sting.mp4",
+    poster: "/ad-refs/sting.jpg",
     eyebrow: "Designer Kicks presents",
     headline: "The Heat Chart.",
     sub: "New name. Same culture. Scroll — this is the whole story.",
   },
   {
     src: "/ad-videos/unboxing.mp4",
+    poster: "/ad-refs/unboxing.jpg",
     eyebrow: "Chapter I · The Blank",
     headline: "Every grail starts as a blank pair.",
     accent: "blank pair",
@@ -37,6 +39,7 @@ const SCENES: FilmScene[] = [
   },
   {
     src: "/ad-videos/notforcheap.mp4",
+    poster: "/ad-refs/notforcheap.jpg",
     eyebrow: "Chapter I · The Work",
     headline: "Hours of paint. One of one.",
     accent: "One of one",
@@ -44,6 +47,7 @@ const SCENES: FilmScene[] = [
   },
   {
     src: "/ad-videos/verdict.mp4",
+    poster: "/ad-refs/verdict.jpg",
     eyebrow: "Chapter II · The Culture",
     headline: "The block always knew how to judge heat.",
     accent: "judge heat",
@@ -69,6 +73,7 @@ const SCENES: FilmScene[] = [
   },
   {
     src: "/ad-videos/trader.mp4",
+    poster: "/ad-refs/trader.jpg",
     eyebrow: "Chapter III · The Watching",
     headline: "People started watching it like a market.",
     accent: "market",
@@ -85,6 +90,7 @@ const SCENES: FilmScene[] = [
   },
   {
     src: "/ad-videos/gallery.mp4",
+    poster: "/ad-refs/gallery.jpg",
     eyebrow: "Chapter IV · The Asset",
     headline: "The work became an asset.",
     accent: "asset",

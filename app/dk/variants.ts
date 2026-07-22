@@ -263,7 +263,7 @@ export const DK_VARIANTS: DkVariant[] = [
     slug: "sting",
     name: "The Sting",
     video: "/ad-videos/sting.mp4",
-    poster: null,
+    poster: "/ad-refs/sting.jpg",
     duration: "4s",
     headline: "New name. Same culture.",
     accent: "culture",
