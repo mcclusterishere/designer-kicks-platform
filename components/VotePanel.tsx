@@ -52,7 +52,9 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+      {/* Side by side on every screen — a matchup reads left vs right,
+          never one under the other. */}
+      <div className="grid grid-cols-2 gap-2 md:gap-6">
         {[a, b].map((side, i) => {
           const pct = total === 0 ? 50 : Math.round((side.votes / total) * 100);
           const isYours = localVote === side.submissionId;
@@ -74,10 +76,10 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                 images={[side.imageUrl, ...side.extraImages]}
                 alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
               />
-              <div className="p-4">
-                <p className="tag text-smoke">{categoryLabel(side.category)} · {side.baseShoe}</p>
-                <h3 className="display mt-1 text-xl text-white">{side.title}</h3>
-                <p className="mt-1 text-sm text-smoke">
+              <div className="p-2.5 sm:p-4">
+                <p className="tag hidden text-smoke sm:block">{categoryLabel(side.category)} · {side.baseShoe}</p>
+                <h3 className="display mt-1 text-base text-white sm:text-xl">{side.title}</h3>
+                <p className="mt-1 text-xs text-smoke sm:text-sm">
                   by{" "}
                   {side.artistSlug ? (
                     <a
@@ -116,16 +118,16 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                   <button
                     onClick={() => vote(side.submissionId)}
                     disabled={pending}
-                    className="mt-4 w-full rounded-lg btn-hard py-3 tag font-bold transition hover:opacity-90 disabled:opacity-50"
+                    className="mt-3 w-full rounded-lg btn-hard py-3 tag font-bold transition hover:opacity-90 disabled:opacity-50 sm:mt-4"
                   >
-                    {pending ? "Counting…" : "Vote This Piece"}
+                    {pending ? "Counting…" : "Vote"}
                   </button>
                 ) : (
                   <a
                     href="/signin"
-                    className="mt-4 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:btn-hard hover:text-ink"
+                    className="mt-3 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:btn-hard hover:text-ink sm:mt-4"
                   >
-                    Sign In To Vote
+                    Sign In
                   </a>
                 )}
               </div>

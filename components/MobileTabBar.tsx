@@ -48,26 +48,27 @@ const TABS: Tab[] = [
     ),
   },
   {
-    href: "/battles",
-    label: "Arena",
-    match: ["/battles", "/tournaments", "/artists", "/heat-list", "/outfits", "/rate"],
-    // A tournament bracket: two seeds funnel into the champion line.
+    href: "/market",
+    label: "Market",
+    match: ["/market", "/catalog", "/quiz", "/giveaway", "/collectors", "/shop"],
+    // Candlestick chart mark — the exchange.
     icon: (
       <IconSvg>
-        <path d="M3.5 6.5H9M3.5 17.5H9" />
-        <path d="M9 6.5V12h4.5M9 17.5V12" />
-        <path d="M13.5 12h4" />
-        <circle cx="19.8" cy="12" r="1.3" fill="currentColor" stroke="none" />
+        <path d="M6 4v3M6 13v3" />
+        <rect x="4.5" y="7" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+        <path d="M12 7v2M12 15v2" />
+        <rect x="10.5" y="9" width="3" height="6" rx="0.8" />
+        <path d="M18 3v3M18 12v3" />
+        <rect x="16.5" y="6" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
       </IconSvg>
     ),
   },
   {
-    // The exchange takes the center throne — Heat Check lives on in the
-    // home feed's game loop (and /quiz still works from there).
-    href: "/market",
-    label: "Market",
-    match: ["/market", "/catalog", "/quiz", "/giveaway", "/collectors", "/shop"],
-    icon: null, // center chart renders specially
+    // The Arena takes the center throne — voting is the whole game.
+    href: "/battles",
+    label: "Arena",
+    match: ["/battles", "/tournaments", "/artists", "/heat-list", "/outfits", "/rate"],
+    icon: null, // center mark renders specially
   },
   {
     href: "/drops",
@@ -116,12 +117,12 @@ export default function MobileTabBar() {
       <div className="mx-auto flex max-w-lg items-end justify-around px-2">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
-          if (tab.label === "Market") {
+          if (tab.label === "Arena") {
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                aria-label="The Market — live prices"
+                aria-label="The Arena — vote on live battles"
                 aria-current={active ? "page" : undefined}
                 className="relative -top-4 flex flex-col items-center"
               >
@@ -132,18 +133,17 @@ export default function MobileTabBar() {
                       : "border-heat bg-panel text-heat glow-heat"
                   }`}
                 >
-                  {/* Candlestick chart mark — the exchange. */}
-                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                    <path d="M6 4v3M6 13v3" />
-                    <rect x="4.5" y="7" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
-                    <path d="M12 7v2M12 15v2" />
-                    <rect x="10.5" y="9" width="3" height="6" rx="0.8" />
-                    <path d="M18 3v3M18 12v3" />
-                    <rect x="16.5" y="6" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+                  {/* Crossed blades — two customs, one verdict. */}
+                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M5 4.5 16.2 15.7M19 4.5 7.8 15.7" />
+                    <path d="M14.7 17.2l2.4-2.4M6.9 14.8l2.4 2.4" />
+                    <path d="M5.6 18.4l-1.2 1.2M18.4 18.4l1.2 1.2" />
+                    <circle cx="4" cy="20" r="1.2" fill="currentColor" stroke="none" />
+                    <circle cx="20" cy="20" r="1.2" fill="currentColor" stroke="none" />
                   </svg>
                 </span>
                 <span className={`tag mt-0.5 ${active ? "text-volt" : "text-smoke"}`}>
-                  Market
+                  Arena
                 </span>
               </Link>
             );
