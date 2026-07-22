@@ -162,7 +162,9 @@ export type OgStats = {
  */
 export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; brands: string[] }> {
   const shoes = await prisma.catalogShoe.findMany({
-    where: { marketPriceCents: { not: null, gt: 0 } },
+    // No photo, no board seat — a blank tile costs more credibility
+    // than the listing is worth.
+    where: { marketPriceCents: { not: null, gt: 0 }, imageUrl: { not: null } },
     orderBy: { marketPriceCents: "desc" },
     select: {
       sku: true, name: true, brand: true, imageUrl: true,

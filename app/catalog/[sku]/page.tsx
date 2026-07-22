@@ -28,7 +28,9 @@ export default async function CatalogShoePage({
 }) {
   const { sku } = await params;
   const shoe = await getShoe(decodeURIComponent(sku));
-  if (!shoe) notFound();
+  // A product page with no photo reads as a broken site — better to
+  // not exist until the image does.
+  if (!shoe || !shoe.imageUrl?.trim()) notFound();
 
   const [flames, customs] = await Promise.all([
     prisma.catalogRating.aggregate({

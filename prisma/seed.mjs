@@ -1303,6 +1303,133 @@ async function seedTeamAndCareers() {
   });
 }
 
+// Blank-photo hygiene: an empty-string imageUrl slips through every
+// `imageUrl IS NOT NULL` filter and renders as a broken tile. Normalize
+// catalog blanks to NULL (all public queries already filter NULL) and
+// pull any blank-image submission out of the public APPROVED pool.
+// No product at all beats a blank photo.
+async function scrubBlankImages() {
+  const blankedShoes = await prisma.$executeRaw`
+    UPDATE "CatalogShoe" SET "imageUrl" = NULL
+    WHERE "imageUrl" IS NOT NULL AND btrim("imageUrl") = ''`;
+  const hiddenSubs = await prisma.$executeRaw`
+    UPDATE "Submission" SET status = 'REJECTED'
+    WHERE btrim("imageUrl") = '' AND status = 'APPROVED'`;
+  if (blankedShoes || hiddenSubs) {
+    console.log(`Image hygiene: ${blankedShoes} blank catalog image(s) nulled, ${hiddenSubs} blank-photo submission(s) unlisted.`);
+  }
+}
+
+// ── OG Series: editorial battles from the catalog's hottest pairs ──
+// The twenty most popular base shoes (community ratings first, then
+// live market heat), photographed, paired into ten vote-offs under the
+// house byline. Idempotent: editorial entries key on (byline, title);
+// a battle pair is created once and never resurrected after it ends.
+const OG_BYLINE = "The Heat Chart — OG Series";
+// Footwear only — mirrors lib/taxonomy.ts retailKind (TS, not
+// importable from this .mjs).
+const NON_SHOE_RE =
+  /\b(hoodie|jogger|sweatpant|sweatshirt|crewneck|tee|t[-\s]?shirt|shirt|jersey|shorts|pants?|jacket|coat|parka|puffer|vest|fleece|tracksuit|set|socks?|anorak|windbreaker|overshirt|cargo|cap|hat|fitted|snapback|beanie|balaclava|durag|bag|backpack|tote|duffel|crossbody|wallet|belt|scarf|gloves?|keychain|lanyard|skateboard|figure|rug|pillow|blanket|bottle|mug|umbrella|towel|sunglasses)\b/i;
+
+async function seedOgSeriesBattles() {
+  const [pool, ratingCounts] = await Promise.all([
+    prisma.catalogShoe.findMany({
+      where: { imageUrl: { not: null } },
+      select: {
+        id: true, sku: true, name: true, brand: true, silhouette: true,
+        colorway: true, imageUrl: true, retailPriceCents: true, marketPriceCents: true,
+      },
+    }),
+    prisma.catalogRating.groupBy({ by: ["shoeId"], _count: { _all: true } }),
+  ]);
+  const rc = new Map(ratingCounts.map((r) => [r.shoeId, r._count._all]));
+
+  const scored = pool
+    .filter((s) => s.imageUrl && s.imageUrl.trim() !== "" && !NON_SHOE_RE.test(`${s.name} ${s.silhouette ?? ""}`))
+    .map((s) => ({
+      s,
+      score:
+        (rc.get(s.id) ?? 0) * 50_000 + // a real rating outranks price hype
+        (s.marketPriceCents ?? 0) +
+        Math.max(0, (s.marketPriceCents ?? 0) - (s.retailPriceCents ?? 0)),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  // One entrant per model family keeps the card varied; backfill with
+  // the next-best overall if dedupe leaves fewer than twenty.
+  const seen = new Set();
+  const top = [];
+  for (const { s } of scored) {
+    const family = `${s.brand ?? "?"}|${(s.silhouette ?? s.name.split(/\s+/).slice(0, 3).join(" ")).toLowerCase()}`;
+    if (seen.has(family)) continue;
+    seen.add(family);
+    top.push(s);
+    if (top.length === 20) break;
+  }
+  if (top.length < 20) {
+    const have = new Set(top.map((s) => s.id));
+    for (const { s } of scored) {
+      if (have.has(s.id)) continue;
+      top.push(s);
+      if (top.length === 20) break;
+    }
+  }
+  if (top.length < 2) return;
+
+  const entries = [];
+  for (const shoe of top) {
+    let sub = await prisma.submission.findFirst({
+      where: { artistName: OG_BYLINE, title: shoe.name },
+    });
+    if (!sub) {
+      const priceBits = [];
+      if (shoe.retailPriceCents) priceBits.push(`Retail $${Math.round(shoe.retailPriceCents / 100)}`);
+      if (shoe.marketPriceCents) priceBits.push(`market ≈$${Math.round(shoe.marketPriceCents / 100)}`);
+      sub = await prisma.submission.create({
+        data: {
+          title: shoe.name,
+          artistName: OG_BYLINE,
+          email: "editorial@theheatchart.com",
+          baseShoe: shoe.name,
+          brand: shoe.brand,
+          silhouette: shoe.silhouette,
+          baseColorway: shoe.colorway,
+          imageUrl: shoe.imageUrl,
+          status: "APPROVED",
+          category: "sneakers",
+          description: `OG Series editorial entrant — the culture's pick of the base catalog.${priceBits.length ? ` ${priceBits.join(" · ")}.` : ""}`,
+        },
+      });
+    } else if (sub.imageUrl !== shoe.imageUrl) {
+      // Catalog re-imports can refresh the photo — keep the entry current.
+      sub = await prisma.submission.update({ where: { id: sub.id }, data: { imageUrl: shoe.imageUrl } });
+    }
+    entries.push(sub);
+  }
+
+  const short = (t) => t.split(/\s+/).slice(0, 4).join(" ");
+  let created = 0;
+  for (let i = 0; i + 1 < entries.length; i += 2) {
+    const a = entries[i];
+    const b = entries[i + 1];
+    const exists = await prisma.battle.findFirst({
+      where: { OR: [{ subAId: a.id, subBId: b.id }, { subAId: b.id, subBId: a.id }] },
+    });
+    if (exists) continue;
+    await prisma.battle.create({
+      data: {
+        title: `OG Series: ${short(a.title)} vs ${short(b.title)}`,
+        subAId: a.id,
+        subBId: b.id,
+        endsAt: new Date(Date.now() + 7 * DAY),
+        status: "ACTIVE",
+      },
+    });
+    created++;
+  }
+  console.log(`OG Series: ${entries.length} editorial entrants, ${created} new battle(s).`);
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1313,6 +1440,7 @@ async function main() {
   await seedTeamAndCareers();
   await retireContent();
   await backfillCatalogLanes();
+  await scrubBlankImages();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
@@ -1648,6 +1776,7 @@ async function main() {
       });
     }
     await seedIconArticles();
+    await seedOgSeriesBattles();
     console.log("Seeded launch content only (no demo artists/battles): products, articles, quiz bank, giveaway.");
     return;
   }
@@ -1927,6 +2056,8 @@ async function main() {
     }
   }
   const totalPolls = await prisma.poll.count({ where: { active: true } });
+
+  await seedOgSeriesBattles();
 
   console.log(
     `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog, ${reconciled} reconciled), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
