@@ -21,6 +21,12 @@ jobs:
           curl -fSLo public/ad-videos/artist.mp4   "$base/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
           curl -fSLo public/ad-videos/home.mp4     "$base/hf_20260721_213455_b9dcb529-faca-4eb8-a3da-ea765c971fac.mp4"
           curl -fSLo public/ad-videos/sting.mp4    "$base/hf_20260721_212336_7c9c9ca9-b771-4e97-b5a5-158e0814ded0.mp4"
+          # The premium Seedance 2.0 batch (1080p std, 8s) — the film scenes
+          curl -fSLo public/ad-videos/trader.mp4      "$base/hf_20260721_212231_d54a132f-5a8e-4449-9a30-90147e3a2d81.mp4"
+          curl -fSLo public/ad-videos/notforcheap.mp4 "$base/hf_20260721_212251_f8cce72e-9835-4d90-85c0-f7e45d36c142.mp4"
+          curl -fSLo public/ad-videos/verdict.mp4     "$base/hf_20260721_212303_029a824a-6511-42f8-a7c7-8197801bf215.mp4"
+          curl -fSLo public/ad-videos/gallery.mp4     "$base/hf_20260721_212314_83268fbf-3352-4111-9dbb-a9fc2e006500.mp4"
+          curl -fSLo public/ad-videos/unboxing.mp4    "$base/hf_20260721_212325_fb58961e-63b2-4ecf-91f4-7eac2d98d906.mp4"
           ls -la public/ad-videos
       - name: Commit the videos
         run: |
