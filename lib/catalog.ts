@@ -127,6 +127,10 @@ export type ImportResult = {
   /** Rows that landed with a live market price — if this stays 0 while
    *  seen climbs, the provider's price fields changed shape on us. */
   priced: number;
+  /** Rows that landed with a retail price — the other leg of the spread.
+   *  seen climbing while this stays 0 = the provider's slim list payload
+   *  is holding retail back and the display hints aren't being honored. */
+  retailPriced: number;
   error?: string;
 };
 
@@ -137,22 +141,26 @@ export type ImportResult = {
  */
 export async function importFromKicksDB(query: string, pages = 1): Promise<ImportResult> {
   const key = process.env.KICKSDB_KEY;
-  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, priced: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
+  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, priced: 0, retailPriced: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
   const base = process.env.KICKSDB_API_URL || "https://api.kicks.dev";
 
-  let imported = 0, updated = 0, seen = 0, priced = 0;
+  let imported = 0, updated = 0, seen = 0, priced = 0, retailPriced = 0;
   for (let page = 1; page <= Math.min(pages, 10); page++) {
     let json: unknown;
     try {
+      // the display hints ask for the heavy fields the slim list omits —
+      // traits carry "Retail Price", variants carry per-size asks. A
+      // provider that doesn't know the params ignores them harmlessly.
       const res = await fetch(
-        `${base}/v3/stockx/products?query=${encodeURIComponent(query)}&limit=50&page=${page}`,
+        `${base}/v3/stockx/products?query=${encodeURIComponent(query)}&limit=50&page=${page}` +
+          `&display[traits]=true&display[variants]=true`,
         { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) }
       );
-      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, priced, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
-      if (!res.ok) return { ok: seen > 0, imported, updated, seen, priced, error: `KicksDB answered ${res.status} — check the key/plan.` };
+      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
+      if (!res.ok) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: `KicksDB answered ${res.status} — check the key/plan.` };
       json = await res.json();
     } catch {
-      return { ok: seen > 0, imported, updated, seen, priced, error: "Couldn't reach KicksDB — network hiccup, run it again." };
+      return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: "Couldn't reach KicksDB — network hiccup, run it again." };
     }
 
     const o = (json ?? {}) as Row;
@@ -175,8 +183,9 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
         colorway: dig(row, ["colorway", "color", "colorName"]) ?? s(digTrait(row, ["colorway"])),
         imageUrl: dig(row, ["image", "imageUrl", "thumbnail", "media", "smallImageUrl"]),
         retailPriceCents: toCents(
-          row["retailPrice"] ?? row["retail_price"] ?? row["price"] ?? row["msrp"] ??
-          digTrait(row, ["retail price", "retail"])
+          row["retailPrice"] ?? row["retail_price"] ?? row["retail_price_cents"] ??
+          row["retailPriceCents"] ?? row["retail"] ?? row["price"] ?? row["msrp"] ??
+          digTrait(row, ["retail price", "retail", "retail price (usd)"])
         ),
         marketPriceCents,
         releaseDate: toDate(
@@ -187,13 +196,21 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
         source: "kicksdb",
       };
       if (marketPriceCents) priced++;
+      if (data.retailPriceCents) retailPriced++;
       const existing = await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } });
-      await prisma.catalogShoe.upsert({ where: { sku }, update: data, create: { sku, ...data } });
+      // A re-import may ADD knowledge, never erase it: a slim provider
+      // response (null price/colorway/image) must not clobber a value a
+      // richer earlier import already landed. Nulls drop out of the
+      // update; the create keeps them so the row shape stays complete.
+      const gained = Object.fromEntries(
+        Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
+      ) as Partial<typeof data>;
+      await prisma.catalogShoe.upsert({ where: { sku }, update: gained, create: { sku, ...data } });
       existing ? updated++ : imported++;
     }
     if (rows.length < 50) break; // last page
   }
-  return { ok: true, imported, updated, seen, priced };
+  return { ok: true, imported, updated, seen, priced, retailPriced };
 }
 
 export type CatalogMatch = {
