@@ -46,6 +46,54 @@ function Delta({ pct }: { pct: number }) {
   );
 }
 
+/**
+ * Honest sparkline: weekly samples in, one polyline out. Green when the
+ * window closed higher than it opened, red when lower — the trading
+ * convention buyers already read fluently.
+ */
+function Sparkline({
+  series,
+  width = 72,
+  height = 24,
+  strokeWidth = 1.6,
+}: {
+  series: number[];
+  width?: number;
+  height?: number;
+  strokeWidth?: number;
+}) {
+  if (series.length < 2) return null;
+  const min = Math.min(...series);
+  const max = Math.max(...series);
+  const span = max - min || 1;
+  const pad = 2;
+  const pts = series
+    .map((v, i) => {
+      const x = pad + (i * (width - pad * 2)) / (series.length - 1);
+      const y = height - pad - ((v - min) * (height - pad * 2)) / span;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const up = series[series.length - 1] >= series[0];
+  return (
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      style={{ width, height }}
+      aria-hidden
+      className="shrink-0"
+    >
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={up ? "#34d399" : "#f87171"}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function StatStrip({ stats }: { stats: { label: string; value: string }[] }) {
   return (
     <div className="mt-5 overflow-x-auto rounded-lg border border-edge bg-surface">
@@ -148,11 +196,12 @@ function CustomTile({
           </p>
         )}
 
-        {/* The proprietary number: Heat Index + its 7-day move */}
-        <div className="mt-2 flex items-center justify-between rounded bg-ink/60 px-2 py-1">
+        {/* The proprietary number: Heat Index, its 8-week tape, its 7-day move */}
+        <div className="mt-2 flex items-center justify-between gap-2 rounded bg-ink/60 px-2 py-1">
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-heat">
             HX <span className="text-sm font-bold tabular-nums text-white">{item.hx.value}</span>
           </span>
+          <Sparkline series={item.series} width={56} height={18} />
           <span
             className={`text-[11px] font-semibold tabular-nums ${
               item.hx.weekDelta > 0
@@ -385,15 +434,59 @@ function CustomsBoardView({
       sort === "price-high" ? price(b) - price(a) : sort === "price-low" ? price(a) - price(b) : 0
     );
 
+  // The exchange index: element-wise average of every listed piece's
+  // weekly HX series — the market's own tape, from real events only.
+  const indexSeries =
+    items.length > 0
+      ? items[0].series.map((_, w) =>
+          Math.round(items.reduce((s, i) => s + (i.series[w] ?? 0), 0) / items.length)
+        )
+      : [];
+  const indexNow = indexSeries[indexSeries.length - 1] ?? 0;
+  const indexPrev = indexSeries[indexSeries.length - 2] ?? indexNow;
+  const indexDeltaPct = indexPrev > 0 ? Math.round(((indexNow - indexPrev) / indexPrev) * 100) : 0;
+
   return (
     <>
+      {/* The desk header — the number a buyer sizes the room by */}
+      <div className="mt-5 rounded-lg border border-edge bg-surface p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">
+              Confirmed volume · all-time
+            </p>
+            <p className="mt-1 text-4xl font-bold tabular-nums text-white sm:text-5xl">
+              {formatUsd(stats.volumeCents)}
+            </p>
+            <p className="mt-1 text-xs tabular-nums text-smoke">
+              {stats.salesCount} sale{stats.salesCount === 1 ? "" : "s"} ·{" "}
+              {stats.verifiedCount} verified · avg{" "}
+              {stats.salesCount ? formatUsd(stats.avgCents) : "—"}
+            </p>
+          </div>
+          {indexSeries.length > 1 && (
+            <div className="text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-heat">
+                Heat Index · 8W
+              </p>
+              <div className="mt-1 flex items-center justify-end gap-2">
+                <Sparkline series={indexSeries} width={120} height={34} strokeWidth={2} />
+                <div>
+                  <p className="text-xl font-bold tabular-nums text-white">{indexNow}</p>
+                  <Delta pct={indexDeltaPct} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       <StatStrip
         stats={[
-          { label: "Volume", value: formatUsd(stats.volumeCents) },
-          { label: "Sales", value: String(stats.salesCount) },
-          { label: "Avg Sale", value: stats.salesCount ? formatUsd(stats.avgCents) : "—" },
-          { label: "Verified", value: String(stats.verifiedCount) },
           { label: "Listed", value: String(items.length) },
+          { label: "Open Bids", value: String(items.reduce((s, i) => s + i.bidCount, 0)) },
+          { label: "High Bid", value: (() => { const h = Math.max(0, ...items.map((i) => i.topOfferCents ?? 0)); return h ? formatUsd(h) : "—"; })() },
+          { label: "Consigned", value: String(items.filter((i) => i.consignment).length) },
+          { label: "Collabs", value: String(items.filter((i) => i.collabWith.length > 0).length) },
         ]}
       />
 

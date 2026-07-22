@@ -34,6 +34,20 @@ export function computeHeatIndex(events: HeatEvent[], now: Date = new Date()): H
 }
 
 /** Build the event list from a piece's relations (all timestamped). */
+/**
+ * Cumulative HX sampled weekly over the trailing window — the honest
+ * sparkline: every point is the index as it actually stood that week.
+ */
+export function heatSeries(events: HeatEvent[], weeks = 8, now: Date = new Date()): number[] {
+  const out: number[] = [];
+  for (let w = weeks - 1; w >= 0; w--) {
+    const cutoff = now.getTime() - w * 7 * 24 * 60 * 60 * 1000;
+    const total = events.reduce((s, e) => (e.at.getTime() <= cutoff ? s + e.pts : s), 0);
+    out.push(Math.max(0, Math.round(100 + total)));
+  }
+  return out;
+}
+
 export function pieceHeatEvents(piece: {
   votes?: { createdAt: Date }[];
   battlesWon?: { createdAt: Date }[];

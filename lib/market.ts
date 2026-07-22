@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { computeHeatIndex, pieceHeatEvents, type HeatIndexValue } from "./heatIndex";
+import { computeHeatIndex, heatSeries, pieceHeatEvents, type HeatIndexValue } from "./heatIndex";
 
 export type MarketItem = {
   id: string;
@@ -21,6 +21,8 @@ export type MarketItem = {
   topOfferCents: number | null;
   bidCount: number;
   hx: HeatIndexValue;
+  /** Weekly HX samples, oldest → newest — the honest sparkline. */
+  series: number[];
   provenanceType: string;
   consignment: { floorCents: number; priorSaleCents: number | null } | null;
 };
@@ -105,16 +107,17 @@ export async function getMarketBoard(): Promise<{ items: MarketItem[]; stats: Ma
           p.consignment?.status === "OPEN"
             ? { floorCents: p.consignment.floorCents, priorSaleCents: p.consignment.priorSaleCents }
             : null,
-        hx: computeHeatIndex(
-          pieceHeatEvents({
+        ...(() => {
+          const events = pieceHeatEvents({
             votes: p.votes,
             battlesWon: p.battlesWon,
             tournamentsWon: p.tournamentsWon,
             ratings: p.ratings,
             openOffers: p.offers,
             confirmedSales: p.sales,
-          })
-        ),
+          });
+          return { hx: computeHeatIndex(events), series: heatSeries(events) };
+        })(),
       };
     })
     .sort(
