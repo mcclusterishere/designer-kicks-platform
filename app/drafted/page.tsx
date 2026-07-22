@@ -44,8 +44,8 @@ const grotesk = localFont({
 
 const DESTINATIONS = [
   {
-    video: "/ad-videos/arena.mp4",
-    poster: "/ad-refs/arena.png",
+    video: "/ad-videos/arena2.mp4",
+    poster: "/ad-refs/arena2.png",
     tag: "01 · The Arena",
     title: "Battle for rank",
     body: "Your pieces go head-to-head. The culture votes. Wins write your record.",
@@ -53,8 +53,8 @@ const DESTINATIONS = [
     cta: "Enter the arena",
   },
   {
-    video: "/ad-videos/market.mp4",
-    poster: "/ad-refs/market.png",
+    video: null,
+    poster: "/ad-refs/exchange2.png",
     tag: "02 · The Exchange",
     title: "Price your work",
     body: "Asks, live bids, sell-now — and a Heat Index that moves when you win.",
@@ -62,8 +62,8 @@ const DESTINATIONS = [
     cta: "See the board",
   },
   {
-    video: "/ad-videos/heatlist.mp4",
-    poster: "/ad-refs/heatlist.png",
+    video: null,
+    poster: "/ad-refs/standings2.png",
     tag: "03 · The Standings",
     title: "Climb the table",
     body: "Every artist ranked by wins, votes, and verified sales. No bought spots.",
@@ -156,12 +156,12 @@ export default async function DraftedPage() {
                 <Link href="/register?ref=drafted" className="btn-hard rounded-full px-7 py-3.5 tag font-bold">
                   Accept the Draft
                 </Link>
-                <Link
-                  href="/film"
+                <a
+                  href="#tape"
                   className="rounded-full border border-edge px-7 py-3.5 tag text-white transition hover:border-volt"
                 >
-                  Watch the Film
-                </Link>
+                  Watch the Tape
+                </a>
               </div>
             </Reveal>
             <Reveal delay={360}>
@@ -184,7 +184,7 @@ export default async function DraftedPage() {
       </section>
 
       {/* ── Film room: the tape, two-up ── */}
-      <section className="mx-auto max-w-6xl px-4 pt-14">
+      <section id="tape" className="mx-auto max-w-6xl scroll-mt-24 px-4 pt-14">
         <Reveal>
           <p className="tag text-volt">Film room</p>
           <h2 className="mt-2 text-4xl uppercase text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>
@@ -237,16 +237,25 @@ export default async function DraftedPage() {
                 className="card-lift group block overflow-hidden rounded-2xl border border-edge bg-surface"
               >
                 <div className="relative">
-                  <video
-                    src={d.video}
-                    poster={d.poster}
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="none"
-                    className="aspect-[4/5] w-full object-cover opacity-90 transition group-hover:opacity-100"
-                  />
+                  {d.video ? (
+                    <video
+                      src={d.video}
+                      poster={d.poster}
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="none"
+                      className="aspect-[4/5] w-full object-cover opacity-90 transition group-hover:opacity-100"
+                    />
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={d.poster}
+                      alt={d.title}
+                      className="aspect-[4/5] w-full object-cover object-top opacity-90 transition group-hover:opacity-100"
+                    />
+                  )}
                   <span className="absolute left-3 top-3 rounded-full bg-ink/85 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                     {d.tag}
                   </span>

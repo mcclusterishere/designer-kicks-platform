@@ -33,6 +33,8 @@ jobs:
           fetch public/ad-videos/doomscroll.mp4  "$base/hf_20260717_021353_2e7a9ac3-5318-4772-844e-86d83e7478e7.mp4"
           fetch public/ad-videos/citywalk.mp4    "$base/hf_20260717_021359_97e6a428-efea-49c3-b506-58c0297d4374.mp4"
           fetch public/ad-videos/vault.mp4       "$base/hf_20260717_023823_146d3861-2d07-40ab-8251-a875907e7540.mp4"
+          # Real-shoe arena recut (v2)
+          fetch public/ad-videos/arena2.mp4      "$base/hf_20260722_063533_28dac7f1-fc7a-4ae0-92cf-2a2c7be6b35c.mp4"
           ls -la public/ad-videos
       - name: Download the app typeface (Urbanist)
         run: |
