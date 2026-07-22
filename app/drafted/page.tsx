@@ -18,10 +18,17 @@ export const metadata = {
 };
 export const dynamic = "force-dynamic";
 
-// The agency grotesk — gives this page its own voice (self-hosted, no
-// network at build). Headlines stay on the house serif.
+// The athletics department: Anton is the poster voice (one weight,
+// all muscle), Archivo carries body copy at weights that never read
+// thin. Both self-hosted — no network at build.
+const sport = localFont({
+  src: "../../public/fonts/Anton.ttf",
+  weight: "400",
+  variable: "--font-sport",
+  display: "swap",
+});
 const grotesk = localFont({
-  src: "../../public/fonts/Urbanist.ttf",
+  src: "../../public/fonts/Archivo.ttf",
   weight: "100 900",
   variable: "--font-grotesk",
   display: "swap",
@@ -105,18 +112,35 @@ export default async function DraftedPage() {
   ];
 
   return (
-    <div className={`${grotesk.variable}`} style={{ fontFamily: "var(--font-grotesk), var(--font-geist-sans), sans-serif" }}>
-      {/* ── Hero: the signing offer ── */}
+    <div className={`${sport.variable} ${grotesk.variable} drafted-sport`} style={{ fontFamily: "var(--font-grotesk), var(--font-geist-sans), sans-serif", fontWeight: 500 }}>
+      {/* ── Hero: the signing offer, shot on the block ── */}
       <section className="relative overflow-hidden">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-volt/10 blur-3xl" />
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:pt-20">
+        <video
+          src="/ad-videos/verdict.mp4"
+          poster="/ad-refs/verdict.jpg"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          className="absolute inset-0 h-full w-full object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-ink" />
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:pt-24">
           <div>
             <Reveal>
               <p className="tag text-volt">The Heat Chart · Scouting Department</p>
             </Reveal>
             <Reveal delay={90}>
-              <h1 className="display mt-3 text-6xl text-white sm:text-7xl">
-                You&apos;ve been <span className="text-gradient-volt">scouted.</span>
+              <h1
+                className="mt-4 text-7xl uppercase leading-[0.88] text-white sm:text-8xl lg:text-9xl"
+                style={{ fontFamily: "var(--font-sport)" }}
+              >
+                You&apos;ve
+                <br />
+                been
+                <br />
+                <span className="text-gradient-volt">scouted.</span>
               </h1>
             </Reveal>
             <Reveal delay={180}>
@@ -147,39 +171,43 @@ export default async function DraftedPage() {
             </Reveal>
           </div>
 
-          {/* The collage: two working assets + floating proof chips */}
-          <div className="relative mx-auto w-full max-w-md">
-            <Reveal from="scale" delay={150}>
-              <video
-                src="/ad-videos/artist.mp4"
-                poster="/ad-refs/artist.png"
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                className="aspect-[9/16] w-3/4 rounded-2xl border border-edge object-cover shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
-              />
-            </Reveal>
-            <Reveal from="right" delay={320} className="absolute -right-1 top-16 w-2/5 sm:right-0">
-              <video
-                src="/ad-videos/trader.mp4"
-                poster="/ad-refs/trader.jpg"
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                className="aspect-[9/16] w-full rounded-2xl border border-edge object-cover shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
-              />
-            </Reveal>
-            <div className="float-slow absolute -left-2 bottom-24 rounded-full border border-volt/50 bg-ink/85 px-4 py-2 text-xs font-bold text-white shadow-lg sm:left-0">
+          {/* Proof chips ride the film */}
+          <div className="relative hidden min-h-72 lg:block">
+            <div className="float-slow absolute right-12 top-10 rounded-full border border-volt/50 bg-ink/85 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg">
               {RESALE_ARTIST_ROYALTY_PCT}% royalty · every resale
             </div>
-            <div className="float-slower absolute -bottom-4 right-6 rounded-full border border-heat/50 bg-ink/85 px-4 py-2 text-xs font-bold text-white shadow-lg">
+            <div className="float-slower absolute bottom-16 right-0 rounded-full border border-heat/50 bg-ink/85 px-5 py-2.5 text-sm font-extrabold text-white shadow-lg">
               HX · your own live index
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ── Film room: the tape, two-up ── */}
+      <section className="mx-auto max-w-6xl px-4 pt-14">
+        <Reveal>
+          <p className="tag text-volt">Film room</p>
+          <h2 className="mt-2 text-4xl uppercase text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>
+            Watch the tape
+          </h2>
+        </Reveal>
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4">
+          <Reveal from="left" delay={100}>
+            <video
+              src="/ad-videos/artist.mp4"
+              poster="/ad-refs/artist.png"
+              autoPlay muted loop playsInline preload="metadata"
+              className="aspect-[9/16] w-full rounded-2xl border border-edge object-cover shadow-[0_24px_60px_rgba(0,0,0,0.5)]"
+            />
+          </Reveal>
+          <Reveal from="right" delay={200}>
+            <video
+              src="/ad-videos/trader.mp4"
+              poster="/ad-refs/trader.jpg"
+              autoPlay muted loop playsInline preload="metadata"
+              className="aspect-[9/16] w-full rounded-2xl border border-edge object-cover shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+            />
+          </Reveal>
         </div>
       </section>
 
@@ -188,7 +216,7 @@ export default async function DraftedPage() {
         <div className="mx-auto grid max-w-6xl grid-cols-2 divide-x divide-edge sm:grid-cols-4">
           {stats.map((s, i) => (
             <Reveal key={s.k} delay={i * 90} className="px-5 py-6 text-center">
-              <p className="display text-3xl tabular-nums text-white sm:text-4xl">{s.v}</p>
+              <p className="text-4xl tabular-nums text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>{s.v}</p>
               <p className="tag mt-1 text-smoke">{s.k}</p>
             </Reveal>
           ))}
@@ -199,7 +227,7 @@ export default async function DraftedPage() {
       <section className="mx-auto max-w-6xl px-4 py-16">
         <Reveal>
           <p className="tag text-volt">Where you&apos;re headed</p>
-          <h2 className="display mt-2 text-4xl text-white sm:text-5xl">The league map</h2>
+          <h2 className="mt-2 text-4xl uppercase text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>The league map</h2>
         </Reveal>
         <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-3 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
           {DESTINATIONS.map((d, i) => (
@@ -224,7 +252,7 @@ export default async function DraftedPage() {
                   </span>
                 </div>
                 <div className="p-4">
-                  <h3 className="display text-xl text-white">{d.title}</h3>
+                  <h3 className="text-2xl uppercase text-white" style={{ fontFamily: "var(--font-sport)" }}>{d.title}</h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-smoke">{d.body}</p>
                   <p className="tag mt-3 text-volt">{d.cta} →</p>
                 </div>
@@ -252,7 +280,7 @@ export default async function DraftedPage() {
           <div>
             <Reveal>
               <p className="tag text-heat">The honest pitch</p>
-              <h2 className="display mt-2 text-4xl leading-tight text-white sm:text-5xl">
+              <h2 className="mt-2 text-4xl uppercase leading-[0.95] text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>
                 Commissions feed you today. <span className="text-gradient-heat">Assets feed you forever.</span>
               </h2>
             </Reveal>
@@ -290,7 +318,7 @@ export default async function DraftedPage() {
       <section className="mx-auto max-w-4xl px-4 py-16">
         <Reveal>
           <p className="tag text-volt">The onboarding itinerary</p>
-          <h2 className="display mt-2 text-4xl text-white sm:text-5xl">Your first week in the league</h2>
+          <h2 className="mt-2 text-4xl uppercase text-white sm:text-5xl" style={{ fontFamily: "var(--font-sport)" }}>Your first week in the league</h2>
         </Reveal>
         <div className="mt-8 space-y-3">
           {ITINERARY.map((s, i) => (
@@ -298,7 +326,7 @@ export default async function DraftedPage() {
               <div className="flex items-start gap-4 rounded-2xl border border-edge bg-surface p-5">
                 <span className="sticker shrink-0 rounded px-2.5 py-1 text-xs">{s.n}</span>
                 <div>
-                  <h3 className="display text-lg text-white">{s.title}</h3>
+                  <h3 className="text-xl uppercase text-white" style={{ fontFamily: "var(--font-sport)" }}>{s.title}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-smoke">{s.body}</p>
                 </div>
               </div>
@@ -360,7 +388,7 @@ export default async function DraftedPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/60" />
             <div className="relative px-6 py-16 text-center sm:py-20">
               <p className="tag text-volt">Signing day</p>
-              <h2 className="display mt-3 text-5xl text-white sm:text-6xl">
+              <h2 className="mt-3 text-6xl uppercase text-white sm:text-7xl" style={{ fontFamily: "var(--font-sport)" }}>
                 The draft is <span className="text-gradient-volt">open.</span>
               </h2>
               <p className="mx-auto mt-3 max-w-md text-smoke">
