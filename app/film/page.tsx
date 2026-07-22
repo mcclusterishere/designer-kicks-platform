@@ -1,4 +1,4 @@
-import ScrollFilm, { type FilmScene } from "@/components/ScrollFilm";
+import FilmExperience, { type FilmScene } from "@/components/FilmExperience";
 
 export const metadata = {
   title: "The Film — How Designer Kicks Became The Heat Chart",
@@ -145,5 +145,5 @@ const SCENES: FilmScene[] = [
 ];
 
 export default function FilmPage() {
-  return <ScrollFilm scenes={SCENES} />;
+  return <FilmExperience scenes={SCENES} />;
 }
