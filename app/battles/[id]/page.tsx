@@ -55,6 +55,56 @@ export default async function BattlePage({
         </div>
       </div>
 
+      {/* The scoreboard — matchday header: crest, live score, crest */}
+      <div className="mt-6 rounded-3xl border border-edge bg-surface px-4 py-6">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={battle.subA.imageUrl}
+              alt={battle.subA.title}
+              className={`h-20 w-20 rounded-2xl border-2 object-cover sm:h-24 sm:w-24 ${
+                battle.winnerId === battle.subA.id ? "border-volt" : "border-edge"
+              }`}
+            />
+            <p className="w-full truncate text-center text-xs font-bold text-white">
+              {battle.subA.artistName}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-center px-2">
+            {active ? (
+              <span className="mb-2 flex items-center gap-1.5 rounded-full bg-heat/15 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-heat">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-heat" />
+                Live
+              </span>
+            ) : (
+              <span className="mb-2 rounded-full bg-panel px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-smoke">
+                FT
+              </span>
+            )}
+            <p className="display text-5xl tabular-nums text-white sm:text-6xl">
+              {aVotes}
+              <span className="px-2 text-smoke/50">–</span>
+              {bVotes}
+            </p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-smoke/70">votes</p>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={battle.subB.imageUrl}
+              alt={battle.subB.title}
+              className={`h-20 w-20 rounded-2xl border-2 object-cover sm:h-24 sm:w-24 ${
+                battle.winnerId === battle.subB.id ? "border-volt" : "border-edge"
+              }`}
+            />
+            <p className="w-full truncate text-center text-xs font-bold text-white">
+              {battle.subB.artistName}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-8">
         <VotePanel
           battleId={battle.id}

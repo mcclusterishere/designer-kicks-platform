@@ -309,7 +309,7 @@ export default async function HomePage() {
           <div className="stripes mx-auto h-px w-28" />
           <blockquote
             className="mt-7 text-2xl italic leading-snug text-white sm:text-3xl"
-            style={{ fontFamily: "var(--font-display), Georgia, serif" }}
+            style={{ fontFamily: "var(--font-sans)", fontWeight: 800 }}
           >
             &ldquo;This started as a Facebook page and a camera roll full of
             customs nobody was ranking. Now the culture keeps the score.&rdquo;

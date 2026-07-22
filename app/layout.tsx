@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Geist, Geist_Mono, Bodoni_Moda } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import Link from "next/link";
 import TrackPageview from "@/components/TrackPageview";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
@@ -24,10 +25,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Fashion-magazine serif for the display type — Vogue-cover energy.
-const bodoni = Bodoni_Moda({
-  variable: "--font-display",
-  subsets: ["latin"],
+// The sports-app typeface — Urbanist variable, self-hosted (fetched by
+// the CI workflow) so builds never touch the network.
+const urbanist = localFont({
+  src: "../public/fonts/Urbanist.ttf",
+  weight: "100 900",
+  variable: "--font-urbanist",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -59,7 +63,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#0a1420",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover" as const,
@@ -83,7 +87,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${urbanist.variable} h-full antialiased`}
     >
       {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
         <head>
@@ -108,7 +112,7 @@ export default async function RootLayout({
         <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
             <Link href="/" className="display text-xl text-white">
-              The<span className="text-volt">Heat</span>
+              The<span className="text-heat">Heat</span>
               Chart
             </Link>
             <HeaderNav
@@ -138,7 +142,7 @@ export default async function RootLayout({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="display text-lg text-white">
-                  The<span className="text-volt">Heat</span>
+                  The<span className="text-heat">Heat</span>
                   Chart
                 </p>
                 <p className="tag mt-2 inline-flex items-center gap-1.5 rounded border border-white/20 px-2.5 py-1 text-white/80">

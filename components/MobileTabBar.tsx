@@ -107,58 +107,54 @@ export default function MobileTabBar() {
   // The admin console keeps its own full-width layout.
   if (pathname.startsWith("/admin")) return null;
 
+  // The floating pill dock: a rounded-full glass bar riding above the
+  // content, with the active tab as a filled signal-blue circle — the
+  // sports-app pattern.
   return (
     <nav
       aria-label="Primary"
-      className="glass fixed inset-x-0 bottom-0 z-50 border-t border-white/5 md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-4 z-50 md:hidden"
+      style={{ bottom: "calc(12px + env(safe-area-inset-bottom))" }}
     >
-      <div className="mx-auto flex max-w-lg items-end justify-around px-2">
+      <div className="glass mx-auto flex max-w-md items-center justify-around rounded-full border border-white/10 px-2 py-2 shadow-[0_16px_40px_rgba(2,10,20,0.65)]">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
-          if (tab.label === "Market") {
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                aria-label="The Market — live prices"
-                aria-current={active ? "page" : undefined}
-                className="relative -top-4 flex flex-col items-center"
-              >
-                <span
-                  className={`flex h-14 w-14 items-center justify-center rounded-full border-2 transition ${
-                    active
-                      ? "border-volt bg-volt text-ink glow-volt"
-                      : "border-heat bg-panel text-heat glow-heat"
-                  }`}
-                >
-                  {/* Candlestick chart mark — the exchange. */}
-                  <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-                    <path d="M6 4v3M6 13v3" />
-                    <rect x="4.5" y="7" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
-                    <path d="M12 7v2M12 15v2" />
-                    <rect x="10.5" y="9" width="3" height="6" rx="0.8" />
-                    <path d="M18 3v3M18 12v3" />
-                    <rect x="16.5" y="6" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
-                  </svg>
-                </span>
-                <span className={`tag mt-0.5 ${active ? "text-volt" : "text-smoke"}`}>
-                  Market
-                </span>
-              </Link>
+          const icon =
+            tab.label === "Market" ? (
+              // Candlestick chart mark — the exchange.
+              <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+                <path d="M6 4v3M6 13v3" />
+                <rect x="4.5" y="7" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+                <path d="M12 7v2M12 15v2" />
+                <rect x="10.5" y="9" width="3" height="6" rx="0.8" />
+                <path d="M18 3v3M18 12v3" />
+                <rect x="16.5" y="6" width="3" height="6" rx="0.8" fill="currentColor" stroke="none" />
+              </svg>
+            ) : (
+              tab.icon
             );
-          }
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              aria-label={tab.label}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center gap-0.5 px-3 py-2 transition ${
-                active ? "text-volt" : "text-smoke hover:text-white"
-              }`}
+              className="flex flex-col items-center"
             >
-              {tab.icon}
-              <span className="tag">{tab.label}</span>
+              <span
+                className={`flex items-center justify-center rounded-full transition-all duration-200 ${
+                  active
+                    ? "h-12 w-12 bg-volt text-white shadow-[0_6px_18px_rgba(47,123,255,0.5)]"
+                    : "h-12 w-12 text-smoke hover:text-white"
+                }`}
+              >
+                {icon}
+              </span>
+              {!active && (
+                <span className="-mt-1 text-[9px] font-bold uppercase tracking-wide text-smoke/70">
+                  {tab.label}
+                </span>
+              )}
             </Link>
           );
         })}

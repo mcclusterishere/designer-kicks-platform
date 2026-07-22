@@ -32,55 +32,70 @@ export default async function HeatListPage() {
           and be first.
         </p>
       ) : (
-        <ol className="mt-8 space-y-3">
-          {heat.map((entry, i) => (
-            <li
-              key={entry.id}
-              className={`flex items-center gap-4 rounded-xl border bg-surface p-3 ${
-                i === 0 ? "border-volt glow-volt" : "border-edge"
-              }`}
-            >
-              <span
-                className={`display w-14 shrink-0 text-center text-3xl ${
-                  i === 0 ? "text-volt" : i < 3 ? "text-heat" : "text-smoke"
+        // The standings table — pos · club · P W L · votes, read like a
+        // league table because it IS one.
+        <div className="mt-8 overflow-hidden rounded-3xl border border-edge bg-surface">
+          <div className="grid grid-cols-[2.5rem_1fr_2.2rem_3.6rem] items-center gap-2 border-b border-edge bg-panel/60 px-4 py-2.5 text-[10px] font-extrabold uppercase tracking-wide text-smoke sm:grid-cols-[3rem_1fr_2.6rem_2.6rem_2.6rem_4.5rem]">
+            <span>#</span>
+            <span>Piece</span>
+            <span className="hidden text-center sm:block">P</span>
+            <span className="text-center">W</span>
+            <span className="hidden text-center sm:block">L</span>
+            <span className="text-right">Votes</span>
+          </div>
+          <ol className="divide-y divide-edge/60">
+            {heat.map((entry, i) => (
+              <li
+                key={entry.id}
+                className={`grid grid-cols-[2.5rem_1fr_2.2rem_3.6rem] items-center gap-2 px-4 py-3 sm:grid-cols-[3rem_1fr_2.6rem_2.6rem_2.6rem_4.5rem] ${
+                  i === 0 ? "bg-volt/10" : ""
                 }`}
               >
-                {i + 1}
-              </span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={entry.imageUrl}
-                alt={entry.title}
-                className="h-20 w-20 shrink-0 rounded-lg object-cover"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold text-white">{entry.title}</p>
-                <p className="truncate text-sm text-smoke">
-                  {categoryLabel(entry.category)} · {entry.baseShoe} · by{" "}
-                  {entry.artistSlug ? (
-                    <Link
-                      href={`/artists/${entry.artistSlug}`}
-                      className="text-white underline decoration-volt hover:text-volt"
-                    >
-                      {entry.artistName}
-                    </Link>
-                  ) : (
-                    entry.artistName
-                  )}
-                  {entry.socialHandle && (
-                    <span className="text-volt"> @{entry.socialHandle}</span>
-                  )}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="display text-xl text-white">
-                  {entry.wins}W<span className="text-smoke">–{entry.battles - entry.wins}L</span>
-                </p>
-                <p className="tag text-smoke">{entry.totalVotes} votes</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm font-extrabold tabular-nums ${
+                    i === 0
+                      ? "bg-volt text-white"
+                      : i < 3
+                        ? "bg-panel text-volt"
+                        : "text-smoke"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <div className="flex min-w-0 items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={entry.imageUrl}
+                    alt={entry.title}
+                    className="h-11 w-11 shrink-0 rounded-xl border border-edge object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white">{entry.title}</p>
+                    <p className="truncate text-xs text-smoke">
+                      {entry.artistSlug ? (
+                        <Link href={`/artists/${entry.artistSlug}`} className="hover:text-volt">
+                          {entry.artistName}
+                        </Link>
+                      ) : (
+                        entry.artistName
+                      )}
+                      {" · "}
+                      {categoryLabel(entry.category)}
+                    </p>
+                  </div>
+                </div>
+                <span className="hidden text-center text-sm tabular-nums text-smoke sm:block">{entry.battles}</span>
+                <span className="text-center text-sm font-bold tabular-nums text-white">{entry.wins}</span>
+                <span className="hidden text-center text-sm tabular-nums text-smoke sm:block">
+                  {entry.battles - entry.wins}
+                </span>
+                <span className="text-right text-sm font-extrabold tabular-nums text-volt">
+                  {entry.totalVotes}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </div>
   );
