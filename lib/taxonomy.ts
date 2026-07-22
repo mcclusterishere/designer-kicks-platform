@@ -64,6 +64,36 @@ export function parseBaseShoe(baseShoe: string | null | undefined): Parsed {
   return { brand: null, silhouette: baseShoe ? titleCase(baseShoe) : null };
 }
 
+// Catalog imports carry whatever "silhouette" the source derived from
+// the product name — for non-footwear that's junk like "Set" or
+// "Hoodie". Classify those into the site's real categories so the
+// Rate deck and catalog chips read Apparel/Accessories, not noise.
+const APPAREL_RE =
+  /\b(hoodie|jogger|sweatpant|sweatshirt|crewneck|tee|t[-\s]?shirt|shirt|jersey|shorts|pants?|jacket|coat|parka|puffer|vest|fleece|tracksuit|track\s*(?:jacket|pants)|set|socks?|anorak|windbreaker|overshirt|cargo)\b/i;
+const ACCESSORY_RE =
+  /\b(cap|hat|fitted|snapback|beanie|balaclava|durag|bag|backpack|tote|duffel|crossbody|wallet|belt|scarf|gloves?|keychain|lanyard|skateboard|figure|rug|pillow|blanket|bottle|mug|umbrella|towel|sunglasses)\b/i;
+// A concrete shoe-model reference outranks garment words — "Jordan 13
+// Velvet" stays a shoe even if a colorway nickname sounds soft.
+const SHOE_HINT =
+  /\b(?:jordan\s*\d|aj\s*\d|dunk|air\s*force|af1|air\s*max|blazer|yeezy|foam(?:posite|\s*runner)|slide|boot|cleat|mule|loafer|990|991|992|993|550|2002r|9060)\b/i;
+
+/**
+ * Category chip for a retail catalog item: "Apparel" or "Accessories"
+ * for non-footwear, null for actual shoes (whose silhouette chip is
+ * real). Checked against the product name first — it's the most
+ * reliable signal — then the imported silhouette.
+ */
+export function retailKind(
+  name: string | null | undefined,
+  silhouette?: string | null
+): "Apparel" | "Accessories" | null {
+  const text = `${name ?? ""} ${silhouette ?? ""}`;
+  if (SHOE_HINT.test(text)) return null;
+  if (APPAREL_RE.test(text)) return "Apparel";
+  if (ACCESSORY_RE.test(text)) return "Accessories";
+  return null;
+}
+
 function titleCase(s: string) {
   return s
     .trim()

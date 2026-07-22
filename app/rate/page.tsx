@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { pieceTaxonomy } from "@/lib/taxonomy";
+import { pieceTaxonomy, retailKind } from "@/lib/taxonomy";
 import { categoryLabel } from "@/lib/categories";
 import RateDeck, { type RateCard } from "@/components/RateDeck";
 import { getTasteProfile } from "@/lib/taste";
@@ -133,7 +133,11 @@ export default async function RatePage() {
   const retailCard = (r: (typeof retailPool)[number]): RateCard => {
     const chips: string[] = [];
     if (r.brand) chips.push(r.brand);
-    if (r.silhouette && r.silhouette !== r.brand) chips.push(r.silhouette);
+    // Non-footwear catalog items carry junk silhouettes ("Set",
+    // "Hoodie") — show the real category instead.
+    const kind = retailKind(r.name, r.silhouette);
+    if (kind) chips.push(kind);
+    else if (r.silhouette && r.silhouette !== r.brand) chips.push(r.silhouette);
     if (r.colorway) chips.push(`“${r.colorway}”`);
     const bits: string[] = [];
     if (r.marketPriceCents) bits.push(`Market ≈$${Math.round(r.marketPriceCents / 100)}`);

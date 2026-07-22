@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { retailKind } from "@/lib/taxonomy";
 import { buyLinks } from "@/lib/affiliates";
 
 export const dynamic = "force-dynamic";
@@ -92,12 +93,24 @@ export default async function CatalogShoePage({
           )}
 
           <dl className="mt-5 space-y-2 border-t border-edge pt-4 text-sm">
-            {shoe.silhouette && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-smoke">Silhouette</dt>
-                <dd className="text-white">{shoe.silhouette}</dd>
-              </div>
-            )}
+            {(() => {
+              // Non-footwear items imported junk silhouettes ("Set") —
+              // show their real category instead.
+              const kind = retailKind(shoe.name, shoe.silhouette);
+              if (kind)
+                return (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-smoke">Category</dt>
+                    <dd className="text-white">{kind}</dd>
+                  </div>
+                );
+              return shoe.silhouette ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-smoke">Silhouette</dt>
+                  <dd className="text-white">{shoe.silhouette}</dd>
+                </div>
+              ) : null;
+            })()}
             {shoe.colorway && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Colorway</dt>
