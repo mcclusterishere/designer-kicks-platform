@@ -1,0 +1,25 @@
+# One-shot: pull the Urbanist variable font (the sports-app typeface)
+# into public/fonts so next/font/local builds offline. Same pattern as
+# fetch-ad-videos: CI has open egress, the dev sandbox doesn't.
+name: Fetch fonts
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Urbanist
+        run: |
+          mkdir -p public/fonts
+          fetch() { [ -f "$1" ] && echo "skip $1" || curl -fSLo "$1" "$2"; }
+          fetch "public/fonts/Urbanist.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/urbanist/Urbanist%5Bwght%5D.ttf"
+          fetch "public/fonts/Urbanist-Italic.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/urbanist/Urbanist-Italic%5Bwght%5D.ttf"
+          ls -la public/fonts
+      - name: Commit
+        run: |
+          git config user.name "McCluster Corp"
+          git config user.email "mattmccluster@gmail.com"
+          git add public/fonts
+          git diff --cached --quiet && echo "nothing new" || { git commit -m "Urbanist variable font for the app theme"; git push; }
