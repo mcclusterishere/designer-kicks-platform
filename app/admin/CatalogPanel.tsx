@@ -40,7 +40,8 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
       {state?.ok && (
         <p className="mt-2 text-sm text-volt">
           +{state.imported} new, {state.updated} refreshed ({state.seen} scanned
-          {typeof state.priced === "number" && `, ${state.priced} with live pricing`}).
+          {typeof state.priced === "number" && `, ${state.priced} with live pricing`}
+          {typeof state.retailPriced === "number" && `, ${state.retailPriced} with retail`}).
           {state.note && <span className="text-heat"> {state.note}</span>}{" "}
           Run more queries brand-by-brand to grow the base.
         </p>
@@ -48,7 +49,14 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
       {state?.ok && state.priced === 0 && (state.seen ?? 0) > 0 && (
         <p className="mt-1 text-xs text-heat">
           0 live prices came back — the provider may not include market data on
-          this plan/endpoint. Retail prices and photos still land.
+          this plan/endpoint.
+        </p>
+      )}
+      {state?.ok && state.retailPriced === 0 && (state.seen ?? 0) > 0 && (
+        <p className="mt-1 text-xs text-heat">
+          0 retail prices came back — the provider&apos;s list payload is arriving
+          without retail even with the display hints. If this persists, retail
+          needs the per-product detail endpoint on this plan.
         </p>
       )}
 

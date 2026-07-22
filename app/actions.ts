@@ -2455,7 +2455,7 @@ export async function createResearchedProfile(
 
 // ---------- Shoe catalog (knowledge base for affiliate matching) ----------
 
-export type CatalogImportResult = ActionResult & { imported?: number; updated?: number; seen?: number; priced?: number };
+export type CatalogImportResult = ActionResult & { imported?: number; updated?: number; seen?: number; priced?: number; retailPriced?: number };
 
 /** Bulk-import real sneakers into the catalog by search query (admin). */
 export async function importCatalog(
@@ -2475,6 +2475,7 @@ export async function importCatalog(
     updated: res.updated,
     seen: res.seen,
     priced: res.priced,
+    retailPriced: res.retailPriced,
     note: res.error, // partial-success warnings ride along
   };
 }
