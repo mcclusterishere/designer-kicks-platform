@@ -4,6 +4,9 @@ export const metadata = {
   title: "The Film — How Designer Kicks Became The Heat Chart",
   description:
     "One scroll, the whole story: a blank pair, the culture that judges heat, the arena, the rankings, and the market where one-of-one customs trade like assets.",
+  // Shelved until the remaster: no nav links point here and search
+  // engines are told to stay out. The URL still works for review.
+  robots: { index: false, follow: false },
   openGraph: {
     title: "The Heat Chart — The Film",
     description:

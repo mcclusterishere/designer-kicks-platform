@@ -174,7 +174,6 @@ export default async function RootLayout({
                   <Link href="/shop" className="hover:text-white">Shop</Link>
                 )}
                 <Link href="/story" className="hover:text-white">Our Story</Link>
-                <Link href="/film" className="hover:text-white">The Film</Link>
                 <Link href="/sell" className="hover:text-white">Sell Your Customs</Link>
                 <Link href="/careers" className="hover:text-white">Careers</Link>
               </div>
