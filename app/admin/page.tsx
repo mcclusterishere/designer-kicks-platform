@@ -46,6 +46,8 @@ import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
 import BroadcastForm from "./BroadcastForm";
+import BattleBlast from "./BattleBlast";
+import { instantChannelStatus } from "@/lib/socialInstant";
 import { GroupForm, GroupLeadRow } from "./GroupScout";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
@@ -1724,6 +1726,19 @@ export default async function AdminPage({
               )}
             </div>
           ))}
+        </div>
+
+        {/* Battle Blast — the instant channels (no Meta review queue) */}
+        <div className="mt-6">
+          <BattleBlast
+            channels={instantChannelStatus()}
+            battles={battles
+              .filter((b) => b.status === "ACTIVE")
+              .map((b) => ({
+                id: b.id,
+                label: b.title ?? `${b.subA.title} vs ${b.subB.title}`,
+              }))}
+          />
         </div>
 
         {/* Tracked-link factory */}

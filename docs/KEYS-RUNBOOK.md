@@ -119,3 +119,44 @@ engagements per post when run by hand).
    number and the exact text it posted.
 Note: refresh the long-lived token before the 60-day expiry
 (calendar reminder — takes one curl).
+
+## 10. Instant channels — the Battle Blast (no review queue)
+
+These five hand out working keys the same minute you ask. Set any of
+them in Railway → Variables and the Battle Blast card in Social HQ
+lights that channel up immediately.
+
+**X / Twitter (~10 min, free tier)** — developer.x.com → sign up
+(free) → create a Project + App → App settings → "User authentication
+set up": Read and write, type Web App, any URLs. Then Keys & Tokens:
+copy all four into `X_CONSUMER_KEY`, `X_CONSUMER_SECRET`,
+`X_ACCESS_TOKEN`, `X_ACCESS_SECRET` (generate the access token AFTER
+enabling read-write, or it comes out read-only). Free tier ≈ 500
+posts/month — plenty for daily battles.
+
+**Bluesky (~3 min)** — app → Settings → App Passwords → create one.
+`BSKY_HANDLE` = your handle (e.g. theheatchart.bsky.social),
+`BSKY_APP_PASSWORD` = the generated password. Done.
+
+**Telegram (~3 min)** — message @BotFather → /newbot → copy the token
+into `TELEGRAM_BOT_TOKEN`. Create a public channel (e.g.
+@theheatchart), add the bot as admin, set `TELEGRAM_CHANNEL` to
+`@theheatchart`.
+
+**Discord (~1 min)** — your server → channel → Edit → Integrations →
+Webhooks → New Webhook → copy URL into `DISCORD_WEBHOOK_URL`.
+
+**Reddit (~5 min)** — reddit.com/prefs/apps → create app → type
+"script". `REDDIT_CLIENT_ID` (under the app name),
+`REDDIT_CLIENT_SECRET`, `REDDIT_USERNAME`, `REDDIT_PASSWORD`, and
+`REDDIT_SUBREDDIT` (your own sub, e.g. TheHeatChart — make it first).
+Posts land as link posts; the battle page's card is the preview.
+
+**Meta sidebar — you may not need the wait:** App Review only gates
+posting on OTHER people's behalf. To post to a Page YOU admin, a Meta
+app in Development Mode works today: developers.facebook.com → your
+app → Graph API Explorer → select the app + your Page → grant
+pages_manage_posts + pages_read_engagement (+ instagram_content_publish
+for IG) → Generate Access Token → extend it to long-lived → that token
+is `FB_PAGE_ACCESS_TOKEN`. Dev-mode tokens on your own assets post for
+real. Same trick powers the Threads token (§9).
