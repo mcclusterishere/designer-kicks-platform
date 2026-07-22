@@ -45,7 +45,7 @@ const grotesk = localFont({
 const DESTINATIONS = [
   {
     video: "/ad-videos/arena2.mp4",
-    poster: "/ad-refs/arena2.png",
+    poster: "/ad-refs/arena2.jpg",
     tag: "01 · The Arena",
     title: "Battle for rank",
     body: "Your pieces go head-to-head. The culture votes. Wins write your record.",
@@ -54,7 +54,7 @@ const DESTINATIONS = [
   },
   {
     video: null,
-    poster: "/ad-refs/exchange2.png",
+    poster: "/ad-refs/exchange2.jpg",
     tag: "02 · The Exchange",
     title: "Price your work",
     body: "Asks, live bids, sell-now — and a Heat Index that moves when you win.",
@@ -63,7 +63,7 @@ const DESTINATIONS = [
   },
   {
     video: null,
-    poster: "/ad-refs/standings2.png",
+    poster: "/ad-refs/standings2.jpg",
     tag: "03 · The Standings",
     title: "Climb the table",
     body: "Every artist ranked by wins, votes, and verified sales. No bought spots.",
