@@ -11,6 +11,7 @@ import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import PmaGate from "@/components/PmaGate";
+import ThemeToggle from "@/components/ThemeToggle";
 import { prisma } from "@/lib/db";
 import "./globals.css";
 
@@ -85,15 +86,23 @@ export default async function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} h-full antialiased`}
     >
-      {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
-        <head>
+      <head>
+        {/* Theme before paint: stored choice applies pre-hydration so
+            light-mode users never see a dark flash (dark is default). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('thc-theme');if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
+          }}
+        />
+        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
           <script
             defer
             data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
             src="https://plausible.io/js/script.js"
           />
-        </head>
-      )}
+        )}
+      </head>
       <body className="min-h-full flex flex-col">
         <Suspense fallback={null}>
           <TrackPageview />
@@ -119,13 +128,17 @@ export default async function RootLayout({
                   : "Sign In",
               }}
             />
-            {/* Mobile: tab bar handles navigation; header keeps just the account chip */}
-            <Link
-              href={session?.user ? "/profile" : "/signin"}
-              className="tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
-            >
-              {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
-            </Link>
+            {/* Mobile: tab bar handles navigation; header keeps the
+                account chip + the day/night switch */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Link
+                href={session?.user ? "/profile" : "/signin"}
+                className="tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
+              >
+                {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+              </Link>
+            </div>
           </div>
         </header>
 

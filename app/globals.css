@@ -459,3 +459,82 @@ time, .tabular {
     transform: none;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+   LIGHT MODE — the white-paper read. Dark stays the house default;
+   [data-theme="light"] flips the token values and remaps the literal
+   white utilities the dark build leans on. Brand red/champagne stay.
+   ───────────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-ink: #ffffff;
+  --color-surface: #f7f7f5;
+  --color-panel: #efefec;
+  --color-edge: #e2e2db;
+  --color-smoke: #575c64;
+}
+[data-theme="light"] body {
+  background: #ffffff;
+  color: #15171a;
+}
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(60rem 40rem at 80% -10%, rgba(240, 78, 69, 0.05), transparent 60%),
+    radial-gradient(50rem 35rem at -10% 110%, rgba(217, 185, 106, 0.05), transparent 60%);
+}
+[data-theme="light"] body::after {
+  opacity: 0.028;
+}
+/* The dark build says text-white everywhere — on paper that means ink. */
+[data-theme="light"] .text-white {
+  color: #15171a !important;
+}
+[data-theme="light"] [class*="text-white/"] {
+  color: rgba(21, 23, 26, 0.72) !important;
+}
+[data-theme="light"] [class*="border-white"] {
+  border-color: rgba(21, 23, 26, 0.16) !important;
+}
+[data-theme="light"] [class*="hover:text-white"]:hover {
+  color: #15171a !important;
+}
+/* White badges over photos become ink chips on paper. */
+[data-theme="light"] .bg-white {
+  background: #15171a !important;
+  color: #ffffff !important;
+}
+[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.72);
+}
+[data-theme="light"] .ghost-word {
+  -webkit-text-stroke-color: rgba(21, 23, 26, 0.08);
+}
+[data-theme="light"] .card-lift:hover {
+  box-shadow: 0 16px 40px rgba(21, 23, 26, 0.14), 0 0 0 1px rgba(240, 78, 69, 0.35);
+}
+[data-theme="light"] ::selection {
+  background: var(--color-volt);
+  color: #ffffff;
+}
+
+/* ── Agency motion kit — the drafted page's scroll language ── */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.float-slow { animation: float-slow 5s ease-in-out infinite; }
+.float-slower { animation: float-slow 7s ease-in-out 1s infinite; }
+
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-x {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 24s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-slow, .float-slower, .marquee-x { animation: none; }
+  .reveal-item { transition: none !important; }
+}
