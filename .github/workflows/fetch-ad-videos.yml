@@ -39,6 +39,8 @@ jobs:
           mkdir -p public/fonts
           fetch() { [ -f "$1" ] && echo "skip $1" || curl -fSLo "$1" "$2"; }
           fetch "public/fonts/Urbanist.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/urbanist/Urbanist%5Bwght%5D.ttf"
+          fetch "public/fonts/Anton.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf"
+          fetch "public/fonts/Archivo.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf"
           ls -la public/fonts
       - name: Commit the videos
         run: |
