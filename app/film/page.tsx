@@ -80,14 +80,6 @@ const SCENES: FilmScene[] = [
     sub: "Hours of heat a night, gone by morning. The feed keeps everything you give it and pays back nothing.",
   },
   {
-    src: "/ad-videos/greenhouse.mp4",
-    poster: "/ad-refs/greenhouse.jpg",
-    eyebrow: "Chapter III · The Harvest",
-    headline: "Likes are a harvest that rots overnight.",
-    accent: "rots",
-    sub: "So we built a place where the culture's attention lands on something you can actually hold — and sell.",
-  },
-  {
     src: "/ad-videos/trader.mp4",
     poster: "/ad-refs/trader.jpg",
     eyebrow: "Chapter III · The Watching",
