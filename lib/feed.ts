@@ -34,7 +34,10 @@ export type FeedItem =
       reactions: number;
       mine: boolean;
       commentCount: number;
-      comments: { id: string; name: string; body: string }[];
+      // Author of the post when it's a claimed artist — lets the
+      // client offer Block; null for house posts.
+      authorUserId: string | null;
+      comments: { id: string; name: string; body: string; userId: string }[];
     }
   | {
       type: "battle";
@@ -104,19 +107,19 @@ export async function getFeed(
   const now = Date.now();
   const since = new Date(now - 90 * 24 * 3_600_000);
 
-  const [posts, battles, pieces, questions, articles, follows, viewer, polls] = await Promise.all([
+  const [posts, battles, pieces, questions, articles, follows, viewer, polls, blocks] = await Promise.all([
     prisma.feedPost.findMany({
       where: { OR: [{ pinned: true }, { createdAt: { gte: since } }] },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
-        artist: { select: { displayName: true, slug: true } },
+        artist: { select: { displayName: true, slug: true, userId: true } },
         _count: { select: { reactions: true, comments: true } },
         reactions: userId ? { where: { userId }, select: { id: true } } : false,
         comments: {
           orderBy: { createdAt: "desc" },
           take: 2,
-          include: { user: { select: { name: true } } },
+          include: { user: { select: { id: true, name: true } } },
         },
       },
     }),
@@ -171,7 +174,13 @@ export async function getFeed(
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
+    // Members this viewer has blocked — their posts and comments are
+    // filtered out below (App Store UGC requirement).
+    userId
+      ? prisma.userBlock.findMany({ where: { blockerId: userId }, select: { blockedId: true } })
+      : Promise.resolve([]),
   ]);
+  const blocked = new Set(blocks.map((b) => b.blockedId));
 
   const followed = new Set(follows.map((f) => f.artistId));
   const favBrands = new Set(
@@ -184,6 +193,8 @@ export async function getFeed(
   const scored: { score: number; item: FeedItem }[] = [];
 
   for (const p of posts) {
+    // A blocked member's posts never reach the blocker's feed.
+    if (p.artist?.userId && blocked.has(p.artist.userId)) continue;
     scored.push({
       score:
         (p.pinned ? 1000 : 60) +
@@ -204,10 +215,12 @@ export async function getFeed(
         reactions: p._count.reactions,
         mine: Array.isArray(p.reactions) && p.reactions.length > 0,
         commentCount: p._count.comments,
+        authorUserId: p.artist?.userId ?? null,
         comments: p.comments
           .slice()
           .reverse()
-          .map((c) => ({ id: c.id, name: c.user.name ?? "A fan", body: c.body })),
+          .filter((c) => !blocked.has(c.user.id))
+          .map((c) => ({ id: c.id, name: c.user.name ?? "A fan", body: c.body, userId: c.user.id })),
       },
     });
   }

@@ -182,7 +182,10 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
           entries only come from free-strike runs — purchases never affect your
           odds of winning.
         </p>
-        {purchasesEnabled ? (
+        {/* App Store 3.1.1: no external purchase of digital credits
+            inside the iOS shell — the app shows only the free path. */}
+        {purchasesEnabled &&
+        !(typeof navigator !== "undefined" && navigator.userAgent.includes("HeatChartApp")) ? (
           <>
             <BuyPanel
               pending={pending}

@@ -8,6 +8,7 @@ import { getTasteProfile } from "@/lib/taste";
 import { formatUsd } from "@/lib/market";
 import { categoryLabel } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
+import DeleteAccount from "@/components/DeleteAccount";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
 import IQPanel from "@/components/IQPanel";
@@ -501,6 +502,7 @@ export default async function ProfilePage() {
           }}
         />
       </div>
+      <DeleteAccount />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "@/app/actions";
 import type { FeedItem } from "@/lib/feed";
 import { categoryLabel } from "@/lib/categories";
+import ModTools from "@/components/ModTools";
 
 // The infinite scroll machine. Pages through /api/feed with an
 // IntersectionObserver sentinel — no button, no page numbers, it just
@@ -155,14 +156,29 @@ function PostCard({
         >
           {shared ? "Copied ✓" : "Share"}
         </button>
+        <ModTools
+          kind="feed_post"
+          targetId={item.id}
+          authorUserId={item.authorUserId}
+          signedIn={signedIn}
+        />
       </div>
 
       {(talkOpen || comments.length > 0) && (
         <div className="border-t border-edge/60 px-4 py-3">
           {comments.map((c) => (
-            <p key={c.id} className="py-1 text-sm">
-              <span className="font-bold text-white">{c.name}</span>{" "}
-              <span className="text-smoke">{c.body}</span>
+            <p key={c.id} className="flex items-baseline gap-1.5 py-1 text-sm">
+              <span className="min-w-0">
+                <span className="font-bold text-white">{c.name}</span>{" "}
+                <span className="text-smoke">{c.body}</span>
+              </span>
+              <ModTools
+                kind="feed_comment"
+                targetId={c.id}
+                authorUserId={c.userId}
+                signedIn={signedIn}
+                className="ml-auto shrink-0"
+              />
             </p>
           ))}
           {talkOpen &&

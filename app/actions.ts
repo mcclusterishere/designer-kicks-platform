@@ -3271,7 +3271,7 @@ export async function toggleFeedReaction(
 }
 
 export type FeedCommentResult =
-  | { ok: true; comment: { id: string; name: string; body: string } }
+  | { ok: true; comment: { id: string; name: string; body: string; userId: string } }
   | { ok: false; error: string };
 
 /** Anyone signed in can talk under a post. */
@@ -3290,11 +3290,11 @@ export async function addFeedComment(
   if (!post) return { ok: false, error: "Post is gone." };
   const comment = await prisma.feedComment.create({
     data: { postId, userId: session.user.id, body },
-    include: { user: { select: { name: true } } },
+    include: { user: { select: { id: true, name: true } } },
   });
   return {
     ok: true,
-    comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body },
+    comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body, userId: comment.user.id },
   };
 }
 
@@ -3904,4 +3904,95 @@ export async function setAmbassadorStatus(id: string, status: string): Promise<v
   if (!["NEW", "AMBASSADOR", "CURATOR", "PASSED"].includes(status)) return;
   await prisma.ambassadorApplication.update({ where: { id }, data: { status } });
   revalidatePath("/admin");
+}
+
+// ---------- App-store safety rails (Apple 1.2 + 5.1.1) ----------
+
+/**
+ * Flag a piece of member content for the moderation queue. One flag
+ * per member per target; every flag emails the admin so the 24-hour
+ * response promise in the terms is real.
+ */
+export async function reportContent(
+  kind: "feed_post" | "feed_comment" | "submission" | "artist",
+  targetId: string,
+  reason?: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to report content." };
+  if (!allowAttempt("report", session.user.id, 10, 60 * 1000)) {
+    return { ok: false, error: "Slow down — try again in a minute." };
+  }
+  const cleanReason = (reason ?? "").slice(0, 500) || null;
+  await prisma.contentFlag.upsert({
+    where: { kind_targetId_reporterId: { kind, targetId, reporterId: session.user.id } },
+    create: { kind, targetId, reporterId: session.user.id, reason: cleanReason },
+    update: { reason: cleanReason, status: "OPEN" },
+  });
+  notifyAdmin(
+    `Content reported: ${kind} ${targetId}`,
+    `A member flagged ${kind} ${targetId}.\nReason: ${cleanReason ?? "(none given)"}\nReporter: ${session.user.id}\n\nReview it in the admin panel and resolve within 24 hours.`
+  );
+  return { ok: true };
+}
+
+/** Block a member: their posts and comments disappear from your feed. */
+export async function blockMember(blockedUserId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to block members." };
+  if (blockedUserId === session.user.id) return { ok: false, error: "That's you." };
+  const exists = await prisma.user.findUnique({ where: { id: blockedUserId }, select: { id: true } });
+  if (!exists) return { ok: false, error: "Member not found." };
+  await prisma.userBlock.upsert({
+    where: { blockerId_blockedId: { blockerId: session.user.id, blockedId: blockedUserId } },
+    create: { blockerId: session.user.id, blockedId: blockedUserId },
+    update: {},
+  });
+  revalidatePath("/feed");
+  return { ok: true };
+}
+
+/**
+ * Self-serve account deletion (App Store 5.1.1(v)). Wipes the
+ * member's personal data and kills every way into the account:
+ * password, OAuth links, sessions. Votes and battle results stay as
+ * anonymous league records; comments show "Deleted Member".
+ */
+export async function deleteMyAccount(confirm: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  if (confirm !== "DELETE") {
+    return { ok: false, error: 'Type DELETE (all caps) to confirm.' };
+  }
+  const userId = session.user.id;
+  await prisma.$transaction([
+    prisma.account.deleteMany({ where: { userId } }),
+    prisma.session.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: "Deleted Member",
+        email: `deleted-${userId}@deleted.theheatchart.com`,
+        emailVerified: null,
+        image: null,
+        passwordHash: null,
+        phone: null,
+        city: null,
+        shoeSize: null,
+        favoriteSilhouette: null,
+        favoriteBrands: null,
+        styleInterests: null,
+        instagram: null,
+        marketingOptIn: false,
+        battleAlerts: false,
+        shopFor: null,
+        signupSource: null,
+      },
+    }),
+  ]);
+  notifyAdmin(
+    "Member deleted their account",
+    `User ${userId} self-deleted from the profile page. PII wiped, sign-in disabled.`
+  );
+  return { ok: true };
 }

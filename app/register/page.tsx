@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth, signIn, oauthProviders } from "@/auth";
 import RegisterForm from "./RegisterForm";
 
@@ -9,7 +10,10 @@ export default async function RegisterPage() {
   const session = await auth();
   if (session?.user) redirect("/profile");
 
-  const hasOAuth = oauthProviders.google || oauthProviders.facebook;
+  // Inside the iOS shell (App Store 4.8): email signup only — no
+  // third-party login buttons.
+  const inApp = ((await headers()).get("user-agent") ?? "").includes("HeatChartApp");
+  const hasOAuth = !inApp && (oauthProviders.google || oauthProviders.facebook);
 
   return (
     <div className="mx-auto max-w-md px-4 py-12">

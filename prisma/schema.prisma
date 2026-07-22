@@ -431,6 +431,34 @@ model FeedComment {
   createdAt DateTime @default(now())
 }
 
+// App-store UGC safety (Apple 1.2): members can flag content for the
+// moderation queue and block other members. A block hides the blocked
+// member's posts and comments from the blocker's feed.
+model ContentFlag {
+  id         String   @id @default(cuid())
+  kind       String // feed_post | feed_comment | submission | artist
+  targetId   String
+  reason     String?
+  reporterId String
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  status     String   @default("OPEN") // OPEN | RESOLVED
+  createdAt  DateTime @default(now())
+
+  @@unique([kind, targetId, reporterId])
+  @@index([status, createdAt])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("blocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("blocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
 model Tournament {
   id        String   @id @default(cuid())
   name      String
@@ -559,6 +587,9 @@ model User {
 
   accounts       Account[]
   sessions       Session[]
+  contentFlags   ContentFlag[]
+  blocksMade     UserBlock[] @relation("blocksMade")
+  blocksReceived UserBlock[] @relation("blocksReceived")
   votes          Vote[]
   quizRuns       QuizRun[]
   creditTxns     CreditTransaction[]

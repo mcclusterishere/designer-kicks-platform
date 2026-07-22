@@ -113,23 +113,39 @@ Answer **No** to "do you or your partners use data for tracking".
   > sell digital goods or use in-app purchase. The giveaway is a free
   > sweepstakes with rules at theheatchart.com/rules.
 
-## Known review risks, called straight
+## Compliance gates — BUILT AND LIVE
 
-1. **Guideline 4.2 (minimum functionality)** — web-wrapper apps get
-   flagged when they feel like "just a website." Working for us: the
-   site is genuinely app-shaped (tab bar, deck voting, games), the
-   shell handles external links natively, and category peers (StockX,
-   GOAT communities) set expectations. If rejected: the standard cure
-   is adding a native layer — push notifications for battle results is
-   the natural one — and resubmitting. That's a planned v1.1 anyway.
-2. **Guideline 4.8 (third-party login)** — we offer email/password
-   alongside Facebook login, which usually satisfies it. If a reviewer
-   pushes back, the fast fix is hiding the Facebook button when the
-   HeatChartApp user agent is present (the shell already sends
-   `HeatChartApp/1.0` in its UA for exactly this kind of switch);
-   Sign in with Apple is the durable fix later.
-3. **Giveaway (5.3 contests)** — rules page exists and states no
-   purchase necessary; link it in review notes if asked.
+Every hard App Review requirement is implemented in the product:
+
+1. **5.1.1(v) account deletion** — self-serve "Delete account" on the
+   profile page: two-step confirm, wipes all personal data (name,
+   email, passport, socials), kills password + OAuth links + sessions.
+2. **1.2 UGC safety** — every feed post and comment carries a ⚑ menu:
+   **Report this** (files a moderation flag + emails the admin — act
+   within the 24h the terms promise) and **Block this member** (their
+   posts and comments vanish from the blocker's feed, server-side).
+   Terms state the zero-tolerance policy.
+3. **3.1.1 payments** — inside the iOS shell (detected by the
+   `HeatChartApp` user agent) the quiz never shows credit-pack
+   purchases, only the free-strikes path. No digital goods are sold in
+   the app, no IAP needed. Physical sneaker sales are exempt by rule.
+4. **4.8 third-party login** — the app shell hides Facebook/Google
+   buttons entirely; in-app auth is email/password only.
+5. **4.2 more-than-a-website** — native share sheet bridge (the site's
+   Share buttons open the real iOS sheet in-app), native external-link
+   handling, offline screen, and the app-grade UI (tab bar, voting
+   deck, games).
+6. **5.3 contests** — /rules states no-purchase-necessary and that the
+   promotion isn't sponsored by Apple, Google, or Meta.
+
+## Remaining review risks, called straight
+
+- **4.2 is a judgment call** — some reviewers still flag hybrid apps.
+  If it happens, the cure is one more native layer (push notifications
+  for battle results — natural v1.1) and a resubmit; rejections of
+  this type are fixed-and-approved routinely, not fatal.
+- Reported-content handling is a promise Apple sometimes tests:
+  flag emails go to the admin inbox — clear them within 24 hours.
 
 ## Submission order of operations (tonight's checklist)
 

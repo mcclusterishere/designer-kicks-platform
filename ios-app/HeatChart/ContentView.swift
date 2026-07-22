@@ -47,6 +47,29 @@ struct WebView: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
 
+        // Native share sheet: WKWebView has no navigator.share, so the
+        // site's Share buttons would dead-end. Polyfill it to post into
+        // the shell, which presents the real iOS share sheet.
+        let sharePolyfill = WKUserScript(
+            source: """
+            if (!navigator.share) {
+              navigator.share = function (data) {
+                window.webkit.messageHandlers.share.postMessage({
+                  title: (data && data.title) || "",
+                  text: (data && data.text) || "",
+                  url: (data && data.url) || location.href
+                });
+                return Promise.resolve();
+              };
+            }
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(sharePolyfill)
+
+        config.userContentController.add(context.coordinator, name: "share")
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -65,9 +88,27 @@ struct WebView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let model: WebViewModel
         init(model: WebViewModel) { self.model = model }
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "share", let body = message.body as? [String: Any] else { return }
+            var items: [Any] = []
+            if let text = body["text"] as? String, !text.isEmpty { items.append(text) }
+            if let urlString = body["url"] as? String, let url = URL(string: urlString) {
+                items.append(url)
+            }
+            guard !items.isEmpty else { return }
+            let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+            let root = scene?.keyWindow?.rootViewController
+            sheet.popoverPresentationController?.sourceView = root?.view
+            root?.present(sheet, animated: true)
+        }
 
         func webView(
             _ webView: WKWebView,
