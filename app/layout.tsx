@@ -72,6 +72,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+  // Inside the iOS shell: no third-party analytics at all — the app's
+  // privacy story stays exactly what the nutrition label says.
+  const { headers } = await import("next/headers");
+  const inAppShell = ((await headers()).get("user-agent") ?? "").includes("HeatChartApp");
   // Equity Uprise PMA: members who joined through a door with no
   // checkbox (OAuth, pre-association accounts) accept via the gate.
   let needsPma = false;
@@ -95,7 +99,7 @@ export default async function RootLayout({
               "try{var t=localStorage.getItem('thc-theme');if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
           }}
         />
-        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
+        {!inAppShell && process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
           <script
             defer
             data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
@@ -107,7 +111,7 @@ export default async function RootLayout({
         <Suspense fallback={null}>
           <TrackPageview />
         </Suspense>
-        <GoogleAnalytics />
+        {!inAppShell && <GoogleAnalytics />}
         <a
           href="#main"
           className="sr-only z-[100] rounded btn-hard px-4 py-2 tag font-bold focus:not-sr-only focus:fixed focus:left-3 focus:top-3"

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { castVote } from "@/app/actions";
+import { appHaptic } from "@/lib/haptics";
 
 /**
  * The mobile voting deck — hot-or-not for battles. One matchup on
@@ -114,6 +115,7 @@ export default function ArenaDeck({
     startTransition(async () => {
       const res = await castVote(b.id, submissionId);
       if (res.ok) {
+        appHaptic("success");
         setVotedFor(submissionId);
         leaveThenAdvance(1600);
       } else if (res.error?.includes("already voted")) {

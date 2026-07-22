@@ -22,6 +22,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of your custom sneakers to submit them to battles and your closet.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose photos of your custom sneakers to upload to your closet and battles.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save images from The Heat Chart to your photo library.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

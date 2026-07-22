@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { castVote } from "@/app/actions";
+import { appHaptic } from "@/lib/haptics";
 import { categoryLabel } from "@/lib/categories";
 import SwipeGallery from "@/components/SwipeGallery";
 
@@ -42,6 +43,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
     startTransition(async () => {
       const res = await castVote(battleId, submissionId);
       if (res.ok) {
+        appHaptic("success");
         setLocalVote(submissionId);
       } else {
         setError(res.error ?? "Something went wrong.");

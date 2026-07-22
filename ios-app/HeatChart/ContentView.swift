@@ -1,11 +1,17 @@
 import SwiftUI
 import WebKit
+import UserNotifications
 
-/// The Heat Chart app shell: a full-bleed WKWebView over
-/// theheatchart.com. The site is built app-first (standalone display,
-/// safe-area-aware tab bar, viewport-fit=cover), so the shell stays
-/// out of the way: same-site links stay in the app, external links
-/// open Safari, and a branded offline screen handles dead network.
+/// The Heat Chart app shell. Not a bare webview — the native layer
+/// carries its own weight (App Review 4.2):
+///  - native share sheet (navigator.share bridge)
+///  - haptic feedback on votes, fired by the site through a JS bridge
+///  - native pull-to-refresh
+///  - camera / photo library integration for submissions
+///  - a local daily reminder (no server push needed)
+///  - branded offline screen, external links out to Safari
+/// Same-site links stay in the app; the site is app-first already
+/// (standalone display, safe-area tab bar, viewport-fit=cover).
 
 private let homeURL = URL(string: "https://theheatchart.com/")!
 private let appHosts: Set<String> = ["theheatchart.com", "www.theheatchart.com"]
@@ -22,6 +28,7 @@ struct ContentView: View {
                 OfflineView { model.reload() }
             }
         }
+        .onAppear { ReminderScheduler.registerLaunch() }
     }
 }
 
@@ -39,6 +46,39 @@ final class WebViewModel: ObservableObject {
     }
 }
 
+/// Daily local reminder — native re-engagement without a push server.
+/// Asks for permission on the third launch (not the first — let the
+/// app earn it), schedules one quiet daily nudge, never duplicates.
+enum ReminderScheduler {
+    private static let launchKey = "hc.launchCount"
+    private static let askedKey = "hc.askedNotifications"
+    private static let reminderId = "hc.dailyBattles"
+
+    static func registerLaunch() {
+        let defaults = UserDefaults.standard
+        let launches = defaults.integer(forKey: launchKey) + 1
+        defaults.set(launches, forKey: launchKey)
+        guard launches >= 3, !defaults.bool(forKey: askedKey) else { return }
+        defaults.set(true, forKey: askedKey)
+
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "The floor is live"
+            content.body = "Fresh battles are up and your free strikes reset — come judge the heat."
+            content.sound = .default
+
+            var time = DateComponents()
+            time.hour = 19
+            let trigger = UNCalendarNotificationTrigger(dateMatching: time, repeats: true)
+            let request = UNNotificationRequest(identifier: reminderId, content: content, trigger: trigger)
+            center.removePendingNotificationRequests(withIdentifiers: [reminderId])
+            center.add(request)
+        }
+    }
+}
+
 struct WebView: UIViewRepresentable {
     @ObservedObject var model: WebViewModel
 
@@ -46,6 +86,9 @@ struct WebView: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
+        // Supported API for UA customization — the site uses this token
+        // to hide third-party login and external purchases in-app.
+        config.applicationNameForUserAgent = "HeatChartApp/1.0"
 
         // Native share sheet: WKWebView has no navigator.share, so the
         // site's Share buttons would dead-end. Polyfill it to post into
@@ -67,8 +110,8 @@ struct WebView: UIViewRepresentable {
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(sharePolyfill)
-
         config.userContentController.add(context.coordinator, name: "share")
+        config.userContentController.add(context.coordinator, name: "haptic")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -77,9 +120,15 @@ struct WebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.backgroundColor = UIColor(red: 0.043, green: 0.043, blue: 0.047, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
-        webView.customUserAgent = (webView.value(forKey: "userAgent") as? String).map { "\($0) HeatChartApp/1.0" }
+
+        // Native pull-to-refresh.
+        let refresh = UIRefreshControl()
+        refresh.tintColor = UIColor(red: 0.941, green: 0.306, blue: 0.271, alpha: 1)
+        refresh.addTarget(context.coordinator, action: #selector(Coordinator.handleRefresh), for: .valueChanged)
+        webView.scrollView.refreshControl = refresh
 
         model.webView = webView
+        context.coordinator.webView = webView
         webView.load(URLRequest(url: homeURL))
         return webView
     }
@@ -90,24 +139,44 @@ struct WebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         let model: WebViewModel
+        weak var webView: WKWebView?
         init(model: WebViewModel) { self.model = model }
+
+        @objc func handleRefresh() {
+            webView?.reload()
+        }
 
         func userContentController(
             _ userContentController: WKUserContentController,
             didReceive message: WKScriptMessage
         ) {
-            guard message.name == "share", let body = message.body as? [String: Any] else { return }
-            var items: [Any] = []
-            if let text = body["text"] as? String, !text.isEmpty { items.append(text) }
-            if let urlString = body["url"] as? String, let url = URL(string: urlString) {
-                items.append(url)
+            switch message.name {
+            case "haptic":
+                let kind = message.body as? String ?? "light"
+                switch kind {
+                case "success":
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                case "warning":
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                default:
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
+            case "share":
+                guard let body = message.body as? [String: Any] else { return }
+                var items: [Any] = []
+                if let text = body["text"] as? String, !text.isEmpty { items.append(text) }
+                if let urlString = body["url"] as? String, let url = URL(string: urlString) {
+                    items.append(url)
+                }
+                guard !items.isEmpty else { return }
+                let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
+                let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
+                let root = scene?.keyWindow?.rootViewController
+                sheet.popoverPresentationController?.sourceView = root?.view
+                root?.present(sheet, animated: true)
+            default:
+                break
             }
-            guard !items.isEmpty else { return }
-            let sheet = UIActivityViewController(activityItems: items, applicationActivities: nil)
-            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene
-            let root = scene?.keyWindow?.rootViewController
-            sheet.popoverPresentationController?.sourceView = root?.view
-            root?.present(sheet, animated: true)
         }
 
         func webView(
@@ -157,11 +226,13 @@ struct WebView: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
+            webView.scrollView.refreshControl?.endRefreshing()
             if (error as NSError).code == NSURLErrorCancelled { return }
             model.offline = true
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            webView.scrollView.refreshControl?.endRefreshing()
             model.offline = false
         }
     }

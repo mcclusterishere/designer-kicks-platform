@@ -7,8 +7,15 @@ install — it opens and archives on any Mac with Xcode 15+.
 What the shell does:
 - Loads https://theheatchart.com full-bleed (the site is already
   app-first: standalone display, safe-area tab bar, dark chrome).
+- Native layer (this is what clears "more than a website"): iOS share
+  sheet for the site's Share buttons, haptic feedback when votes land,
+  pull-to-refresh, camera/photo-library uploads with proper usage
+  strings, and a daily local notification (no push server; permission
+  asked on the third launch, never the first).
 - Same-site links stay in the app; external links (affiliate outlinks,
   socials, mailto) open in Safari — Apple wants exactly this split.
+- Zero third-party analytics load inside the shell — the privacy
+  nutrition label is literally true.
 - Branded offline screen with retry, dark launch screen, portrait only.
 - Cookies persist, so members stay signed in between launches.
 
