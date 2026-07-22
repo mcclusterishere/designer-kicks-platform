@@ -64,33 +64,34 @@ function Scene({
   const parts = scene.accent ? scene.headline.split(scene.accent) : [scene.headline];
 
   return (
-    <section ref={sectionRef} className="relative min-h-[100svh] overflow-hidden bg-black">
-      <video
-        ref={videoRef}
-        src={scene.src}
-        poster={scene.poster}
-        muted
-        loop
-        playsInline
-        preload="none"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
-      {/* Legibility vignette */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-black/50" />
+    <section ref={sectionRef} className="flex min-h-[100svh] flex-col bg-black">
+      {/* The picture gets the top of the screen, whole and unobstructed */}
+      <div className="relative min-h-0 flex-1">
+        <video
+          ref={videoRef}
+          src={scene.src}
+          poster={scene.poster}
+          muted
+          loop
+          playsInline
+          preload="none"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <p className="absolute right-4 top-4 tag tabular-nums text-white/70">
+          {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+        </p>
+        {/* Thin seam so the frame reads as intentional, not clipped */}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black to-transparent" />
+      </div>
 
-      {/* Scene marker */}
-      <p className="absolute right-4 top-4 z-10 tag tabular-nums text-white/60">
-        {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
-      </p>
-
-      {/* The words, rising in with the scene */}
+      {/* The words live in their own panel — never on top of the shot */}
       <div
-        className={`absolute inset-x-0 bottom-0 z-10 mx-auto max-w-2xl px-6 pb-28 text-center transition-all duration-700 md:pb-20 ${
-          visible ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+        className={`mx-auto w-full max-w-2xl px-6 pb-28 pt-2 text-center transition-all duration-700 md:pb-14 ${
+          visible ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
         }`}
       >
         <p className="tag text-volt">{scene.eyebrow}</p>
-        <h2 className="display mt-2 text-4xl leading-tight text-white sm:text-6xl">
+        <h2 className="display mt-1.5 text-3xl leading-tight text-white sm:text-5xl">
           {scene.accent && parts.length === 2 ? (
             <>
               {parts[0]}
@@ -101,19 +102,19 @@ function Scene({
             scene.headline
           )}
         </h2>
-        <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-smoke sm:text-lg">
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-smoke sm:text-base">
           {scene.sub}
         </p>
         {scene.ctas && (
-          <div className="mx-auto mt-5 grid max-w-xs gap-2">
+          <div className="mx-auto mt-4 grid max-w-xs gap-2">
             {scene.ctas.map((c) => (
               <Link
                 key={c.href}
                 href={c.href}
                 className={
                   c.hard
-                    ? "btn-hard block rounded-xl py-3.5 tag font-bold"
-                    : "glass block rounded-xl border border-white/25 py-3.5 tag text-white transition hover:border-volt"
+                    ? "btn-hard block rounded-xl py-3 tag font-bold"
+                    : "block rounded-xl border border-edge py-3 tag text-white transition hover:border-volt"
                 }
               >
                 {c.label}

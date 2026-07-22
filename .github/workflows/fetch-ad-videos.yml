@@ -14,29 +14,30 @@ jobs:
       - name: Download campaign videos
         run: |
           mkdir -p public/ad-videos
+          # Never clobber a file already in the repo — optimized encodes live there
+          fetch() { [ -f "$1" ] && echo "skip $1" || curl -fSLo "$1" "$2"; }
           base="https://d8j0ntlcm91z4.cloudfront.net/user_3G3F7jiUHPTPLSNf3XP0bAYtQmG"
-          curl -fSLo public/ad-videos/market.mp4   "$base/hf_20260721_213415_8219ffeb-c069-4f5e-9cdd-144df450bd91.mp4"
-          curl -fSLo public/ad-videos/arena.mp4    "$base/hf_20260721_213424_de7e88e7-30d2-4d56-8e43-3fb0a17cb45c.mp4"
-          curl -fSLo public/ad-videos/heatlist.mp4 "$base/hf_20260721_213434_71fb44b4-38d4-4c07-a69c-e74eadf4fc69.mp4"
-          curl -fSLo public/ad-videos/artist.mp4   "$base/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
-          curl -fSLo public/ad-videos/home.mp4     "$base/hf_20260721_213455_b9dcb529-faca-4eb8-a3da-ea765c971fac.mp4"
-          curl -fSLo public/ad-videos/sting.mp4    "$base/hf_20260721_212336_7c9c9ca9-b771-4e97-b5a5-158e0814ded0.mp4"
+          fetch public/ad-videos/market.mp4   "$base/hf_20260721_213415_8219ffeb-c069-4f5e-9cdd-144df450bd91.mp4"
+          fetch public/ad-videos/arena.mp4    "$base/hf_20260721_213424_de7e88e7-30d2-4d56-8e43-3fb0a17cb45c.mp4"
+          fetch public/ad-videos/heatlist.mp4 "$base/hf_20260721_213434_71fb44b4-38d4-4c07-a69c-e74eadf4fc69.mp4"
+          fetch public/ad-videos/artist.mp4   "$base/hf_20260721_213443_bd25e005-62d2-4f61-8052-fe1c36006adb.mp4"
+          fetch public/ad-videos/home.mp4     "$base/hf_20260721_213455_b9dcb529-faca-4eb8-a3da-ea765c971fac.mp4"
+          fetch public/ad-videos/sting.mp4    "$base/hf_20260721_212336_7c9c9ca9-b771-4e97-b5a5-158e0814ded0.mp4"
           # The premium Seedance 2.0 batch (1080p std, 8s) — the film scenes
-          curl -fSLo public/ad-videos/trader.mp4      "$base/hf_20260721_212231_d54a132f-5a8e-4449-9a30-90147e3a2d81.mp4"
-          curl -fSLo public/ad-videos/notforcheap.mp4 "$base/hf_20260721_212251_f8cce72e-9835-4d90-85c0-f7e45d36c142.mp4"
-          curl -fSLo public/ad-videos/verdict.mp4     "$base/hf_20260721_212303_029a824a-6511-42f8-a7c7-8197801bf215.mp4"
-          curl -fSLo public/ad-videos/gallery.mp4     "$base/hf_20260721_212314_83268fbf-3352-4111-9dbb-a9fc2e006500.mp4"
-          curl -fSLo public/ad-videos/unboxing.mp4    "$base/hf_20260721_212325_fb58961e-63b2-4ecf-91f4-7eac2d98d906.mp4"
+          fetch public/ad-videos/trader.mp4      "$base/hf_20260721_212231_d54a132f-5a8e-4449-9a30-90147e3a2d81.mp4"
+          fetch public/ad-videos/notforcheap.mp4 "$base/hf_20260721_212251_f8cce72e-9835-4d90-85c0-f7e45d36c142.mp4"
+          fetch public/ad-videos/verdict.mp4     "$base/hf_20260721_212303_029a824a-6511-42f8-a7c7-8197801bf215.mp4"
+          fetch public/ad-videos/gallery.mp4     "$base/hf_20260721_212314_83268fbf-3352-4111-9dbb-a9fc2e006500.mp4"
+          fetch public/ad-videos/unboxing.mp4    "$base/hf_20260721_212325_fb58961e-63b2-4ecf-91f4-7eac2d98d906.mp4"
           # The night-campaign verticals — the rest of the brand's asset library
-          curl -fSLo public/ad-videos/doomscroll.mp4  "$base/hf_20260717_021353_2e7a9ac3-5318-4772-844e-86d83e7478e7.mp4"
-          curl -fSLo public/ad-videos/greenhouse.mp4  "$base/hf_20260717_021413_0f616c2f-02be-48e0-b718-6770dc2c3bce.mp4"
-          curl -fSLo public/ad-videos/citywalk.mp4    "$base/hf_20260717_021359_97e6a428-efea-49c3-b506-58c0297d4374.mp4"
-          curl -fSLo public/ad-videos/vault.mp4       "$base/hf_20260717_023823_146d3861-2d07-40ab-8251-a875907e7540.mp4"
+          fetch public/ad-videos/doomscroll.mp4  "$base/hf_20260717_021353_2e7a9ac3-5318-4772-844e-86d83e7478e7.mp4"
+          fetch public/ad-videos/greenhouse.mp4  "$base/hf_20260717_021413_0f616c2f-02be-48e0-b718-6770dc2c3bce.mp4"
+          fetch public/ad-videos/citywalk.mp4    "$base/hf_20260717_021359_97e6a428-efea-49c3-b506-58c0297d4374.mp4"
+          fetch public/ad-videos/vault.mp4       "$base/hf_20260717_023823_146d3861-2d07-40ab-8251-a875907e7540.mp4"
           ls -la public/ad-videos
       - name: Commit the videos
         run: |
           git config user.name "McCluster Corp"
           git config user.email "mattmccluster@gmail.com"
           git add public/ad-videos
-          git commit -m "Self-host campaign videos in public/ad-videos"
-          git push
+          git diff --cached --quiet && echo "nothing new" || { git commit -m "Self-host campaign videos in public/ad-videos"; git push; }
