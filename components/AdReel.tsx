@@ -18,8 +18,8 @@ export default function AdReel() {
             The league, in <span className="text-heat">six seconds</span>
           </h2>
         </div>
-        <Link href="/dk" className="tag text-smoke transition hover:text-volt">
-          All reels →
+        <Link href="/film" className="tag text-smoke transition hover:text-volt">
+          Watch the film →
         </Link>
       </div>
       <div className="-mx-4 mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2">
