@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { AuthError } from "next-auth";
 import type { ActionResult } from "./actions";
+import { checkEmailDomain } from "@/lib/emailDomains";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -36,6 +37,15 @@ export async function registerUser(
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  // Server-side backstop for the signup typo guard: a domain one
+  // keystroke off gmail/yahoo/etc. is never anyone's real email.
+  const domainCheck = checkEmailDomain(email);
+  if (domainCheck.verdict === "typo") {
+    return {
+      ok: false,
+      error: `That email service doesn't exist — did you mean @${domainCheck.suggestion}?`,
+    };
+  }
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
   // COPPA: the service is 13+. The affirmation is required at signup.
@@ -161,6 +171,15 @@ export async function requestPasswordReset(
 ): Promise<ActionResult & { devResetLink?: string }> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  // Server-side backstop for the signup typo guard: a domain one
+  // keystroke off gmail/yahoo/etc. is never anyone's real email.
+  const domainCheck = checkEmailDomain(email);
+  if (domainCheck.verdict === "typo") {
+    return {
+      ok: false,
+      error: `That email service doesn't exist — did you mean @${domainCheck.suggestion}?`,
+    };
+  }
 
   if (!allowAttempt("pwreset", await clientIp(), 5, 15 * 60 * 1000)) {
     return { ok: false, error: "Too many reset requests — try again in 15 minutes." };
