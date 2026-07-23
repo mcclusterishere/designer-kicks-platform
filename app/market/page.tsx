@@ -1,3 +1,4 @@
+import LocalMoney from "@/components/LocalMoney";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
@@ -225,6 +226,7 @@ function CustomTile({
             </p>
             {salePct !== null && <Delta pct={salePct} />}
           </div>
+          {headline ? <LocalMoney usd={headline / 100} /> : null}
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums text-smoke">
           <span>
@@ -290,6 +292,7 @@ function OgTile({ item }: { item: OgItem }) {
             <p className="text-xl font-bold tabular-nums text-white">{formatUsd(item.marketCents)}</p>
             {item.premiumPct !== null && <Delta pct={item.premiumPct} />}
           </div>
+          <LocalMoney usd={item.marketCents / 100} />
         </div>
         {/* The spread: retail → eBay new → eBay used. Live medians from
             the auto-matcher; dashes until the eBay keys connect. */}

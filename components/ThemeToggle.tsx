@@ -34,7 +34,7 @@ export default function ThemeToggle() {
   useEffect(() => {
     let stored: string | null = null;
     try {
-      stored = localStorage.getItem("thc-theme");
+      stored = localStorage.getItem("thc-theme2");
     } catch {}
     const initial: Mode = stored === "light" || stored === "dark" ? stored : "auto";
     setMode(initial);
@@ -51,7 +51,7 @@ export default function ThemeToggle() {
   const cycle = () => {
     const next: Mode = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
     try {
-      localStorage.setItem("thc-theme", next);
+      localStorage.setItem("thc-theme2", next);
     } catch {}
     setMode(next);
     applyMode(next);

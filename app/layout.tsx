@@ -98,7 +98,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('thc-theme');if(t!=='light'&&t!=='dark'){var h=new Date().getHours();t=h>=7&&h<19?'light':'dark'}if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
+              "try{var t=localStorage.getItem('thc-theme2');if(t!=='light'&&t!=='dark'){var h=new Date().getHours();t=h>=7&&h<19?'light':'dark'}if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
           }}
         />
         {!inAppShell && process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (

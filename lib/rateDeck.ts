@@ -118,6 +118,7 @@ export async function buildRateDeck(
       chips,
       kind: "retail",
       value: bits.join(" · ") || null,
+      usdValue: (r.marketPriceCents ?? r.retailPriceCents ?? 0) / 100 || null,
     };
   };
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { rateDesign, rateCatalogShoe, moreRateCards } from "@/app/actions";
 import SwipeGallery from "@/components/SwipeGallery";
+import LocalMoney from "@/components/LocalMoney";
 
 export type RateCard = {
   id: string;
@@ -16,6 +17,7 @@ export type RateCard = {
   // their own table and wear a market-value plate. Customs omit these.
   kind?: "custom" | "retail";
   value?: string | null;
+  usdValue?: number | null;
 };
 
 // The Rate game deck — one design at a time, scored out of five
@@ -167,8 +169,9 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
               )}
             </p>
             {card.value && (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-volt/50 bg-volt/10 px-3 py-1.5">
-                <span className="tag font-bold text-volt">{card.value}</span>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-lg border border-volt/50 bg-volt/10 px-3 py-1.5 tag font-bold text-volt">{card.value}</span>
+                {card.usdValue ? <LocalMoney usd={card.usdValue} /> : null}
               </div>
             )}
             {card.chips.length > 0 && (
