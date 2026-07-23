@@ -2092,16 +2092,54 @@ export async function lookupSkuForArticle(id: string): Promise<ActionResult> {
   }
   const article = await prisma.article.findUnique({
     where: { id },
-    select: { title: true },
+    select: { title: true, coverImage: true },
   });
   if (!article) return { ok: false, error: "Article not found." };
   const hit = await findSku(article.title).catch(() => null);
   if (!hit?.sku) {
     return { ok: false, error: "No style code matched that headline. Add it by hand." };
   }
-  await prisma.article.update({ where: { id }, data: { sku: hit.sku.toUpperCase() } });
+  const sku = hit.sku.toUpperCase();
+
+  // Apply the code AND the shoe's photo (only if the story has no cover
+  // yet — never clobber a hand-picked one).
+  const articleData: { sku: string; coverImage?: string } = { sku };
+  const appliedPhoto = Boolean(hit.image && !article.coverImage);
+  if (appliedPhoto) articleData.coverImage = hit.image!;
+  await prisma.article.update({ where: { id }, data: articleData });
+
+  // Fold the shoe into the catalog so the SKU resolves to a priced entry
+  // (photo + retail) that the story and the market board can read. Fills
+  // blanks only — never overwrites data an import already captured.
+  const existing = await prisma.catalogShoe.findUnique({ where: { sku } });
+  if (!existing) {
+    await prisma.catalogShoe.create({
+      data: {
+        sku,
+        name: hit.name ?? article.title.split(/[—:|(]/)[0].trim(),
+        imageUrl: hit.image ?? null,
+        retailPriceCents: hit.retailPriceCents ?? null,
+        releaseDate: hit.releaseDate ?? null,
+        source: "article",
+      },
+    });
+  } else {
+    const fill: { imageUrl?: string; retailPriceCents?: number; releaseDate?: Date } = {};
+    if (!existing.imageUrl && hit.image) fill.imageUrl = hit.image;
+    if (!existing.retailPriceCents && hit.retailPriceCents) fill.retailPriceCents = hit.retailPriceCents;
+    if (!existing.releaseDate && hit.releaseDate) fill.releaseDate = hit.releaseDate;
+    if (Object.keys(fill).length > 0) {
+      await prisma.catalogShoe.update({ where: { sku }, data: fill });
+    }
+  }
+
   revalidatePath("/admin");
-  return { ok: true, note: `Found style code ${hit.sku}${hit.name ? ` (${hit.name})` : ""}.` };
+  revalidatePath("/market");
+  const bits = [`Found style code ${sku}`];
+  if (hit.name) bits.push(`(${hit.name})`);
+  if (appliedPhoto) bits.push("— photo applied");
+  if (hit.retailPriceCents) bits.push(`— retail ${(hit.retailPriceCents / 100).toFixed(0)} saved to catalog`);
+  return { ok: true, note: `${bits.join(" ")}.` };
 }
 
 // ---------- Editor Desk ----------

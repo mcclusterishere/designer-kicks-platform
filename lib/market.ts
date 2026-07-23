@@ -164,11 +164,17 @@ export type OgStats = {
  * the pair — the number StockX built a business on.
  */
 export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; brands: string[] }> {
+  // Any shoe with a price earns a seat — a live resale number if we have
+  // one, otherwise retail as the floor. Requiring BOTH a market price AND
+  // an image was silently emptying the whole board whenever an import
+  // skipped either field. Imaged shoes still lead (the card falls back to
+  // a 👟 tile for the rest).
   const shoes = await prisma.catalogShoe.findMany({
-    // No photo, no board seat — a blank tile costs more credibility
-    // than the listing is worth.
-    where: { marketPriceCents: { not: null, gt: 0 }, imageUrl: { not: null } },
-    orderBy: { marketPriceCents: "desc" },
+    where: {
+      OR: [{ marketPriceCents: { gt: 0 } }, { retailPriceCents: { gt: 0 } }],
+    },
+    orderBy: { marketPriceCents: { sort: "desc", nulls: "last" } },
+    take: 1000,
     select: {
       sku: true, name: true, brand: true, imageUrl: true,
       retailPriceCents: true, marketPriceCents: true, releaseDate: true,
@@ -176,21 +182,34 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
     },
   });
 
-  const items: OgItem[] = shoes.map((s) => ({
-    sku: s.sku,
-    name: s.name,
-    brand: s.brand,
-    imageUrl: s.imageUrl,
-    retailCents: s.retailPriceCents,
-    marketCents: s.marketPriceCents!,
-    premiumPct:
-      s.retailPriceCents && s.retailPriceCents > 0
-        ? Math.round(((s.marketPriceCents! - s.retailPriceCents) / s.retailPriceCents) * 100)
-        : null,
-    ebayNewCents: s.ebayNewCents,
-    ebayUsedCents: s.ebayUsedCents,
-    releaseDate: s.releaseDate,
-  }));
+  const items: OgItem[] = shoes
+    .map((s) => {
+      const hasMarket = Boolean(s.marketPriceCents && s.marketPriceCents > 0);
+      // Headline value: live resale if we have it, else retail floor.
+      const marketCents = hasMarket ? s.marketPriceCents! : (s.retailPriceCents ?? 0);
+      return {
+        sku: s.sku,
+        name: s.name,
+        brand: s.brand,
+        imageUrl: s.imageUrl,
+        retailCents: s.retailPriceCents,
+        marketCents,
+        // Premium only reads true when we have a real resale number AND a
+        // retail to measure it against — never a fabricated 0% off a floor.
+        premiumPct:
+          hasMarket && s.retailPriceCents && s.retailPriceCents > 0
+            ? Math.round(((s.marketPriceCents! - s.retailPriceCents) / s.retailPriceCents) * 100)
+            : null,
+        ebayNewCents: s.ebayNewCents,
+        ebayUsedCents: s.ebayUsedCents,
+        releaseDate: s.releaseDate,
+      };
+    })
+    // Imaged, higher-value pairs float to the top of the board.
+    .sort((a, b) => {
+      const img = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
+      return img !== 0 ? img : b.marketCents - a.marketCents;
+    });
 
   const withPremium = items.filter((i) => i.premiumPct !== null);
   const stats: OgStats = {
