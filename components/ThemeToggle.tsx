@@ -3,36 +3,85 @@
 import { useEffect, useState } from "react";
 
 /**
- * The day/night switch. Dark is the house default; light mode is a
- * true white-paper read. Choice persists in localStorage and is
- * applied pre-hydration by the inline script in the layout head, so
- * there's no flash — this button just flips the attribute live.
+ * The day/night switch, now three-way: AUTO (default) follows the
+ * member's own clock — light 7am–7pm local, dark at night; their
+ * device time already speaks their timezone. Tapping cycles
+ * Auto → Light → Dark. Manual picks persist; Auto re-checks each
+ * minute so the theme rolls over by itself at dusk and dawn. The
+ * pre-hydration script in the layout applies the same rule before
+ * first paint, so there's never a flash.
  */
+
+type Mode = "auto" | "light" | "dark";
+
+function timeTheme(): "light" | "dark" {
+  const h = new Date().getHours();
+  return h >= 7 && h < 19 ? "light" : "dark";
+}
+
+function applyMode(mode: Mode) {
+  const theme = mode === "auto" ? timeTheme() : mode;
+  if (theme === "light") {
+    document.documentElement.dataset.theme = "light";
+  } else {
+    delete document.documentElement.dataset.theme;
+  }
+}
+
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [mode, setMode] = useState<Mode>("auto");
 
   useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem("thc-theme");
+    } catch {}
+    const initial: Mode = stored === "light" || stored === "dark" ? stored : "auto";
+    setMode(initial);
+    applyMode(initial);
   }, []);
 
-  const flip = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
+  // Auto mode rolls over on its own when the clock crosses 7am/7pm.
+  useEffect(() => {
+    if (mode !== "auto") return;
+    const tick = setInterval(() => applyMode("auto"), 60_000);
+    return () => clearInterval(tick);
+  }, [mode]);
+
+  const cycle = () => {
+    const next: Mode = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
     try {
       localStorage.setItem("thc-theme", next);
     } catch {}
-    setTheme(next);
+    setMode(next);
+    applyMode(next);
   };
+
+  const label =
+    mode === "auto"
+      ? "Theme: auto (follows your local time) — tap for light"
+      : mode === "light"
+        ? "Theme: light — tap for dark"
+        : "Theme: dark — tap for auto";
 
   return (
     <button
       type="button"
-      onClick={flip}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      title={theme === "dark" ? "Light mode" : "Dark mode"}
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-edge text-smoke transition hover:border-volt hover:text-white"
+      onClick={cycle}
+      aria-label={label}
+      title={
+        mode === "auto" ? "Auto — day/night by your clock" : mode === "light" ? "Light" : "Dark"
+      }
+      className="relative flex h-9 w-9 items-center justify-center rounded-full border border-edge text-smoke transition hover:border-volt hover:text-white"
     >
-      {theme === "dark" ? (
+      {mode === "auto" ? (
+        // Half sun, half moon — the clock decides.
+        <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 3a9 9 0 1 0 0 18Z" fill="currentColor" stroke="none" opacity="0.35" />
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v18" />
+        </svg>
+      ) : mode === "light" ? (
         // Sun
         <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
           <circle cx="12" cy="12" r="4" />

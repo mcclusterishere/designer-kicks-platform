@@ -91,12 +91,14 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} h-full antialiased`}
     >
       <head>
-        {/* Theme before paint: stored choice applies pre-hydration so
-            light-mode users never see a dark flash (dark is default). */}
+        {/* Theme before paint. Default is AUTO: the user's own clock
+            decides — light 7am–7pm local, dark at night (device time
+            already carries their timezone). A stored light/dark choice
+            overrides; runs pre-hydration so there's never a flash. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('thc-theme');if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
+              "try{var t=localStorage.getItem('thc-theme');if(t!=='light'&&t!=='dark'){var h=new Date().getHours();t=h>=7&&h<19?'light':'dark'}if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
           }}
         />
         {!inAppShell && process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
