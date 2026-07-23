@@ -1756,6 +1756,86 @@ async function backfillArticleCovers() {
   if (applied > 0) console.log(`Article covers: matched ${applied} article(s) to catalog photos.`);
 }
 
+// The OG Drops board reads real retail releases from the catalog, priced
+// against resale. Nothing ever seeded the catalog — it only filled from the
+// KicksDB admin import — so before an import is run the board sits empty.
+// This ships a curated floor of real, iconic pairs (accurate SKUs + retail,
+// with resale snapshots on the pairs whose premium is durable) so the board
+// is never empty. Idempotent and non-destructive: a pair is created if its
+// SKU is missing, and on an existing row ONLY blank fields are filled — a
+// later KicksDB/eBay refresh (richer data, live prices, images) always wins.
+async function seedOgCatalog() {
+  const d = (s) => new Date(s + "T00:00:00Z");
+  // sku, name, brand, silhouette, colorway, retail¢, market¢|null, release|null
+  const SHOES = [
+    ["DZ5485-612", "Air Jordan 1 Retro High OG Lost & Found", "Jordan", "Air Jordan 1", "Chicago Lost & Found", 18000, 38000, d("2022-11-19")],
+    ["555088-610", "Air Jordan 1 Retro High OG Bred Toe", "Jordan", "Air Jordan 1", "Bred Toe", 16000, 30000, d("2018-02-24")],
+    ["555088-711", "Air Jordan 1 Retro High OG University Blue", "Jordan", "Air Jordan 1", "University Blue", 17000, 25000, d("2021-03-06")],
+    ["DM7866-162", "Air Jordan 1 Low OG Travis Scott Reverse Mocha", "Jordan", "Air Jordan 1", "Reverse Mocha", 15000, 85000, d("2022-07-21")],
+    ["DN3707-100", "Air Jordan 3 Retro White Cement Reimagined", "Jordan", "Air Jordan 3", "White Cement", 21000, null, d("2023-03-11")],
+    ["CU1110-010", "Air Jordan 4 Retro Black Cat", "Jordan", "Air Jordan 4", "Black Cat", 19000, 42000, d("2020-01-22")],
+    ["308497-060", "Air Jordan 4 Retro Bred", "Jordan", "Air Jordan 4", "Bred", 20000, 34000, d("2019-05-04")],
+    ["CT8012-005", "Air Jordan 11 Retro Cool Grey", "Jordan", "Air Jordan 11", "Cool Grey", 22500, null, d("2021-12-11")],
+    ["DD1391-100", "Nike Dunk Low Retro Panda", "Nike", "Dunk Low", "Black/White", 11000, 13000, d("2021-01-14")],
+    ["DD1391-102", "Nike Dunk Low Retro UNC", "Nike", "Dunk Low", "University Blue", 11000, 15000, d("2021-03-10")],
+    ["CW2288-111", "Nike Air Force 1 '07 White", "Nike", "Air Force 1", "Triple White", 11500, null, null],
+    ["DQ3989-100", "Nike Air Max 1 '86 OG Big Bubble", "Nike", "Air Max 1", "Big Bubble", 16000, null, d("2023-03-26")],
+    ["CT5053-001", "Nike SB Dunk Low Travis Scott", "Nike", "SB Dunk Low", "Travis Scott", 15000, 140000, d("2020-02-29")],
+    ["BQ6806-100", "Nike Blazer Mid '77 Vintage", "Nike", "Blazer Mid", "White/Black", 10500, null, null],
+    ["AA3834-101", "Air Jordan 1 x Off-White Chicago (The Ten)", "Nike", "Air Jordan 1", "Off-White", 19000, 550000, d("2017-11-01")],
+    ["CP9654", "adidas Yeezy Boost 350 V2 Zebra", "adidas", "Yeezy 350 V2", "Zebra", 22000, 28000, d("2017-02-25")],
+    ["CP9652", "adidas Yeezy Boost 350 V2 Bred", "adidas", "Yeezy 350 V2", "Black/Red", 22000, 38000, d("2016-12-17")],
+    ["B75571", "adidas Yeezy Boost 700 Wave Runner", "adidas", "Yeezy 700", "Wave Runner", 30000, 40000, d("2017-11-01")],
+    ["B75806", "adidas Samba OG Cloud White", "adidas", "Samba", "Cloud White/Black", 10000, 12000, null],
+    ["HQ8708", "adidas Campus 00s Core Black", "adidas", "Campus", "Core Black", 11000, null, null],
+    ["BB550WT1", "New Balance 550 White Green", "New Balance", "550", "White/Green", 12000, 13000, d("2021-05-13")],
+    ["M990GL6", "New Balance 990v6 Grey", "New Balance", "990", "Grey", 20000, null, d("2023-04-14")],
+    ["M2002RDA", "New Balance 2002R Rain Cloud", "New Balance", "2002R", "Rain Cloud", 15000, 20000, d("2021-11-19")],
+    ["U9060ECA", "New Balance 9060 Sea Salt", "New Balance", "9060", "Sea Salt", 15000, null, d("2023-01-13")],
+    ["162050C", "Converse Chuck 70 High Black", "Converse", "Chuck 70", "Black", 8500, null, null],
+    ["L41086600", "Salomon XT-6 Black Phantom", "Salomon", "XT-6", "Black/Phantom", 20000, null, null],
+    ["1201A019", "ASICS Gel-Kayano 14 Cream Black", "ASICS", "Gel-Kayano 14", "Cream/Black", 16000, 17000, null],
+  ];
+
+  let created = 0;
+  let filled = 0;
+  for (const [sku, name, brand, silhouette, colorway, retail, market, release] of SHOES) {
+    const existing = await prisma.catalogShoe.findUnique({
+      where: { sku },
+      select: {
+        retailPriceCents: true, marketPriceCents: true, releaseDate: true,
+        brand: true, silhouette: true, colorway: true,
+      },
+    });
+    if (!existing) {
+      await prisma.catalogShoe.create({
+        data: {
+          sku, name, brand, silhouette, colorway,
+          retailPriceCents: retail, marketPriceCents: market,
+          releaseDate: release, gender: "mens", source: "seed",
+        },
+      });
+      created++;
+      continue;
+    }
+    // Fill only what's blank — never overwrite a live import's data.
+    const patch = {};
+    if (existing.retailPriceCents == null && retail != null) patch.retailPriceCents = retail;
+    if (existing.marketPriceCents == null && market != null) patch.marketPriceCents = market;
+    if (existing.releaseDate == null && release != null) patch.releaseDate = release;
+    if (!existing.brand && brand) patch.brand = brand;
+    if (!existing.silhouette && silhouette) patch.silhouette = silhouette;
+    if (!existing.colorway && colorway) patch.colorway = colorway;
+    if (Object.keys(patch).length) {
+      await prisma.catalogShoe.update({ where: { sku }, data: patch });
+      filled++;
+    }
+  }
+  if (created || filled) {
+    console.log(`OG catalog floor: ${created} pair(s) seeded, ${filled} price-filled.`);
+  }
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1765,6 +1845,7 @@ async function main() {
   // Team + careers seed runs in every mode (idempotent top-up).
   await seedTeamAndCareers();
   await retireContent();
+  await seedOgCatalog();
   await backfillCatalogLanes();
   await scrubBlankImages();
   await mergeDuplicateArtists();
