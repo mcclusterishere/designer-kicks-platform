@@ -4112,15 +4112,21 @@ export async function repairArtistAccount(formData: FormData): Promise<RepairRes
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return { ok: false, error: "That target email isn't valid." };
     }
-    const target = await prisma.user.findUnique({
+    let target = await prisma.user.findUnique({
       where: { email },
       select: { id: true, name: true },
     });
     if (!target) {
-      return {
-        ok: false,
-        error: `No member signs in with ${email}. Have them create/confirm that login first, then reassign.`,
-      };
+      // No account with that email yet — mint a claimable one and hand
+      // the page to it. The artist then does "forgot password" on this
+      // address to set a login and walk into their Studio. This is what
+      // makes the repair one click even when the right email was never
+      // registered (e.g. the on-file address had a typo).
+      target = await prisma.user.create({
+        data: { email, name: artist.displayName },
+        select: { id: true, name: true },
+      });
+      notes.push(`Created a login for ${email} — the artist sets a password via "Forgot password".`);
     }
     if (target.id !== artist.userId) {
       // The target account can't already own a different artist page
