@@ -57,6 +57,7 @@ import { providersConfigured } from "@/lib/sneakerApi";
 import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
 import MatchPhotosButton from "./MatchPhotosButton";
+import FixPhotosButton from "./FixPhotosButton";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
 import { editorRefLink } from "@/lib/editor";
@@ -452,6 +453,11 @@ export default async function AdminPage({
       <div className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="display text-4xl text-white">Command Center</h1>
         <p className="mt-1.5 text-smoke">Everything that runs The Heat Chart, one room at a time.</p>
+
+        {/* Always-visible: rescue iPhone HEIC photos that don't show in Chrome */}
+        <div className="mt-5">
+          <FixPhotosButton />
+        </div>
 
         <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-2xl border border-edge bg-surface p-2">
           {[

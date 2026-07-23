@@ -62,6 +62,12 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  // Accept iPhone/Safari HEIC too — saveUpload re-encodes every image to a
+  // clean JPEG, so it lands as a universally-viewable file regardless.
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/heic-sequence": "heic",
+  "image/heif-sequence": "heif",
 };
 // 15-second clips: duration is gated in the browser (no ffprobe on the
 // server) — the 40MB cap is the hard backstop, sized for ~15s of 1080p.
@@ -2232,6 +2238,21 @@ export async function matchArticlePhotos(): Promise<ActionResult> {
   if (fromApi) parts.push(`${fromApi} pulled live`);
   if (stillMissing) parts.push(`${stillMissing} still need one`);
   return { ok: true, note: `Article photos: ${parts.join(" · ")}.` };
+}
+
+// Re-encode already-stored HEIC photos (invisible in Chrome) to JPEG in
+// place. One button; run it once to rescue everything uploaded before the
+// normalize-on-upload fix.
+export async function fixUploadedPhotos(): Promise<ActionResult> {
+  await requireAdmin();
+  const { repairBrokenUploads } = await import("@/lib/uploadRepair");
+  const r = await repairBrokenUploads();
+  revalidatePath("/");
+  const note =
+    `Scanned ${r.scanned} photo${r.scanned === 1 ? "" : "s"} · ` +
+    `converted ${r.fixed} HEIC to JPEG · ${r.skipped} already fine` +
+    (r.failed ? ` · ${r.failed} couldn't be read` : "");
+  return { ok: true, note };
 }
 
 // ---------- Editor Desk ----------

@@ -43,6 +43,21 @@ export async function saveUpload(
   fileName: string,
   contentType: string
 ): Promise<string> {
+  // Every image is re-encoded to a clean JPEG so an iPhone/Safari photo
+  // (HEIC, or a mislabeled MIME) can never render blank in Chrome/Firefox.
+  // Videos pass through untouched. If we somehow can't decode it, keep the
+  // original bytes rather than lose the upload.
+  if (contentType.startsWith("image/")) {
+    try {
+      const { normalizeImage } = await import("./imageNormalize");
+      data = await normalizeImage(data);
+      contentType = "image/jpeg";
+      fileName = fileName.replace(/\.[^.]+$/, "") + ".jpg";
+    } catch {
+      /* undecodable — fall through with the original bytes */
+    }
+  }
+
   const cfg = s3Config();
 
   if (cfg) {

@@ -25,6 +25,7 @@
     "@aws-sdk/client-s3": "^3.1089.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
+    "heic-convert": "^2.1.0",
     "next": "16.2.10",
     "next-auth": "^5.0.0-beta.31",
     "prisma": "^6.19.3",
