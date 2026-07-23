@@ -1589,15 +1589,15 @@ async function promoteNamedEditors() {
   }
 }
 
-// The Editor's Pick — the house hand-picks one designer to front the
-// platform, independent of the Heat List. Benjamin Chase is that pick: a
-// wearable-armor / custom-vest designer (the giveaway is a 1-of-1 vest he
-// builds for the winner). Idempotent: once a human edits the name/note in
-// admin, this stops overwriting it. Exactly one artist wears the crown.
+// The Editor's Pick — a quietly hand-picked feature, independent of the
+// Heat List. The designer is Hitman Benji (Benjamin Chase is the person
+// behind the alias); the giveaway is a 1-of-1 vest he builds for the
+// winner. Kept understated on purpose — prestige, not a flex. Idempotent:
+// once a human edits the name/note in admin, this stops overwriting it.
 const BENJI_EDITORIAL_NOTE =
-  "The editors' pick — not voted up, chosen. Benjamin Chase turns tactical vest blanks into one-of-one wearable armor: brocade, hand-laid lace, inked centerpieces, finished like couture. When we needed a face for what a designer can be here, there was no debate.";
+  "Hitman Benji turns tactical vest blanks into one-of-one wearable armor — brocade, hand-laid lace, inked centerpieces, finished like couture. The kind of work you feel before anybody tells you to.";
 const BENJI_BIO =
-  "Custom apparel and wearable-armor designer. Builds one-of-one statement vests — hand-painted, hand-stitched, no two alike — and treats a tactical blank like a canvas. The Heat Chart's Editor's Pick.";
+  "Custom apparel and wearable-armor designer. Builds one-of-one statement vests — hand-painted, hand-stitched, no two alike — and treats a tactical blank like a canvas.";
 
 async function featureBenjiChase() {
   // Find his page: prefer the campaign slug, then the staged persona, then
@@ -1632,8 +1632,8 @@ async function featureBenjiChase() {
       artist = await prisma.artistProfile.create({
         data: {
           userId: user.id,
-          slug: "benji-chase",
-          displayName: "Benjamin Chase",
+          slug: "hitman-benji",
+          displayName: "Hitman Benji",
           status: "APPROVED",
           bio: BENJI_BIO,
         },
@@ -1642,10 +1642,12 @@ async function featureBenjiChase() {
   }
   if (!artist) return;
 
-  // Promote the persona to his real name once (leave later human edits alone).
+  // His designer name is Hitman Benji — keep it. Self-heal any page my
+  // earlier code had renamed to Benji/Benjamin Chase back to the alias,
+  // but never clobber a name a human deliberately set to something else.
   const data = { editorsPick: true, editorialNote: artist.editorialNote || BENJI_EDITORIAL_NOTE };
-  if (artist.displayName === "Hitman Benji" || artist.displayName === "Benji Chase")
-    data.displayName = "Benjamin Chase";
+  if (artist.displayName === "Benji Chase" || artist.displayName === "Benjamin Chase")
+    data.displayName = "Hitman Benji";
   if (!artist.bio) data.bio = BENJI_BIO;
   await prisma.artistProfile.update({ where: { id: artist.id }, data });
 
@@ -1684,9 +1686,9 @@ async function featureBenjiChase() {
 // Chase builds for the winner. Convert the known Tour Yellow shoe giveaway
 // in place; never touch a giveaway that's already the vest or something a
 // human set to something else.
-const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Benjamin Chase";
+const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Hitman Benji";
 const VEST_DESC =
-  "Our Editor's Pick designer, Benjamin Chase, hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
+  "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
 
 async function refreshFeaturedGiveaway() {
   const g = await prisma.giveaway.findFirst({
@@ -1702,7 +1704,7 @@ async function refreshFeaturedGiveaway() {
     where: { id: g.id },
     data: { title: "Editor's Pick Giveaway", prize: VEST_PRIZE, description: VEST_DESC },
   });
-  console.log("Giveaway swapped: Tour Yellow shoe → Benjamin Chase custom vest.");
+  console.log("Giveaway swapped: Tour Yellow shoe → Hitman Benji custom vest.");
 }
 
 async function main() {
@@ -2062,9 +2064,9 @@ async function main() {
       await prisma.giveaway.create({
         data: {
           title: "Editor's Pick Giveaway",
-          prize: "A 1-of-1 custom vest, hand-built by Benjamin Chase",
+          prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
           description:
-            "Our Editor's Pick designer, Benjamin Chase, hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
+            "Hitman Benji hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
           endsAt: new Date(Date.now() + 30 * DAY),
         },
       });
@@ -2237,9 +2239,9 @@ async function main() {
     await prisma.giveaway.create({
       data: {
         title: "Editor's Pick Giveaway",
-        prize: "A 1-of-1 custom vest, hand-built by Benjamin Chase",
+        prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
         description:
-          "Our Editor's Pick designer, Benjamin Chase, hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
+          "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
         endsAt: new Date(now + 30 * DAY),
       },
     });

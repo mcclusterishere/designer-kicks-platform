@@ -8,7 +8,7 @@ import Countdown from "@/components/Countdown";
 export const metadata = {
   title: "Editor's Pick Giveaway — The Heat Chart",
   description:
-    "Win a 1-of-1 custom vest hand-built by our Editor's Pick designer, Benjamin Chase, by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
+    "Win a 1-of-1 custom vest hand-built by Hitman Benji by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
 };
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function GiveawayPage() {
   const pick = await getEditorsPick();
   const benji = pick
     ? { name: pick.displayName, href: `/artists/${pick.slug}` }
-    : { name: "Benjamin Chase", href: "/artists" };
+    : { name: "Hitman Benji", href: "/artists" };
 
   const yourEntries =
     session?.user?.id && giveaway
@@ -36,13 +36,13 @@ export default async function GiveawayPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <p className="tag text-heat">The prize · Editor's Pick</p>
+      <p className="tag text-heat">The prize</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
         One Custom Vest. One Winner.
       </h1>
       <p className="mt-3 max-w-xl text-base font-medium text-smoke">
         No shoes, no gift cards — a one-of-one wearable-armor piece,
-        hand-built by our Editor's Pick designer,{" "}
+        hand-built by{" "}
         <Link href={benji.href} className="font-bold text-heat underline">
           {benji.name}
         </Link>

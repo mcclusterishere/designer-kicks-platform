@@ -9,6 +9,8 @@ import { formatUsd } from "@/lib/market";
 import MiniBars from "@/components/MiniBars";
 import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
+import ProfileMusicForm from "./ProfileMusicForm";
+import ProfileMusic from "@/components/ProfileMusic";
 import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
@@ -24,7 +26,7 @@ export default async function StudioPage() {
 
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true, sellsOnline: true },
+    select: { id: true, status: true, sellsOnline: true, spotifyUrl: true },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
@@ -361,6 +363,24 @@ export default async function StudioPage() {
                   </button>
                 </form>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Your music — plays on your league page */}
+      <div className="mt-12">
+        <p className="display text-xl text-white">Your music</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Make music too? Tie your Spotify (or DistroKid / Apple Music) and it
+          plays right on your league page — the culture hears you while they
+          look at your work.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <ProfileMusicForm current={profile.spotifyUrl} />
+          {profile.spotifyUrl && (
+            <div className="mt-4 border-t border-edge pt-4">
+              <ProfileMusic url={profile.spotifyUrl} />
             </div>
           )}
         </div>

@@ -44,6 +44,7 @@ import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
+import { isMusicLink } from "@/lib/spotify";
 import { isEditor, currentUserRole, ensureRefCode, editorRefLink } from "@/lib/editor";
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
@@ -2322,7 +2323,7 @@ async function myApprovedArtist() {
   if (!session?.user?.id) return null;
   return prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, slug: true },
   });
 }
 
@@ -2364,6 +2365,37 @@ export async function removeArtistShop(id: string) {
     await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: null } });
   }
   revalidatePath("/studio");
+}
+
+// A maker ties their Spotify (or DistroKid/hyperfollow/Apple Music) link so
+// their music plays on their profile. Blank clears it.
+export async function setArtistMusic(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  let url = String(formData.get("spotifyUrl") ?? "").trim();
+  if (!url) {
+    await prisma.artistProfile.update({ where: { id: profile.id }, data: { spotifyUrl: null } });
+    revalidatePath("/studio");
+    revalidatePath(`/artists/${profile.slug}`);
+    return { ok: true, note: "Music removed from your page." };
+  }
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  if (url.length > 400) return { ok: false, error: "That link is too long." };
+  if (!isMusicLink(url)) {
+    return {
+      ok: false,
+      error: "Paste a Spotify link (or a DistroKid / hyperfollow / Apple Music link).",
+    };
+  }
+  await prisma.artistProfile.update({ where: { id: profile.id }, data: { spotifyUrl: url } });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Your music is live on your profile." };
 }
 
 // ---------- Onboarding Agent (research → preloaded profile) ----------

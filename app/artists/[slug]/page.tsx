@@ -21,6 +21,7 @@ import ShippingQuote from "@/components/ShippingQuote";
 import ConsignForm from "@/components/ConsignForm";
 import CommissionForm from "@/components/CommissionForm";
 import ClaimLinkShare from "@/components/ClaimLinkShare";
+import ProfileMusic from "@/components/ProfileMusic";
 import { siteUrl } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
@@ -113,7 +114,7 @@ export default async function ArtistPage({ params }: Props) {
         <div>
           {artist.editorsPick ? (
             <span className="inline-block rounded-full bg-heat px-3 py-1 tag font-bold text-ink">
-              ★ Editor's Pick · House Designer
+              ★ Editor's Pick
             </span>
           ) : (
             <p className="tag text-volt">Artist</p>
@@ -193,6 +194,8 @@ export default async function ArtistPage({ params }: Props) {
           </div>
         ))}
       </div>
+
+      <ProfileMusic url={artist.spotifyUrl} />
 
       {claimable && (
         <ClaimProfileForm artistId={artist.id} displayName={artist.displayName} />

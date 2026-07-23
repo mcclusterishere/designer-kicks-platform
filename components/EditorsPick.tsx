@@ -38,7 +38,7 @@ export default async function EditorsPick() {
           )}
 
           <div>
-            <p className="tag text-heat">The House Designer · Editor's Pick</p>
+            <p className="tag text-heat">Editor's Pick</p>
             <h2 className="display mt-3 text-4xl text-white sm:text-5xl">
               {pick.displayName}
             </h2>
@@ -50,9 +50,6 @@ export default async function EditorsPick() {
                 {pick.note}
               </p>
             )}
-            <p className="mt-4 text-sm font-bold text-heat">
-              Not a ranking. A statement — chosen by the editors.
-            </p>
             <div className="mt-7 flex flex-wrap items-center gap-4">
               <Link
                 href={`/artists/${pick.slug}`}

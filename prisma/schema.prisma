@@ -109,11 +109,15 @@ model ArtistProfile {
   // (claim link sent). Claimed pages leave the board entirely.
   outreachStage String  @default("NEW")
   outreachNotes String?
-  // Editorial anointment — the house's hand-picked designer, independent
-  // of the Heat List ranking. Exactly one artist wears this at a time.
-  // editorialNote is the editors' blurb on why they're the pick.
+  // Editorial anointment — a quietly hand-picked feature, independent of
+  // the Heat List. Exactly one artist wears this at a time. editorialNote
+  // is the editors' short blurb on the work.
   editorsPick   Boolean @default(false)
   editorialNote String?
+  // Music: a Spotify (or DistroKid/hyperfollow/Apple Music) link the maker
+  // ties to their page so their tracks play right on the profile. Many of
+  // these customizers are musicians too.
+  spotifyUrl    String?
   createdAt   DateTime @default(now())
 
   // Where they already sell — captured at onboarding, shown on their page.
