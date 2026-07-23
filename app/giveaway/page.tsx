@@ -8,7 +8,7 @@ import Countdown from "@/components/Countdown";
 export const metadata = {
   title: "Editor's Pick Giveaway — The Heat Chart",
   description:
-    "Win a 1-of-1 custom vest hand-built by our Editor's Pick designer, Benji Chase, by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
+    "Win a 1-of-1 custom vest hand-built by our Editor's Pick designer, Benjamin Chase, by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
 };
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function GiveawayPage() {
   const pick = await getEditorsPick();
   const benji = pick
     ? { name: pick.displayName, href: `/artists/${pick.slug}` }
-    : { name: "Benji Chase", href: "/artists" };
+    : { name: "Benjamin Chase", href: "/artists" };
 
   const yourEntries =
     session?.user?.id && giveaway
