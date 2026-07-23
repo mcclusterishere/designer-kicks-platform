@@ -84,6 +84,33 @@ export default async function GiveawayPage() {
         </p>
       )}
 
+      {pick && (
+        <section className="mt-8 overflow-hidden rounded-xl border border-edge bg-surface">
+          <div className="grid sm:grid-cols-[140px_1fr]">
+            {pick.heroImage && (
+              <img
+                src={pick.heroImage}
+                alt={`A piece by ${pick.displayName}`}
+                className="hidden h-full w-full object-cover sm:block"
+              />
+            )}
+            <div className="p-5">
+              <p className="tag text-heat">Meet the maker</p>
+              <h2 className="display mt-1 text-2xl text-white">{pick.displayName}</h2>
+              <p className="mt-2 text-sm font-medium leading-relaxed text-smoke">
+                {pick.note || pick.bio}
+              </p>
+              <Link
+                href={benji.href}
+                className="mt-3 inline-block tag font-bold text-heat underline"
+              >
+                See his work →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       {pastWinners.length > 0 && (
         <section className="mt-10">
           <h2 className="display text-2xl text-white">Past Winners</h2>
