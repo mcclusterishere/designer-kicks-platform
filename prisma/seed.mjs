@@ -1443,7 +1443,7 @@ async function seedOgSeriesBattles() {
  */
 async function mergeDuplicateArtists() {
   // [staged-duplicate instagram, member-survivor instagram], no @.
-  const PAIRS = [["dekota_customz", "the_gifted_7"]];
+  const PAIRS = [["the_gifted_7", "dekota_customz"]];
   const norm = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
 
   for (const [dupIg, survIg] of PAIRS) {
@@ -1548,6 +1548,35 @@ async function mergeDuplicateArtists() {
  * by account NAME so it works whatever email the account used.
  * Idempotent; logs only when it actually promotes.
  */
+/**
+ * Identity correction: the merged Dekota page briefly wore
+ * "@the_gifted_7" — not his real Instagram. His account, pieces, and
+ * followers stay untouched; the page's public face returns to the
+ * verified @dekota_customz identity and the original slug. One-shot:
+ * once no profile carries the_gifted_7, this never fires again.
+ */
+async function correctDekotaIdentity() {
+  const wrong = await prisma.artistProfile.findFirst({
+    where: { instagram: { equals: "the_gifted_7", mode: "insensitive" } },
+  });
+  if (!wrong) return;
+  const slugFree = !(await prisma.artistProfile.findFirst({
+    where: { slug: "justin-dekota", id: { not: wrong.id } },
+  }));
+  await prisma.artistProfile.update({
+    where: { id: wrong.id },
+    data: {
+      instagram: "dekota_customz",
+      ...(slugFree ? { slug: "justin-dekota" } : {}),
+      bio: "Atlanta sneaker artist bringing concepts to life — story builds with a message under the paint. KAWS-style characters, hand-lettered narratives, heels that read like panels. Commissions open.",
+      city: wrong.city ?? "Atlanta, GA",
+    },
+  });
+  console.log(
+    `Identity correction: ${wrong.slug} now wears @dekota_customz${slugFree ? " at /artists/justin-dekota" : ""}.`
+  );
+}
+
 async function promoteNamedEditors() {
   const res = await prisma.user.updateMany({
     where: {
@@ -1576,6 +1605,7 @@ async function main() {
   await backfillCatalogLanes();
   await scrubBlankImages();
   await mergeDuplicateArtists();
+  await correctDekotaIdentity();
   await promoteNamedEditors();
 
   // Wipe in dependency order so reseeding is idempotent.

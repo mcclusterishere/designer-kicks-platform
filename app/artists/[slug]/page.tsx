@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
@@ -37,11 +37,20 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
+// Retired page addresses that were shared in emails/DMs before a
+// rename — old links land on the artist, never a 404.
+const SLUG_ALIASES: Record<string, string> = {
+  "justin-dekota-2": "justin-dekota",
+};
+
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
   await finalizeExpiredBattles();
 
-  const artist = await getArtistBySlug(slug);
+  let artist = await getArtistBySlug(slug);
+  if (!artist && SLUG_ALIASES[slug]) {
+    redirect(`/artists/${SLUG_ALIASES[slug]}`);
+  }
   if (!artist) notFound();
 
   const session = await auth();
