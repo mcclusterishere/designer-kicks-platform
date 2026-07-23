@@ -44,9 +44,13 @@ export type FeedItem =
       id: string;
       title: string | null;
       endsAt: string;
-      votes: number;
-      a: { title: string; imageUrl: string; artistName: string };
-      b: { title: string; imageUrl: string; artistName: string };
+      // Per-side submission id (to cast a vote inline) + live vote count
+      // (to reveal the split the moment you pick). myPick = the side this
+      // viewer already voted for, so a revisit shows the result, not the
+      // buttons.
+      a: { id: string; title: string; imageUrl: string; artistName: string; votes: number };
+      b: { id: string; title: string; imageUrl: string; artistName: string; votes: number };
+      myPick: string | null;
     }
   | {
       type: "piece";
@@ -132,7 +136,10 @@ export async function getFeed(
       include: {
         subA: { include: { artist: { select: { displayName: true } } } },
         subB: { include: { artist: { select: { displayName: true } } } },
-        _count: { select: { votes: true } },
+        // Vote rows (light: two ids each) let us split the tally per side
+        // and spot whether THIS viewer already voted — the inline card
+        // reveals the result instead of the buttons for them.
+        votes: { select: { submissionId: true, userId: true } },
       },
       take: 25,
     }),
@@ -230,23 +237,38 @@ export async function getFeed(
   }
 
   for (const b of battles) {
+    const aVotes = b.votes.filter((v) => v.submissionId === b.subAId).length;
+    const bVotes = b.votes.filter((v) => v.submissionId === b.subBId).length;
+    const myPick = userId
+      ? (b.votes.find((v) => v.userId === userId)?.submissionId ?? null)
+      : null;
     scored.push({
-      score: 50 + recency(b.createdAt, now) + 6 * Math.log1p(b._count.votes),
+      // A battle you haven't voted on floats up — the feed always keeps a
+      // live matchup in front of you to tap.
+      score:
+        50 +
+        recency(b.createdAt, now) +
+        6 * Math.log1p(aVotes + bVotes) +
+        (userId && !myPick ? 14 : 0),
       item: {
         type: "battle",
         id: b.id,
         title: b.title,
         endsAt: b.endsAt.toISOString(),
-        votes: b._count.votes,
+        myPick,
         a: {
+          id: b.subAId,
           title: b.subA.title,
           imageUrl: b.subA.imageUrl,
           artistName: b.subA.artist?.displayName ?? b.subA.artistName,
+          votes: aVotes,
         },
         b: {
+          id: b.subBId,
           title: b.subB.title,
           imageUrl: b.subB.imageUrl,
           artistName: b.subB.artist?.displayName ?? b.subB.artistName,
+          votes: bVotes,
         },
       },
     });

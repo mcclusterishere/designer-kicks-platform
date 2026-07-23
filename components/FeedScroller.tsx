@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import Link from "next/link";
 import {
   addFeedComment,
   answerFeedQuestion,
+  castVote,
   getCallOutOptions,
   rateDesign,
   throwCallOut,
@@ -379,6 +380,152 @@ function PieceCard({
 }
 
 /**
+ * A live battle you vote on WITHOUT leaving the feed — the hot-or-not
+ * beat, inline. Tap a side (or swipe toward it) to cast your vote; the
+ * split reveals on the spot and the next battle is already further down
+ * the scroll. Revisiting a battle you've voted shows the result.
+ */
+function BattleCard({
+  item,
+  signedIn,
+}: {
+  item: Extract<FeedItem, { type: "battle" }>;
+  signedIn: boolean;
+}) {
+  const [pick, setPick] = useState<string | null>(item.myPick);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  const aVotes = item.a.votes + (pick === item.a.id ? 1 : 0);
+  const bVotes = item.b.votes + (pick === item.b.id ? 1 : 0);
+  const total = aVotes + bVotes;
+
+  async function vote(submissionId: string) {
+    if (pending || pick) return;
+    if (!signedIn) {
+      setError("Sign in to vote — it takes 10 seconds.");
+      return;
+    }
+    setPending(true);
+    setError(null);
+    setPick(submissionId); // optimistic
+    const res = await castVote(item.id, submissionId);
+    if (!res.ok) {
+      if (res.error?.includes("already voted")) {
+        // keep the pick — they had voted before
+      } else {
+        setPick(null);
+        setError(res.error ?? "Something went wrong.");
+      }
+    }
+    setPending(false);
+  }
+
+  function onTouchStart(e: TouchEvent) {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onTouchEnd(e: TouchEvent) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || pick) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    // Only a deliberate horizontal swipe votes — never a vertical scroll
+    // that drifted sideways.
+    if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    // Swipe toward a side picks it: left → A (left shoe), right → B.
+    vote(dx < 0 ? item.a.id : item.b.id);
+  }
+
+  return (
+    <article
+      className="overflow-hidden rounded-2xl border border-edge bg-surface transition hover:border-heat/60"
+      data-testid="feed-item"
+      data-feed-type="battle"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <div className="flex items-center justify-between px-4 pt-4">
+        <span className="tag text-heat">Live battle</span>
+        <span className="tag text-smoke">
+          {pick ? `${total} vote${total === 1 ? "" : "s"}` : "Tap a side to vote"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 p-4 pt-3">
+        {[item.a, item.b].map((side, s) => {
+          const isPick = pick === side.id;
+          const votes = s === 0 ? aVotes : bVotes;
+          const pct = total === 0 ? 50 : Math.round((votes / total) * 100);
+          return (
+            <div
+              key={side.id}
+              className={`overflow-hidden rounded-xl border bg-surface transition ${
+                isPick ? "border-volt glow-volt" : "border-edge"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => vote(side.id)}
+                disabled={pending || pick !== null}
+                aria-label={`Vote for ${side.title}`}
+                className="block w-full text-left"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={side.imageUrl} alt={side.title} className="aspect-square w-full object-cover" />
+              </button>
+              <div className="p-2.5">
+                <p className="truncate text-sm font-bold text-white">{side.title}</p>
+                <p className="truncate text-xs text-smoke">{side.artistName}</p>
+                {pick ? (
+                  <div className="mt-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="display text-lg text-volt">{pct}%</span>
+                      <span className="tag text-[10px] text-smoke">{votes}</span>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded bg-panel">
+                      <div
+                        className={`h-full rounded ${s === 0 ? "bg-volt" : "bg-heat"} transition-all duration-500`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {isPick && <p className="tag mt-1 text-[10px] text-volt">Your vote</p>}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => vote(side.id)}
+                    disabled={pending}
+                    data-testid="feed-battle-vote"
+                    className="mt-2 w-full rounded-lg btn-hard py-2 tag font-bold disabled:opacity-50"
+                  >
+                    Vote
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between border-t border-edge px-4 py-2.5">
+        {error ? (
+          <span className="tag text-heat">{error}</span>
+        ) : !signedIn ? (
+          <Link href="/signin" className="tag text-volt underline underline-offset-4">
+            Sign in to vote →
+          </Link>
+        ) : (
+          <span className="tag text-smoke">{pick ? "Voted ✓" : "Your call"}</span>
+        )}
+        <Link href={`/battles/${item.id}`} className="tag text-smoke underline underline-offset-4 hover:text-white">
+          Full battle →
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+/**
  * A culture question floating in the feed. One shot per question,
  * forever — correct answers build the Culture IQ that follows you.
  */
@@ -600,29 +747,7 @@ function Card({
     return <PostCard item={item} signedIn={signedIn} />;
   }
   if (item.type === "battle") {
-    return (
-      <Link href={`/battles/${item.id}`} className="block" data-testid="feed-item" data-feed-type="battle">
-        <article className={`${shell} transition hover:border-heat/60`}>
-          <div className="flex items-center justify-between px-4 pt-4">
-            <span className="tag text-heat">Live battle</span>
-            <span className="tag text-smoke">{item.votes} votes</span>
-          </div>
-          <div className="grid grid-cols-2 gap-px bg-edge p-4 pt-3">
-            {[item.a, item.b].map((side, i) => (
-              <div key={i} className="min-w-0 bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={side.imageUrl} alt={side.title} className="aspect-square w-full object-cover" />
-                <p className="mt-1.5 truncate text-sm font-bold text-white">{side.title}</p>
-                <p className="truncate text-xs text-smoke">{side.artistName}</p>
-              </div>
-            ))}
-          </div>
-          <p className="border-t border-edge px-4 py-2.5 text-center tag text-heat">
-            Vote now →
-          </p>
-        </article>
-      </Link>
-    );
+    return <BattleCard item={item} signedIn={signedIn} />;
   }
   if (item.type === "piece") {
     return <PieceCard item={item} signedIn={signedIn} viewerArtistSlug={viewerArtistSlug} />;
