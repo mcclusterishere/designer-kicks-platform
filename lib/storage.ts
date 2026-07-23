@@ -56,6 +56,21 @@ export async function saveUpload(
     } catch {
       /* undecodable — fall through with the original bytes */
     }
+  } else if (contentType.startsWith("video/")) {
+    // Transcode to a universal H.264/AAC MP4 so an iPhone .mov (HEVC) plays
+    // on every device, not just Apple's. If ffmpeg is unavailable the
+    // original is kept — an upload is never lost over this.
+    try {
+      const { transcodeToMp4 } = await import("./videoNormalize");
+      const mp4 = await transcodeToMp4(data);
+      if (mp4) {
+        data = mp4;
+        contentType = "video/mp4";
+        fileName = fileName.replace(/\.[^.]+$/, "") + ".mp4";
+      }
+    } catch {
+      /* keep the original clip */
+    }
   }
 
   const cfg = s3Config();
