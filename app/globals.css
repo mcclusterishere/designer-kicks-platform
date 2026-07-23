@@ -12,9 +12,11 @@
   --color-edge: #232321;
   --color-volt: #f04e45;
   --color-heat: #d9b96a;
-  /* Muted text: lightened to clear WCAG AA (4.5:1) on the dark
-     surfaces for normal-size body copy. */
-  --color-smoke: #b9b6ac;
+  /* Muted text: brightened well past WCAG AA (now ~6:1 on the dark
+     surfaces) so description copy reads without squinting. Paired with
+     the weight bump below — thin muted grey on black was murder on
+     any eye over thirty. */
+  --color-smoke: #cbc8bf;
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
@@ -23,6 +25,21 @@ body {
   background: var(--color-ink);
   color: #f5f5f5;
   font-family: var(--font-sans);
+  /* Body copy rides a touch heavier than hairline-400 so description
+     text carries weight. Headers set their own weight (.display, the
+     font-semibold/bold utilities) and are unaffected. */
+  font-weight: 450;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Muted "smoke" text is the site's convention for description/body
+   copy. Give it real weight so it stops disappearing — but keep it in
+   the base layer so any explicit font-bold/semibold utility still wins.
+   This is the single biggest legibility lever on the whole app. */
+@layer base {
+  .text-smoke {
+    font-weight: 520;
+  }
 }
 
 /* Finish details — the stuff you feel more than see */
