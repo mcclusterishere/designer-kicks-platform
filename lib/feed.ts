@@ -62,6 +62,10 @@ export type FeedItem =
       // The viewer's own Rate-game score on this piece (null = hasn't
       // rated — the feed card shows the flames to vote right there).
       myStars: number | null;
+      // Why this landed in your feed — "Because you follow …" / "Your
+      // brand: …" — the algorithm saying itself out loud. null = no
+      // personal reason (it's here on merit).
+      why: string | null;
     }
   | {
       type: "question";
@@ -255,8 +259,15 @@ export async function getFeed(
       ? (s.ratings.find((r) => r.userId === userId)?.stars ?? null)
       : null;
     let personal = 0;
-    if (s.artistId && followed.has(s.artistId)) personal += 12;
-    if (brand && favBrands.has(brand.toLowerCase())) personal += 10;
+    let why: string | null = null;
+    if (s.artistId && followed.has(s.artistId)) {
+      personal += 12;
+      why = `Because you follow ${s.artist?.displayName ?? s.artistName}`;
+    }
+    if (brand && favBrands.has(brand.toLowerCase())) {
+      personal += 10;
+      why ??= `Your brand · ${brand}`;
+    }
     // Unrated pieces surface first for this viewer — the feed IS the
     // Rate game now, so it deals you what you haven't scored.
     if (userId && myStars === null) personal += 8;
@@ -279,6 +290,7 @@ export async function getFeed(
         votes: s._count.votes,
         heat: hs ? { score: hs.score, count: hs.count } : null,
         myStars,
+        why,
       },
     });
   }

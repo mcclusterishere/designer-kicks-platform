@@ -1,6 +1,8 @@
 import LocalMoney from "@/components/LocalMoney";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+import { fitsMember } from "@/lib/shoeSize";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, getOgBoard, getHotBases, formatUsd, type MarketItem, type OgItem, type HotBase } from "@/lib/market";
 import OfferForm from "@/components/OfferForm";
@@ -116,10 +118,12 @@ function CustomTile({
   item,
   rank,
   signedIn,
+  fitsYou,
 }: {
   item: MarketItem;
   rank: number | undefined;
   signedIn: boolean;
+  fitsYou: boolean;
 }) {
   const salePct =
     item.lastSaleCents && item.prevSaleCents
@@ -144,6 +148,12 @@ function CustomTile({
         {item.collabWith.length > 0 && (
           <span className="absolute right-2 top-2 rounded bg-volt px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
             Collab
+          </span>
+        )}
+        {/* "We know you": this one-of-one was made in the member's size */}
+        {fitsYou && (
+          <span className="glow-heat absolute right-2 bottom-2 flex items-center gap-1 rounded bg-heat px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            👟 Your size
           </span>
         )}
         {item.consignment && (
@@ -335,6 +345,12 @@ export default async function MarketPage({
     og ? getHotBases() : Promise.resolve([]),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
+  // The member's passport size powers the "your size" badge on customs.
+  const memberSize = session?.user?.id
+    ? (await prisma.user
+        .findUnique({ where: { id: session.user.id }, select: { shoeSize: true } })
+        .catch(() => null))?.shoeSize ?? null
+    : null;
 
   const switchBase =
     "flex-1 rounded-full px-5 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] transition";
@@ -389,6 +405,7 @@ export default async function MarketPage({
           q={q}
           needle={needle}
           sort={sort}
+          memberSize={memberSize}
         />
       ) : null}
 
@@ -411,6 +428,7 @@ function CustomsBoardView({
   q,
   needle,
   sort,
+  memberSize,
 }: {
   board: Awaited<ReturnType<typeof getMarketBoard>>;
   heatRank: Map<string, number>;
@@ -419,6 +437,7 @@ function CustomsBoardView({
   q: string;
   needle: string;
   sort: string;
+  memberSize: string | null;
 }) {
   const { items, stats } = board;
   const price = (i: MarketItem) => i.askCents ?? i.lastSaleCents ?? i.topOfferCents ?? 0;
@@ -553,7 +572,13 @@ function CustomsBoardView({
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {filtered.map((item) => (
-            <CustomTile key={item.id} item={item} rank={heatRank.get(item.id)} signedIn={signedIn} />
+            <CustomTile
+              key={item.id}
+              item={item}
+              rank={heatRank.get(item.id)}
+              signedIn={signedIn}
+              fitsYou={fitsMember(item.size, memberSize)}
+            />
           ))}
         </div>
       )}

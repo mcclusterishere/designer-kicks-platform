@@ -267,6 +267,12 @@ function PieceCard({
       data-testid="feed-item"
       data-feed-type="piece"
     >
+      {/* The algorithm, out loud: why this piece is in your feed */}
+      {item.why && (
+        <p className="flex items-center gap-1.5 border-b border-edge/60 px-4 py-2 text-xs text-heat">
+          <span aria-hidden>✦</span> {item.why}
+        </p>
+      )}
       <Link href={item.artistSlug ? `/artists/${item.artistSlug}` : "/artists"} className="block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={item.imageUrl} alt={item.title} className="aspect-square w-full object-cover" />

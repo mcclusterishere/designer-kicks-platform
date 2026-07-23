@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
+import MemberGreeting from "@/components/MemberGreeting";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getPublishedArticles } from "@/lib/articles";
 import { getActiveGiveaway } from "@/lib/quiz";
@@ -14,6 +16,14 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   await finalizeExpiredBattles();
+
+  const session = await auth();
+  const member = session?.user?.id
+    ? await prisma.user
+        .findUnique({ where: { id: session.user.id }, select: { name: true } })
+        .catch(() => null)
+    : null;
+  const firstName = member?.name?.trim().split(/\s+/)[0] ?? null;
 
   const [battles, heat, products, articles] = await Promise.all([
     prisma.battle.findMany({
@@ -45,9 +55,13 @@ export default async function HomePage() {
       {/* Masthead: who we are + the live giveaway, one calm bar at the top */}
       <div className="border-b border-edge bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2.5 px-4 py-3.5">
-          <p className="text-sm font-medium tracking-wide text-smoke">
-            Custom sneaker culture · An <span className="text-volt">Equity Uprise</span> project
-          </p>
+          {firstName ? (
+            <MemberGreeting firstName={firstName} />
+          ) : (
+            <p className="text-sm font-medium tracking-wide text-smoke">
+              Custom sneaker culture · An <span className="text-volt">Equity Uprise</span> project
+            </p>
+          )}
           {giveaway && (
             <Link href="/quiz" className="group flex flex-wrap items-center gap-3 text-sm">
               <span className="text-smoke">
