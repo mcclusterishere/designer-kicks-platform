@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>The Heat Chart Arena</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; background: #05050a; overflow: hidden;
+    font-family: "Courier New", monospace; -webkit-tap-highlight-color: transparent;
+    touch-action: none; overscroll-behavior: none;
+  }
+  #game { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; }
+  #loading {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #f04e45; font-weight: bold; letter-spacing: 3px; font-size: 18px; text-transform: uppercase;
+  }
+  #err {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    color: #d9b96a; text-align: center; padding: 24px; line-height: 1.6; font-size: 15px;
+  }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+  <div id="game"></div>
+  <div id="loading">Loading The Heat Chart Arena…</div>
+  <div id="err">
+    Couldn't load the game engine (Phaser CDN).<br />
+    Check your internet connection and reload — the game pulls Phaser 3 from a CDN.
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+  <script>
+  /* =======================================================================
+     THE HEAT CHART ARENA — a 16-bit 1v1 fighter prototype (Phaser 3).
+     Dakota Customs (P1) vs Scalper Bot AI (P2). Single-file, no assets:
+     every sprite and the stage are drawn procedurally at boot.
+     Structure: CFG (tuning) → sfx (WebAudio) → art (texture painters) →
+     Fighter (class) → BootScene → FightScene.
+     ======================================================================= */
+
+  if (typeof Phaser === "undefined") {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("err").style.display = "flex";
+  } else {
+    document.getElementById("loading").style.display = "none";
+    boot();
+  }
+
+  function boot() {
+
+  /* ------------------------------- tuning ------------------------------- */
+  const CFG = {
+    WIDTH: 900, HEIGHT: 506,
+    GROUND_Y: 452,          // y of the stage floor (fighters' feet rest here)
+    GRAVITY: 1600,
+    MOVE_SPEED: 250,
+    JUMP_VEL: -660,
+    ROUND_TIME: 30,         // seconds
+    PUNCH_DMG: 5, KICK_DMG: 8, SPECIAL_DMG: 25,
+    HEAT_GAIN: 10,          // % per hit landed
+    PUNCH_REACH: 66, KICK_REACH: 84,
+    PUNCH_CD: 320, KICK_CD: 520, SPECIAL_CD: 850,
+    KNOCK: 200,
+    // palettes
+    VOLT: 0xf04e45, HEAT: 0xd9b96a, CYAN: 0x22d3ee, INK: 0x0b0b0c,
+  };
+
+  /* --------------------------- sound (WebAudio) ------------------------- */
+  const SFX = (() => {
+    let ctx = null;
+    function ac() {
+      if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } }
+      if (ctx && ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+    function tone(freq, dur, type, vol, slideTo) {
+      const c = ac(); if (!c) return;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "square";
+      o.frequency.setValueAtTime(freq, c.currentTime);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, c.currentTime + dur);
+      g.gain.setValueAtTime(vol || 0.14, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(); o.stop(c.currentTime + dur);
+    }
+    function noise(dur, vol) {
+      const c = ac(); if (!c) return;
+      const n = c.sampleRate * dur, buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const s = c.createBufferSource(), g = c.createGain();
+      s.buffer = buf; g.gain.value = vol || 0.18; s.connect(g); g.connect(c.destination); s.start();
+    }
+    return {
+      resume: ac,
+      punch: () => tone(220, 0.07, "square", 0.12, 160),
+      kick:  () => tone(150, 0.10, "square", 0.14, 90),
+      hit:   () => { noise(0.09, 0.2); tone(380, 0.05, "sawtooth", 0.08, 120); },
+      special: () => { tone(180, 0.5, "sawtooth", 0.18, 900); },
+      jump:  () => tone(300, 0.12, "sine", 0.08, 620),
+      ko:    () => tone(400, 0.6, "square", 0.18, 60),
+      bell:  () => tone(880, 0.18, "triangle", 0.16),
+    };
+  })();
+
+  /* --------------------------- art (procedural) ------------------------- */
+  // Paint a blocky humanoid into a Graphics, then bake it to a texture.
+  function px(g, c, x, y, w, h) { g.fillStyle(c, 1); g.fillRect(x, y, w, h); }
+
+  function paintDakota(g) {
+    // 64 x 112, facing right. Customizer: red hoodie, champagne cap, spray can.
+    px(g, 0x20242c, 20, 96, 12, 16); px(g, 0x20242c, 34, 96, 12, 16);   // legs
+    px(g, 0x14161b, 18, 108, 16, 4); px(g, 0x14161b, 34, 108, 16, 4);   // shoes
+    px(g, CFG.VOLT, 16, 52, 34, 46);                                     // hoodie torso
+    px(g, 0x9c1017, 16, 52, 34, 6);                                      // hoodie shoulder line
+    px(g, CFG.VOLT, 8, 56, 10, 30);                                      // back arm
+    px(g, CFG.VOLT, 48, 58, 12, 26);                                     // front arm
+    px(g, 0x8a5a3b, 50, 82, 10, 10);                                     // front hand
+    px(g, 0xc9ccce, 58, 74, 8, 16); px(g, CFG.VOLT, 58, 72, 8, 4);       // spray can + red cap
+    px(g, 0x8a5a3b, 24, 30, 22, 24);                                     // head
+    px(g, 0x6e4630, 24, 30, 22, 4);                                      // brow
+    px(g, CFG.HEAT, 20, 22, 30, 10); px(g, 0xb08f45, 44, 24, 12, 6);     // champagne cap + brim
+    px(g, 0x14161b, 30, 40, 4, 4); px(g, 0x14161b, 40, 40, 4, 4);        // eyes
+    g.generateTexture("dakota", 68, 112);
+  }
+
+  function paintScalper(g) {
+    // 64 x 112, facing right. Bot: grey chassis, red visor, antenna, phone.
+    px(g, 0x3a3f47, 20, 96, 12, 16); px(g, 0x3a3f47, 34, 96, 12, 16);    // legs
+    px(g, 0x22262c, 18, 108, 16, 4); px(g, 0x22262c, 34, 108, 16, 4);    // feet
+    px(g, 0x6b7280, 16, 52, 34, 46);                                     // chassis
+    px(g, 0x2b2f36, 22, 60, 22, 20);                                     // chest panel
+    px(g, CFG.CYAN, 26, 64, 6, 6); px(g, CFG.CYAN, 34, 64, 6, 6);        // chest lights
+    px(g, 0x4b5158, 8, 56, 10, 30);                                      // back arm
+    px(g, 0x4b5158, 48, 58, 12, 26);                                     // front arm
+    px(g, 0x9aa0a8, 50, 80, 10, 12);                                     // front claw
+    px(g, 0x101418, 60, 76, 6, 14); px(g, CFG.CYAN, 61, 78, 4, 4);       // reseller phone
+    px(g, 0x565c64, 24, 28, 22, 26);                                     // head box
+    px(g, 0x1a1d22, 24, 38, 22, 8); px(g, CFG.VOLT, 26, 40, 18, 4);      // red visor slit
+    px(g, 0x9aa0a8, 33, 18, 4, 12); px(g, CFG.VOLT, 31, 14, 8, 6);       // antenna + light
+    g.generateTexture("scalper", 68, 112);
+  }
+
+  function paintHeatwave(g) {
+    px(g, 0xffe08a, 0, 0, 40, 40); // will be masked by circles
+    g.clear();
+    g.fillStyle(CFG.VOLT, 1); g.fillCircle(20, 20, 20);
+    g.fillStyle(CFG.HEAT, 1); g.fillCircle(20, 20, 13);
+    g.fillStyle(0xffffff, 1); g.fillCircle(20, 20, 6);
+    g.generateTexture("heatwave", 40, 40);
+  }
+
+  function paintSpark(g) { g.fillStyle(0xffffff, 1); g.fillRect(0, 0, 7, 7); g.generateTexture("spark", 7, 7); }
+
+  /* ------------------------------ Fighter ------------------------------- */
+  class Fighter extends Phaser.Physics.Arcade.Sprite {
+    constructor(scene, x, y, key, opts) {
+      super(scene, x, y, key);
+      scene.add.existing(this);
+      scene.physics.add.existing(this);
+      this.setDepth(10).setCollideWorldBounds(true);
+      this.body.setSize(46, 100).setOffset((this.width - 46) / 2, this.height - 100);
+      this.label = opts.name;
+      this.isAI = !!opts.isAI;
+      this.facing = opts.facing;              // 1 = right, -1 = left
+      this.limbColor = opts.limbColor;
+      this.hp = 100; this.heat = 0; this.dead = false;
+      this.attack = null;                     // active attack descriptor
+      this.cdUntil = 0;                       // attack cooldown
+      // Visual limb for the punch/kick "connect" frame.
+      this.limb = scene.add.rectangle(0, 0, 10, 10, opts.limbColor).setDepth(11).setVisible(false);
+      // AI brain state
+      this.aiNext = 0; this.aiIntent = "idle";
+    }
+
+    faceOpponent(opp) {
+      this.facing = this.x <= opp.x ? 1 : -1;
+      this.setFlipX(this.facing < 0);
+    }
+
+    onGround() { return this.body.blocked.down || this.body.touching.down; }
+
+    jump() {
+      if (this.dead || !this.onGround()) return;
+      this.setVelocityY(CFG.JUMP_VEL); SFX.jump();
+    }
+
+    canAct(now) { return !this.dead && !this.attack && now >= this.cdUntil; }
+
+    startAttack(now, type) {
+      if (!this.canAct(now)) return;
+      const isKick = type === "kick";
+      this.attack = {
+        type,
+        dmg: isKick ? CFG.KICK_DMG : CFG.PUNCH_DMG,
+        reach: isKick ? CFG.KICK_REACH : CFG.PUNCH_REACH,
+        h: isKick ? 24 : 26,
+        yoff: isKick ? 54 : 18,           // from top of body box
+        start: now + 80, end: now + 220,  // active window
+        hasHit: false,
+      };
+      this.cdUntil = now + (isKick ? CFG.KICK_CD : CFG.PUNCH_CD) + 220;
+      SFX[type] && SFX[type]();
+      // little lunge for feel (facing is handled by flipX, never scale)
+      this.scene.tweens.add({ targets: this, x: this.x + this.facing * 16, duration: 90, yoyo: true, ease: "quad.out" });
+    }
+
+    special(now) {
+      if (this.dead || this.attack || this.heat < 100) return;
+      this.heat = 0;
+      this.cdUntil = now + CFG.SPECIAL_CD;
+      SFX.special();
+      this.scene.cameras.main.flash(120, 240, 78, 69);
+      this.scene.tweens.add({ targets: this, x: this.x + this.facing * 26, duration: 120, yoyo: true });
+      this.scene.fireHeatwave(this);
+    }
+
+    // World-space rectangles for manual hit detection.
+    hurtRect() { const b = this.body; return { x: b.x, y: b.y, w: b.width, h: b.height }; }
+    attackRect() {
+      const a = this.attack, b = this.body;
+      const y = b.y + a.yoff, h = a.h, w = a.reach;
+      const x = this.facing > 0 ? b.right : b.left - w;
+      return { x, y, w, h };
+    }
+
+    // Called every frame from the scene.
+    tick(now) {
+      // Resolve the visual limb during the active attack window.
+      const a = this.attack;
+      if (a) {
+        if (now >= a.start && now <= a.end) {
+          const r = this.attackRect();
+          this.limb.setVisible(true).setPosition(r.x + r.w / 2, r.y + r.h / 2).setSize(r.w, r.h);
+        } else {
+          this.limb.setVisible(false);
+        }
+        if (now > a.end) { this.attack = null; this.limb.setVisible(false); }
+      }
+      this.limb.setPosition(this.limb.x, this.limb.y); // keep depth ordering
+    }
+  }
+
+  /* ------------------------------ BootScene ----------------------------- */
+  class BootScene extends Phaser.Scene {
+    constructor() { super("boot"); }
+    create() {
+      paintDakota(this.make.graphics({ add: false }));
+      paintScalper(this.make.graphics({ add: false }));
+      paintHeatwave(this.make.graphics({ add: false }));
+      paintSpark(this.make.graphics({ add: false }));
+      this.scene.start("fight");
+    }
+  }
+
+  /* ------------------------------ FightScene ---------------------------- */
+  class FightScene extends Phaser.Scene {
+    constructor() { super("fight"); }
+
+    create() {
+      const W = CFG.WIDTH, H = CFG.HEIGHT;
+      this.physics.world.setBounds(40, 0, W - 80, CFG.GROUND_Y);
+      this.state = "intro";
+      this.timeLeft = CFG.ROUND_TIME;
+
+      this.drawStage();
+
+      // Ground: a static platform the fighters stand on.
+      this.ground = this.add.rectangle(W / 2, CFG.GROUND_Y + 20, W, 40, 0x000000, 0);
+      this.physics.add.existing(this.ground, true);
+
+      // Fighters
+      this.p1 = new Fighter(this, W * 0.30, CFG.GROUND_Y - 70, "dakota",
+        { name: "DAKOTA CUSTOMS", facing: 1, limbColor: CFG.HEAT });
+      this.p2 = new Fighter(this, W * 0.70, CFG.GROUND_Y - 70, "scalper",
+        { name: "SCALPER BOT", facing: -1, isAI: true, limbColor: CFG.CYAN });
+      [this.p1, this.p2].forEach((f) => this.physics.add.collider(f, this.ground));
+      this.physics.add.collider(this.p1, this.p2);
+
+      this.projectiles = this.physics.add.group();
+
+      this.buildHud();
+      this.setupInput();
+      this.buildTouchControls();
+
+      // Intro: "ROUND 1 — FIGHT!" then release control.
+      this.banner = this.add.text(W / 2, H / 2 - 30, "ROUND 1", bannerStyle(46))
+        .setOrigin(0.5).setDepth(50);
+      SFX.bell();
+      this.time.delayedCall(900, () => {
+        this.banner.setText("FIGHT!").setColor("#f04e45");
+        SFX.bell();
+      });
+      this.time.delayedCall(1500, () => {
+        this.banner.destroy();
+        this.state = "fighting";
+      });
+    }
+
+    /* ---- stage backdrop (drawn once) ---- */
+    drawStage() {
+      const W = CFG.WIDTH, H = CFG.HEIGHT, g = this.add.graphics().setDepth(0);
+      // sky gradient
+      g.fillGradientStyle(0x141020, 0x141020, 0x090711, 0x090711, 1);
+      g.fillRect(0, 0, W, H);
+      // banner behind everything
+      this.add.text(W / 2, 96, "★ SNEAKER CON ★", { fontFamily: '"Courier New",monospace', fontSize: "26px", color: "#2b2440", fontStyle: "bold" }).setOrigin(0.5).setDepth(0);
+      this.add.text(W / 2, 128, "HEAT CHART ARENA", { fontFamily: '"Courier New",monospace', fontSize: "16px", color: "#3a2f52", fontStyle: "bold" }).setOrigin(0.5).setDepth(0);
+      // shelves of shoe boxes on the back walls
+      const boxCols = [0xf04e45, 0xd9b96a, 0x22d3ee, 0x8a5cff, 0x38d39f];
+      for (let side = 0; side < 2; side++) {
+        const bx = side === 0 ? 30 : W - 110;
+        for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+          g.fillStyle(boxCols[(r + c + side) % boxCols.length], 0.5);
+          g.fillRect(bx + c * 20, 160 + r * 26, 16, 20);
+        }
+      }
+      // spotlights
+      for (let i = 0; i < 3; i++) {
+        g.fillStyle(0xffffff, 0.05);
+        const sx = W * (0.25 + i * 0.25);
+        g.fillTriangle(sx, 150, sx - 90, CFG.GROUND_Y, sx + 90, CFG.GROUND_Y);
+      }
+      // perspective floor grid
+      g.lineStyle(2, 0x241d3a, 1);
+      for (let x = 0; x <= W; x += 60) { g.lineBetween(x, CFG.GROUND_Y, W / 2 + (x - W / 2) * 3.2, H); }
+      for (let i = 0; i < 5; i++) { const y = CFG.GROUND_Y + i * 14 + i * i * 3; g.lineBetween(0, y, W, y); }
+      // crowd silhouette
+      g.fillStyle(0x05040a, 1);
+      for (let x = 0; x < W; x += 26) g.fillCircle(x + 13, CFG.GROUND_Y - 4, 13);
+      // lit stage lip
+      g.fillStyle(0xf04e45, 0.35); g.fillRect(0, CFG.GROUND_Y - 3, W, 3);
+      g.fillStyle(0x0d0b16, 1); g.fillRect(0, CFG.GROUND_Y, W, H - CFG.GROUND_Y);
+      // scanlines overlay (fixed)
+      const sl = this.add.graphics().setDepth(60);
+      sl.fillStyle(0x000000, 0.10);
+      for (let y = 0; y < H; y += 3) sl.fillRect(0, y, W, 1);
+    }
+
+    /* ---- HUD: names, health, heat, timer ---- */
+    buildHud() {
+      const W = CFG.WIDTH;
+      this.add.text(30, 16, "DAKOTA CUSTOMS", hudName()).setDepth(40);
+      this.add.text(W - 30, 16, "SCALPER BOT", hudName()).setOrigin(1, 0).setDepth(40);
+      this.hud = this.add.graphics().setDepth(40);
+      this.timerText = this.add.text(W / 2, 22, "" + CFG.ROUND_TIME, {
+        fontFamily: '"Courier New",monospace', fontSize: "40px", color: "#ffffff", fontStyle: "bold",
+        stroke: "#f04e45", strokeThickness: 5,
+      }).setOrigin(0.5, 0).setDepth(41);
+      this.updateHud();
+    }
+
+    updateHud() {
+      const g = this.hud, W = CFG.WIDTH; g.clear();
+      const barW = 360, barH = 22, y = 40;
+      // frames
+      g.fillStyle(0x000000, 0.55); g.fillRect(28, y, barW, barH); g.fillRect(W - 28 - barW, y, barW, barH);
+      // health (P1 drains from the right, P2 from the left — arcade mirror)
+      const h1 = Math.max(0, this.p1.hp) / 100, h2 = Math.max(0, this.p2.hp) / 100;
+      g.fillStyle(0x38d39f, 1); g.fillRect(28 + barW * (1 - h1), y, barW * h1, barH);
+      g.fillStyle(0xf04e45, 1); g.fillRect(W - 28 - barW, y, barW * h2, barH);
+      g.lineStyle(2, 0xffffff, 0.4); g.strokeRect(28, y, barW, barH); g.strokeRect(W - 28 - barW, y, barW, barH);
+      // heat meters
+      const hy = y + barH + 5, hh = 8;
+      g.fillStyle(0x000000, 0.5); g.fillRect(28, hy, barW, hh); g.fillRect(W - 28 - barW, hy, barW, hh);
+      const flash = (f) => (f.heat >= 100 && (this.time.now % 300 < 150)) ? 0xffffff : 0xd9b96a;
+      g.fillStyle(flash(this.p1), 1); g.fillRect(28, hy, barW * (this.p1.heat / 100), hh);
+      g.fillStyle(flash(this.p2), 1); g.fillRect(W - 28 - barW * (this.p2.heat / 100), hy, barW * (this.p2.heat / 100), hh);
+      g.lineStyle(1, 0xd9b96a, 0.6); g.strokeRect(28, hy, barW, hh); g.strokeRect(W - 28 - barW, hy, barW, hh);
+    }
+
+    /* ---- input: keyboard + attack events ---- */
+    setupInput() {
+      const kb = this.input.keyboard;
+      this.keys = kb.addKeys({ left: "A", right: "D", up: "W", down: "S" });
+      this.touch = { left: false, right: false };
+      const wake = () => SFX.resume();
+      kb.on("keydown-W", () => { wake(); this.p1.jump(); });
+      kb.on("keydown-J", () => { wake(); this.p1.startAttack(this.time.now, "punch"); });
+      kb.on("keydown-K", () => { wake(); this.p1.startAttack(this.time.now, "kick"); });
+      kb.on("keydown-L", () => { wake(); this.p1.special(this.time.now); });
+      this.input.addPointer(3); // allow multi-touch (move + attack together)
+    }
+
+    /* ---- on-screen controls for touch devices ---- */
+    buildTouchControls() {
+      if (!this.sys.game.device.input.touch) return;
+      const H = CFG.HEIGHT, W = CFG.WIDTH;
+      const pad = (cx, cy, label, onDown, onUp) => {
+        const r = 42;
+        const c = this.add.circle(cx, cy, r, 0xffffff, 0.10).setDepth(70).setScrollFactor(0)
+          .setStrokeStyle(2, 0xffffff, 0.35).setInteractive({ useHandCursor: true });
+        this.add.text(cx, cy, label, { fontFamily: '"Courier New",monospace', fontSize: "20px", color: "#ffffff", fontStyle: "bold" }).setOrigin(0.5).setDepth(71).setScrollFactor(0);
+        c.on("pointerdown", () => { SFX.resume(); c.setFillStyle(0xf04e45, 0.35); onDown && onDown(); });
+        const up = () => { c.setFillStyle(0xffffff, 0.10); onUp && onUp(); };
+        c.on("pointerup", up); c.on("pointerout", up); c.on("pointerupoutside", up);
+        return c;
+      };
+      const by = H - 60;
+      // left cluster: move + jump
+      pad(70, by, "◀", () => (this.touch.left = true), () => (this.touch.left = false));
+      pad(170, by, "▶", () => (this.touch.right = true), () => (this.touch.right = false));
+      pad(120, by - 88, "▲", () => this.p1.jump());
+      // right cluster: attacks
+      pad(W - 170, by, "P", () => this.p1.startAttack(this.time.now, "punch"));
+      pad(W - 70, by, "K", () => this.p1.startAttack(this.time.now, "kick"));
+      pad(W - 120, by - 88, "SP", () => this.p1.special(this.time.now));
+    }
+
+    /* ---- special projectile ---- */
+    fireHeatwave(owner) {
+      const p = this.projectiles.create(owner.x + owner.facing * 40, owner.body.center.y - 8, "heatwave");
+      p.body.setAllowGravity(false);
+      p.owner = owner;
+      p.setVelocityX(owner.facing * 620).setDepth(9);
+      this.tweens.add({ targets: p, angle: 360, duration: 400, repeat: -1 });
+      const foe = owner === this.p1 ? this.p2 : this.p1;
+      this.physics.add.overlap(p, foe, (proj, f) => {
+        if (!proj.active) return;
+        this.burst(proj.x, proj.y, CFG.HEAT, 16);
+        proj.destroy();
+        this.applyDamage(owner, f, CFG.SPECIAL_DMG, true);
+      });
+      this.time.delayedCall(1600, () => p.active && p.destroy());
+    }
+
+    /* ---- damage resolution ---- */
+    applyDamage(attacker, target, dmg, isSpecial) {
+      if (target.dead || this.state !== "fighting") return;
+      target.hp = Math.max(0, target.hp - dmg);
+      attacker.heat = Math.min(100, attacker.heat + CFG.HEAT_GAIN);
+      SFX.hit();
+      this.burst(target.x, target.body.center.y, isSpecial ? CFG.VOLT : 0xffffff, isSpecial ? 14 : 8);
+      target.setVelocityX(attacker.facing * (isSpecial ? CFG.KNOCK * 1.8 : CFG.KNOCK));
+      if (isSpecial) target.setVelocityY(-220);
+      target.setTintFill(0xffffff);
+      this.time.delayedCall(90, () => target.active && target.clearTint());
+      this.cameras.main.shake(isSpecial ? 220 : 90, isSpecial ? 0.012 : 0.006);
+      this.updateHud();
+      if (target.hp <= 0) { target.dead = true; this.endMatch("KO"); }
+    }
+
+    burst(x, y, color, n) {
+      const e = this.add.particles(x, y, "spark", {
+        speed: { min: 60, max: 260 }, angle: { min: 0, max: 360 }, lifespan: 340,
+        scale: { start: 1.4, end: 0 }, quantity: n, tint: color, emitting: false,
+      }).setDepth(20);
+      e.explode(n);
+      this.time.delayedCall(400, () => e.destroy());
+    }
+
+    /* ---- Scalper Bot AI ---- */
+    updateAI(now) {
+      const me = this.p2, foe = this.p1;
+      if (me.dead || this.state !== "fighting") { me.setVelocityX(0); return; }
+      const dist = Math.abs(me.x - foe.x);
+      const dir = me.x < foe.x ? 1 : -1;
+
+      if (me.heat >= 100 && dist < 460) { me.special(now); }
+
+      if (now >= me.aiNext) {
+        // Re-decide intent every 260–520ms with some randomness.
+        me.aiNext = now + Phaser.Math.Between(260, 520);
+        const r = Math.random();
+        if (dist > 150) me.aiIntent = "chase";
+        else if (r < 0.5) me.aiIntent = "attack";
+        else if (r < 0.68) me.aiIntent = "retreat";
+        else if (r < 0.80) { me.aiIntent = "idle"; me.jump(); }
+        else me.aiIntent = "idle";
+      }
+
+      if (me.attack) { me.setVelocityX(0); return; }
+      if (me.aiIntent === "chase") me.setVelocityX(dir * (CFG.MOVE_SPEED - 30));
+      else if (me.aiIntent === "retreat") me.setVelocityX(-dir * (CFG.MOVE_SPEED - 80));
+      else me.setVelocityX(0);
+
+      if (dist < 96 && me.canAct(now) && me.aiIntent !== "retreat") {
+        me.startAttack(now, Math.random() < 0.6 ? "punch" : "kick");
+      }
+    }
+
+    /* ---- per-frame ---- */
+    update() {
+      const now = this.time.now;
+      this.updateHud();
+
+      if (this.state === "fighting") {
+        // round clock
+        this.timeLeft -= this.game.loop.delta / 1000;
+        const shown = Math.max(0, Math.ceil(this.timeLeft));
+        this.timerText.setText("" + shown);
+        this.timerText.setColor(shown <= 5 ? "#f04e45" : "#ffffff");
+        if (this.timeLeft <= 0) { this.endMatch("TIME"); }
+
+        // P1 movement (keyboard OR touch)
+        const p1 = this.p1;
+        if (!p1.dead && !p1.attack) {
+          const left = this.keys.left.isDown || this.touch.left;
+          const right = this.keys.right.isDown || this.touch.right;
+          p1.setVelocityX(left ? -CFG.MOVE_SPEED : right ? CFG.MOVE_SPEED : 0);
+        } else if (!p1.dead && p1.attack) { p1.setVelocityX(0); }
+
+        this.updateAI(now);
+      } else {
+        // frozen (intro / over): stop drift
+        if (this.p1.onGround()) this.p1.setVelocityX(0);
+        if (this.p2.onGround()) this.p2.setVelocityX(0);
+      }
+
+      // facing + attack visuals
+      this.p1.faceOpponent(this.p2); this.p2.faceOpponent(this.p1);
+      this.p1.tick(now); this.p2.tick(now);
+
+      // manual hit detection (attacker's active window vs foe hurtbox)
+      if (this.state === "fighting") {
+        this.resolveHit(this.p1, this.p2);
+        this.resolveHit(this.p2, this.p1);
+      }
+    }
+
+    resolveHit(atk, def) {
+      const a = atk.attack; if (!a || a.hasHit) return;
+      const now = this.time.now; if (now < a.start || now > a.end) return;
+      if (aabb(atk.attackRect(), def.hurtRect())) { a.hasHit = true; this.applyDamage(atk, def, a.dmg, false); }
+    }
+
+    /* ---- end of match + victory overlay ---- */
+    endMatch(reason) {
+      if (this.state === "over") return;
+      this.state = "over";
+      SFX.ko();
+      this.p1.setVelocityX(0); this.p2.setVelocityX(0);
+      const p1Win = this.p1.hp > this.p2.hp || (this.p2.dead && !this.p1.dead);
+      const W = CFG.WIDTH, H = CFG.HEIGHT;
+
+      this.add.rectangle(W / 2, H / 2, W, H, 0x05040a, 0.72).setDepth(80);
+      const title = p1Win ? "VICTORY!" : "DEFEATED";
+      const sub = p1Win ? "This is how we do in the A!" : "The scalper flipped you. Run it back.";
+      this.add.text(W / 2, H / 2 - 70, title, bannerStyle(64).and({ color: p1Win ? "#d9b96a" : "#f04e45" }))
+        .setOrigin(0.5).setDepth(81);
+      this.add.text(W / 2, H / 2 - 6, sub, {
+        fontFamily: '"Courier New",monospace', fontSize: "22px", color: "#ffffff", fontStyle: "bold",
+        align: "center", wordWrap: { width: W - 120 },
+      }).setOrigin(0.5).setDepth(81);
+      this.add.text(W / 2, H / 2 + 44, "· " + reason + " ·", {
+        fontFamily: '"Courier New",monospace', fontSize: "16px", color: "#b9b6ac",
+      }).setOrigin(0.5).setDepth(81);
+
+      // Rematch button
+      const btn = this.add.rectangle(W / 2, H / 2 + 104, 240, 56, 0xf04e45, 1).setDepth(81)
+        .setStrokeStyle(3, 0xffffff, 0.8).setInteractive({ useHandCursor: true });
+      this.add.text(W / 2, H / 2 + 104, "REMATCH", {
+        fontFamily: '"Courier New",monospace', fontSize: "26px", color: "#ffffff", fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(82);
+      const restart = () => { SFX.resume(); this.scene.restart(); };
+      btn.on("pointerdown", restart);
+      this.input.keyboard.once("keydown-ENTER", restart);
+      this.tweens.add({ targets: btn, scaleX: 1.06, scaleY: 1.06, duration: 500, yoyo: true, repeat: -1 });
+    }
+  }
+
+  /* ------------------------------ text styles --------------------------- */
+  function bannerStyle(size) {
+    const s = {
+      fontFamily: '"Courier New",monospace', fontSize: size + "px", color: "#ffffff",
+      fontStyle: "bold", stroke: "#000000", strokeThickness: 6, align: "center",
+    };
+    s.and = (extra) => Object.assign(s, extra);
+    return s;
+  }
+  function hudName() {
+    return { fontFamily: '"Courier New",monospace', fontSize: "15px", color: "#d9b96a", fontStyle: "bold" };
+  }
+
+  /* ------------------------------ helpers ------------------------------- */
+  function aabb(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  /* ------------------------------ launch -------------------------------- */
+  new Phaser.Game({
+    type: Phaser.AUTO,
+    width: CFG.WIDTH, height: CFG.HEIGHT,
+    parent: "game",
+    backgroundColor: "#05050a",
+    pixelArt: true, roundPixels: true,
+    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    physics: { default: "arcade", arcade: { gravity: { y: CFG.GRAVITY }, debug: false } },
+    scene: [BootScene, FightScene],
+  });
+
+  } // boot()
+  </script>
+</body>
+</html>
