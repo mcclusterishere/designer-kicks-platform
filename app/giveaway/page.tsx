@@ -2,18 +2,23 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getActiveGiveaway } from "@/lib/quiz";
+import { getEditorsPick } from "@/lib/editorsPick";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
-  title: "Rare Shoe Giveaway — The Heat Chart",
+  title: "Editor's Pick Giveaway — The Heat Chart",
   description:
-    "Win rare kicks by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
+    "Win a 1-of-1 custom vest hand-built by our Editor's Pick designer, Benji Chase, by playing the Heat Check culture game. No purchase necessary — free entries available daily.",
 };
 export const dynamic = "force-dynamic";
 
 export default async function GiveawayPage() {
   const session = await auth();
   const giveaway = await getActiveGiveaway();
+  const pick = await getEditorsPick();
+  const benji = pick
+    ? { name: pick.displayName, href: `/artists/${pick.slug}` }
+    : { name: "Benji Chase", href: "/artists" };
 
   const yourEntries =
     session?.user?.id && giveaway
@@ -31,17 +36,25 @@ export default async function GiveawayPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <p className="tag text-volt">The prize</p>
+      <p className="tag text-heat">The prize · Editor's Pick</p>
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
-        Rare Shoe Giveaway
+        One Custom Vest. One Winner.
       </h1>
+      <p className="mt-3 max-w-xl text-base font-medium text-smoke">
+        No shoes, no gift cards — a one-of-one wearable-armor piece,
+        hand-built by our Editor's Pick designer,{" "}
+        <Link href={benji.href} className="font-bold text-heat underline">
+          {benji.name}
+        </Link>
+        . His art, worn as armor. It never goes on sale.
+      </p>
 
       {giveaway ? (
-        <div className="mt-6 rounded-xl border border-volt/60 bg-surface p-6 glow-volt">
+        <div className="mt-6 rounded-xl border border-heat/50 bg-surface p-6 glow-heat">
           <p className="tag text-smoke">Now running</p>
           <p className="display mt-1 text-3xl text-white">{giveaway.prize}</p>
           {giveaway.description && (
-            <p className="mt-2 text-smoke">{giveaway.description}</p>
+            <p className="mt-2 font-medium text-smoke">{giveaway.description}</p>
           )}
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <span className="text-smoke">

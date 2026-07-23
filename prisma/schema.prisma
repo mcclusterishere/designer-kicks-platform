@@ -109,6 +109,11 @@ model ArtistProfile {
   // (claim link sent). Claimed pages leave the board entirely.
   outreachStage String  @default("NEW")
   outreachNotes String?
+  // Editorial anointment — the house's hand-picked designer, independent
+  // of the Heat List ranking. Exactly one artist wears this at a time.
+  // editorialNote is the editors' blurb on why they're the pick.
+  editorsPick   Boolean @default(false)
+  editorialNote String?
   createdAt   DateTime @default(now())
 
   // Where they already sell — captured at onboarding, shown on their page.

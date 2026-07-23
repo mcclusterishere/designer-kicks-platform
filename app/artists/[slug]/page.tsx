@@ -111,8 +111,14 @@ export default async function ArtistPage({ params }: Props) {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="tag text-volt">Artist</p>
-          <h1 className="display mt-1 text-4xl text-white sm:text-5xl">
+          {artist.editorsPick ? (
+            <span className="inline-block rounded-full bg-heat px-3 py-1 tag font-bold text-ink">
+              ★ Editor's Pick · House Designer
+            </span>
+          ) : (
+            <p className="tag text-volt">Artist</p>
+          )}
+          <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
             {artist.displayName}
           </h1>
           {artist.userId && (
@@ -135,6 +141,14 @@ export default async function ArtistPage({ params }: Props) {
             {artist.city}
           </p>
           {artist.bio && <p className="mt-3 max-w-xl text-smoke">{artist.bio}</p>}
+          {artist.editorsPick && artist.editorialNote && (
+            <blockquote className="mt-4 max-w-xl border-l-2 border-heat pl-4 text-base font-medium italic leading-relaxed text-smoke">
+              {artist.editorialNote}
+              <cite className="mt-1 block text-sm font-bold not-italic text-heat">
+                — The Heat Chart editors
+              </cite>
+            </blockquote>
+          )}
           {!isOwnPage && session?.user && (
             <CommissionForm artistId={artist.id} artistName={artist.displayName} />
           )}

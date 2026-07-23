@@ -1589,6 +1589,121 @@ async function promoteNamedEditors() {
   }
 }
 
+// The Editor's Pick — the house hand-picks one designer to front the
+// platform, independent of the Heat List. Benji Chase is that pick: a
+// wearable-armor / custom-vest designer (the giveaway is a 1-of-1 vest he
+// builds for the winner). Idempotent: once a human edits the name/note in
+// admin, this stops overwriting it. Exactly one artist wears the crown.
+const BENJI_EDITORIAL_NOTE =
+  "The editors' pick — not voted up, chosen. Benji Chase turns tactical vest blanks into one-of-one wearable armor: brocade, hand-laid lace, inked centerpieces, finished like couture. When we needed a face for what a designer can be here, there was no debate.";
+const BENJI_BIO =
+  "Custom apparel and wearable-armor designer. Builds one-of-one statement vests — hand-painted, hand-stitched, no two alike — and treats a tactical blank like a canvas. The Heat Chart's Editor's Pick.";
+
+async function featureBenjiChase() {
+  // Find his page: prefer the campaign slug, then the staged persona, then
+  // any account carrying his name.
+  let artist = await prisma.artistProfile.findFirst({
+    where: {
+      OR: [
+        { slug: "benji-chase" },
+        { slug: "hitman-benji" },
+        { displayName: { in: ["Benji Chase", "Benjamin Chase", "Hitman Benji"], mode: "insensitive" } },
+      ],
+    },
+  });
+
+  // No page yet (fresh launch DB) — stand one up so the pick always exists.
+  if (!artist) {
+    let user = await prisma.user.findFirst({
+      where: { name: { in: ["Benji Chase", "Benjamin Chase"], mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { email: "benji.chase@theheatchart.com", name: "Benji Chase", role: "EDITOR" },
+        select: { id: true },
+      });
+    }
+    // Guard against a stray profile already on this user.
+    const existing = await prisma.artistProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (existing) {
+      artist = await prisma.artistProfile.findUnique({ where: { id: existing.id } });
+    } else {
+      artist = await prisma.artistProfile.create({
+        data: {
+          userId: user.id,
+          slug: "benji-chase",
+          displayName: "Benji Chase",
+          status: "APPROVED",
+          bio: BENJI_BIO,
+        },
+      });
+    }
+  }
+  if (!artist) return;
+
+  // Promote the persona to his real name once (leave later human edits alone).
+  const data = { editorsPick: true, editorialNote: artist.editorialNote || BENJI_EDITORIAL_NOTE };
+  if (artist.displayName === "Hitman Benji") data.displayName = "Benji Chase";
+  if (!artist.bio) data.bio = BENJI_BIO;
+  await prisma.artistProfile.update({ where: { id: artist.id }, data });
+
+  // Give the pick a face if his page is empty (fresh launch DB) — his real
+  // custom-vest photo ships in public/seed. Never duplicates: skips if he
+  // already has any piece.
+  const pieces = await prisma.submission.count({ where: { artistId: artist.id } });
+  if (pieces === 0) {
+    const owner = await prisma.user.findUnique({ where: { id: artist.userId }, select: { email: true } });
+    await prisma.submission.create({
+      data: {
+        title: "Red Cupid Vest",
+        artistId: artist.id,
+        artistName: data.displayName || artist.displayName,
+        email: owner?.email || "benji.chase@theheatchart.com",
+        baseShoe: "Tactical vest blank",
+        category: "apparel",
+        status: "APPROVED",
+        imageUrl: "/seed/hb-cupid-1.webp",
+        description:
+          "Black tactical vest rebuilt over red-and-gold cherub brocade — hand-laid black lace angel wings across the shoulders, inked cupid-girl centerpiece, and the crossed-pistol mark punched underneath. One of one.",
+      },
+    });
+    console.log("Editor's Pick: seeded Benji's vest piece (page had none).");
+  }
+
+  // Exactly one Editor's Pick at a time — clear the crown everywhere else.
+  await prisma.artistProfile.updateMany({
+    where: { editorsPick: true, id: { not: artist.id } },
+    data: { editorsPick: false },
+  });
+  console.log(`Editor's Pick: ${data.displayName || artist.displayName} (${artist.slug}) is the house designer.`);
+}
+
+// The live giveaway is no longer a shoe — it's a 1-of-1 custom vest Benji
+// Chase builds for the winner. Convert the known Tour Yellow shoe giveaway
+// in place; never touch a giveaway that's already the vest or something a
+// human set to something else.
+const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Benji Chase";
+const VEST_DESC =
+  "Our Editor's Pick designer, Benji Chase, hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
+
+async function refreshFeaturedGiveaway() {
+  const g = await prisma.giveaway.findFirst({
+    where: { status: "ACTIVE" },
+    orderBy: { endsAt: "asc" },
+  });
+  if (!g) return;
+  const blob = `${g.prize} ${g.description ?? ""}`;
+  const alreadyVest = /vest|benji/i.test(g.prize);
+  const wasTheShoe = /jordan|tour yellow|sneaker|deadstock|shoe/i.test(blob);
+  if (alreadyVest || !wasTheShoe) return; // don't clobber a human's choice
+  await prisma.giveaway.update({
+    where: { id: g.id },
+    data: { title: "Editor's Pick Giveaway", prize: VEST_PRIZE, description: VEST_DESC },
+  });
+  console.log("Giveaway swapped: Tour Yellow shoe → Benji Chase custom vest.");
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1603,6 +1718,8 @@ async function main() {
   await mergeDuplicateArtists();
   await restoreDekotaHandle();
   await promoteNamedEditors();
+  await featureBenjiChase();
+  await refreshFeaturedGiveaway();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
@@ -1943,10 +2060,10 @@ async function main() {
     if (!activeGiveaway) {
       await prisma.giveaway.create({
         data: {
-          title: "Launch Giveaway",
-          prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+          title: "Editor's Pick Giveaway",
+          prize: "A 1-of-1 custom vest, hand-built by Benji Chase",
           description:
-            "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+            "Our Editor's Pick designer, Benji Chase, hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
           endsAt: new Date(Date.now() + 30 * DAY),
         },
       });
@@ -2118,10 +2235,10 @@ async function main() {
   if (!activeGiveaway) {
     await prisma.giveaway.create({
       data: {
-        title: "Launch Giveaway",
-        prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+        title: "Editor's Pick Giveaway",
+        prize: "A 1-of-1 custom vest, hand-built by Benji Chase",
         description:
-          "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+          "Our Editor's Pick designer, Benji Chase, hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
         endsAt: new Date(now + 30 * DAY),
       },
     });
@@ -2234,6 +2351,12 @@ async function main() {
   const totalPolls = await prisma.poll.count({ where: { active: true } });
 
   await seedOgSeriesBattles();
+
+  // Re-assert the Editor's Pick after the demo artist reseed so Benji's
+  // crown + real name survive a full demo reseed (idempotent; the launch
+  // path already ran these before returning above).
+  await featureBenjiChase();
+  await refreshFeaturedGiveaway();
 
   console.log(
     `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog, ${reconciled} reconciled), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
