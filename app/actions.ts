@@ -2142,6 +2142,98 @@ export async function lookupSkuForArticle(id: string): Promise<ActionResult> {
   return { ok: true, note: `${bits.join(" ")}.` };
 }
 
+/** Normalize a shoe name for fuzzy article-title ↔ catalog matching. */
+function normShoeName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/['’"]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Give every cover-less article the shoe's photo. Matches to the catalog
+ * by style code first, then by normalized name; anything still uncovered
+ * (and not in the catalog) gets a bounded live lookup that also grows the
+ * catalog. One button, run it after any import.
+ */
+export async function matchArticlePhotos(): Promise<ActionResult> {
+  await requireAdmin();
+  const articles = await prisma.article.findMany({
+    where: { OR: [{ coverImage: null }, { coverImage: "" }] },
+    select: { id: true, title: true, sku: true },
+  });
+  if (articles.length === 0) return { ok: true, note: "Every article already has a cover." };
+
+  const shoes = await prisma.catalogShoe.findMany({
+    where: { imageUrl: { not: null } },
+    select: { sku: true, name: true, imageUrl: true },
+  });
+  const bySku = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const s of shoes) {
+    if (!s.imageUrl) continue;
+    bySku.set(s.sku.toUpperCase(), s.imageUrl);
+    const k = normShoeName(s.name);
+    if (k && !byName.has(k)) byName.set(k, s.imageUrl);
+  }
+
+  let fromCatalog = 0;
+  let fromApi = 0;
+  let stillMissing = 0;
+  const apiLive = sneakerApiLive();
+  let apiBudget = 40; // don't hammer the provider on a big backlog
+
+  for (const a of articles) {
+    let img: string | undefined = a.sku ? bySku.get(a.sku.toUpperCase()) : undefined;
+    if (!img) img = byName.get(normShoeName(a.title.split(/[—:|(]/)[0]));
+    if (img) {
+      await prisma.article.update({ where: { id: a.id }, data: { coverImage: img } });
+      fromCatalog++;
+      continue;
+    }
+    // Not in the catalog yet — pull it live (bounded) and fold it in.
+    if (apiLive && apiBudget > 0) {
+      apiBudget--;
+      const hit = await findSku(a.title).catch(() => null);
+      if (hit?.image) {
+        await prisma.article.update({
+          where: { id: a.id },
+          data: { coverImage: hit.image, ...(hit.sku && !a.sku ? { sku: hit.sku.toUpperCase() } : {}) },
+        });
+        if (hit.sku) {
+          const sku = hit.sku.toUpperCase();
+          const existing = await prisma.catalogShoe.findUnique({ where: { sku } });
+          if (!existing) {
+            await prisma.catalogShoe.create({
+              data: {
+                sku,
+                name: hit.name ?? a.title.split(/[—:|(]/)[0].trim(),
+                imageUrl: hit.image,
+                retailPriceCents: hit.retailPriceCents ?? null,
+                releaseDate: hit.releaseDate ?? null,
+                source: "article",
+              },
+            });
+          } else if (!existing.imageUrl) {
+            await prisma.catalogShoe.update({ where: { sku }, data: { imageUrl: hit.image } });
+          }
+        }
+        fromApi++;
+        continue;
+      }
+    }
+    stillMissing++;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/news");
+  const parts = [`${fromCatalog} matched from the catalog`];
+  if (fromApi) parts.push(`${fromApi} pulled live`);
+  if (stillMissing) parts.push(`${stillMissing} still need one`);
+  return { ok: true, note: `Article photos: ${parts.join(" · ")}.` };
+}
+
 // ---------- Editor Desk ----------
 
 /** Editor stages a mild-outreach prospect (with optional media upload). */

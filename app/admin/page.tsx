@@ -56,6 +56,7 @@ import { placesConfigured } from "@/lib/stores";
 import { providersConfigured } from "@/lib/sneakerApi";
 import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
+import MatchPhotosButton from "./MatchPhotosButton";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
 import { editorRefLink } from "@/lib/editor";
@@ -1955,6 +1956,11 @@ export default async function AdminPage({
             withSku={articles.filter((a) => a.sku).length}
             total={articles.length}
           />
+        </div>
+
+        {/* Photo backfill: article → catalog shoe photo */}
+        <div className="mt-4">
+          <MatchPhotosButton missing={articles.filter((a) => !a.coverImage).length} />
         </div>
 
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">

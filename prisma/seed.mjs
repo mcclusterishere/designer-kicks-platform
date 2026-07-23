@@ -1707,6 +1707,55 @@ async function refreshFeaturedGiveaway() {
   console.log("Giveaway swapped: Tour Yellow shoe → Hitman Benji custom vest.");
 }
 
+/** Normalize a shoe name for fuzzy title↔catalog matching. */
+function normShoeName(s) {
+  return (s || "")
+    .toLowerCase()
+    .replace(/['’"]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Every article about a shoe should wear that shoe's photo — the catalog
+ * is full of them. Match cover-less articles to a catalog shoe by style
+ * code first, then by normalized name, and borrow its image. Idempotent:
+ * only touches articles that have no cover, only when the catalog has a
+ * photo to lend.
+ */
+async function backfillArticleCovers() {
+  const articles = await prisma.article.findMany({
+    where: { OR: [{ coverImage: null }, { coverImage: "" }] },
+    select: { id: true, title: true, sku: true },
+  });
+  if (articles.length === 0) return;
+
+  const shoes = await prisma.catalogShoe.findMany({
+    where: { imageUrl: { not: null } },
+    select: { sku: true, name: true, imageUrl: true },
+  });
+  if (shoes.length === 0) return;
+
+  const bySku = new Map();
+  const byName = new Map();
+  for (const s of shoes) {
+    bySku.set(s.sku.toUpperCase(), s.imageUrl);
+    const k = normShoeName(s.name);
+    if (k && !byName.has(k)) byName.set(k, s.imageUrl);
+  }
+
+  let applied = 0;
+  for (const a of articles) {
+    let img = a.sku ? bySku.get(a.sku.toUpperCase()) : null;
+    if (!img) img = byName.get(normShoeName(a.title.split(/[—:|(]/)[0]));
+    if (img) {
+      await prisma.article.update({ where: { id: a.id }, data: { coverImage: img } });
+      applied++;
+    }
+  }
+  if (applied > 0) console.log(`Article covers: matched ${applied} article(s) to catalog photos.`);
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -2073,6 +2122,7 @@ async function main() {
     }
     await seedIconArticles();
     await seedOgSeriesBattles();
+    await backfillArticleCovers();
     console.log("Seeded launch content only (no demo artists/battles): products, articles, quiz bank, giveaway.");
     return;
   }
@@ -2360,6 +2410,7 @@ async function main() {
   // path already ran these before returning above).
   await featureBenjiChase();
   await refreshFeaturedGiveaway();
+  await backfillArticleCovers();
 
   console.log(
     `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog, ${reconciled} reconciled), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`
