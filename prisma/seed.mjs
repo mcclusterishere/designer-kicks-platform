@@ -919,7 +919,7 @@ const preloadArtists = [
     slug: "justin-dekota",
     email: null,
     displayName: "Justin Dekota",
-    instagram: "dekota_customz",
+    instagram: "the_gifted_7",
     city: "Atlanta, GA",
     bio: "Atlanta sneaker artist bringing concepts to life — story builds with a message under the paint. KAWS-style characters, hand-lettered narratives, heels that read like panels. Commissions open.",
     pieces: [
@@ -1443,7 +1443,7 @@ async function seedOgSeriesBattles() {
  */
 async function mergeDuplicateArtists() {
   // [staged-duplicate instagram, member-survivor instagram], no @.
-  const PAIRS = [["the_gifted_7", "dekota_customz"]];
+  const PAIRS = []; // duplicate-merge pairs; Dekota's already merged — repairs now go through the admin tool
   const norm = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
 
   for (const [dupIg, survIg] of PAIRS) {
@@ -1549,32 +1549,28 @@ async function mergeDuplicateArtists() {
  * Idempotent; logs only when it actually promotes.
  */
 /**
- * Identity correction: the merged Dekota page briefly wore
- * "@the_gifted_7" — not his real Instagram. His account, pieces, and
- * followers stay untouched; the page's public face returns to the
- * verified @dekota_customz identity and the original slug. One-shot:
- * once no profile carries the_gifted_7, this never fires again.
+ * Handle restore: @the_gifted_7 is Dekota's real Instagram (confirmed
+ * by the owner) — an earlier pass wrongly forced @dekota_customz onto
+ * the merged page. Put the real handle back on his page. Idempotent:
+ * once it reads the_gifted_7 this is a no-op. Account linkage (which
+ * login owns the page) is a separate repair done from the admin tool,
+ * because it needs real production data a seed script shouldn't guess.
  */
-async function correctDekotaIdentity() {
-  const wrong = await prisma.artistProfile.findFirst({
-    where: { instagram: { equals: "the_gifted_7", mode: "insensitive" } },
-  });
-  if (!wrong) return;
-  const slugFree = !(await prisma.artistProfile.findFirst({
-    where: { slug: "justin-dekota", id: { not: wrong.id } },
-  }));
-  await prisma.artistProfile.update({
-    where: { id: wrong.id },
-    data: {
-      instagram: "dekota_customz",
-      ...(slugFree ? { slug: "justin-dekota" } : {}),
-      bio: "Atlanta sneaker artist bringing concepts to life — story builds with a message under the paint. KAWS-style characters, hand-lettered narratives, heels that read like panels. Commissions open.",
-      city: wrong.city ?? "Atlanta, GA",
+async function restoreDekotaHandle() {
+  const p = await prisma.artistProfile.findFirst({
+    where: {
+      OR: [
+        { slug: "justin-dekota" },
+        { instagram: { equals: "dekota_customz", mode: "insensitive" } },
+      ],
     },
   });
-  console.log(
-    `Identity correction: ${wrong.slug} now wears @dekota_customz${slugFree ? " at /artists/justin-dekota" : ""}.`
-  );
+  if (!p || (p.instagram ?? "").toLowerCase() === "the_gifted_7") return;
+  await prisma.artistProfile.update({
+    where: { id: p.id },
+    data: { instagram: "the_gifted_7" },
+  });
+  console.log(`Handle restore: ${p.slug} now wears @the_gifted_7 (owner's real IG).`);
 }
 
 async function promoteNamedEditors() {
@@ -1605,7 +1601,7 @@ async function main() {
   await backfillCatalogLanes();
   await scrubBlankImages();
   await mergeDuplicateArtists();
-  await correctDekotaIdentity();
+  await restoreDekotaHandle();
   await promoteNamedEditors();
 
   // Wipe in dependency order so reseeding is idempotent.

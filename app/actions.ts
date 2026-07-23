@@ -4080,3 +4080,80 @@ export async function moreRateCards(excludeIds: string[]): Promise<MoreCardsResu
   );
   return { ok: true, cards };
 }
+
+// ---------- Admin: artist account repair ----------
+
+export type RepairResult = { ok: true; note: string } | { ok: false; error: string };
+
+/**
+ * Move an artist page onto the account its owner actually logs in with.
+ * The "profile is gone" bug is an account-linkage mismatch: a merge can
+ * leave the page owned by one User while the artist signs in as another
+ * (a claimable staged account they set a password on). This relinks the
+ * page's userId to the account matching `email`, so Studio finds it
+ * again. Optionally corrects the handle/slug in the same pass.
+ */
+export async function repairArtistAccount(formData: FormData): Promise<RepairResult> {
+  await requireAdmin();
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  if (!slug) return { ok: false, error: "Artist page slug is required." };
+
+  const artist = await prisma.artistProfile.findUnique({
+    where: { slug },
+    select: { id: true, userId: true, displayName: true },
+  });
+  if (!artist) return { ok: false, error: `No artist page at "${slug}".` };
+
+  const notes: string[] = [];
+
+  if (email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: "That target email isn't valid." };
+    }
+    const target = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true },
+    });
+    if (!target) {
+      return {
+        ok: false,
+        error: `No member signs in with ${email}. Have them create/confirm that login first, then reassign.`,
+      };
+    }
+    if (target.id !== artist.userId) {
+      // The target account can't already own a different artist page
+      // (userId is unique on ArtistProfile).
+      const clash = await prisma.artistProfile.findUnique({
+        where: { userId: target.id },
+        select: { slug: true },
+      });
+      if (clash) {
+        return {
+          ok: false,
+          error: `${email} already owns the page "${clash.slug}". Merge those first.`,
+        };
+      }
+      await prisma.artistProfile.update({
+        where: { id: artist.id },
+        data: { userId: target.id },
+      });
+      notes.push(`Page reassigned to ${email} — they'll see it in their Studio now.`);
+    } else {
+      notes.push(`${email} already owns this page.`);
+    }
+  }
+
+  if (instagram) {
+    await prisma.artistProfile.update({
+      where: { id: artist.id },
+      data: { instagram },
+    });
+    notes.push(`Instagram set to @${instagram}.`);
+  }
+
+  revalidatePath(`/artists/${slug}`);
+  revalidatePath("/admin");
+  return { ok: true, note: notes.join(" ") || "No changes — fill the target email or a new handle." };
+}

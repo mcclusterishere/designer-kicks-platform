@@ -12,6 +12,7 @@ import AddShopForm from "./AddShopForm";
 import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
+import StudioAssistant from "./StudioAssistant";
 import { siteUrl } from "@/lib/articles";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
@@ -101,6 +102,11 @@ export default async function StudioPage() {
             <p className="tag mt-1 text-smoke">{t.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* The artist's private AI corner — knows their standing */}
+      <div className="mt-8">
+        <StudioAssistant />
       </div>
 
       {/* Commission inbox — fans proposing builds. Accepting emails the

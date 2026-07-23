@@ -116,3 +116,67 @@ export async function imageParts(files: File[], maxTotalBytes = 9_000_000): Prom
   }
   return parts;
 }
+
+/**
+ * Multi-turn plain-text chat (the artist assistant runs on this).
+ * Same key/model-fallback contract as geminiJson — returns null when
+ * dormant or on any failure, so the caller always has a graceful
+ * fallback. `history` is the running conversation (user/model turns).
+ */
+export type ChatTurn = { role: "user" | "model"; text: string };
+
+export async function geminiChat(opts: {
+  system: string;
+  history: ChatTurn[];
+  temperature?: number;
+  timeoutMs?: number;
+}): Promise<string | null> {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+  const apiKey: string = key;
+
+  const models = process.env.GEMINI_MODEL
+    ? [process.env.GEMINI_MODEL]
+    : ["gemini-2.5-flash", "gemini-2.0-flash"];
+  const apiBase = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com";
+  const body = {
+    system_instruction: { parts: [{ text: opts.system }] },
+    contents: opts.history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
+    generationConfig: { temperature: opts.temperature ?? 0.6, maxOutputTokens: 800 },
+  };
+
+  async function call(model: string) {
+    const url = `${apiBase}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 30_000),
+    });
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return res.json();
+  }
+
+  try {
+    let data;
+    let lastErr: unknown = null;
+    for (const model of models) {
+      try {
+        data = await call(model);
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!data) throw lastErr ?? new Error("Gemini chat: all models failed");
+    const text: string =
+      (data?.candidates?.[0]?.content?.parts ?? [])
+        .map((p: { text?: string }) => p.text ?? "")
+        .join("")
+        .trim() || "";
+    return text || null;
+  } catch (e) {
+    console.error("[gemini chat]", e);
+    return null;
+  }
+}

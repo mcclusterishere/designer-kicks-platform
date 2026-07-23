@@ -44,6 +44,7 @@ import { siteUrl } from "@/lib/articles";
 import UtmBuilder from "./UtmBuilder";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
+import ArtistRepairForm from "./ArtistRepairForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
 import BroadcastForm from "./BroadcastForm";
 import BattleBlast from "./BattleBlast";
@@ -176,6 +177,20 @@ export default async function AdminPage({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
     include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
+  // Account-repair diagnostic: every page + which login owns it, and
+  // whether that account can actually sign in. A page whose owner
+  // can't log in is the "my profile is gone" case.
+  const artistOwners = await prisma.artistProfile.findMany({
+    where: { status: "APPROVED" },
+    orderBy: { displayName: "asc" },
+    select: {
+      slug: true,
+      displayName: true,
+      instagram: true,
+      user: { select: { email: true, passwordHash: true, accounts: { select: { provider: true } } } },
+    },
   });
 
   // Customizer-announced drops awaiting review before they hit /drops.
@@ -469,6 +484,54 @@ export default async function AdminPage({
       {show("settings") && (
       <section className="mt-8">
         <TwoFactorPanel enabled={twoFactorOn} />
+      </section>
+      )}
+
+      {/* Artist account repair — fix "my profile is gone" */}
+      {show("settings") && (
+      <section className="mt-8 rounded-xl border border-heat/40 bg-surface p-5">
+        <h2 className="display text-2xl text-white">Artist account repair</h2>
+        <p className="mt-1 text-sm text-smoke">
+          A page whose owner <span className="text-heat">can&apos;t log in</span> is
+          the &ldquo;my profile is gone&rdquo; case — the artist signs in with a
+          different account than the one holding their page. Find their real
+          login email, then reassign the page to it below.
+        </p>
+        <div className="mt-4 max-h-72 overflow-y-auto rounded-lg border border-edge">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 bg-panel text-xs uppercase tracking-wide text-smoke">
+              <tr>
+                <th className="px-3 py-2">Page</th>
+                <th className="px-3 py-2">Owner login</th>
+                <th className="px-3 py-2">Can sign in?</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-edge/60">
+              {artistOwners.map((a) => {
+                const canLogin = Boolean(a.user.passwordHash) || a.user.accounts.length > 0;
+                return (
+                  <tr key={a.slug}>
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-white">{a.displayName}</span>
+                      <span className="block text-xs text-smoke">
+                        /{a.slug}{a.instagram ? ` · @${a.instagram}` : ""}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-smoke">{a.user.email}</td>
+                    <td className="px-3 py-2">
+                      {canLogin ? (
+                        <span className="text-volt">yes</span>
+                      ) : (
+                        <span className="font-bold text-heat">no — claimable</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <ArtistRepairForm />
       </section>
       )}
 
