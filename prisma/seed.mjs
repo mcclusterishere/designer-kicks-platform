@@ -1430,6 +1430,118 @@ async function seedOgSeriesBattles() {
   console.log(`OG Series: ${entries.length} editorial entrants, ${created} new battle(s).`);
 }
 
+
+/**
+ * One real artist, one page. When a staged page and a member's own
+ * page exist for the same person, fold the staged page into theirs:
+ * every piece, collab credit, follower, claim, shop, drop, post,
+ * commission and consignment moves to the member's page; their own
+ * name, bio, handle and slug win; empty fields (city, portfolio)
+ * fill from the staged page; page views add up; then the staged page
+ * is deleted. Keyed by known duplicate pairs and idempotent, so it is
+ * safe on every deploy.
+ */
+async function mergeDuplicateArtists() {
+  // [staged-duplicate instagram, member-survivor instagram], no @.
+  const PAIRS = [["dekota_customz", "the_gifted_7"]];
+  const norm = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
+
+  for (const [dupIg, survIg] of PAIRS) {
+    const profiles = await prisma.artistProfile.findMany();
+    const dup = profiles.find((p) => norm(p.instagram) === dupIg);
+    const surv = profiles.find((p) => norm(p.instagram) === survIg);
+    if (!surv) continue;
+
+    if (dup && dup.id !== surv.id) {
+    const move = { where: { artistId: dup.id }, data: { artistId: surv.id } };
+    await prisma.submission.updateMany(move);
+    await prisma.artistShop.updateMany(move);
+    await prisma.artistDrop.updateMany(move);
+    await prisma.feedPost.updateMany(move);
+    await prisma.commissionRequest.updateMany(move);
+    await prisma.consignment.updateMany(move);
+    await prisma.artistClaim.updateMany(move);
+
+    // Followers are unique per (artist, user): move the ones the
+    // survivor doesn't already have, drop the rest.
+    const kept = await prisma.artistFollow.findMany({
+      where: { artistId: surv.id },
+      select: { userId: true },
+    });
+    const have = new Set(kept.map((f) => f.userId));
+    const moving = await prisma.artistFollow.findMany({ where: { artistId: dup.id } });
+    for (const f of moving) {
+      if (have.has(f.userId)) {
+        await prisma.artistFollow.delete({ where: { id: f.id } });
+      } else {
+        await prisma.artistFollow.update({ where: { id: f.id }, data: { artistId: surv.id } });
+      }
+    }
+
+    // Collab credits ride an implicit join table — reconnect by hand.
+    const collabs = await prisma.submission.findMany({
+      where: { collaborators: { some: { id: dup.id } } },
+      select: { id: true },
+    });
+    for (const c of collabs) {
+      await prisma.submission.update({
+        where: { id: c.id },
+        data: { collaborators: { disconnect: { id: dup.id }, connect: { id: surv.id } } },
+      });
+    }
+
+    // The member's page wins; staged info only fills the gaps.
+    await prisma.artistProfile.update({
+      where: { id: surv.id },
+      data: {
+        city: surv.city ?? dup.city,
+        portfolioUrl: surv.portfolioUrl ?? dup.portfolioUrl,
+        sellsOnline: surv.sellsOnline ?? dup.sellsOnline,
+        onboardedById: surv.onboardedById ?? dup.onboardedById,
+        viewCount: surv.viewCount + dup.viewCount,
+        status: "APPROVED",
+      },
+    });
+    await prisma.artistProfile.delete({ where: { id: dup.id } });
+    console.log(
+      `Merged duplicate artist: ${dup.slug} (@${dupIg}) folded into ${surv.slug} (@${survIg}).`
+    );
+    }
+
+    // If the merge landed two copies of the same piece on the survivor
+    // (staged copy + their own upload), keep the one carrying battles
+    // or votes and drop the unreferenced stray. Never delete a piece
+    // that's in a battle.
+    const pieces = await prisma.submission.findMany({
+      where: { artistId: surv.id },
+      include: {
+        _count: { select: { votes: true } },
+        battlesAsA: { select: { id: true } },
+        battlesAsB: { select: { id: true } },
+      },
+    });
+    const byTitle = new Map();
+    for (const p of pieces) {
+      const key = p.title.trim().toLowerCase();
+      if (!byTitle.has(key)) byTitle.set(key, []);
+      byTitle.get(key).push(p);
+    }
+    for (const [, group] of byTitle) {
+      if (group.length < 2) continue;
+      const referenced = (p) =>
+        p.battlesAsA.length + p.battlesAsB.length > 0 || p._count.votes > 0;
+      const keep =
+        group.find(referenced) ?? group[0];
+      for (const p of group) {
+        if (p.id === keep.id) continue;
+        if (referenced(p)) continue; // both live — leave for a human
+        await prisma.submission.delete({ where: { id: p.id } }).catch(() => {});
+        console.log(`Merge dedupe: removed stray copy of "${p.title}".`);
+      }
+    }
+  }
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1441,6 +1553,7 @@ async function main() {
   await retireContent();
   await backfillCatalogLanes();
   await scrubBlankImages();
+  await mergeDuplicateArtists();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
@@ -1623,6 +1736,20 @@ async function main() {
     for (const pa of preloadArtists) {
       const claimEmail = pa.email ?? `claim.${pa.slug}@theheatchart.com`;
       let profile = await prisma.artistProfile.findUnique({ where: { slug: pa.slug } });
+      if (!profile) {
+        // The artist may live under their own page now (self-signed-up
+        // or merged) — match by IG handle or name before minting a
+        // staged page, or the duplicate the merge just killed comes
+        // straight back on the next deploy.
+        const normIg = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
+        const all = await prisma.artistProfile.findMany();
+        profile =
+          all.find((p) => pa.instagram && normIg(p.instagram) === normIg(pa.instagram)) ??
+          all.find(
+            (p) => p.displayName.trim().toLowerCase() === pa.displayName.trim().toLowerCase()
+          ) ??
+          null;
+      }
       if (!profile) {
         const user = await prisma.user.upsert({
           where: { email: claimEmail },

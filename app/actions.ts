@@ -310,6 +310,33 @@ export async function applyForArtist(
   if (existing?.status === "PENDING") return { ok: false, error: "Your application is already under review." };
   if (existing?.status === "APPROVED") return { ok: false, error: "You already have an approved artist account." };
 
+  // One artist, one page: if a page already carries this name or IG
+  // handle (usually a pre-staged roster page), send them to claim it
+  // instead of minting a twin. Duplicate pages split records,
+  // followers, and search — never again.
+  const igNorm = instagram.replace(/^@/, "").trim();
+  const twin = await prisma.artistProfile.findFirst({
+    where: {
+      userId: { not: session.user.id },
+      status: { in: ["APPROVED", "PENDING"] },
+      OR: [
+        ...(igNorm
+          ? [
+              { instagram: { equals: igNorm, mode: "insensitive" as const } },
+              { instagram: { equals: `@${igNorm}`, mode: "insensitive" as const } },
+            ]
+          : []),
+        { displayName: { equals: displayName, mode: "insensitive" as const } },
+      ],
+    },
+  });
+  if (twin) {
+    return {
+      ok: false,
+      error: `${twin.displayName} already has a page on the league — if that's you, don't start over: open theheatchart.com/artists/${twin.slug} and hit "Claim this page" to take it over with its record and followers. Not you? Tweak your artist name slightly (or email hello@theheatchart.com) and re-apply.`,
+    };
+  }
+
   const data = {
     displayName,
     instagram: instagram || null,
