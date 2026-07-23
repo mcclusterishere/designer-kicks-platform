@@ -471,10 +471,15 @@ time, .tabular {
    ───────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
   --color-ink: #ffffff;
-  --color-surface: #f7f7f5;
-  --color-panel: #efefec;
-  --color-edge: #e2e2db;
-  --color-smoke: #575c64;
+  --color-surface: #f6f5f2;
+  --color-panel: #edece7;
+  /* Daylight contrast: borders you can see, secondary text near-black,
+     and the accents re-tuned for paper — night-club red and champagne
+     sit at 3.5:1 and 1.9:1 on white, which reads as fog. */
+  --color-edge: #d7d4ca;
+  --color-smoke: #40454d;
+  --color-volt: #c9342c;
+  --color-heat: #8a6a1f;
 }
 [data-theme="light"] body {
   background: #ffffff;
@@ -518,6 +523,30 @@ time, .tabular {
 [data-theme="light"] ::selection {
   background: var(--color-volt);
   color: #ffffff;
+}
+/* Gradient display type: the champagne ramp's light stops vanish on
+   paper — swap to a bronze ramp that holds. */
+[data-theme="light"] .text-gradient-heat {
+  background: linear-gradient(100deg, #a8853d 0%, #8a6a1f 55%, #5f470f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+[data-theme="light"] .text-gradient-volt {
+  background: linear-gradient(100deg, #e05a4a 0%, #c9342c 45%, #8a0f13 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Members who ask their device for more contrast get more contrast. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-smoke: #d6d3ca;
+    --color-edge: #45453f;
+  }
+  [data-theme="light"] {
+    --color-smoke: #24272c;
+    --color-edge: #a9a699;
+  }
 }
 
 /* ── Agency motion kit — the drafted page's scroll language ── */
