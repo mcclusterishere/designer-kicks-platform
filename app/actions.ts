@@ -2599,17 +2599,47 @@ export async function findLeads(
   if (gate) return { ok: false, error: gate };
   const focus = String(formData.get("focus") ?? "").trim().slice(0, 200);
 
-  const out = await geminiJson<{ candidates?: unknown[] }>({
+  const SCHEMA =
+    'Return ONLY JSON: {"candidates":[{"name":string,"instagram":string|null,"link":string|null,"city":string|null,"why":string}]} with up to 10 candidates. ' +
+    "instagram is the bare handle. link is their most useful public URL. why is one short line on what makes their work stand out.";
+  const SLANG =
+    "Briefs are casual — interpret shorthand generously: ATL=Atlanta, NYC=New York, LA=Los Angeles, HTX=Houston, CHI=Chicago, IG=Instagram, AF1=Air Force 1, AJ1=Jordan 1. " +
+    '"custom sneaker ATL" means: custom sneaker artists in or near Atlanta. Never ask for a better brief — work with what you have.';
+
+  // Pass 1 — search-grounded, strict: only artists actually found.
+  let out = await geminiJson<{ candidates?: unknown[] }>({
     system:
       "You scout custom-sneaker artists (customizers who hand-paint/rework sneakers) who could join The Heat Chart, a battle-league platform. " +
-      "Use search to find REAL, currently-active artists with public Instagram or portfolio pages. Prefer independent artists over big brands. " +
-      'Return ONLY JSON: {"candidates":[{"name":string,"instagram":string|null,"link":string|null,"city":string|null,"why":string}]} with up to 10 candidates. ' +
-      "instagram is the bare handle. link is their most useful public URL. why is one short line on what makes their work stand out. Only list artists you actually found — never invent.",
+      SLANG + " Use search to find REAL, currently-active artists with public Instagram or portfolio pages. Prefer independent artists over big brands. " +
+      SCHEMA + " Only list artists you actually found — never invent.",
     parts: [{ text: focus ? `Scout brief from the editor: ${focus}` : "Scout brief: notable independent custom-sneaker artists active right now." }],
     search: true,
     temperature: 0.4,
   });
-  if (!out?.candidates?.length) return { ok: false, error: "The scout came back empty — try a more specific brief." };
+
+  // Pass 2 — the scout NEVER shrugs at the editor: broaden on our
+  // side and allow well-known artists from model knowledge, flagged
+  // for a handle check before staging.
+  let secondPass = false;
+  if (!out?.candidates?.length) {
+    secondPass = true;
+    out = await geminiJson<{ candidates?: unknown[] }>({
+      system:
+        "You scout custom-sneaker artists (customizers who hand-paint/rework sneakers) for The Heat Chart, a battle-league platform. " +
+        SLANG + " " + SCHEMA +
+        " List real, widely-known independent customizers you are CONFIDENT actually exist that best match the brief; if the brief names a city, include artists from that city or region first, then great fits from anywhere. Never fabricate a person.",
+      parts: [{ text: focus ? `Scout brief from the editor: ${focus}` : "Scout brief: notable independent custom-sneaker artists active right now." }],
+      search: true,
+      temperature: 0.6,
+    });
+  }
+  if (!out?.candidates?.length) {
+    console.error("[findLeads] both passes empty", { focus });
+    return {
+      ok: false,
+      error: "The scout struck out — that's on us, not your brief. Give it another run in a minute; if it keeps happening, tell the office.",
+    };
+  }
 
   const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   const raw: LeadCandidate[] = out.candidates
@@ -2634,10 +2664,14 @@ export async function findLeads(
     (c) => !(c.instagram && handles.has(c.instagram.toLowerCase())) && !names.has(c.name.toLowerCase())
   );
   const dropped = raw.length - leads.length;
+  const notes = [
+    dropped > 0 ? `${dropped} already on the chart — filtered out.` : null,
+    secondPass ? "Ranged wider than live search — double-check handles before staging." : null,
+  ].filter(Boolean);
   return {
     ok: true,
     leads,
-    note: dropped > 0 ? `${dropped} already on the chart — filtered out.` : undefined,
+    note: notes.length ? notes.join(" ") : undefined,
   };
 }
 

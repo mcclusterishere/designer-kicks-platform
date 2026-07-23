@@ -41,17 +41,22 @@ export async function geminiJson<T = unknown>(opts: {
 }): Promise<T | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
+  const apiKey: string = key; // narrowed copy visible inside call()
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  // Newest capable model first; the older flash stays as a safety net
+  // for keys/regions that don't serve it yet. GEMINI_MODEL pins one.
+  const models = process.env.GEMINI_MODEL
+    ? [process.env.GEMINI_MODEL]
+    : ["gemini-2.5-flash", "gemini-2.0-flash"];
   const apiBase = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com";
-  const url = `${apiBase}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const body = {
     system_instruction: { parts: [{ text: opts.system }] },
     contents: [{ role: "user", parts: opts.parts }],
     generationConfig: { temperature: opts.temperature ?? 0.3 },
   };
 
-  async function call(withTools: boolean) {
+  async function call(model: string, withTools: boolean) {
+    const url = `${apiBase}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const payload = withTools ? { ...body, tools: [{ google_search: {} }] } : body;
     const res = await fetch(url, {
       method: "POST",
@@ -65,12 +70,25 @@ export async function geminiJson<T = unknown>(opts: {
 
   try {
     let data;
-    try {
-      data = await call(Boolean(opts.search));
-    } catch (e) {
-      if (!opts.search) throw e;
-      data = await call(false);
+    let lastErr: unknown = null;
+    for (const model of models) {
+      try {
+        data = await call(model, Boolean(opts.search));
+        break;
+      } catch (e1) {
+        if (opts.search) {
+          try {
+            data = await call(model, false);
+            break;
+          } catch (e2) {
+            lastErr = e2;
+            continue;
+          }
+        }
+        lastErr = e1;
+      }
     }
+    if (!data) throw lastErr ?? new Error("Gemini: all models failed");
     const text: string =
       (data?.candidates?.[0]?.content?.parts ?? [])
         .map((p: { text?: string }) => p.text ?? "")
