@@ -4,6 +4,7 @@ import { createReadStream } from "fs";
 import { Readable } from "stream";
 import path from "path";
 import { uploadDir } from "@/lib/uploadDir";
+import { readBlob } from "@/lib/blobStore";
 
 const UPLOAD_DIR = uploadDir();
 const CONTENT_TYPES: Record<string, string> = {
@@ -17,6 +18,11 @@ const CONTENT_TYPES: Record<string, string> = {
   ".webm": "video/webm",
 };
 
+// Force Node runtime (Buffers, fs, Prisma) and never cache at the edge —
+// bytes come from Postgres now.
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ name: string }> }
@@ -26,8 +32,54 @@ export async function GET(
   if (!/^[0-9a-f-]{36}\.(jpe?g|png|webp|gif|mp4|mov|webm)$/i.test(name)) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const extType = CONTENT_TYPES[path.extname(name).toLowerCase()] ?? "application/octet-stream";
+  const range = req.headers.get("range");
+
+  // Primary store: Postgres. Bytes persist across redeploys with no volume.
+  const blob = await readBlob(name).catch(() => null);
+  if (blob) {
+    const type = blob.contentType || extType;
+    const isVideo = type.startsWith("video/");
+    const size = blob.size || blob.data.length;
+
+    // Range support so Safari plays video and seeking works everywhere.
+    if (isVideo && range) {
+      const m = /bytes=(\d*)-(\d*)/.exec(range);
+      const start = m && m[1] ? parseInt(m[1], 10) : 0;
+      const end = m && m[2] ? parseInt(m[2], 10) : size - 1;
+      if (start >= size || end >= size || start > end) {
+        return new NextResponse("Range Not Satisfiable", {
+          status: 416,
+          headers: { "Content-Range": `bytes */${size}` },
+        });
+      }
+      const chunk = blob.data.subarray(start, end + 1);
+      return new NextResponse(new Uint8Array(chunk), {
+        status: 206,
+        headers: {
+          "Content-Type": type,
+          "Content-Length": String(end - start + 1),
+          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    }
+
+    return new NextResponse(new Uint8Array(blob.data), {
+      headers: {
+        "Content-Type": type,
+        "Content-Length": String(size),
+        ...(isVideo ? { "Accept-Ranges": "bytes" } : {}),
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
+    });
+  }
+
+  // Fallback: legacy files that may still live on local disk (dev, or the
+  // best-effort disk write when the DB was unreachable at upload time).
   const full = path.join(UPLOAD_DIR, name);
-  const type = CONTENT_TYPES[path.extname(name).toLowerCase()] ?? "application/octet-stream";
+  const type = extType;
   const isVideo = type.startsWith("video/");
 
   let size: number;
@@ -37,9 +89,6 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  // Videos need HTTP Range support or Safari won't play them (and seeking
-  // breaks everywhere). Stream the requested byte range.
-  const range = req.headers.get("range");
   if (isVideo && range) {
     const m = /bytes=(\d*)-(\d*)/.exec(range);
     const start = m && m[1] ? parseInt(m[1], 10) : 0;

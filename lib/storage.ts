@@ -98,8 +98,19 @@ export async function saveUpload(
     return `${cfg.publicUrl}/${key}`;
   }
 
-  const dir = uploadDir();
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, fileName), data);
-  return `/api/uploads/${fileName}`;
+  // No object storage configured → persist in Postgres (bytea). This is
+  // the reliable default here: it survives every redeploy without needing
+  // a mounted disk volume. Served via /api/uploads/<name>, same as before.
+  try {
+    const { saveBlob } = await import("./blobStore");
+    await saveBlob(fileName, contentType, data);
+    return `/api/uploads/${fileName}`;
+  } catch {
+    // Last-ditch fallback to local disk (e.g. DB unreachable). Better a
+    // best-effort write than a lost upload; the DB path is the norm.
+    const dir = uploadDir();
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, fileName), data);
+    return `/api/uploads/${fileName}`;
+  }
 }

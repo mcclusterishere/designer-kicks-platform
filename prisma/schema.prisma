@@ -1108,3 +1108,23 @@ model CatalogRating {
   @@unique([shoeId, userId])
   @@index([userId])
 }
+
+// Persistent binary store for user uploads (photos + short clips), kept
+// in Postgres so uploads survive every redeploy WITHOUT depending on a
+// mounted disk volume (Railway app-service volumes weren't mounting; the
+// Postgres volume is the one storage that reliably persists here). The
+// image bytes are already normalized to compact JPEG before they land
+// here, so rows stay small. Served through /api/uploads/[name], which
+// keeps the exact same public URL scheme — so switching to S3/R2 later is
+// just an env-var change with zero record migration. `name` is the
+// uuid.ext filename that appears in every saved imageUrl/videoUrl.
+model UploadBlob {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  contentType String
+  size        Int
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

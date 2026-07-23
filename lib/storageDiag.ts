@@ -4,19 +4,23 @@ import path from "path";
 import { prisma } from "./db";
 import { uploadDir } from "./uploadDir";
 import { objectStorageConfigured } from "./storage";
+import { blobStats, blobExists } from "./blobStore";
 
 /**
- * A live X-ray of upload storage: which driver is active, where local
- * files actually live (and whether that dir exists + is writable + how
- * many files are there), and — the important part — whether the image
- * URLs saved on records actually resolve to real files. If records point
- * at /api/uploads/… paths that aren't on disk, the volume isn't
- * persisting (or points at the wrong path) and every photo 404s for
- * everyone. That's the difference between a codec bug and a storage bug.
+ * A live X-ray of upload storage. Three possible drivers:
+ *  - s3:  external object storage (URLs are absolute http…)
+ *  - db:  Postgres bytea (the default here — survives redeploys with no
+ *         volume). URLs are /api/uploads/<name>, bytes live in UploadBlob.
+ *  - local: legacy disk fallback.
+ * The important part is the reality check: do the image URLs saved on real
+ * records actually resolve to stored bytes? If records point at
+ * /api/uploads/… names that aren't in the blob table (and aren't on disk),
+ * they 404 for everyone — that's a storage bug, not a codec one.
  */
 export type StorageDiag = {
-  driver: "s3" | "local";
+  driver: "s3" | "db" | "local";
   s3?: { bucket: string; publicUrl: string; endpoint: string | null };
+  db?: { count: number; totalBytes: number };
   local?: {
     dir: string;
     cwd: string;
@@ -33,8 +37,6 @@ export type StorageDiag = {
     s3Urls: number;
     seedPublic: number;
     missingSamples: string[];
-    // A URL that DID resolve to a real file — rendered as a live test so
-    // you can see whether serving works, separate from whether files exist.
     presentSample: string | null;
   };
 };
@@ -42,8 +44,9 @@ export type StorageDiag = {
 export async function storageDiagnostics(): Promise<StorageDiag> {
   const isS3 = objectStorageConfigured();
   const dir = uploadDir();
+  const driver: StorageDiag["driver"] = isS3 ? "s3" : "db";
   const diag: StorageDiag = {
-    driver: isS3 ? "s3" : "local",
+    driver,
     dbCheck: {
       checked: 0, localUrls: 0, presentOnDisk: 0, missingOnDisk: 0,
       s3Urls: 0, seedPublic: 0, missingSamples: [], presentSample: null,
@@ -57,6 +60,10 @@ export async function storageDiagnostics(): Promise<StorageDiag> {
       endpoint: process.env.S3_ENDPOINT || null,
     };
   } else {
+    // DB driver stats
+    diag.db = await blobStats().catch(() => ({ count: 0, totalBytes: 0 }));
+
+    // Local disk info is still useful (legacy files / fallback writes).
     let exists = false, writable = false, fileCount = 0;
     try {
       await access(dir, constants.F_OK);
@@ -79,7 +86,7 @@ export async function storageDiagnostics(): Promise<StorageDiag> {
     };
   }
 
-  // Reality check: do the URLs on real records resolve to real files?
+  // Reality check: do the URLs on real records resolve to real bytes?
   const subs = await prisma.submission
     .findMany({ select: { imageUrl: true, extraImages: true }, orderBy: { createdAt: "desc" }, take: 80 })
     .catch(() => []);
@@ -90,13 +97,20 @@ export async function storageDiagnostics(): Promise<StorageDiag> {
     diag.dbCheck.checked++;
     if (u.startsWith("/api/uploads/")) {
       diag.dbCheck.localUrls++;
-      if (isS3) continue; // can't stat S3 from here
+      if (isS3) continue; // can't check external store from here
       const name = u.slice("/api/uploads/".length);
-      try {
-        await stat(path.join(dir, name));
+      // Present if it's either in the Postgres blob store OR on disk.
+      let present = await blobExists(name).catch(() => false);
+      if (!present) {
+        try {
+          await stat(path.join(dir, name));
+          present = true;
+        } catch {}
+      }
+      if (present) {
         diag.dbCheck.presentOnDisk++;
         if (!diag.dbCheck.presentSample) diag.dbCheck.presentSample = u;
-      } catch {
+      } else {
         diag.dbCheck.missingOnDisk++;
         if (diag.dbCheck.missingSamples.length < 5) diag.dbCheck.missingSamples.push(u);
       }
