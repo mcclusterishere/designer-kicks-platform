@@ -1746,6 +1746,66 @@ export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJE
 }
 
 /**
+ * Permanently remove a piece and everything hanging off it. Votes, ratings,
+ * offers, sales, outfit items and the consignment cascade on the submission
+ * delete — but Battle and Tournament references do NOT cascade in the schema,
+ * so a piece that's in a battle would otherwise refuse to delete. Those are
+ * cleared first (battles it fought are removed, taking their votes with them;
+ * bracket slots and champion/winner pointers are nulled). The piece's stored
+ * image/video bytes are freed too. Admin-only — for clearing junk or
+ * broken-image entries.
+ */
+export async function deleteSubmissionCascade(id: string) {
+  await requireAdmin();
+
+  const sub = await prisma.submission.findUnique({
+    where: { id },
+    select: { imageUrl: true, extraImages: true, videoUrl: true },
+  });
+  if (!sub) return; // already gone
+
+  const battles = await prisma.battle.findMany({
+    where: { OR: [{ subAId: id }, { subBId: id }] },
+    select: { id: true },
+  });
+  const battleIds = battles.map((b) => b.id);
+
+  await prisma.$transaction([
+    // Detach from any tournament bracket slots / champion pointers.
+    prisma.tournamentMatch.updateMany({ where: { subAId: id }, data: { subAId: null } }),
+    prisma.tournamentMatch.updateMany({ where: { subBId: id }, data: { subBId: null } }),
+    prisma.tournamentMatch.updateMany({ where: { winnerId: id }, data: { winnerId: null } }),
+    prisma.tournament.updateMany({ where: { championId: id }, data: { championId: null } }),
+    // A tournament match may point at a battle we're about to delete.
+    ...(battleIds.length
+      ? [prisma.tournamentMatch.updateMany({ where: { battleId: { in: battleIds } }, data: { battleId: null } })]
+      : []),
+    // Clear winner refs at this piece, then drop the battles it fought
+    // (their votes cascade on battle delete).
+    prisma.battle.updateMany({ where: { winnerId: id }, data: { winnerId: null } }),
+    ...(battleIds.length ? [prisma.battle.deleteMany({ where: { id: { in: battleIds } } })] : []),
+    // The piece itself — remaining child rows cascade on submissionId.
+    prisma.submission.delete({ where: { id } }),
+  ]);
+
+  // Reclaim the stored bytes for this piece's media.
+  const localName = (u?: string | null) =>
+    u && u.startsWith("/api/uploads/") ? u.slice("/api/uploads/".length) : null;
+  const names = [sub.imageUrl, sub.videoUrl, ...(sub.extraImages || [])]
+    .map(localName)
+    .filter((n): n is string => !!n);
+  if (names.length) {
+    const { deleteBlob } = await import("@/lib/blobStore");
+    for (const n of names) await deleteBlob(n);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/heat-list");
+  revalidatePath("/");
+  revalidatePath("/market");
+}
+
+/**
  * A customizer announces their own upcoming drop onto the calendar.
  * Approved artists only; it lands PENDING and shows on /drops once an
  * admin approves it (same vetting as submissions).

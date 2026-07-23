@@ -59,6 +59,25 @@ export async function blobExists(name: string): Promise<boolean> {
   return !!row;
 }
 
+/** Delete an upload's bytes by filename (no-op if absent). */
+export async function deleteBlob(name: string): Promise<void> {
+  await prisma.uploadBlob.deleteMany({ where: { name } }).catch(() => {});
+}
+
+/**
+ * Given a list of upload filenames, return the subset that actually have
+ * bytes stored. Used by admin to flag pieces whose image is gone (the
+ * records left pointing at files the old ephemeral disk wiped).
+ */
+export async function existingBlobNames(names: string[]): Promise<Set<string>> {
+  const unique = [...new Set(names.filter(Boolean))];
+  if (unique.length === 0) return new Set();
+  const rows = await prisma.uploadBlob
+    .findMany({ where: { name: { in: unique } }, select: { name: true } })
+    .catch(() => [] as { name: string }[]);
+  return new Set(rows.map((r) => r.name));
+}
+
 /** Count + total bytes held, for the admin storage panel. */
 export async function blobStats(): Promise<{ count: number; totalBytes: number }> {
   const [count, agg] = await Promise.all([

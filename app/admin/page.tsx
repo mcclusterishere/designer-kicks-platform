@@ -37,6 +37,8 @@ import QuestionForm from "./QuestionForm";
 import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
+import PieceManager from "./PieceManager";
+import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import { oauthProviders } from "@/auth";
@@ -132,6 +134,7 @@ export default async function AdminPage({
     prisma.submission.findMany({
       where: { status: "APPROVED" },
       orderBy: { createdAt: "desc" },
+      include: { _count: { select: { votes: true } } },
     }),
     prisma.battle.findMany({
       orderBy: { createdAt: "desc" },
@@ -163,6 +166,27 @@ export default async function AdminPage({
       include: { champion: true },
     }),
   ]);
+
+  // Flag approved pieces whose cover image was lost before the storage fix
+  // (record points at an /api/uploads file that has no bytes anymore), so
+  // pictureless / junk entries can be found and removed. External http
+  // images and seeded /public paths are treated as live.
+  const approvedLocalNames = approved
+    .map((s) => s.imageUrl)
+    .filter((u) => u.startsWith("/api/uploads/"))
+    .map((u) => u.slice("/api/uploads/".length));
+  const liveBlobNames = await existingBlobNames(approvedLocalNames);
+  const managePieces = approved.map((s) => ({
+    id: s.id,
+    title: s.title,
+    artistName: s.artistName,
+    imageUrl: s.imageUrl,
+    category: s.category,
+    votes: s._count?.votes ?? 0,
+    broken:
+      s.imageUrl.startsWith("/api/uploads/") &&
+      !liveBlobNames.has(s.imageUrl.slice("/api/uploads/".length)),
+  }));
 
   const pulse = await getSiteAnalytics();
   const traffic = await getTrafficPulse();
@@ -873,6 +897,23 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+      )}
+
+      {/* Manage / remove live pieces */}
+      {show("roster") && (
+      <section className="mt-10">
+        <h2 className="display text-2xl text-white">
+          Manage pieces <span className="text-smoke">({managePieces.length})</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Every live (approved) piece. Search for one to remove junk or
+          pictureless entries — deleting is permanent and pulls the piece from
+          the Heat List, battles and the market. Pieces marked{" "}
+          <span className="text-heat">no image</span> lost their photo before the
+          storage fix; re-upload or delete them.
+        </p>
+        <PieceManager pieces={managePieces} />
       </section>
       )}
 
