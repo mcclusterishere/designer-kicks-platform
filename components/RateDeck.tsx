@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { rateDesign, rateCatalogShoe } from "@/app/actions";
+import { rateDesign, rateCatalogShoe, moreRateCards } from "@/app/actions";
 import SwipeGallery from "@/components/SwipeGallery";
 
 export type RateCard = {
@@ -22,16 +22,43 @@ export type RateCard = {
 // flames. Feels like an app: stacked cards, one-thumb controls, the
 // community verdict revealed the moment you commit.
 export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ratedBefore: number }) {
+  const [deck, setDeck] = useState(cards);
   const [index, setIndex] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [reveal, setReveal] = useState<{ stars: number; avg: number; count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Endless mode: when the hand runs low, deal another behind the
+  // scenes. `exhausted` flips only when a re-deal comes back empty.
+  const [exhausted, setExhausted] = useState(false);
+  const dealing = useRef(false);
+  const seen = useRef<string[]>([]);
 
-  const card = cards[index];
+  useEffect(() => {
+    if (exhausted || dealing.current) return;
+    if (deck.length - index > 3) return;
+    dealing.current = true;
+    const exclude = [...seen.current, ...deck.map((c) => c.id)];
+    moreRateCards(exclude)
+      .then((res) => {
+        if (!res.ok) return;
+        setDeck((d) => {
+          const ids = new Set(d.map((c) => c.id));
+          const fresh = res.cards.filter((c) => !ids.has(c.id) && !seen.current.includes(c.id));
+          if (fresh.length === 0) setExhausted(true);
+          return [...d, ...fresh];
+        });
+      })
+      .finally(() => {
+        dealing.current = false;
+      });
+  }, [index, deck, exhausted]);
+
+  const card = deck[index];
   const done = !card;
 
   function advance() {
+    if (card) seen.current.push(card.id);
     setLeaving(true);
     window.setTimeout(() => {
       setReveal(null);
@@ -57,8 +84,8 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
   if (done) {
     return (
       <div className="rounded-3xl border border-volt/40 bg-surface/80 p-8 text-center shadow-2xl">
-        <p className="display text-4xl text-volt">Done</p>
-        <h2 className="display mt-3 text-3xl text-white">Deck Cleared</h2>
+        <p className="display text-4xl text-volt">Cleared</p>
+        <h2 className="display mt-3 text-3xl text-white">You Rated Everything Live</h2>
         <p className="mx-auto mt-2 max-w-xs text-sm text-smoke">
           You&apos;ve rated {ratedBefore + index} design{ratedBefore + index === 1 ? "" : "s"}. Every
           score sharpens your taste profile — and decides what the chart
@@ -81,23 +108,17 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
 
   return (
     <div>
-      {/* Progress */}
-      <div className="mb-3 flex items-center justify-between">
+      {/* Running count — the deck never runs out, so no fake finish line */}
+      <div className="mb-4 flex items-center justify-between">
         <p className="tag text-smoke">
-          {index + 1} / {cards.length}
+          <span className="text-white">{ratedBefore + index}</span> rated
         </p>
-        <p className="tag text-volt">Rate the heat</p>
-      </div>
-      <div className="mb-4 h-1 w-full overflow-hidden rounded-full bg-panel">
-        <div
-          className="h-full rounded-full bg-volt transition-all duration-500"
-          style={{ width: `${(index / cards.length) * 100}%` }}
-        />
+        <p className="tag text-volt">∞ endless deck</p>
       </div>
 
       {/* The stack */}
       <div className="relative">
-        {cards
+        {deck
           .slice(index + 1, index + 3)
           .reverse()
           .map((c, i, arr) => {
@@ -193,9 +214,9 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
               <button
                 onClick={advance}
                 disabled={pending || leaving}
-                className="mt-3 w-full text-center tag text-smoke hover:text-white"
+                className="mt-3 w-full rounded-xl border-2 border-volt/60 bg-panel py-3 tag font-bold text-volt transition hover:border-volt hover:bg-volt/10 disabled:opacity-50"
               >
-                Pass — show me another
+                Show Me Another →
               </button>
             )}
             {error && <p className="mt-2 text-center text-sm text-heat">{error}</p>}

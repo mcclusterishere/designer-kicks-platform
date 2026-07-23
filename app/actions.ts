@@ -4023,3 +4023,26 @@ export async function deleteMyAccount(confirm: string): Promise<ActionResult> {
   );
   return { ok: true };
 }
+
+// ---------- Rate: the endless deck ----------
+
+import { buildRateDeck } from "@/lib/rateDeck";
+import type { RateCard } from "@/components/RateDeck";
+
+export type MoreCardsResult = { ok: true; cards: RateCard[] } | { ok: false; error: string };
+
+/** Deals the next hand — rated pieces are excluded at the query level,
+ *  passed ones ride in via excludeIds. Rate all day if you want. */
+export async function moreRateCards(excludeIds: string[]): Promise<MoreCardsResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to rate." };
+  if (!allowAttempt("rate-deal", session.user.id, 30, 60 * 1000)) {
+    return { ok: false, error: "Slow down — the deck deals again in a minute." };
+  }
+  const cards = await buildRateDeck(
+    session.user.id,
+    12,
+    Array.isArray(excludeIds) ? excludeIds.filter((x) => typeof x === "string") : []
+  );
+  return { ok: true, cards };
+}

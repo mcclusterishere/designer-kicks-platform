@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import LocalPay from "@/components/LocalPay";
 import remarkGfm from "remark-gfm";
 import { prisma } from "@/lib/db";
 import ApplyForm from "./ApplyForm";
@@ -44,6 +45,12 @@ export default async function CareersPage() {
                 <span className="tag rounded-full border border-volt/50 px-3 py-1 text-volt">{job.location}</span>
               </div>
               <p className="mt-1 tag text-heat">{job.payLine}</p>
+              {/* International recruiting: the first $ figure in the pay
+                  line converts to the visitor's own currency. */}
+              {(() => {
+                const m = job.payLine.match(/\$([0-9]+(?:\.[0-9]+)?)/);
+                return m ? <LocalPay usd={parseFloat(m[1])} className="mt-1" /> : null;
+              })()}
               <div className="prose-invert mt-4 max-w-none space-y-3 text-sm leading-relaxed text-smoke [&_a]:text-volt [&_a]:underline [&_h2]:mt-4 [&_h2]:text-white [&_h3]:text-white [&_strong]:text-white [&_ul]:list-disc [&_ul]:pl-5">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{job.body}</ReactMarkdown>
               </div>

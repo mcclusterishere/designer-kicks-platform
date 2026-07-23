@@ -1542,6 +1542,28 @@ async function mergeDuplicateArtists() {
   }
 }
 
+
+/**
+ * Named promotions: the owner's scout account rides the deploy — keyed
+ * by account NAME so it works whatever email the account used.
+ * Idempotent; logs only when it actually promotes.
+ */
+async function promoteNamedEditors() {
+  const res = await prisma.user.updateMany({
+    where: {
+      role: "MEMBER",
+      OR: [
+        { name: { equals: "Benjamin Chase", mode: "insensitive" } },
+        { name: { equals: "Benji Chase", mode: "insensitive" } },
+      ],
+    },
+    data: { role: "EDITOR" },
+  });
+  if (res.count > 0) {
+    console.log(`Editor promotion: ${res.count} account(s) named Benjamin/Benji Chase → EDITOR.`);
+  }
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1554,6 +1576,7 @@ async function main() {
   await backfillCatalogLanes();
   await scrubBlankImages();
   await mergeDuplicateArtists();
+  await promoteNamedEditors();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.

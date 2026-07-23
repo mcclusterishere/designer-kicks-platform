@@ -102,19 +102,22 @@ export default async function BattlesPage() {
           </Link>
         ))}
 
-        {/* The rest of the competitive floor, tucked into chips */}
-        <div className="no-scrollbar mt-5 flex gap-2 overflow-x-auto">
+        {/* The rest of the competitive floor — live doors, not labels:
+            each chip radiates a staggered heartbeat ring */}
+        <p className="tag mt-6 text-heat">More ways to compete</p>
+        <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto pb-2 pt-1">
           {[
-            { href: "/rate", label: "Rate" },
-            { href: "/outfits", label: "Fit Battles" },
-            { href: "/tournaments", label: "Brackets" },
-            { href: "/heat-list", label: "Heat List" },
-            { href: "/artists", label: "League" },
-          ].map((l) => (
+            { href: "/rate", label: "🔥 Rate" },
+            { href: "/outfits", label: "👟 Fit Battles" },
+            { href: "/tournaments", label: "🏆 Brackets" },
+            { href: "/heat-list", label: "📈 Heat List" },
+            { href: "/artists", label: "🎨 League" },
+          ].map((l, i) => (
             <Link
               key={l.href}
               href={l.href}
-              className="tag shrink-0 rounded-full border border-edge px-4 py-2 text-smoke"
+              style={{ animationDelay: `${i * 350}ms` }}
+              className="chip-pulse shrink-0 rounded-full border border-volt/50 bg-surface px-5 py-2.5 text-[13px] font-extrabold uppercase tracking-wide text-white"
             >
               {l.label}
             </Link>
