@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { rateDesign, rateCatalogShoe, moreRateCards } from "@/app/actions";
 import SwipeGallery from "@/components/SwipeGallery";
+import PieceMedia from "@/components/PieceMedia";
 import LocalMoney from "@/components/LocalMoney";
 
 export type RateCard = {
@@ -12,6 +13,7 @@ export type RateCard = {
   artistName: string;
   artistSlug: string | null;
   images: string[]; // cover first, then every extra angle — swipeable
+  videoUrl?: string | null; // a maker's clip plays in place of the photos
   chips: string[];
   // Retail cards are REAL shoes from the catalog — they rate through
   // their own table and wear a market-value plate. Customs omit these.
@@ -145,13 +147,23 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
           }`}
         >
           {/* keyed per card so the gallery rewinds to photo 1 on deal */}
-          <SwipeGallery
-            key={card.id}
-            testId="rate-gallery"
-            images={card.images}
-            alt={`${card.title} by ${card.artistName}`}
-            fit={card.kind === "retail" ? "contain" : "cover"}
-          />
+          {card.videoUrl ? (
+            <PieceMedia
+              key={card.id}
+              imageUrl={card.images[0]}
+              videoUrl={card.videoUrl}
+              title={`${card.title} by ${card.artistName}`}
+              className="aspect-square w-full object-cover"
+            />
+          ) : (
+            <SwipeGallery
+              key={card.id}
+              testId="rate-gallery"
+              images={card.images}
+              alt={`${card.title} by ${card.artistName}`}
+              fit={card.kind === "retail" ? "contain" : "cover"}
+            />
+          )}
           {card.kind !== "retail" && (
             <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/60 to-transparent" />
           )}

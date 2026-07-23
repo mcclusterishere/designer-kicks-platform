@@ -5,6 +5,7 @@ import { castVote } from "@/app/actions";
 import { appHaptic } from "@/lib/haptics";
 import { categoryLabel } from "@/lib/categories";
 import SwipeGallery from "@/components/SwipeGallery";
+import PieceMedia from "@/components/PieceMedia";
 
 type Side = {
   submissionId: string;
@@ -15,6 +16,7 @@ type Side = {
   baseShoe: string;
   category: string;
   imageUrl: string;
+  videoUrl: string | null;
   extraImages: string[];
   votes: number;
 };
@@ -73,11 +75,20 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                   Winner
                 </div>
               )}
-              <SwipeGallery
-                testId="vote-gallery"
-                images={[side.imageUrl, ...side.extraImages]}
-                alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
-              />
+              {side.videoUrl ? (
+                <PieceMedia
+                  imageUrl={side.imageUrl}
+                  videoUrl={side.videoUrl}
+                  title={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
+                  className="aspect-square w-full object-cover"
+                />
+              ) : (
+                <SwipeGallery
+                  testId="vote-gallery"
+                  images={[side.imageUrl, ...side.extraImages]}
+                  alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
+                />
+              )}
               <div className="p-2.5 sm:p-4">
                 <p className="tag hidden text-smoke sm:block">{categoryLabel(side.category)} · {side.baseShoe}</p>
                 <h3 className="display mt-1 break-words text-base leading-tight text-white sm:text-xl">{side.title}</h3>

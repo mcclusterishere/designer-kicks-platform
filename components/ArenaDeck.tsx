@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { castVote } from "@/app/actions";
 import { appHaptic } from "@/lib/haptics";
+import PieceMedia from "@/components/PieceMedia";
 
 /**
  * The mobile voting deck — hot-or-not for battles. One matchup on
@@ -18,6 +19,7 @@ export type DeckSide = {
   title: string;
   artistName: string;
   imageUrl: string;
+  videoUrl: string | null;
   extraImages: string[];
   votes: number;
 };
@@ -33,6 +35,19 @@ export type DeckBattle = {
 function SidePhotos({ side }: { side: DeckSide }) {
   const [idx, setIdx] = useState(0);
   const images = [side.imageUrl, ...side.extraImages];
+  // A maker's clip beats a still — play it in place of the photo carousel.
+  if (side.videoUrl) {
+    return (
+      <div className="relative aspect-[3/4] overflow-hidden bg-panel">
+        <PieceMedia
+          imageUrl={side.imageUrl}
+          videoUrl={side.videoUrl}
+          title={side.title}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
   return (
     <div className="relative aspect-[3/4] overflow-hidden bg-panel">
       <div

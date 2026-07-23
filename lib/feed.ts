@@ -48,8 +48,8 @@ export type FeedItem =
       // (to reveal the split the moment you pick). myPick = the side this
       // viewer already voted for, so a revisit shows the result, not the
       // buttons.
-      a: { id: string; title: string; imageUrl: string; artistName: string; votes: number };
-      b: { id: string; title: string; imageUrl: string; artistName: string; votes: number };
+      a: { id: string; title: string; imageUrl: string; videoUrl: string | null; artistName: string; votes: number };
+      b: { id: string; title: string; imageUrl: string; videoUrl: string | null; artistName: string; votes: number };
       myPick: string | null;
     }
   | {
@@ -57,6 +57,7 @@ export type FeedItem =
       id: string;
       title: string;
       imageUrl: string;
+      videoUrl: string | null;
       artistName: string;
       artistSlug: string | null;
       brand: string | null;
@@ -260,6 +261,7 @@ export async function getFeed(
           id: b.subAId,
           title: b.subA.title,
           imageUrl: b.subA.imageUrl,
+          videoUrl: b.subA.videoUrl,
           artistName: b.subA.artist?.displayName ?? b.subA.artistName,
           votes: aVotes,
         },
@@ -267,6 +269,7 @@ export async function getFeed(
           id: b.subBId,
           title: b.subB.title,
           imageUrl: b.subB.imageUrl,
+          videoUrl: b.subB.videoUrl,
           artistName: b.subB.artist?.displayName ?? b.subB.artistName,
           votes: bVotes,
         },
@@ -305,6 +308,7 @@ export async function getFeed(
         id: s.id,
         title: s.title,
         imageUrl: s.imageUrl,
+        videoUrl: s.videoUrl,
         artistName: s.artist?.displayName ?? s.artistName,
         artistSlug: s.artist?.slug ?? null,
         brand,

@@ -16,6 +16,7 @@ import {
 import type { FeedItem } from "@/lib/feed";
 import { categoryLabel } from "@/lib/categories";
 import ModTools from "@/components/ModTools";
+import PieceMedia from "@/components/PieceMedia";
 
 // The infinite scroll machine. Pages through /api/feed with an
 // IntersectionObserver sentinel — no button, no page numbers, it just
@@ -275,8 +276,12 @@ function PieceCard({
         </p>
       )}
       <Link href={item.artistSlug ? `/artists/${item.artistSlug}` : "/artists"} className="block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={item.imageUrl} alt={item.title} className="aspect-square w-full object-cover" />
+        <PieceMedia
+          imageUrl={item.imageUrl}
+          videoUrl={item.videoUrl}
+          title={item.title}
+          className="aspect-square w-full object-cover"
+        />
       </Link>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -471,8 +476,12 @@ function BattleCard({
                 aria-label={`Vote for ${side.title}`}
                 className="block w-full text-left"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={side.imageUrl} alt={side.title} className="aspect-square w-full object-cover" />
+                <PieceMedia
+                  imageUrl={side.imageUrl}
+                  videoUrl={side.videoUrl}
+                  title={side.title}
+                  className="aspect-square w-full object-cover"
+                />
               </button>
               <div className="p-2.5">
                 <p className="truncate text-sm font-bold text-white">{side.title}</p>

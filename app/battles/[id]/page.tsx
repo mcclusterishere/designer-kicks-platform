@@ -121,6 +121,7 @@ export default async function BattlePage({
             baseShoe: battle.subA.baseShoe,
             category: battle.subA.category,
             imageUrl: battle.subA.imageUrl,
+            videoUrl: battle.subA.videoUrl,
             extraImages: battle.subA.extraImages,
             votes: aVotes,
           }}
@@ -133,6 +134,7 @@ export default async function BattlePage({
             baseShoe: battle.subB.baseShoe,
             category: battle.subB.category,
             imageUrl: battle.subB.imageUrl,
+            videoUrl: battle.subB.videoUrl,
             extraImages: battle.subB.extraImages,
             votes: bVotes,
           }}

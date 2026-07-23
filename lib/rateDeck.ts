@@ -138,6 +138,7 @@ export async function buildRateDeck(
       artistName: s.artist?.displayName ?? s.artistName,
       artistSlug: s.artist?.slug ?? null,
       images: [s.imageUrl, ...s.extraImages],
+      videoUrl: s.videoUrl,
       chips,
       kind: "custom" as const,
     };
