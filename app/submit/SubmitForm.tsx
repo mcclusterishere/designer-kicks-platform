@@ -247,7 +247,7 @@ export default function SubmitForm({ artistDefaults }: Props) {
             id="collabWith"
             name="collabWith"
             maxLength={120}
-            placeholder="e.g. Justin Dekota, @dekota_customz"
+            placeholder="e.g. Krylon Kelz, @theirhandle"
             className={inputClass}
           />
           <p className="mt-1.5 text-xs text-smoke/70">

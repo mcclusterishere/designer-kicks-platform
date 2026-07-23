@@ -914,8 +914,8 @@ const preloadArtists = [
     ],
   },
   {
-    // Atlanta concept artist — verified FB (4.8K), IG @dekota_customz,
-    // commissions open. FB DMs are closed; IG is the channel.
+    // Atlanta concept artist — active IG @the_gifted_7 (the old
+    // @dekota_customz page is locked/abandoned). IG is the channel.
     slug: "justin-dekota",
     email: null,
     displayName: "Justin Dekota",
