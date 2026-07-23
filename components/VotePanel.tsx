@@ -80,7 +80,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
               />
               <div className="p-2.5 sm:p-4">
                 <p className="tag hidden text-smoke sm:block">{categoryLabel(side.category)} · {side.baseShoe}</p>
-                <h3 className="display mt-1 text-base text-white sm:text-xl">{side.title}</h3>
+                <h3 className="display mt-1 break-words text-base leading-tight text-white sm:text-xl">{side.title}</h3>
                 <p className="mt-1 text-xs text-smoke sm:text-sm">
                   by{" "}
                   {side.artistSlug ? (

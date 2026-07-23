@@ -603,7 +603,7 @@ function Card({
           </div>
           <div className="grid grid-cols-2 gap-px bg-edge p-4 pt-3">
             {[item.a, item.b].map((side, i) => (
-              <div key={i} className="bg-surface">
+              <div key={i} className="min-w-0 bg-surface">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={side.imageUrl} alt={side.title} className="aspect-square w-full object-cover" />
                 <p className="mt-1.5 truncate text-sm font-bold text-white">{side.title}</p>

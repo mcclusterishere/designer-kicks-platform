@@ -57,7 +57,10 @@ function Crest({
           </span>
         )}
       </div>
-      <div className="min-w-0 text-center">
+      {/* w-full is load-bearing: inside items-center the div otherwise
+          shrink-wraps its content, truncate never engages, and long
+          titles overlap the score. */}
+      <div className="w-full min-w-0 text-center">
         <p className="truncate text-sm font-bold text-white">{sub.title}</p>
         <p className="truncate text-xs text-smoke">{sub.artistName}</p>
       </div>
