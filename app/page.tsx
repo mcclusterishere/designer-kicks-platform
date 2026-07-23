@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import MemberGreeting from "@/components/MemberGreeting";
+import MemberNudges from "@/components/MemberNudges";
+import { getMemberNudges } from "@/lib/nudges";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getPublishedArticles } from "@/lib/articles";
 import { getActiveGiveaway } from "@/lib/quiz";
@@ -24,6 +26,10 @@ export default async function HomePage() {
         .catch(() => null)
     : null;
   const firstName = member?.name?.trim().split(/\s+/)[0] ?? null;
+  // Open loops to pick back up — only for signed-in members.
+  const nudges = session?.user?.id
+    ? await getMemberNudges(session.user.id).catch(() => [])
+    : [];
 
   const [battles, heat, products, articles] = await Promise.all([
     prisma.battle.findMany({
@@ -74,6 +80,9 @@ export default async function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Unfinished business — pick up where you left off */}
+      <MemberNudges nudges={nudges} />
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-edge">
