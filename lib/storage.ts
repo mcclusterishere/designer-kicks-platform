@@ -1,5 +1,6 @@
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { uploadDir } from "./uploadDir";
 
 /**
  * Upload storage with two drivers:
@@ -15,7 +16,6 @@ import path from "path";
  *   wrong for serverless platforms where the filesystem is ephemeral.
  */
 
-const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
 function s3Config() {
   const bucket = process.env.S3_BUCKET;
@@ -98,7 +98,8 @@ export async function saveUpload(
     return `${cfg.publicUrl}/${key}`;
   }
 
-  await mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(LOCAL_UPLOAD_DIR, fileName), data);
+  const dir = uploadDir();
+  await mkdir(dir, { recursive: true });
+  await writeFile(path.join(dir, fileName), data);
   return `/api/uploads/${fileName}`;
 }

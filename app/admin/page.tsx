@@ -58,6 +58,7 @@ import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
 import MatchPhotosButton from "./MatchPhotosButton";
 import FixPhotosButton from "./FixPhotosButton";
+import StorageHealthPanel from "@/components/StorageHealthPanel";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
 import { editorRefLink } from "@/lib/editor";
@@ -454,8 +455,9 @@ export default async function AdminPage({
         <h1 className="display text-4xl text-white">Command Center</h1>
         <p className="mt-1.5 text-smoke">Everything that runs The Heat Chart, one room at a time.</p>
 
-        {/* Always-visible: rescue iPhone HEIC photos that don't show in Chrome */}
-        <div className="mt-5">
+        {/* Always-visible: is storage even holding the photos? then rescue HEIC. */}
+        <div className="mt-5 space-y-3">
+          <StorageHealthPanel />
           <FixPhotosButton />
         </div>
 

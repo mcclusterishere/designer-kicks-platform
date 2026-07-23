@@ -3,8 +3,9 @@ import { readFile, stat } from "fs/promises";
 import { createReadStream } from "fs";
 import { Readable } from "stream";
 import path from "path";
+import { uploadDir } from "@/lib/uploadDir";
 
-const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
+const UPLOAD_DIR = uploadDir();
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",

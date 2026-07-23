@@ -2,8 +2,9 @@ import { readdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import sharp from "sharp";
 import { normalizeImage } from "./imageNormalize";
+import { uploadDir } from "./uploadDir";
 
-const DIR = path.join(process.cwd(), "data", "uploads");
+const DIR = uploadDir();
 
 /**
  * Fix already-stored photos that Chrome/Firefox can't show — the HEIC
