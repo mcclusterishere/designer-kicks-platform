@@ -38,6 +38,7 @@ import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
+import DropRadar from "./DropRadar";
 import PieceManager from "./PieceManager";
 import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
@@ -178,6 +179,21 @@ export default async function AdminPage({
     .filter((u) => u.startsWith("/api/uploads/"))
     .map((u) => u.slice("/api/uploads/".length));
   const liveBlobNames = await existingBlobNames(approvedLocalNames);
+  // Drop Radar review queue: auto-drafted retail posts awaiting a one-tap
+  // publish. Kept out of the public newsroom until an editor approves.
+  const radarDrafts = articles
+    .filter((a) => a.status === "DRAFT" && (a.tags || "").includes("Drop Radar"))
+    .map((a) => ({
+      id: a.id,
+      title: a.title,
+      coverImage: a.coverImage,
+      sku: a.sku,
+      dropLabel: a.dropAt
+        ? a.dropAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+        : null,
+      excerpt: a.excerpt,
+    }));
+
   const managePieces = approved.map((s) => ({
     id: s.id,
     title: s.title,
@@ -2012,6 +2028,11 @@ export default async function AdminPage({
         {/* Photo backfill: article → catalog shoe photo */}
         <div className="mt-4">
           <MatchPhotosButton missing={articles.filter((a) => !a.coverImage).length} />
+        </div>
+
+        {/* Drop Radar: auto-drafted retail drop posts, review-and-publish */}
+        <div id="drop-radar" className="mt-4">
+          <DropRadar drafts={radarDrafts} />
         </div>
 
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">

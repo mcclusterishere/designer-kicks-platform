@@ -2119,6 +2119,43 @@ export async function deleteArticle(id: string) {
   revalidatePath("/admin");
 }
 
+export type DropRadarScan = { ok: boolean; error?: string; scanned?: number; drafted?: number; skipped?: number };
+
+/**
+ * Drop Radar: generate a fresh batch of DRAFT drop posts from real catalog
+ * releases. Facts come from the DB; Gemini writes only prose + a culture
+ * question. Nothing publishes — the drafts wait for one-tap review.
+ */
+export async function scanDropRadar(): Promise<DropRadarScan> {
+  await requireAdmin();
+  const { generateDropDrafts } = await import("@/lib/dropRadar");
+  const r = await generateDropDrafts(5);
+  if (!r.configured) {
+    return { ok: false, error: "Drop Radar is off — add GEMINI_API_KEY in Railway to switch it on." };
+  }
+  revalidatePath("/admin");
+  revalidatePath("/news");
+  revalidatePath("/drops");
+  return { ok: true, scanned: r.scanned, drafted: r.drafted, skipped: r.skipped };
+}
+
+/** Publish a draft article (Drop Radar or otherwise) and activate its culture question. */
+export async function publishArticle(id: string) {
+  await requireAdmin();
+  const a = await prisma.article.findUnique({ where: { id }, select: { slug: true, publishedAt: true } });
+  if (!a) return;
+  await prisma.article.update({
+    where: { id },
+    data: { status: "PUBLISHED", publishedAt: a.publishedAt ?? new Date() },
+  });
+  await prisma.quizQuestion.updateMany({ where: { articleId: id }, data: { active: true } });
+  revalidatePath("/news");
+  revalidatePath(`/news/${a.slug}`);
+  revalidatePath("/drops");
+  revalidatePath("/");
+  revalidatePath("/admin");
+}
+
 // ---------- Drop-date sync (SKU → release date waterfall) ----------
 
 /**
