@@ -33,16 +33,16 @@ const bodoni = Bodoni_Moda({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: "The Heat Chart — Custom Sneaker Culture, Battles & Culture IQ",
+  title: "The Heat Chart — Sneaker Drops, Live Resale & One-of-One Artwork",
   description:
-    "Showcase your custom kicks, battle other artists in community vote-offs, climb the Heat List, and build your Culture IQ. A home for custom-sneaker culture — a project of McCluster Corp's Equity Uprise program.",
+    "Sneaker culture, all of it: release dates and drop coverage, live resale prices on the pairs everyone's chasing, free games and a weekly fantasy draft — plus the one thing no other platform has, wearable one-of-one artwork from the independent makers who build it. Free to play, free to vote.",
   manifest: "/manifest.webmanifest",
   // Branded link unfurls everywhere a URL gets dropped — FB, IG DMs,
   // WhatsApp, iMessage. Pages with their own image (articles) override.
   openGraph: {
     type: "website",
     siteName: "The Heat Chart",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The Heat Chart — Custom Sneaker Battles" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The Heat Chart — sneaker drops, live resale, and one-of-one artwork" }],
   },
   twitter: {
     card: "summary_large_image",

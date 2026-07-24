@@ -106,10 +106,10 @@ export default async function HomePage() {
               <span className="text-gradient-volt">The Heat Chart.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-smoke">
-              The proving ground for custom sneaker culture. Artists put their
-              hardest pairs up; the culture votes them into rank. Watch the
-              battles, back your favorite maker — or step in and defend your
-              own name.
+              Sneaker culture, all of it. Release dates and drop coverage,
+              live resale on every pair worth chasing, free games and a
+              weekly draft — and the part nobody else has: wearable
+              one-of-one artwork, straight from the makers who build it.
             </p>
             <div className="mt-9 flex flex-wrap gap-5">
               <Link
@@ -119,13 +119,30 @@ export default async function HomePage() {
                 Vote In Battles
               </Link>
               <Link
-                href="/submit"
+                href="/drops"
                 className="btn-hard-volt rounded-lg border-2 border-white/90 bg-ink px-7 py-3.5 tag font-bold text-white"
               >
-                Submit Your Customs
+                See What&apos;s Dropping
               </Link>
             </div>
-            <p className="tag mt-8 text-smoke">
+
+            {/* Every door in, on one line — the site is wider than one lane. */}
+            <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              {[
+                ["/drops", "Drop calendar"],
+                ["/market", "Live resale"],
+                ["/league", "The Draft"],
+                ["/games", "Free games"],
+                ["/available", "Shop 1-of-1s"],
+                ["/news", "Newsroom"],
+              ].map(([href, label]) => (
+                <Link key={href} href={href} className="font-medium text-smoke underline-offset-4 hover:text-volt hover:underline">
+                  {label}
+                </Link>
+              ))}
+            </div>
+
+            <p className="tag mt-7 text-smoke">
               Free to vote · Free to play · 1% seller fee when checkout opens
             </p>
           </div>
@@ -239,6 +256,11 @@ export default async function HomePage() {
               <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
                 The <span className="text-volt">Heat List</span>
               </h2>
+              <p className="mt-2 max-w-lg text-sm text-smoke">
+                Hand-finished, one-of-one artwork on a sneaker — signed by the
+                maker, owned by one person, ranked by the culture. Not a
+                colorway you missed. A piece nobody else on earth has.
+              </p>
             </div>
             <Link
               href="/heat-list"
