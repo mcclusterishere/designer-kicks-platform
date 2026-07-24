@@ -1161,6 +1161,9 @@ model LeagueEntry {
   // Frozen final score/rank once the season settles; live-computed while OPEN.
   finalScore Float?
   finalRank  Int?
+  // What this entry won when the week settled, e.g. "10 credits + 3 entries".
+  // Doubles as the payout record — set in the same pass that grants them.
+  prize      String?
   createdAt  DateTime @default(now())
 
   picks LeaguePick[]

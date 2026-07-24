@@ -85,25 +85,78 @@ export async function getCurrentSeason() {
   return season;
 }
 
+/**
+ * Weekly payout table. Free-to-play and skill-based: you win by reading the
+ * culture right, never by spending. Credits run the Culture IQ game;
+ * giveaway entries ride the live giveaway when there is one.
+ */
+export const PRIZES: { credits: number; entries: number }[] = [
+  { credits: 10, entries: 3 }, // 1st
+  { credits: 5, entries: 2 }, // 2nd
+  { credits: 3, entries: 1 }, // 3rd
+];
+
 export async function settleSeason(seasonId: string): Promise<void> {
+  // Claim the season atomically. Only the caller that flips OPEN→SETTLED
+  // proceeds, so concurrent page loads can never pay a week out twice.
+  const claim = await prisma.leagueSeason.updateMany({
+    where: { id: seasonId, status: "OPEN" },
+    data: { status: "SETTLED" },
+  });
+  if (claim.count === 0) return;
+
   const entries = await prisma.leagueEntry.findMany({
     where: { seasonId },
     include: { picks: { select: { assetType: true, refId: true, startMetric: true } } },
   });
-  const allPicks = entries.flatMap((e) => e.picks);
-  const now = await currentMetrics(allPicks);
+  if (entries.length === 0) return;
+
+  const now = await currentMetrics(entries.flatMap((e) => e.picks));
   const scored = entries
     .map((e) => ({
       id: e.id,
+      userId: e.userId,
       score: e.picks.reduce((sum, p) => sum + ((now.get(p.refId) ?? 0) - p.startMetric), 0),
     }))
     .sort((a, b) => b.score - a.score);
-  await prisma.$transaction([
-    ...scored.map((s, i) =>
+
+  await prisma.$transaction(
+    scored.map((s, i) =>
       prisma.leagueEntry.update({ where: { id: s.id }, data: { finalScore: s.score, finalRank: i + 1 } })
-    ),
-    prisma.leagueSeason.update({ where: { id: seasonId }, data: { status: "SETTLED" } }),
-  ]);
+    )
+  );
+
+  // Pay the podium. A roster has to actually move to win — no points, no
+  // prize — so an idle week never hands out credits.
+  const { grantCredits, getActiveGiveaway } = await import("./quiz");
+  const giveaway = await getActiveGiveaway().catch(() => null);
+
+  for (let i = 0; i < Math.min(PRIZES.length, scored.length); i++) {
+    const row = scored[i];
+    if (row.score <= 0) continue;
+    const prize = PRIZES[i];
+
+    await grantCredits(row.userId, prize.credits, "league").catch(() => {});
+
+    let entriesGiven = 0;
+    if (giveaway) {
+      for (let n = 0; n < prize.entries; n++) {
+        const ok = await prisma.giveawayEntry
+          .create({ data: { giveawayId: giveaway.id, userId: row.userId, source: "league" } })
+          .then(() => true)
+          .catch(() => false);
+        if (ok) entriesGiven++;
+      }
+    }
+
+    const label = [
+      `${prize.credits} credit${prize.credits === 1 ? "" : "s"}`,
+      entriesGiven > 0 ? `${entriesGiven} giveaway entr${entriesGiven === 1 ? "y" : "ies"}` : null,
+    ]
+      .filter(Boolean)
+      .join(" + ");
+    await prisma.leagueEntry.update({ where: { id: row.id }, data: { prize: label } }).catch(() => {});
+  }
 }
 
 // ---- Draft slate ----
@@ -156,7 +209,7 @@ export async function getDraftSlate(): Promise<{ customs: SlateCustom[]; drops: 
 // ---- My entry + leaderboard ----
 
 export type MyPick = { assetType: string; label: string; imageUrl: string | null; points: number };
-export type MyEntry = { picks: MyPick[]; total: number } | null;
+export type MyEntry = { picks: MyPick[]; total: number; prize: string | null } | null;
 
 export async function getMyEntry(userId: string, seasonId: string): Promise<MyEntry> {
   const entry = await prisma.leagueEntry.findUnique({
@@ -171,7 +224,40 @@ export async function getMyEntry(userId: string, seasonId: string): Promise<MyEn
     imageUrl: p.imageUrl,
     points: Math.round((now.get(p.refId) ?? 0) - p.startMetric),
   }));
-  return { picks, total: picks.reduce((s, p) => s + p.points, 0) };
+  return { picks, total: picks.reduce((s, p) => s + p.points, 0), prize: entry.prize };
+}
+
+/** Last settled week's podium — proof the prizes are real and already paid. */
+export type PastWinner = { name: string; score: number; rank: number; prize: string | null };
+
+export async function getLastWinners(): Promise<{ label: string; winners: PastWinner[] } | null> {
+  const season = await prisma.leagueSeason.findFirst({
+    where: { status: "SETTLED" },
+    orderBy: { endsAt: "desc" },
+    select: { label: true },
+  });
+  if (!season) return null;
+  const last = await prisma.leagueSeason.findFirst({
+    where: { status: "SETTLED" },
+    orderBy: { endsAt: "desc" },
+    include: {
+      entries: {
+        where: { finalRank: { lte: 3 } },
+        orderBy: { finalRank: "asc" },
+        include: { user: { select: { name: true } } },
+      },
+    },
+  });
+  if (!last || last.entries.length === 0) return null;
+  return {
+    label: last.label,
+    winners: last.entries.map((e) => ({
+      name: e.user.name || "Player",
+      score: Math.round(e.finalScore ?? 0),
+      rank: e.finalRank ?? 0,
+      prize: e.prize,
+    })),
+  };
 }
 
 export type LeaderRow = { name: string; score: number; rank: number; you: boolean };

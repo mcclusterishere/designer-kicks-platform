@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import { getCurrentSeason, getDraftSlate, getMyEntry, getLeaderboard } from "@/lib/league";
+import { getCurrentSeason, getDraftSlate, getMyEntry, getLeaderboard, getLastWinners } from "@/lib/league";
 import DraftBoard from "./DraftBoard";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,7 @@ export default async function LeaguePage() {
 
   const myEntry = userId ? await getMyEntry(userId, season.id) : null;
   const leaderboard = await getLeaderboard(season.id, userId);
+  const past = await getLastWinners();
   const slate = userId && !myEntry ? await getDraftSlate() : null;
   const myRow = leaderboard.find((r) => r.you) ?? null;
 
@@ -91,6 +92,11 @@ export default async function LeaguePage() {
               </div>
             ))}
           </div>
+          {myEntry.prize && (
+            <p className="mt-3 rounded border border-volt/50 bg-volt/10 px-3 py-2 text-sm font-bold text-volt">
+              🏆 You cashed this week — {myEntry.prize} paid to your account.
+            </p>
+          )}
           <p className="mt-3 text-xs text-smoke">
             Live points update as your picks move all week. Roster locks until the week rolls.
           </p>
@@ -122,6 +128,26 @@ export default async function LeaguePage() {
         </div>
       </div>
 
+      {/* Last week's podium — proof the payouts are real */}
+      {past && (
+        <div className="mt-8">
+          <h2 className="display text-2xl text-white">Last week&apos;s winners</h2>
+          <p className="tag mt-1 text-smoke">{past.label}</p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {past.winners.map((w) => (
+              <div key={w.rank} className="rounded-xl border border-edge bg-surface p-4">
+                <p className="text-2xl">{w.rank === 1 ? "🥇" : w.rank === 2 ? "🥈" : "🥉"}</p>
+                <p className="mt-1 truncate font-bold text-white">{w.name}</p>
+                <p className="tabular-nums text-sm text-smoke">
+                  {w.score >= 0 ? "+" : ""}{w.score} pts
+                </p>
+                {w.prize && <p className="mt-1 tag text-volt">{w.prize}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* How it scores */}
       <div className="mt-8 rounded-xl border border-edge bg-surface p-5 text-sm text-smoke">
         <p className="tag text-volt">How you score</p>
@@ -129,6 +155,13 @@ export default async function LeaguePage() {
           <li><span className="text-white">Customs</span> earn on real heat — every vote (+2), battle win (+50), and verified sale (+300) after you draft them.</li>
           <li><span className="text-white">OG drops</span> earn on resale premium — how far the market pushes them over retail. Call the pop before it releases.</li>
           <li>Points are the <span className="text-white">movement since you drafted</span>. Draft early, ride the whole week.</li>
+        </ul>
+        <p className="tag mt-4 text-volt">What you win</p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li><span className="text-white">🥇 1st</span> — 10 Culture credits + 3 giveaway entries</li>
+          <li><span className="text-white">🥈 2nd</span> — 5 credits + 2 entries</li>
+          <li><span className="text-white">🥉 3rd</span> — 3 credits + 1 entry</li>
+          <li>Paid automatically the moment the week rolls. Free to play — your roster has to actually move to cash.</li>
         </ul>
       </div>
     </div>
