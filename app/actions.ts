@@ -3570,6 +3570,37 @@ export async function setArtistStage(artistId: string, stage: string): Promise<v
 }
 
 /** Save the admin's working notes on a lead ("DM'd 7/18, replied 🔥"). */
+/**
+ * Log a touch on a recruiting lead: stamps the time, counts it, and moves
+ * the stage forward. That timestamp is what the Roster Run uses to decide
+ * who's due next, so logging a touch is the whole tracking system.
+ */
+export async function logOutreachTouch(artistId: string, nextStage?: string) {
+  await requireEditor();
+  const lead = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    select: { outreachStage: true, touchCount: true },
+  });
+  if (!lead) return;
+  // First touch on an untouched lead advances NEW → CONTACTED on its own.
+  const stage =
+    nextStage && ["NEW", "CONTACTED", "IN_TALKS", "INVITED", "ARCHIVED"].includes(nextStage)
+      ? nextStage
+      : lead.outreachStage === "NEW"
+        ? "CONTACTED"
+        : lead.outreachStage;
+  await prisma.artistProfile.update({
+    where: { id: artistId },
+    data: {
+      lastTouchAt: new Date(),
+      touchCount: { increment: 1 },
+      outreachStage: stage,
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/editor");
+}
+
 export async function saveArtistNotes(
   _prev: ActionResult | null,
   formData: FormData

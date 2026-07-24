@@ -39,6 +39,8 @@ import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
+import RosterRun from "./RosterRun";
+import { getRosterRun } from "@/lib/rosterRun";
 import PieceManager from "./PieceManager";
 import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
@@ -360,6 +362,9 @@ export default async function AdminPage({
     orderBy: [{ invitedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
     include: { user: { select: { email: true } } },
   });
+  // Today's recruiting queue — who's due for a touch, already sorted.
+  const rosterRun = await getRosterRun(25);
+
   const humanizeAgo = (d: Date) => {
     const days = Math.floor((Date.now() - d.getTime()) / 86400000);
     return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
@@ -1214,6 +1219,11 @@ export default async function AdminPage({
           vs 10% fees, keep every sale) plus their personal claim link. No
           Resend key set? You get the claim link to DM by hand instead.
         </p>
+
+        {/* The daily queue: who's due, why, and what to send them. */}
+        <div className="mt-4">
+          <RosterRun items={rosterRun.items} counts={rosterRun.counts} />
+        </div>
         {outreachLeads.length === 0 ? (
           <p className="mt-3 text-sm text-smoke">
             No cold leads — every artist page on the chart is claimed. 🔥

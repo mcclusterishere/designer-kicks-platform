@@ -109,6 +109,12 @@ model ArtistProfile {
   // (claim link sent). Claimed pages leave the board entirely.
   outreachStage String  @default("NEW")
   outreachNotes String?
+  // Follow-up engine: when we last actually reached out, and how many
+  // times. Pipelines don't die from bad leads, they die from nobody
+  // circling back — these two fields let the Roster Run compute exactly
+  // who is due today instead of relying on someone's memory.
+  lastTouchAt   DateTime?
+  touchCount    Int      @default(0)
   // Editorial anointment — a quietly hand-picked feature, independent of
   // the Heat List. Exactly one artist wears this at a time. editorialNote
   // is the editors' short blurb on the work.
