@@ -10,6 +10,7 @@ import MiniBars from "@/components/MiniBars";
 import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
 import ProfileMusicForm from "./ProfileMusicForm";
+import CommissionDeskForm from "./CommissionDeskForm";
 import ProfileMusic from "@/components/ProfileMusic";
 import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
@@ -26,7 +27,11 @@ export default async function StudioPage() {
 
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true, sellsOnline: true, spotifyUrl: true },
+    select: {
+      id: true, status: true, sellsOnline: true, spotifyUrl: true,
+      commissionOpen: true, commissionMinCents: true, commissionMaxCents: true,
+      commissionDays: true, commissionSlots: true,
+    },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
@@ -365,6 +370,19 @@ export default async function StudioPage() {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Commission desk — price + turnaround, stated upfront */}
+      <div className="mt-12">
+        <p className="display text-xl text-white">Your commission desk</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          What stops most buyers isn&apos;t your price — it&apos;s not knowing it. Post your
+          starting price and turnaround once and every visitor sees it upfront, so the people
+          who reach out already know what they&apos;re signing up for.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <CommissionDeskForm current={profile} />
         </div>
       </div>
 

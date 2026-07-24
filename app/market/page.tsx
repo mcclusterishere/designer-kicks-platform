@@ -367,6 +367,12 @@ export default async function MarketPage({
               ? "OG retail drops tracked against live resale value."
               : "One-of-one customs priced by the artists who built them."}
           </p>
+          <Link
+            href="/available"
+            className="mt-2 inline-block rounded-full border border-volt px-3 py-1 tag font-bold text-volt transition hover:bg-volt/10"
+          >
+            ⚡ Available now — ships without a wait
+          </Link>
         </div>
 
         {/* The switch: customs by night, OG drops by day */}

@@ -20,6 +20,7 @@ import SellNowButton from "@/components/SellNowButton";
 import ShippingQuote from "@/components/ShippingQuote";
 import ConsignForm from "@/components/ConsignForm";
 import CommissionForm from "@/components/CommissionForm";
+import CommissionDesk from "@/components/CommissionDesk";
 import ClaimLinkShare from "@/components/ClaimLinkShare";
 import ProfileMusic from "@/components/ProfileMusic";
 import { siteUrl } from "@/lib/articles";
@@ -179,6 +180,11 @@ export default async function ArtistPage({ params }: Props) {
             </a>
           )}
         </div>
+      </div>
+
+      {/* What it costs and how long it takes — answered before anyone asks. */}
+      <div className="mt-6">
+        <CommissionDesk desk={artist} />
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

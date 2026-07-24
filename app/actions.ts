@@ -2646,6 +2646,54 @@ export async function removeArtistShop(id: string) {
 
 // A maker ties their Spotify (or DistroKid/hyperfollow/Apple Music) link so
 // their music plays on their profile. Blank clears it.
+/**
+ * The commission desk: price floor, turnaround, and whether you're taking
+ * work — stated upfront so a buyer never has to DM to find out. Blank a
+ * field to clear it; the public page then says "ask" instead of guessing.
+ */
+export async function setCommissionDesk(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const money = (k: string): number | null => {
+    const raw = String(formData.get(k) ?? "").replace(/[^0-9.]/g, "").trim();
+    if (!raw) return null;
+    const n = Math.round(Number(raw) * 100);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, 100_000_00) : null;
+  };
+  const whole = (k: string, max: number): number | null => {
+    const raw = String(formData.get(k) ?? "").replace(/[^0-9]/g, "").trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, max) : null;
+  };
+
+  const min = money("commissionMinCents");
+  const max = money("commissionMaxCents");
+  if (min && max && max < min) {
+    return { ok: false, error: "Top of range can't be lower than the starting price." };
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      commissionOpen: formData.get("commissionOpen") === "on",
+      commissionMinCents: min,
+      commissionMaxCents: max,
+      commissionDays: whole("commissionDays", 365),
+      commissionSlots: whole("commissionSlots", 99),
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  revalidatePath("/artists");
+  return { ok: true, note: "Commission desk updated — buyers see it on your page." };
+}
+
 export async function setArtistMusic(
   _prev: ActionResult | null,
   formData: FormData

@@ -118,6 +118,16 @@ model ArtistProfile {
   // ties to their page so their tracks play right on the profile. Many of
   // these customizers are musicians too.
   spotifyUrl    String?
+
+  // Commission desk — the honest answer to "what does it cost and how long
+  // does it take", stated upfront instead of discovered after a DM. The
+  // #1 friction on custom work is uncertainty, not price. Null = not
+  // stated yet; the page then says so plainly rather than guessing.
+  commissionOpen    Boolean @default(true) // taking work vs booked out
+  commissionMinCents Int?   // "from $X"
+  commissionMaxCents Int?   // typical top end, optional
+  commissionDays     Int?   // typical turnaround in days
+  commissionSlots    Int?   // open slots right now, optional scarcity
   createdAt   DateTime @default(now())
 
   // Where they already sell — captured at onboarding, shown on their page.

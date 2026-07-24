@@ -226,6 +226,50 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
   return { items, stats, brands };
 }
 
+export type ReadyPiece = {
+  id: string;
+  title: string;
+  artistName: string;
+  artistSlug: string | null;
+  imageUrl: string;
+  askCents: number;
+  size: string | null;
+  category: string;
+};
+
+/**
+ * Available now — finished one-of-ones with an open ask and no confirmed
+ * sale. These ship without a commission wait, which is the honest answer
+ * to "custom work takes weeks": some of it is already made. Newest first
+ * so the lane always looks alive.
+ */
+export async function getAvailableNow(limit = 24): Promise<ReadyPiece[]> {
+  const pieces = await prisma.submission.findMany({
+    where: {
+      status: "APPROVED",
+      askingPriceCents: { not: null, gt: 0 },
+      sales: { none: { status: "CONFIRMED" } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true, title: true, artistName: true, imageUrl: true,
+      askingPriceCents: true, size: true, category: true,
+      artist: { select: { slug: true, status: true } },
+    },
+  });
+  return pieces.map((p) => ({
+    id: p.id,
+    title: p.title,
+    artistName: p.artistName,
+    artistSlug: p.artist?.status === "APPROVED" ? p.artist.slug : null,
+    imageUrl: p.imageUrl,
+    askCents: p.askingPriceCents ?? 0,
+    size: p.size,
+    category: p.category,
+  }));
+}
+
 export type HotBase = {
   silhouette: string;
   customsBuilt: number;
