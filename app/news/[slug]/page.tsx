@@ -192,6 +192,7 @@ export default async function ArticlePage({ params }: Props) {
           [&_strong]:text-white
           [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6
           [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6
+          [&_img]:my-6 [&_img]:w-full [&_img]:rounded-xl [&_img]:border [&_img]:border-edge
           [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm
           [&_th]:border [&_th]:border-edge [&_th]:bg-panel [&_th]:p-2 [&_th]:text-left
           [&_td]:border [&_td]:border-edge [&_td]:p-2
