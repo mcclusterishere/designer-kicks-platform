@@ -2750,6 +2750,39 @@ export async function importCatalog(
   };
 }
 
+export type CatalogRefreshResult = {
+  ok: boolean;
+  error?: string;
+  brands?: { brand: string; imported: number; updated: number; priced: number }[];
+  ebay?: { configured: boolean; checked: number; matched: number };
+};
+
+/**
+ * Run the daily catalog refresh on demand (admin) — exactly what the
+ * refresh-catalog cron does: re-import a rotating batch of brands from
+ * KicksDB (photos + live prices), then pull fresh eBay new/used medians.
+ * Lets an admin fill the OG board and verify the eBay keys without
+ * waiting for the cron. The eBay line reports matched/checked so a live
+ * count confirms the credentials are working.
+ */
+export async function refreshCatalogNow(): Promise<CatalogRefreshResult> {
+  await requireAdmin();
+  const { refreshCatalogPricing } = await import("@/lib/catalog");
+  const { syncEbayPrices } = await import("@/lib/ebay");
+  const summary = await refreshCatalogPricing();
+  const ebay = await syncEbayPrices(40).catch(() => ({ configured: true, checked: 0, matched: 0 }));
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  return {
+    ok: summary.ok,
+    error: summary.error,
+    brands: summary.brands?.map((b) => ({
+      brand: b.brand, imported: b.imported, updated: b.updated, priced: b.priced,
+    })),
+    ebay,
+  };
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour

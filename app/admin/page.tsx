@@ -37,6 +37,7 @@ import QuestionForm from "./QuestionForm";
 import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
+import CatalogRefreshButton from "./CatalogRefreshButton";
 import PieceManager from "./PieceManager";
 import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
@@ -84,6 +85,7 @@ async function CatalogSection() {
       </p>
       <div className="mt-4">
         <CatalogPanel configured={catalogConfigured()} />
+        {catalogConfigured() && <CatalogRefreshButton />}
       </div>
       {stats.total > 0 && (
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-smoke">
