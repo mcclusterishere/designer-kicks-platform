@@ -2156,6 +2156,35 @@ export async function publishArticle(id: string) {
   revalidatePath("/admin");
 }
 
+// ---------- The Draft (weekly fantasy league) ----------
+
+/** Lock in a weekly roster of customs + drops. One entry per user per week. */
+export async function draftLeagueRoster(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Sign in to draft your roster." };
+  let picks: unknown;
+  try {
+    picks = JSON.parse(String(formData.get("picks") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Couldn't read your picks — try again." };
+  }
+  if (!Array.isArray(picks)) return { ok: false, error: "Couldn't read your picks — try again." };
+  const clean = picks
+    .filter((p): p is { assetType: "CUSTOM" | "DROP"; refId: string } =>
+      !!p && (p.assetType === "CUSTOM" || p.assetType === "DROP") && typeof p.refId === "string")
+    .slice(0, 12);
+  const { draftRoster } = await import("@/lib/league");
+  const r = await draftRoster(userId, clean);
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/league");
+  revalidatePath("/");
+  return { ok: true, note: "Roster locked — good luck this week." };
+}
+
 // ---------- Drop-date sync (SKU → release date waterfall) ----------
 
 /**

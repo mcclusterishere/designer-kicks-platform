@@ -626,6 +626,7 @@ model User {
   stagedProspects  OutreachProspect[]
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
   catalogRatings   CatalogRating[]
+  leagueEntries    LeagueEntry[]
 }
 
 // A private thread between an editor and the league office. Editors can
@@ -1127,4 +1128,62 @@ model UploadBlob {
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ---------- The Draft: weekly fantasy league ----------
+// Draft a roster of customs (1-of-1 artist pieces) and drops (OG retail
+// releases) each week; earn Heat Points as your picks move on real
+// on-platform signals — votes, battle wins, verified sales, and resale
+// premium. A fantasy league nobody else can run, because the customs data
+// only lives here.
+
+model LeagueSeason {
+  id        String   @id @default(cuid())
+  // Human label, e.g. "Week of Jul 21".
+  label     String
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+  // OPEN = drafting + live scoring; SETTLED = week closed, ranks frozen.
+  status    String   @default("OPEN") // OPEN | SETTLED
+  createdAt DateTime @default(now())
+
+  entries LeagueEntry[]
+
+  @@index([status, endsAt])
+}
+
+model LeagueEntry {
+  id       String @id @default(cuid())
+  seasonId String
+  season   LeagueSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Frozen final score/rank once the season settles; live-computed while OPEN.
+  finalScore Float?
+  finalRank  Int?
+  createdAt  DateTime @default(now())
+
+  picks LeaguePick[]
+
+  @@unique([seasonId, userId])
+  @@index([seasonId])
+}
+
+model LeaguePick {
+  id        String @id @default(cuid())
+  entryId   String
+  entry     LeagueEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  // CUSTOM → refId is a Submission id; DROP → refId is a CatalogShoe id.
+  assetType String // CUSTOM | DROP
+  refId     String
+  // Denormalized for display so the leaderboard needs no extra joins.
+  label     String
+  imageUrl  String?
+  // Composite metric snapshotted at draft time; live points = now − start.
+  startMetric Float @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([entryId, refId])
+  @@index([entryId])
+  @@index([assetType, refId])
 }

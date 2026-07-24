@@ -16,6 +16,13 @@ export const dynamic = "force-dynamic";
 
 const GAMES = [
   {
+    href: "/league",
+    emoji: "🏆",
+    title: "The Draft",
+    blurb: "Draft customs + OG drops. Score on real heat and resale. New board every week.",
+    tone: "volt" as const,
+  },
+  {
     href: "/games/guess-the-resale",
     emoji: "💸",
     title: "Guess The Resale",
