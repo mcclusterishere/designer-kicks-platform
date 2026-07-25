@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -44,6 +45,13 @@ export async function generateMetadata({ params }: Props) {
 const SLUG_ALIASES: Record<string, string> = {
   "justin-dekota-2": "justin-dekota",
 };
+
+/** How densely the maker chose to hang the wall. */
+function closetGridClass(layout: string): string {
+  if (layout === "list") return "grid-cols-1";
+  if (layout === "gallery") return "grid-cols-1 sm:grid-cols-2";
+  return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+}
 
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
@@ -104,6 +112,22 @@ export default async function ArtistPage({ params }: Props) {
     totalVotes += s._count.votes;
   }
   const winRate = battles > 0 ? Math.round((wins / battles) * 100) : null;
+
+  // The maker's lead piece goes first. Done here rather than in the query
+  // because "featured, then everything else in the arranged order" isn't
+  // something a single ORDER BY can express — and a featured piece that
+  // was since deleted or hidden simply doesn't match, so the closet falls
+  // back to their arrangement instead of breaking.
+  const closetOrdered = (() => {
+    const id = artist.featuredSubmissionId;
+    if (!id) return artist.submissions;
+    const lead = artist.submissions.find((s) => s.id === id);
+    return lead ? [lead, ...artist.submissions.filter((s) => s.id !== id)] : artist.submissions;
+  })();
+
+  // Section labels get printed above the first piece that carries them, so
+  // a maker who files their work in chapters gets chapters.
+  const seenSections = new Set<string>();
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
@@ -257,9 +281,15 @@ export default async function ArtistPage({ params }: Props) {
         </div>
       )}
 
-      {/* The Closet — every one-of-one, with its live heat rank */}
-      <h2 className="display mt-10 text-2xl text-white">
-        The Closet
+      {/* The Closet — hung the way the maker arranged it. The heading, the
+          lead piece, the density and the accent are all theirs; the heat
+          rank on each piece stays ours, because that one isn't a matter of
+          taste. */}
+      <h2
+        className="display mt-10 text-2xl text-white"
+        style={artist.accentColor ? { color: artist.accentColor } : undefined}
+      >
+        {artist.closetHeadline?.trim() || "The Closet"}
       </h2>
       <p className="mt-1 text-sm text-smoke">
         Every one-of-one in the collection, ranked live on the{" "}
@@ -268,16 +298,37 @@ export default async function ArtistPage({ params }: Props) {
       {artist.submissions.length === 0 ? (
         <p className="mt-4 text-smoke">No approved customs yet.</p>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {artist.submissions.map((s) => {
+        <div className={`mt-4 grid gap-6 ${closetGridClass(artist.closetLayout)}`}>
+          {closetOrdered.map((s) => {
             const shoeBattles =
               s.battlesAsA.filter((b) => b.status === "COMPLETED").length +
               s.battlesAsB.filter((b) => b.status === "COMPLETED").length;
             const rank = heatRank.get(s.id);
             const pendingSale = s.sales.find((sale) => sale.status === "PENDING");
             const lastSale = s.sales.find((sale) => sale.status === "CONFIRMED");
+            const section = s.closetSection?.trim();
+            const openSection = section && !seenSections.has(section) ? section : null;
+            if (openSection) seenSections.add(openSection);
+            const isLead = s.id === artist.featuredSubmissionId;
             return (
-              <div key={s.id} className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50">
+              <Fragment key={s.id}>
+                {/* A chapter heading is a row of its own, not a hat on the
+                    first card in it — otherwise the card it rides stretches
+                    across the grid and the wall goes crooked. */}
+                {openSection && (
+                  <h3
+                    className="col-span-full mt-2 border-b border-edge pb-1.5 tag text-smoke"
+                    style={artist.accentColor ? { color: artist.accentColor } : undefined}
+                  >
+                    {openSection}
+                  </h3>
+                )}
+              <div
+                className={`group overflow-hidden rounded-xl border bg-surface transition hover:border-volt/50 ${
+                  isLead ? "border-volt/70" : "border-edge"
+                }`}
+                style={isLead && artist.accentColor ? { borderColor: artist.accentColor } : undefined}
+              >
                 <div className="relative overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -416,6 +467,7 @@ export default async function ArtistPage({ params }: Props) {
                   )}
                 </div>
               </div>
+              </Fragment>
             );
           })}
         </div>

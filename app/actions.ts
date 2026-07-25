@@ -2670,6 +2670,117 @@ export async function updateArtistProfile(
  * match your own work — the price on someone else's piece is unreachable
  * from here.
  */
+/**
+ * How the maker's own room is hung: headline, lead piece, accent, layout.
+ *
+ * The accent is the only field here that reaches a style attribute, so it's
+ * the only one that gets strict validation — a strict hex or nothing. The
+ * rest are text, capped and stored as written.
+ */
+export async function updateClosetLook(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+
+  const headline = String(formData.get("closetHeadline") ?? "").trim().slice(0, 120);
+  const layoutRaw = String(formData.get("closetLayout") ?? "grid");
+  const layout = ["grid", "gallery", "list"].includes(layoutRaw) ? layoutRaw : "grid";
+
+  // Anything that isn't a plain 6-digit hex is dropped rather than escaped.
+  const accentRaw = String(formData.get("accentColor") ?? "").trim();
+  const accentColor = /^#[0-9a-fA-F]{6}$/.test(accentRaw) ? accentRaw.toLowerCase() : null;
+  if (accentRaw && !accentColor) {
+    return { ok: false, error: "Use a colour like #ff5a3c, or leave it blank for the house look." };
+  }
+
+  // Feature must be a piece they actually own — scoped in the WHERE, so a
+  // forged id can't graft someone else's work onto this page.
+  const featureRaw = String(formData.get("featuredSubmissionId") ?? "").trim();
+  let featuredSubmissionId: string | null = null;
+  if (featureRaw) {
+    const owned = await prisma.submission.findFirst({
+      where: { id: featureRaw, artistId: profile.id, status: "APPROVED" },
+      select: { id: true },
+    });
+    if (!owned) return { ok: false, error: "You can only feature one of your own approved pieces." };
+    featuredSubmissionId = owned.id;
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      closetHeadline: headline || null,
+      closetLayout: layout,
+      accentColor,
+      featuredSubmissionId,
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Closet updated." };
+}
+
+/**
+ * Move a piece up or down the wall, hide it, or file it under a section.
+ *
+ * Hiding is deliberately not deleting: the piece keeps its votes, its
+ * battle record and its place in the league, it just isn't hanging in the
+ * maker's own room. Somebody tidying their portfolio shouldn't have to
+ * destroy history to do it.
+ */
+export async function updatePieceInCloset(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const id = String(formData.get("pieceId") ?? "");
+  const move = String(formData.get("move") ?? "");
+
+  // Ownership is enforced in the WHERE of every read below, never after.
+  const pieces = await prisma.submission.findMany({
+    where: { artistId: profile.id, status: "APPROVED" },
+    orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    select: { id: true, closetHidden: true },
+  });
+  const at = pieces.findIndex((p) => p.id === id);
+  if (at === -1) return { ok: false, error: "That piece isn't yours." };
+
+  if (move === "up" || move === "down") {
+    const to = move === "up" ? at - 1 : at + 1;
+    if (to < 0 || to >= pieces.length) return { ok: true, note: "Already at the end." };
+    const reordered = [...pieces];
+    [reordered[at], reordered[to]] = [reordered[to], reordered[at]];
+    // Renumber the whole wall so the order is total rather than relative —
+    // partial ordering is what makes these lists drift over time.
+    await prisma.$transaction(
+      reordered.map((p, i) =>
+        prisma.submission.update({ where: { id: p.id }, data: { closetOrder: i } })
+      )
+    );
+  } else if (move === "hide") {
+    await prisma.submission.update({
+      where: { id },
+      data: { closetHidden: !pieces[at].closetHidden },
+    });
+  } else if (move === "section") {
+    const section = String(formData.get("section") ?? "").trim().slice(0, 40);
+    await prisma.submission.update({ where: { id }, data: { closetSection: section || null } });
+  } else {
+    return { ok: false, error: "Unknown change." };
+  }
+
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Closet updated." };
+}
+
 export async function updateMyPiece(
   _prev: ActionResult | null,
   formData: FormData

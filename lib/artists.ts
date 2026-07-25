@@ -115,8 +115,11 @@ export async function getArtistBySlug(slug: string) {
       // booleans derived from this must never leak the hash itself.
       user: { select: { passwordHash: true, _count: { select: { accounts: true } } } },
       submissions: {
-        where: { status: "APPROVED" },
-        orderBy: { createdAt: "desc" },
+        // Hidden pieces keep their votes, battles and league standing —
+        // they just don't hang in the maker's own room. The order is the
+        // maker's if they've arranged one, newest-first if they haven't.
+        where: { status: "APPROVED", closetHidden: false },
+        orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
         include: {
           _count: { select: { votes: true, battlesWon: true } },
           battlesAsA: { select: { status: true } },

@@ -13,6 +13,7 @@ import ProfileMusicForm from "./ProfileMusicForm";
 import CommissionDeskForm from "./CommissionDeskForm";
 import ProfileEditForm from "./ProfileEditForm";
 import PieceManager from "./PieceManager";
+import ClosetLookForm from "./ClosetLookForm";
 import ProfileMusic from "@/components/ProfileMusic";
 import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
@@ -34,6 +35,7 @@ export default async function StudioPage() {
       commissionOpen: true, commissionMinCents: true, commissionMaxCents: true,
       commissionDays: true, commissionSlots: true,
       bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
+      closetHeadline: true, featuredSubmissionId: true, accentColor: true, closetLayout: true,
     },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
@@ -48,12 +50,15 @@ export default async function StudioPage() {
       orderBy: { createdAt: "asc" },
       include: { user: { select: { name: true } } },
     }),
+    // Ordered exactly the way the public page will hang them, so the
+    // arrows in the manager move things in the direction people expect.
     prisma.submission.findMany({
       where: { artistId: profile.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       select: {
         id: true, title: true, imageUrl: true, size: true, description: true,
         askingPriceCents: true, category: true,
+        closetHidden: true, closetSection: true,
         sales: { where: { status: "CONFIRMED" }, select: { id: true }, take: 1 },
       },
     }),
@@ -144,6 +149,25 @@ export default async function StudioPage() {
           Reprice, resize, rewrite or remove any piece — no resubmitting. Clear the price to
           take something off the market and keep it on your page.
         </p>
+
+        {/* How the room is hung, before the pieces in it. */}
+        <div className="mt-4 rounded-xl border border-edge bg-panel p-4">
+          <p className="tag text-heat">Your look</p>
+          <p className="mt-0.5 mb-3 max-w-2xl text-sm text-smoke">
+            Your page shouldn&apos;t look like everyone else&apos;s. Pick what you lead with,
+            say it in your words, and give the page your colour.
+          </p>
+          <ClosetLookForm
+            current={{
+              closetHeadline: profile.closetHeadline,
+              featuredSubmissionId: profile.featuredSubmissionId,
+              accentColor: profile.accentColor,
+              closetLayout: profile.closetLayout,
+            }}
+            pieces={myPieces.map((p) => ({ id: p.id, title: p.title }))}
+          />
+        </div>
+
         <div className="mt-3">
           <PieceManager
             pieces={myPieces.map((p) => ({
@@ -155,6 +179,9 @@ export default async function StudioPage() {
               askingPriceCents: p.askingPriceCents,
               category: p.category,
               sold: p.sales.length > 0,
+              closetHidden: p.closetHidden,
+              closetSection: p.closetSection,
+              featured: profile.featuredSubmissionId === p.id,
             }))}
           />
         </div>

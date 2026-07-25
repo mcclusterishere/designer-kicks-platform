@@ -32,6 +32,18 @@ model Submission {
   // Gallery beyond the cover shot — voters swipe through these inline.
   extraImages String[] @default([])
 
+  // How this piece hangs in its maker's closet. closetOrder is a manual
+  // rank (lower first); null falls back to newest-first, so a maker who
+  // never touches the ordering still gets a sensible closet. closetHidden
+  // takes a piece off the artist's own page WITHOUT deleting it or
+  // withdrawing it from the league — the record and the votes stand,
+  // it just isn't in the room. closetSection is a free-text group label
+  // ("2026 work", "Commissions") for makers who want their closet in
+  // chapters instead of one wall.
+  closetOrder   Int?
+  closetHidden  Boolean @default(false)
+  closetSection String?
+
   // Optional 15-second clip of the piece. Duration is gated client-side
   // (no ffprobe on the server); the hard backstop is the 40MB size cap.
   // One video per artist per day — scale guard while hosting is small.
@@ -138,6 +150,23 @@ model ArtistProfile {
   commissionMaxCents Int?   // typical top end, optional
   commissionDays     Int?   // typical turnaround in days
   commissionSlots    Int?   // open slots right now, optional scarcity
+  // Closet customization — the maker's own hang of their own room. A
+  // portfolio where everyone's work is dealt in upload order flattens the
+  // difference between makers, and the difference is the whole point.
+  //
+  // closetHeadline is the line over the work, in their words rather than
+  // ours. featuredSubmissionId is the one piece they lead with — a
+  // deliberate loose reference, not a relation, so deleting the piece just
+  // clears the feature instead of cascading into the profile. accentColor
+  // is a single hex the page borrows for rules and highlights; it's
+  // validated on write and ignored if it isn't a hex, because a stray
+  // value here would leak straight into a style attribute. closetLayout
+  // picks how the grid hangs.
+  closetHeadline String?
+  featuredSubmissionId String?
+  accentColor    String?
+  closetLayout   String  @default("grid") // grid | gallery | list
+
   createdAt   DateTime @default(now())
 
   // Where they already sell — captured at onboarding, shown on their page.
