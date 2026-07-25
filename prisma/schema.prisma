@@ -1016,6 +1016,40 @@ model QuizQuestion {
   category    String  @default("history")
   explanation String?
   active      Boolean @default(true)
+
+  /**
+   * Which game this belongs to: "culture" (the original trivia — who
+   * designed what, which year, which collab) or "markets" (the same
+   * culture used to teach how markets actually work).
+   *
+   * Defaulted to culture so the existing bank is correctly labelled
+   * without touching a row. The two tracks never mix inside a run: a
+   * markets run that kept serving Jordan trivia would teach nothing, and
+   * a culture run interrupted by a question about cost of carry would
+   * just feel broken.
+   */
+  track       String  @default("culture")
+
+  /**
+   * The named financial idea, e.g. "bid-ask-spread". Markets questions
+   * only. Shared with lib/marketLessons so the same concept can be taught
+   * on the market page and tested here under one name.
+   */
+  concept     String?
+
+  /**
+   * The micro-lesson: what this concept IS, in two or three sentences,
+   * naming the term a trading desk would use.
+   *
+   * Deliberately a separate field from `explanation`. An explanation
+   * justifies one answer ("Jordan signed in 1984"); a lesson teaches
+   * something transferable that outlives the question. Culture trivia
+   * only ever needed the former.
+   */
+  lesson      String?
+
+  /** 1–5, the progression ladder in lib/iq. Culture questions stay at 1. */
+  level       Int     @default(1)
   // Culture questions born from articles — the feed links back to the
   // story so people can read up before (or after) they answer.
   articleId   String?
@@ -1027,6 +1061,8 @@ model QuizQuestion {
   // Quiz pool + count filter on active; culture-question upsert on articleId.
   @@index([active])
   @@index([articleId])
+  // Every run builds its pool by track.
+  @@index([track, active])
 }
 
 // The Culture IQ ledger: one row per user per question, forever. A
@@ -1051,6 +1087,8 @@ model QuizRun {
   id           String    @id @default(cuid())
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /** Which game this run is playing. Fixed for the life of the run. */
+  track        String    @default("culture")
   questionIds  String // JSON array, server-chosen order
   currentIndex Int       @default(0)
   correctCount Int       @default(0)

@@ -34,11 +34,13 @@ export default async function QuizPage({
     await verifyCheckoutSession(session_id);
   }
 
-  const [giveaway, questionCount, leaderboard] = await Promise.all([
+  const [giveaway, cultureCount, marketsCount, leaderboard] = await Promise.all([
     getActiveGiveaway(),
-    prisma.quizQuestion.count({ where: { active: true } }),
+    prisma.quizQuestion.count({ where: { active: true, track: "culture" } }),
+    prisma.quizQuestion.count({ where: { active: true, track: "markets" } }),
     getQuizLeaderboard(10),
   ]);
+  const questionCount = cultureCount + marketsCount;
 
   if (!session?.user?.id) {
     return (
@@ -70,7 +72,7 @@ export default async function QuizPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <Hero giveawayTitle={giveaway?.prize ?? null} />
+      <Hero giveawayTitle={giveaway?.prize ?? null} track={initialState?.track} />
 
       {giveaway && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-heat/50 bg-surface p-4">
@@ -99,6 +101,8 @@ export default async function QuizPage({
             process.env.PAYMENTS_DEV_MODE === "true"
           }
           questionCount={questionCount}
+          cultureCount={cultureCount}
+          marketsCount={marketsCount}
         />
       </div>
 
@@ -155,7 +159,28 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
   );
 }
 
-function Hero({ giveawayTitle }: { giveawayTitle: string | null }) {
+function Hero({
+  giveawayTitle,
+  track,
+}: {
+  giveawayTitle: string | null;
+  track?: "culture" | "markets";
+}) {
+  // Mid-run the page has to agree with the game being played. A markets run
+  // under a heading that says "Culture IQ" reads as a bug.
+  if (track === "markets") {
+    return (
+      <div>
+        <p className="tag text-volt">Market IQ</p>
+        <h1 className="display mt-2 text-4xl text-white sm:text-5xl">The Desk</h1>
+        <p className="mt-3 text-smoke">
+          How markets actually work, taught through the one you already read for
+          fun. Every answer moves your Market IQ and climbs the desk — from
+          Retail Buyer up to Desk Head. Same strikes, same rules, different game.
+        </p>
+      </div>
+    );
+  }
   return (
     <div>
       <p className="tag text-heat">Culture IQ</p>

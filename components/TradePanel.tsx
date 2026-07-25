@@ -151,8 +151,8 @@ export default function TradePanel({
                 <Explain lesson="oneofone" values={lessonValues} />
               </p>
               <p className="mt-1 text-xs leading-relaxed text-smoke">
-                One unit, no queue of buyers and sellers — so there's an asking price and a
-                sale record, but no bid and no ask.
+                One unit, no queue of buyers and sellers — so there&apos;s an asking price
+                and a sale record, but no bid and no ask.
               </p>
             </div>
           )}

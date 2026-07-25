@@ -1199,9 +1199,9 @@ const preloadArtists = [
   },
 ];
 
-function loadQuestions() {
+function loadQuestions(file = "questions.json") {
   try {
-    const raw = readFileSync(path.join(here, "questions.json"), "utf8");
+    const raw = readFileSync(path.join(here, file), "utf8");
     const parsed = JSON.parse(raw);
     return parsed.filter(
       (q) =>
@@ -2235,10 +2235,19 @@ async function main() {
     // the live game instead of freezing at whatever first seeded.
     // (Culture questions come from articles above; these are the
     // standalone trivia bank, keyed articleId = null.)
-    const bank = loadQuestions();
+    // Two banks now: the culture trivia and the markets curriculum. Same
+    // upsert either way — keyed on question text, additive, and never
+    // touching the admin's active toggle.
+    const bank = [
+      ...loadQuestions().map((q) => ({ ...q, track: "culture" })),
+      ...loadQuestions("market-questions.json").map((q) => ({ ...q, track: "markets" })),
+    ];
     const existingTrivia = await prisma.quizQuestion.findMany({
       where: { articleId: null },
-      select: { id: true, question: true, options: true, answerIndex: true },
+      select: {
+        id: true, question: true, options: true, answerIndex: true,
+        track: true, lesson: true, concept: true, level: true,
+      },
     });
     const byText = new Map(existingTrivia.map((q) => [q.question, q]));
     let newQuestions = 0;
@@ -2248,16 +2257,28 @@ async function main() {
         options: JSON.stringify(q.options),
         answerIndex: q.answerIndex,
         difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
-        category: q.category || "history",
+        category: q.category || (q.track === "markets" ? "markets" : "history"),
         explanation: q.explanation || null,
+        track: q.track,
+        lesson: q.lesson || null,
+        concept: q.concept || null,
+        level: Number.isInteger(q.level) ? q.level : 1,
       };
       const existing = byText.get(q.question);
       if (existing) {
-        // Repair the correctness fields when questions.json fixes a wrong
+        // Repair the correctness fields when a bank fixes a wrong
         // answer/options — otherwise a bad answerIndex would score players
-        // wrong forever and burn into the IQ ledger. Only touches content
-        // that actually differs; never flips the admin's `active` toggle.
-        if (existing.options !== content.options || existing.answerIndex !== content.answerIndex) {
+        // wrong forever and burn into the IQ ledger. Teaching fields count
+        // as correctness here: a markets question whose lesson never
+        // arrived is a question that teaches nothing.
+        const stale =
+          existing.options !== content.options ||
+          existing.answerIndex !== content.answerIndex ||
+          existing.track !== content.track ||
+          existing.lesson !== content.lesson ||
+          existing.concept !== content.concept ||
+          existing.level !== content.level;
+        if (stale) {
           await prisma.quizQuestion.update({ where: { id: existing.id }, data: content });
           fixedQuestions++;
         }

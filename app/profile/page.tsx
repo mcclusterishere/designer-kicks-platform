@@ -2,6 +2,7 @@ import Money from "@/components/Money";
 import PushToggle from "@/components/PushToggle";
 import PlayLimits from "@/components/PlayLimits";
 import CreditStatement from "@/components/CreditStatement";
+import DeskRank from "@/components/DeskRank";
 import { unreadCount } from "@/lib/messages";
 import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
@@ -19,7 +20,7 @@ import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
 import IQPanel from "@/components/IQPanel";
 import Walkthrough from "@/components/Walkthrough";
-import { cultureIQ } from "@/lib/iq";
+import { cultureIQ, marketIQ, rankFor } from "@/lib/iq";
 import { respondOffer, withdrawOffer } from "@/app/actions";
 
 export const metadata = { title: "Your Profile — The Heat Chart" };
@@ -96,6 +97,8 @@ export default async function ProfilePage() {
   ]);
   const unread = await unreadCount(user.id);
   const { stakedToday, statement } = await import("@/lib/ledger");
+  const mkt = await marketIQ(user.id);
+  const deskRank = rankFor(mkt.correct);
   const [limits, todayStaked, ledgerEntries] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
@@ -153,6 +156,7 @@ export default async function ProfilePage() {
           excludedUntil={limits?.selfExcludedUntil?.toISOString() ?? null}
           stakedToday={todayStaked}
         />
+        <DeskRank iq={mkt} rank={deskRank} />
         <CreditStatement entries={ledgerEntries} balance={creditUser?.credits ?? 0} />
       </div>
 
