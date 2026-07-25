@@ -146,9 +146,25 @@ export default async function RootLayout({
               }}
               unread={unread}
             />
-            {/* Mobile: tab bar handles navigation; header keeps the
-                account chip + the day/night switch */}
+            {/* Mobile: tab bar handles navigation; header keeps Post,
+                the account chip + the day/night switch.
+                Post is here because it went missing. Submit lives in
+                HeaderNav, which is `md:flex` — so when the four-door nav
+                shipped, phones lost every unconditional route to it. The
+                tab bar has five doors and Post isn't one, and both
+                fallback links (home, and the end of the vote deck) only
+                render when there are no live battles. The healthier the
+                arena got, the harder it became to enter it: an artist on
+                a phone had to vote through every open battle before a
+                submit button appeared. Artists are the supply side of
+                this market — their way in cannot be conditional. */}
             <div className="flex items-center gap-2">
+              <Link
+                href="/submit"
+                className="btn-hard tag rounded-full px-3 py-2 font-bold md:hidden"
+              >
+                ＋ Post
+              </Link>
               <ThemeToggle />
               <Link
                 href={session?.user ? "/profile" : "/signin"}

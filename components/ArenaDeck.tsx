@@ -290,6 +290,18 @@ export default function ArenaDeck({
           </button>
         )}
       </div>
+
+      {/* The way in, always. This used to live only in the "floor
+          cleared" state above, which meant an artist had to vote through
+          every open battle before the site offered them a way to enter
+          one. Watching the fights should never be the toll for joining
+          them. */}
+      <p className="mt-5 text-center text-xs text-smoke">
+        Made something?{" "}
+        <Link href="/submit" className="font-bold text-volt underline">
+          Put it on the floor
+        </Link>
+      </p>
     </div>
   );
 }

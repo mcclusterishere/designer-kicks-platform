@@ -32,6 +32,15 @@ export default async function SubmitPage() {
         <li>📸 One clean photo, good light, your work is the star (JPG/PNG/WebP, max 6MB)</li>
         <li>Your own work only — no stock photos, no reposts</li>
         <li>We review every submission before it enters a battle</li>
+        {/* Said up front because it was being discovered the hard way:
+            after filling the form and pushing a 40MB clip. Also kills a
+            misconception worth killing — artists were reading the video
+            cap as a cap on pieces. Post as many pieces as you like. */}
+        <li>
+          Post as many pieces as you want. The only cap is{" "}
+          <span className="text-white">one video a day</span> while we scale
+          hosting — photos are unlimited.
+        </li>
       </ul>
 
       {!session?.user ? (

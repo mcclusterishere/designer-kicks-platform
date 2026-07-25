@@ -246,6 +246,19 @@ export default async function HomePage() {
             ))}
           </div>
         )}
+
+        {/* The empty state above offers a way in; a busy arena has to
+            offer one too. This line used to exist only when there were
+            no battles at all, so the invitation to enter disappeared
+            exactly when there was something worth entering. */}
+        {battles.length > 0 && (
+          <p className="mt-8 text-center text-sm text-smoke">
+            Your work belongs on this wall.{" "}
+            <Link href="/submit" className="font-bold text-volt underline">
+              Enter your customs
+            </Link>
+          </p>
+        )}
       </section>
 
       {/* Heat list preview */}
