@@ -23,7 +23,18 @@ export function cronAuthorized(req: NextRequest): boolean {
   const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   const key = req.nextUrl.searchParams.get("key")?.trim() ?? "";
 
-  return safeEqual(bearer, secret) || safeEqual(key, secret);
+  // A literal "+" in a query string decodes to a space. Secrets generated
+  // with base64 often contain "+", and pasting one into a scheduler's URL
+  // field without percent-encoding it silently corrupts the value — an
+  // invisible cause of 401s. Compare the plus-restored form too so the
+  // obvious paste just works.
+  const plusRestored = key.includes(" ") ? key.replace(/ /g, "+") : "";
+
+  return (
+    safeEqual(bearer, secret) ||
+    safeEqual(key, secret) ||
+    (plusRestored !== "" && safeEqual(plusRestored, secret))
+  );
 }
 
 function safeEqual(a: string, b: string): boolean {
