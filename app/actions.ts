@@ -39,6 +39,7 @@ import { redirect } from "next/navigation";
 import { randomUUID, randomInt, randomBytes } from "crypto";
 import { saveUpload } from "@/lib/storage";
 import { resaleSplitLabel } from "@/lib/resale";
+import { estimateFeeCents } from "@/lib/reseller";
 import { sendMail } from "@/lib/mailer";
 import { allowAttempt } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
@@ -5340,4 +5341,174 @@ export async function galleryTouchAction(formData: FormData): Promise<void> {
  */
 export async function scoutGalleriesAction(formData: FormData): Promise<void> {
   await scoutGalleries(null, formData);
+}
+
+// ---- Reseller desk: house inventory ------------------------------------
+//
+// These rows are our own capital, so the write path is stricter than the
+// rest of the admin panel. Cost basis is required and must be positive:
+// an item with no cost silently reports infinite margin everywhere
+// downstream, and a P&L that flatters itself is worse than none.
+
+/**
+ * Dollars in a text field to integer cents. Returns null for blank so a
+ * missing optional price stays missing, rather than becoming a very
+ * confident $0.00 — the distinction matters on every money field here.
+ */
+function dollarsToCents(raw: FormDataEntryValue | null): number | null {
+  const s = String(raw ?? "").trim().replace(/[$,]/g, "");
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100);
+}
+
+/** Add or edit a pair on the shelf. */
+export async function saveInventoryItem(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const size = String(formData.get("size") ?? "").trim();
+  const sku = String(formData.get("sku") ?? "").trim();
+  const brand = String(formData.get("brand") ?? "").trim();
+  const condition = String(formData.get("condition") ?? "DS");
+  const acquiredFrom = String(formData.get("acquiredFrom") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const imageUrl = String(formData.get("imageUrl") ?? "").trim();
+
+  if (!name || !size) return { ok: false, error: "Name and size are required." };
+  if (!["DS", "VNDS", "USED"].includes(condition)) return { ok: false, error: "Unknown condition." };
+
+  const costCents = dollarsToCents(formData.get("cost"));
+  if (costCents === null || costCents <= 0) {
+    return { ok: false, error: "Cost basis is required — every margin on the desk is computed from it." };
+  }
+  const listCents = dollarsToCents(formData.get("listPrice"));
+
+  const acquiredRaw = String(formData.get("acquiredAt") ?? "").trim();
+  const acquiredAt = acquiredRaw ? new Date(`${acquiredRaw}T12:00:00Z`) : undefined;
+  if (acquiredAt && Number.isNaN(acquiredAt.getTime())) {
+    return { ok: false, error: "Acquired date isn't a real date." };
+  }
+
+  // Link to the catalog when the SKU matches — that link is what makes
+  // live comps and lower-of-cost-or-market valuation possible.
+  const catalogShoeId = sku
+    ? (await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } }))?.id ?? null
+    : null;
+
+  const publicListed = formData.get("publicListed") === "on";
+  const data = {
+    name,
+    size,
+    sku: sku || null,
+    brand: brand || null,
+    condition,
+    costCents,
+    listPriceCents: listCents,
+    acquiredFrom: acquiredFrom || null,
+    notes: notes || null,
+    imageUrl: imageUrl || null,
+    catalogShoeId,
+    publicListed,
+    // Listing a pair starts its days-on-market clock. Only stamp it the
+    // first time, so re-saving an already-listed pair doesn't reset the
+    // clock and make aging stock look fresh.
+    ...(listCents !== null ? { status: "LISTED" } : {}),
+    ...(acquiredAt ? { acquiredAt } : {}),
+  };
+
+  if (id) {
+    const existing = await prisma.inventoryItem.findUnique({ where: { id }, select: { listedAt: true } });
+    await prisma.inventoryItem.update({
+      where: { id },
+      data: { ...data, ...(listCents !== null && !existing?.listedAt ? { listedAt: new Date() } : {}) },
+    });
+  } else {
+    await prisma.inventoryItem.create({
+      data: { ...data, ...(listCents !== null ? { listedAt: new Date() } : {}) },
+    });
+  }
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Record a sale. This is the write that turns a guess into a number. */
+export async function sellInventoryItem(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, error: "Which pair?" };
+
+  const soldPriceCents = dollarsToCents(formData.get("soldPrice"));
+  if (soldPriceCents === null || soldPriceCents <= 0) {
+    return { ok: false, error: "What did it actually sell for?" };
+  }
+  const channel = String(formData.get("soldChannel") ?? "other");
+  // The fee is pre-filled from the channel's published rate, but what
+  // the operator types wins. An estimate that silently overwrites the
+  // real number is how a ledger stops being usable as evidence.
+  const typedFee = dollarsToCents(formData.get("fee"));
+  const feeCents = typedFee ?? estimateFeeCents(soldPriceCents, channel);
+  const shipCents = dollarsToCents(formData.get("ship")) ?? 0;
+
+  const soldRaw = String(formData.get("soldAt") ?? "").trim();
+  const soldAt = soldRaw ? new Date(`${soldRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(soldAt.getTime())) return { ok: false, error: "Sold date isn't a real date." };
+
+  await prisma.inventoryItem.update({
+    where: { id },
+    data: {
+      status: "SOLD",
+      soldPriceCents,
+      soldChannel: channel,
+      feeCents,
+      shipCents,
+      soldAt,
+      // A sold pair leaves the storefront immediately. Nothing worse
+      // than taking money for a pair that's already gone.
+      publicListed: false,
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/available");
+  return { ok: true };
+}
+
+/** Pull a pair off the shelf entirely (returned, kept, written off). */
+export async function removeInventoryItem(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.inventoryItem.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin");
+}
+
+/** Show or hide a pair on our own storefront, without touching anything else. */
+export async function toggleInventoryListing(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const item = await prisma.inventoryItem.findUnique({
+    where: { id },
+    select: { publicListed: true, listPriceCents: true, listedAt: true },
+  });
+  if (!item) return;
+  // A pair with no price can't go on the storefront — it would render as
+  // a buyable item with nothing to charge.
+  if (!item.publicListed && item.listPriceCents === null) return;
+  await prisma.inventoryItem.update({
+    where: { id },
+    data: {
+      publicListed: !item.publicListed,
+      ...(!item.publicListed && !item.listedAt ? { listedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/available");
 }

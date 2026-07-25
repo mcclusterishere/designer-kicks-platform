@@ -39,6 +39,7 @@ import QuestionForm from "./QuestionForm";
 import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
+import ResellerDesk from "./ResellerDesk";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
 import RosterRun from "./RosterRun";
@@ -514,7 +515,7 @@ export default async function AdminPage({
   // scroll. Deep links still work — editing a product or article jumps
   // straight to its tab.
   const { tab: tabParam } = await searchParams;
-  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "team", "settings"];
+  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "desk", "team", "settings"];
   const tab = editArticle ? "content" : edit ? "market" : TAB_IDS.includes(tabParam ?? "") ? (tabParam as string) : "pulse";
   const show = (t: string) => tab === t;
   const rosterAttention =
@@ -563,6 +564,10 @@ export default async function AdminPage({
             { id: "games", label: "Games", icon: "🎮", n: 0 },
             { id: "content", label: "Content", icon: "📰", n: 0 },
             { id: "market", label: "Market", icon: "💰", n: 0 },
+            // The desk is our own capital, which is why it sits apart from
+            // Market (affiliate links and the shoe catalog — other people's
+            // inventory). Different money, different room.
+            { id: "desk", label: "Reseller", icon: "📦", n: 0 },
             { id: "team", label: "Team", icon: "👥", n: 0 },
             { id: "settings", label: "Settings", icon: "⚙️", n: 0 },
           ].map((t) => (
@@ -2039,6 +2044,15 @@ export default async function AdminPage({
       )}
 
       {show("market") && <CatalogSection />}
+
+      {/* The reseller desk: pairs the house owns outright. Its own room
+          because it is the only section on this page describing our own
+          capital rather than other people's inventory. */}
+      {show("desk") && (
+        <section className="mt-8">
+          <ResellerDesk />
+        </section>
+      )}
       {show("content") && <DripSection />}
 
       {/* Sales ledger */}

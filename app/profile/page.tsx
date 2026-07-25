@@ -176,12 +176,23 @@ export default async function ProfilePage() {
                 Your work, your rates, your drops — all controlled from the Studio.
               </p>
             </div>
-            <Link
-              href="/studio"
-              className="shrink-0 rounded-lg btn-hard px-5 py-2.5 tag font-bold"
-            >
-              Open Studio →
-            </Link>
+            {/* Post first, Studio second. This ordering is Dakota's, not
+                ours: asked what would make the site better, the one
+                concrete thing he named was that posting belongs on your
+                own profile rather than the home page. He's right, and
+                it's how every tool a maker already uses works — your
+                work lives on your page, so you post from your page. */}
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link href="/submit" className="rounded-lg btn-hard px-5 py-2.5 tag font-bold">
+                ＋ Post a piece
+              </Link>
+              <Link
+                href="/studio"
+                className="rounded-lg border border-volt/50 px-5 py-2.5 tag font-bold text-white transition hover:border-volt"
+              >
+                Open Studio →
+              </Link>
+            </div>
           </div>
 
           {/* Straight into the controls, no hunting */}

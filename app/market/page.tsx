@@ -7,6 +7,7 @@ import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, getHotBases, formatUsd, type MarketItem, type HotBase } from "@/lib/market";
 import { getExchangeBoard, getIndexStats, getMovers, getIndexHistory, type SortKey } from "@/lib/exchange";
 import ExchangeTable from "@/components/ExchangeTable";
+import HouseStock from "@/components/HouseStock";
 import TickerTape from "@/components/TickerTape";
 import IndexHero from "@/components/IndexHero";
 import CatalogBoard from "@/components/CatalogBoard";
@@ -302,11 +303,13 @@ export default async function MarketPage({
   // people came to look at; "og" is kept as an alias so every link already
   // in the wild still lands on the book.
   const raw = sp.board ?? "exchange";
-  const board: "exchange" | "catalog" | "customs" = raw === "customs"
+  const board: "exchange" | "catalog" | "customs" | "instock" = raw === "customs"
     ? "customs"
     : raw === "catalog"
       ? "catalog"
-      : "exchange";
+      : raw === "instock"
+        ? "instock"
+        : "exchange";
   const og = board === "exchange";
   const needle = q.trim().toLowerCase();
 
@@ -359,7 +362,9 @@ export default async function MarketPage({
               ? "Retail drops tracked against live resale — chart, book and spread."
               : board === "catalog"
                 ? "The same pairs, laid out to browse."
-                : "One-of-one customs priced by the artists who built them."}
+                : board === "instock"
+                  ? "Pairs we own outright and sell direct — our stock, our shipping."
+                  : "One-of-one customs priced by the artists who built them."}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Link
@@ -390,6 +395,9 @@ export default async function MarketPage({
               { key: "exchange", label: "📈 Chart", tone: "bg-heat text-ink" },
               { key: "catalog", label: "▦ Browse", tone: "bg-volt text-ink" },
               { key: "customs", label: "✦ Customs", tone: "bg-volt text-ink" },
+              // Ours, kept visibly separate from the boards that list
+              // other people's inventory.
+              { key: "instock", label: "🏷 In Stock", tone: "bg-volt text-ink" },
             ] as const
           ).map((t) => (
             <Link
@@ -414,7 +422,9 @@ export default async function MarketPage({
         />
       )}
 
-      {board === "catalog" ? (
+      {board === "instock" ? (
+        <HouseStock />
+      ) : board === "catalog" ? (
         <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
       ) : og && ogBoard ? (
         <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />

@@ -34,6 +34,12 @@ const FORBIDDEN = [
   { name: "socialHandle key", re: /socialHandle/ },
   { name: "consignorName key", re: /consignorName/ },
   { name: "any email address", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|net|org|io|co)\b/ },
+  // House inventory: what we paid, what we'd clear, and who bought it are
+  // ours alone. The storefront query uses an explicit select for exactly
+  // this reason — a buyer seeing the cost basis on a pair is a buyer who
+  // never pays the asking price again.
+  { name: "cost basis", re: /costCents/ },
+  { name: "margin fields", re: /feeCents|shipCents|soldPriceCents|acquiredFrom/ },
 ];
 
 async function sweep(label, url) {
@@ -67,7 +73,12 @@ try {
   }
 
   // The rest of the logged-out public surface, for good measure.
-  for (const path of ["/", "/artists", "/heat-list", "/market", "/drops", "/news", "/quiz"]) {
+  for (const path of [
+    "/", "/artists", "/heat-list", "/market", "/drops", "/news", "/quiz",
+    // The house storefront: our own stock, and the one public page that
+    // renders rows carrying our cost basis.
+    "/market?board=instock",
+  ]) {
     await sweep(path, `${BASE}${path}`);
   }
 
