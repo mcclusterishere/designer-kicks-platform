@@ -109,7 +109,15 @@ export async function GET(req: NextRequest) {
     })
   );
 
-  // 7. Fingerprint the market so the index has real history to chart.
+  // 7. Settle prediction calls whose window has closed.
+  steps.push(
+    await run("settle-calls", async () => {
+      const { resolveDuePredictions } = await import("@/lib/predictions");
+      return resolveDuePredictions();
+    })
+  );
+
+  // 8. Fingerprint the market so the index has real history to chart.
   steps.push(
     await run("index-snapshot", async () => {
       const { recordIndexSnapshot } = await import("@/lib/exchange");

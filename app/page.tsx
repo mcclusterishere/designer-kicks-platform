@@ -132,6 +132,7 @@ export default async function HomePage() {
                 ["/drops", "Drop calendar"],
                 ["/market", "Live resale"],
                 ["/league", "The Draft"],
+                ["/predict", "The Call"],
                 ["/games", "Free games"],
                 ["/available", "Shop 1-of-1s"],
                 ["/news", "Newsroom"],

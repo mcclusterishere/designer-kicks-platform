@@ -2728,6 +2728,31 @@ export async function deleteMyPiece(pieceId: string) {
   revalidatePath(`/artists/${profile.slug}`);
 }
 
+// ---------- The Call (prediction market) ----------
+
+/** Lock in a read on where a pair's resale lands. */
+export async function makePredictionCall(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Sign in to make a call." };
+
+  const shoeId = String(formData.get("shoeId") ?? "");
+  const kind = String(formData.get("kind") ?? "DIRECTION") === "PRICE" ? "PRICE" : "DIRECTION";
+  const horizonDays = Number(formData.get("horizonDays")) || 7;
+  const direction = String(formData.get("direction") ?? "") === "DOWN" ? "DOWN" : "UP";
+  const rawPrice = String(formData.get("predictedPrice") ?? "").replace(/[^0-9.]/g, "").trim();
+  const predictedCents = rawPrice ? Math.round(Number(rawPrice) * 100) : undefined;
+
+  const { makeCall } = await import("@/lib/predictions");
+  const r = await makeCall({ userId, shoeId, kind, horizonDays, direction, predictedCents });
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/predict");
+  return { ok: true, note: "Call locked. It settles itself when the window closes." };
+}
+
 async function myApprovedArtist() {
   const session = await auth();
   if (!session?.user?.id) return null;

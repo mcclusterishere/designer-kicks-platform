@@ -647,6 +647,7 @@ model User {
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
   catalogRatings   CatalogRating[]
   leagueEntries    LeagueEntry[]
+  predictions      Prediction[]
 }
 
 // A private thread between an editor and the league office. Editors can
@@ -1112,6 +1113,7 @@ model CatalogShoe {
 
   ratings CatalogRating[]
   priceHistory PriceSnapshot[]
+  predictions  Prediction[]
 
   @@index([brand])
   @@index([silhouette])
@@ -1249,4 +1251,39 @@ model PriceSnapshot {
   @@unique([shoeId, source, at])
   @@index([shoeId, at])
   @@index([at])
+}
+
+// The Call — predict where a pair's resale lands, get scored when reality
+// arrives. Every prediction stores the price it was made against (basis),
+// so settlement is a comparison of two recorded facts rather than a
+// judgement call. Resolved by the cron once resolveAt passes.
+model Prediction {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shoeId  String
+  shoe    CatalogShoe @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+
+  kind        String // DIRECTION | PRICE
+  horizonDays Int
+  // What the market read when the call was made — the line you're betting against.
+  basisCents  Int
+  // DIRECTION calls: UP | DOWN. PRICE calls: the number you're calling.
+  direction     String?
+  predictedCents Int?
+
+  resolveAt DateTime
+  status    String   @default("OPEN") // OPEN | SETTLED | VOID
+  // Filled at settlement.
+  actualCents Int?
+  correct     Boolean?
+  points      Int?
+  settledAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  // One open call per pair per horizon per person — no hedging both ways.
+  @@unique([userId, shoeId, horizonDays, status])
+  @@index([status, resolveAt])
+  @@index([userId, status])
+  @@index([shoeId])
 }

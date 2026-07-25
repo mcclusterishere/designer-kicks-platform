@@ -23,6 +23,13 @@ const GAMES = [
     tone: "volt" as const,
   },
   {
+    href: "/predict",
+    emoji: "🎯",
+    title: "The Call",
+    blurb: "Say where a pair lands in 7 or 30 days. Settled on real recorded prices — build a track record.",
+    tone: "heat" as const,
+  },
+  {
     href: "/games/guess-the-resale",
     emoji: "💸",
     title: "Guess The Resale",

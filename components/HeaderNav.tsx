@@ -13,7 +13,7 @@ const LINKS = [
   },
   { href: "/drops", label: "Drops", match: ["/drops", "/news"] },
   { href: "/catalog", label: "Catalog", match: ["/catalog"] },
-  { href: "/market", label: "Market", match: ["/market", "/collectors", "/shop"] },
+  { href: "/market", label: "Market", match: ["/market", "/predict", "/collectors", "/shop"] },
 ];
 
 function lit(pathname: string, match: string[]): boolean {
