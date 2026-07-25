@@ -2881,18 +2881,23 @@ export async function makePredictionCall(
   const userId = session?.user?.id;
   if (!userId) return { ok: false, error: "Sign in to make a call." };
 
-  const shoeId = String(formData.get("shoeId") ?? "");
+  const shoeId = String(formData.get("shoeId") ?? "") || undefined;
+  const submissionId = String(formData.get("submissionId") ?? "") || undefined;
   const kind = String(formData.get("kind") ?? "DIRECTION") === "PRICE" ? "PRICE" : "DIRECTION";
   const horizonDays = Number(formData.get("horizonDays")) || 7;
   const direction = String(formData.get("direction") ?? "") === "DOWN" ? "DOWN" : "UP";
   const rawPrice = String(formData.get("predictedPrice") ?? "").replace(/[^0-9.]/g, "").trim();
   const predictedCents = rawPrice ? Math.round(Number(rawPrice) * 100) : undefined;
+  const stakeCredits = Number(formData.get("stakeCredits")) || 0;
 
   const { makeCall } = await import("@/lib/predictions");
-  const r = await makeCall({ userId, shoeId, kind, horizonDays, direction, predictedCents });
+  const r = await makeCall({
+    userId, shoeId, submissionId, kind, horizonDays, direction, predictedCents, stakeCredits,
+  });
   if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/market");
   revalidatePath("/predict");
-  return { ok: true, note: "Call locked. It settles itself when the window closes." };
+  return { ok: true, note: r.note ?? "Call locked. It settles itself when the window closes." };
 }
 
 async function myApprovedArtist() {

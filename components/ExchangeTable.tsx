@@ -44,7 +44,7 @@ export default function ExchangeTable({
   pages: number;
   total: number;
 }) {
-  const base = { board: "og", q: query, brand, sort };
+  const base: Record<string, string | undefined> = { q: query, brand, sort };
 
   return (
     <div className="mt-4">
@@ -89,7 +89,9 @@ export default function ExchangeTable({
                     style={{ "--i": i } as React.CSSProperties}
                   >
                     <td className="px-3 py-2.5">
-                      <Link href={`/catalog/${encodeURIComponent(r.sku)}`} className="flex items-center gap-2.5">
+                      {/* Opens the trade panel in place rather than leaving
+                          the market — the whole point of centralising it. */}
+                      <Link href={href(base, { sym: r.sku })} className="flex items-center gap-2.5">
                         {r.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={r.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded bg-panel object-cover" />

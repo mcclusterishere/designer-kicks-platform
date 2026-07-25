@@ -85,6 +85,7 @@ model Submission {
   battlesAsB Battle[] @relation("battleSubB")
   battlesWon Battle[] @relation("battleWinner")
   votes      Vote[]
+  predictions Prediction[]
 
   tournamentsWon Tournament[]      @relation("tournamentChampion")
   matchesAsA     TournamentMatch[] @relation("matchSubA")
@@ -1358,8 +1359,25 @@ model Prediction {
   id      String @id @default(cuid())
   userId  String
   user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  shoeId  String
-  shoe    CatalogShoe @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+
+  // A call is on a retail pair OR a one-of-one, never both. Two nullable
+  // sides rather than one polymorphic id, so the database still enforces
+  // that whatever is referenced actually exists.
+  shoeId  String?
+  shoe    CatalogShoe? @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+  submissionId String?
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /** OG | CUSTOM — which floor this call was made on. */
+  side    String @default("OG")
+
+  // Credits staked. This is the whole point of the panel: a call with
+  // nothing behind it is an opinion, and opinions don't make a market.
+  // Debited when the call is placed and returned with winnings on a hit,
+  // so the balance on screen is always what's actually left.
+  stakeCredits Int @default(0)
+  /** Credits returned at settlement — stake plus winnings, or zero. */
+  payoutCredits Int?
 
   kind        String // DIRECTION | PRICE
   horizonDays Int
@@ -1379,10 +1397,15 @@ model Prediction {
   createdAt   DateTime @default(now())
 
   // One open call per pair per horizon per person — no hedging both ways.
+  // Separate constraints per side because a null in a compound unique
+  // doesn't collide, so one index can't cover both.
   @@unique([userId, shoeId, horizonDays, status])
+  @@unique([userId, submissionId, horizonDays, status])
   @@index([status, resolveAt])
   @@index([userId, status])
   @@index([shoeId])
+  @@index([submissionId])
+  @@index([side, status])
 }
 
 

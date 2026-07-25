@@ -40,33 +40,83 @@ export function scorePrice(predictedCents: number, actualCents: number): number 
   return Math.max(0, Math.round(25 - errPct));
 }
 
+export const STAKES = [5, 10, 25, 50] as const;
+
+/**
+ * What a winning call pays, as a multiple of the stake.
+ *
+ * Direction pays even money doubled when you were the minority — the same
+ * shape as the points scoring, so the incentive to be early rather than
+ * agreeable survives into the credits. A price call pays on accuracy, up to
+ * triple, because calling a number is strictly harder than calling a way.
+ *
+ * Stakes are Culture credits, which are earned by playing and can be bought
+ * for entries — they are not currency and never pay out as money. That's
+ * deliberate: the moment a wrong call costs someone real money this stops
+ * being a game and starts being something that needs a licence.
+ */
+export function payoutFor(stake: number, kind: "DIRECTION" | "PRICE", points: number, minority: boolean): number {
+  if (points <= 0) return 0;
+  if (kind === "DIRECTION") return Math.round(stake * (minority ? 3 : 2));
+  // PRICE: points run 1..25, so accuracy scales the multiple from ~1.1x to 3x.
+  return Math.round(stake * (1 + (points / 25) * 2));
+}
+
 export type CallInput = {
   userId: string;
-  shoeId: string;
+  /** Exactly one of these. OG calls carry a shoe, customs carry a piece. */
+  shoeId?: string;
+  submissionId?: string;
   kind: "DIRECTION" | "PRICE";
   horizonDays: number;
   direction?: "UP" | "DOWN";
   predictedCents?: number;
+  /** Credits at risk. Debited now, returned with winnings on a hit. */
+  stakeCredits?: number;
 };
 
-export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?: string }> {
+export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?: string; note?: string }> {
   const horizon = HORIZONS.includes(input.horizonDays as Horizon) ? input.horizonDays : null;
   if (!horizon) return { ok: false, error: "Pick a 7 or 30 day window." };
 
-  const shoe = await prisma.catalogShoe.findUnique({
-    where: { id: input.shoeId },
-    select: { id: true, marketPriceCents: true, ebayNewCents: true },
-  });
-  if (!shoe) return { ok: false, error: "That pair isn't on the board." };
+  const onOg = Boolean(input.shoeId);
+  const onCustom = Boolean(input.submissionId);
+  if (onOg === onCustom) return { ok: false, error: "Pick one pair to call." };
 
-  const basis = marketPrice(shoe);
-  if (!basis) return { ok: false, error: "No live price on that pair yet — nothing to call against." };
+  // The line you're calling against, from whichever floor this is.
+  let basis: number | null = null;
+  if (onOg) {
+    const shoe = await prisma.catalogShoe.findUnique({
+      where: { id: input.shoeId },
+      select: { marketPriceCents: true, ebayNewCents: true },
+    });
+    if (!shoe) return { ok: false, error: "That pair isn't on the board." };
+    basis = marketPrice(shoe);
+  } else {
+    // A one-of-one's market read is the artist's ask, or the last sale if
+    // it has one — the same numbers the customs board already shows.
+    const piece = await prisma.submission.findFirst({
+      where: { id: input.submissionId, status: "APPROVED" },
+      select: {
+        askingPriceCents: true,
+        sales: { where: { status: "CONFIRMED" }, orderBy: { soldAt: "desc" }, take: 1, select: { priceCents: true } },
+      },
+    });
+    if (!piece) return { ok: false, error: "That piece isn't on the board." };
+    basis = piece.askingPriceCents || piece.sales[0]?.priceCents || null;
+  }
+  if (!basis) return { ok: false, error: "No price on that one yet — nothing to call against." };
 
   const existing = await prisma.prediction.findFirst({
-    where: { userId: input.userId, shoeId: shoe.id, horizonDays: horizon, status: "OPEN" },
+    where: {
+      userId: input.userId,
+      ...(onOg ? { shoeId: input.shoeId } : { submissionId: input.submissionId }),
+      horizonDays: horizon,
+      status: "OPEN",
+    },
     select: { id: true },
   });
-  if (existing) return { ok: false, error: "You already have an open call on this pair at that window." };
+  if (existing) return { ok: false, error: "You already have an open call on this one at that window." };
 
   if (input.kind === "DIRECTION" && input.direction !== "UP" && input.direction !== "DOWN") {
     return { ok: false, error: "Call it up or down." };
@@ -77,19 +127,57 @@ export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?:
     if (c > 5_000_000_00) return { ok: false, error: "That price isn't realistic." };
   }
 
-  await prisma.prediction.create({
-    data: {
-      userId: input.userId,
-      shoeId: shoe.id,
-      kind: input.kind,
-      horizonDays: horizon,
-      basisCents: basis,
-      direction: input.kind === "DIRECTION" ? input.direction : null,
-      predictedCents: input.kind === "PRICE" ? input.predictedCents : null,
-      resolveAt: new Date(Date.now() + horizon * DAY),
-    },
-  });
-  return { ok: true };
+  const stake = STAKES.includes((input.stakeCredits ?? 0) as (typeof STAKES)[number])
+    ? input.stakeCredits!
+    : 0;
+
+  // Debit first, and only if the balance covers it. The conditional update
+  // is the guard: two calls fired at once can't both pass because the
+  // second one's WHERE no longer matches once the first has decremented.
+  if (stake > 0) {
+    const paid = await prisma.user.updateMany({
+      where: { id: input.userId, credits: { gte: stake } },
+      data: { credits: { decrement: stake } },
+    });
+    if (paid.count === 0) return { ok: false, error: "Not enough credits for that stake." };
+    await prisma.creditTransaction
+      .create({ data: { userId: input.userId, delta: -stake, reason: "call-stake" } })
+      .catch(() => {});
+  }
+
+  try {
+    await prisma.prediction.create({
+      data: {
+        userId: input.userId,
+        shoeId: onOg ? input.shoeId : null,
+        submissionId: onCustom ? input.submissionId : null,
+        side: onOg ? "OG" : "CUSTOM",
+        stakeCredits: stake,
+        kind: input.kind,
+        horizonDays: horizon,
+        basisCents: basis,
+        direction: input.kind === "DIRECTION" ? input.direction : null,
+        predictedCents: input.kind === "PRICE" ? input.predictedCents : null,
+        resolveAt: new Date(Date.now() + horizon * DAY),
+      },
+    });
+  } catch (e) {
+    // Never keep somebody's stake for a call that didn't get written.
+    if (stake > 0) {
+      await prisma.user
+        .update({ where: { id: input.userId }, data: { credits: { increment: stake } } })
+        .catch(() => {});
+      await prisma.creditTransaction
+        .create({ data: { userId: input.userId, delta: stake, reason: "call-stake-refund" } })
+        .catch(() => {});
+    }
+    return { ok: false, error: "Couldn't place that call — your credits weren't touched." };
+  }
+
+  return {
+    ok: true,
+    note: stake > 0 ? `${stake} credits staked.` : "Called with nothing at risk.",
+  };
 }
 
 /**
@@ -106,15 +194,25 @@ export async function resolveDuePredictions(limit = 300): Promise<{
     where: { status: "OPEN", resolveAt: { lte: new Date() } },
     orderBy: { resolveAt: "asc" },
     take: limit,
-    include: { shoe: { select: { marketPriceCents: true, ebayNewCents: true } } },
+    include: {
+      shoe: { select: { marketPriceCents: true, ebayNewCents: true } },
+      submission: {
+        select: {
+          askingPriceCents: true,
+          sales: { where: { status: "CONFIRMED" }, orderBy: { soldAt: "desc" }, take: 1, select: { priceCents: true } },
+        },
+      },
+    },
   });
   if (due.length === 0) return { settled: 0, voided: 0, pointsAwarded: 0 };
 
   // Crowd split per (shoe, horizon) so contrarian calls can be identified.
   const groups = new Map<string, { up: number; down: number }>();
+  const groupKey = (p: { shoeId: string | null; submissionId: string | null; horizonDays: number }) =>
+    `${p.shoeId ?? p.submissionId}:${p.horizonDays}`;
   for (const p of due) {
     if (p.kind !== "DIRECTION") continue;
-    const k = `${p.shoeId}:${p.horizonDays}`;
+    const k = groupKey(p);
     const g = groups.get(k) ?? { up: 0, down: 0 };
     if (p.direction === "UP") g.up++;
     else g.down++;
@@ -124,19 +222,36 @@ export async function resolveDuePredictions(limit = 300): Promise<{
   let settled = 0, voided = 0, pointsAwarded = 0;
 
   for (const p of due) {
-    const actual = marketPrice(p.shoe);
-    // No reading to settle against — void it. Never guess someone's record.
+    // Whichever floor this call was made on, read that floor's price.
+    const actual = p.shoe
+      ? marketPrice(p.shoe)
+      : p.submission
+        ? p.submission.askingPriceCents || p.submission.sales[0]?.priceCents || null
+        : null;
+
+    // No reading to settle against — void it. Never guess someone's record,
+    // and hand the stake straight back: a gap in our data must never cost
+    // somebody credits they staked in good faith.
     if (!actual) {
       await prisma.prediction.update({
         where: { id: p.id },
-        data: { status: "VOID", settledAt: new Date() },
+        data: { status: "VOID", settledAt: new Date(), payoutCredits: p.stakeCredits },
       }).catch(() => {});
+      if (p.stakeCredits > 0) {
+        await prisma.user
+          .update({ where: { id: p.userId }, data: { credits: { increment: p.stakeCredits } } })
+          .catch(() => {});
+        await prisma.creditTransaction
+          .create({ data: { userId: p.userId, delta: p.stakeCredits, reason: "call-void-refund" } })
+          .catch(() => {});
+      }
       voided++;
       continue;
     }
 
     let correct = false;
     let points = 0;
+    let minority = false;
 
     if (p.kind === "DIRECTION") {
       const moved = actual - p.basisCents;
@@ -144,24 +259,40 @@ export async function resolveDuePredictions(limit = 300): Promise<{
       // A flat market resolves against both sides — no free points for noise.
       correct = moved !== 0 && ((p.direction === "UP" && wentUp) || (p.direction === "DOWN" && !wentUp));
       if (correct) {
-        const g = groups.get(`${p.shoeId}:${p.horizonDays}`) ?? { up: 0, down: 0 };
+        const g = groups.get(groupKey(p)) ?? { up: 0, down: 0 };
         const mySide = p.direction === "UP" ? g.up : g.down;
         const otherSide = p.direction === "UP" ? g.down : g.up;
-        points = scoreDirection(mySide < otherSide);
+        minority = mySide < otherSide;
+        points = scoreDirection(minority);
       }
     } else {
       points = scorePrice(p.predictedCents ?? 0, actual);
       correct = points > 0;
     }
 
+    // Stake back plus winnings on a hit; nothing on a miss.
+    const payout = payoutFor(p.stakeCredits, p.kind as "DIRECTION" | "PRICE", points, minority);
+
     await prisma.prediction.update({
       where: { id: p.id },
-      data: { status: "SETTLED", actualCents: actual, correct, points, settledAt: new Date() },
+      data: {
+        status: "SETTLED",
+        actualCents: actual,
+        correct,
+        points,
+        payoutCredits: payout,
+        settledAt: new Date(),
+      },
     }).catch(() => {});
 
     if (points > 0) {
-      // Winning calls pay Culture credits on the same rail as the quiz.
+      // Two separate credit events on a win: the staked payout, and the
+      // small standing reward for being right that a no-stake call also
+      // earns. Kept apart so the ledger reads honestly.
       const { grantCredits } = await import("./quiz");
+      if (payout > 0) {
+        await grantCredits(p.userId, payout, "call-payout").catch(() => {});
+      }
       await grantCredits(p.userId, Math.max(1, Math.round(points / 10)), "prediction").catch(() => {});
       pointsAwarded += points;
     }

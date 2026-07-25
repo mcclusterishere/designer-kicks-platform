@@ -11,6 +11,7 @@ import TickerTape from "@/components/TickerTape";
 import IndexHero from "@/components/IndexHero";
 import CatalogBoard from "@/components/CatalogBoard";
 import PairChart from "@/components/PairChart";
+import TradePanel from "@/components/TradePanel";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
@@ -264,7 +265,14 @@ function CustomTile({
             )}
           </span>
         </div>
-        <div className="mt-auto">
+        {/* Speculate on a one-of-one the same way as a retail pair. */}
+        <Link
+          href={`/market?board=customs&sym=${item.id}`}
+          className="mt-2 block rounded-lg border border-heat/60 py-2 text-center tag font-bold text-heat transition hover:bg-heat/10"
+        >
+          ◈ Chart &amp; call
+        </Link>
+        <div className="mt-2">
           <OfferForm
             submissionId={item.id}
             signedIn={signedIn}
@@ -283,11 +291,12 @@ function CustomTile({
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string }>;
+  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string; sym?: string }>;
 }) {
   await finalizeExpiredBattles();
   const sp = await searchParams;
   const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "" } = sp;
+  const sym = (sp.sym ?? "").trim();
 
   // One tab, four views. The exchange leads because the chart is the thing
   // people came to look at; "og" is kept as an alias so every link already
@@ -309,6 +318,25 @@ export default async function MarketPage({
     og ? getHotBases() : Promise.resolve([]),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
+
+  // The trade panel. Driven by a URL param so the chart is server-rendered
+  // with real data and a specific pair is a shareable link, not a modal
+  // that vanishes on reload.
+  const { getTradeTarget } = await import("@/lib/tradePanel");
+  const panelSide = board === "customs" ? "CUSTOM" : "OG";
+  const [tradeTarget, wallet] = await Promise.all([
+    sym ? getTradeTarget(panelSide, sym, session?.user?.id ?? null) : Promise.resolve(null),
+    session?.user?.id
+      ? prisma.user.findUnique({ where: { id: session.user.id }, select: { credits: true } })
+      : Promise.resolve(null),
+  ]);
+  const keep = new URLSearchParams({
+    ...(board !== "exchange" ? { board } : {}),
+    ...(q ? { q } : {}),
+    ...(brand !== "all" ? { brand } : {}),
+    ...(sort !== "hot" ? { sort } : {}),
+  }).toString();
+  const closeHref = keep ? `/market?${keep}` : "/market";
   // The member's passport size powers the "your size" badge on customs.
   const memberSize = session?.user?.id
     ? (await prisma.user
@@ -376,6 +404,15 @@ export default async function MarketPage({
           ))}
         </div>
       </div>
+
+      {tradeTarget && (
+        <TradePanel
+          target={tradeTarget}
+          credits={wallet?.credits ?? 0}
+          signedIn={Boolean(session?.user)}
+          closeHref={closeHref}
+        />
+      )}
 
       {board === "catalog" ? (
         <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
