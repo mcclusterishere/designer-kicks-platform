@@ -19,15 +19,17 @@ export default async function BattlePage({
 
   const result = await getBattleWithVotes(id);
   if (!result) notFound();
-  const { battle, aVotes, bVotes } = result;
+  const { battle, aVotes, bVotes, aGuest, bGuest } = result;
 
   const session = await auth();
-  const yourVote = session?.user?.id
+  // Whoever this is — account or a device that already voted — look up their
+  // ballot by the same key castVote would have written.
+  const { existingGuestKey } = await import("@/lib/guest");
+  const voterKey = session?.user?.id ?? (await existingGuestKey());
+  const yourVote = voterKey
     ? (
         await prisma.vote.findUnique({
-          where: {
-            battleId_voterKey: { battleId: battle.id, voterKey: session.user.id },
-          },
+          where: { battleId_voterKey: { battleId: battle.id, voterKey } },
         })
       )?.submissionId ?? null
     : null;

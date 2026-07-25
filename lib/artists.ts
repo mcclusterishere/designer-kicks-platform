@@ -58,7 +58,8 @@ export async function getArtistRankings(): Promise<ArtistRanking[]> {
       submissions: {
         where: { status: "APPROVED" },
         include: {
-          _count: { select: { votes: true, battlesWon: true } },
+          // Account votes only: this total is the artist's public record.
+          _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
         },
@@ -121,7 +122,7 @@ export async function getArtistBySlug(slug: string) {
         where: { status: "APPROVED", closetHidden: false },
         orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
         include: {
-          _count: { select: { votes: true, battlesWon: true } },
+          _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
           tournamentsWon: { select: { id: true, name: true } },

@@ -37,7 +37,7 @@ export type FeedItem =
       // Author of the post when it's a claimed artist — lets the
       // client offer Block; null for house posts.
       authorUserId: string | null;
-      comments: { id: string; name: string; body: string; userId: string }[];
+      comments: { id: string; name: string; body: string; userId: string; parentId: string | null }[];
     }
   | {
       type: "battle";
@@ -127,8 +127,16 @@ export async function getFeed(
         reactions: userId ? { where: { userId }, select: { id: true } } : false,
         comments: {
           orderBy: { createdAt: "desc" },
-          take: 2,
-          include: { user: { select: { id: true, name: true } } },
+          take: 4,
+          include: {
+            user: { select: { id: true, name: true } },
+            // One level of replies, oldest first so a thread reads in order.
+            replies: {
+              orderBy: { createdAt: "asc" },
+              take: 3,
+              include: { user: { select: { id: true, name: true } } },
+            },
+          },
         },
       },
     }),
@@ -228,11 +236,24 @@ export async function getFeed(
         mine: Array.isArray(p.reactions) && p.reactions.length > 0,
         commentCount: p._count.comments,
         authorUserId: p.artist?.userId ?? null,
+        // Parents in chronological order, each followed by its replies, so
+        // the flat list the client renders still reads as a thread.
         comments: p.comments
           .slice()
           .reverse()
           .filter((c) => !blocked.has(c.user.id))
-          .map((c) => ({ id: c.id, name: c.user.name ?? "A fan", body: c.body, userId: c.user.id })),
+          .flatMap((c) => [
+            { id: c.id, name: c.user.name ?? "A fan", body: c.body, userId: c.user.id, parentId: null },
+            ...c.replies
+              .filter((r) => !blocked.has(r.user.id))
+              .map((r) => ({
+                id: r.id,
+                name: r.user.name ?? "A fan",
+                body: r.body,
+                userId: r.user.id,
+                parentId: c.id,
+              })),
+          ]),
       },
     });
   }

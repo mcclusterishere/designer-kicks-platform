@@ -1,4 +1,6 @@
 import Money from "@/components/Money";
+import PushToggle from "@/components/PushToggle";
+import { unreadCount } from "@/lib/messages";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -89,6 +91,7 @@ export default async function ProfilePage() {
     }),
     prisma.user.findUnique({ where: { id: user.id }, select: { credits: true } }),
   ]);
+  const unread = await unreadCount(user.id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -103,6 +106,27 @@ export default async function ProfilePage() {
         <form action={logoutUser}>
           <button className="tag text-smoke hover:text-white">Sign out</button>
         </form>
+      </div>
+
+      {/* Inbox + alerts: the two things that bring somebody back. */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link
+          href="/messages"
+          className={`rounded-xl border p-4 transition hover:border-volt ${
+            unread > 0 ? "border-volt/60 bg-volt/5" : "border-edge bg-surface"
+          }`}
+        >
+          <p className="tag text-heat">Messages</p>
+          <p className="mt-0.5 text-sm text-white">
+            {unread > 0
+              ? `${unread} unread message${unread === 1 ? "" : "s"}`
+              : "Your commission conversations"}
+          </p>
+          <p className="mt-1 text-xs text-smoke">
+            Sizes, base pairs and budgets — on the record, on your account.
+          </p>
+        </Link>
+        <PushToggle vapidKey={process.env.VAPID_PUBLIC_KEY ?? null} />
       </div>
 
       {/* Artist account comes first — this is the maker's home base. */}

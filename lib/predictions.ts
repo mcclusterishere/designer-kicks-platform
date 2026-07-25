@@ -165,6 +165,16 @@ export async function resolveDuePredictions(limit = 300): Promise<{
       await grantCredits(p.userId, Math.max(1, Math.round(points / 10)), "prediction").catch(() => {});
       pointsAwarded += points;
     }
+
+    // One of the four alerts we promised: your call settled. Failure here
+    // must never roll back a settlement, so it's fire-and-forget.
+    const { pushTo } = await import("./push");
+    pushTo(p.userId, {
+      title: correct ? `Your call landed — +${points}` : "Your call settled",
+      body: `${p.kind === "DIRECTION" ? "Direction" : "Price"} call closed at $${Math.round(actual / 100)}.`,
+      url: "/predict",
+      tag: `call-${p.id}`,
+    }).catch(() => {});
     settled++;
   }
 

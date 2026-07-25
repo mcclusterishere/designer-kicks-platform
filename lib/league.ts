@@ -168,7 +168,9 @@ export async function getDraftSlate(): Promise<{ customs: SlateCustom[]; drops: 
   const [subs, shoes] = await Promise.all([
     prisma.submission.findMany({
       where: { status: "APPROVED" },
-      select: { id: true, title: true, artistName: true, imageUrl: true, _count: { select: { votes: true, battlesWon: true } } },
+      // The Draft pays out credits and giveaway entries, so its heat is
+      // account votes only — same rule as the Heat List.
+      select: { id: true, title: true, artistName: true, imageUrl: true, _count: { select: { votes: { where: { guest: false } }, battlesWon: true } } },
       orderBy: { createdAt: "desc" },
       take: 120,
     }),

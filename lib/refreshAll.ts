@@ -156,7 +156,25 @@ export async function refreshEverything(mode: RefreshMode = "nightly"): Promise<
     })
   );
 
-  // 10. Fingerprint the market so the index has real history to chart.
+  // 10. Tell people the things they'd be annoyed to have missed. Runs after
+  //     the drop and battle work above so it announces current state, and
+  //     stays dormant without VAPID keys.
+  steps.push(
+    await run("notify-closing-battles", async () => {
+      const { notifyClosingBattles, pushConfigured } = await import("./push");
+      if (!pushConfigured()) return { configured: false };
+      return notifyClosingBattles();
+    })
+  );
+  steps.push(
+    await run("notify-upcoming-drops", async () => {
+      const { notifyUpcomingDrops, pushConfigured } = await import("./push");
+      if (!pushConfigured()) return { configured: false };
+      return notifyUpcomingDrops();
+    })
+  );
+
+  // 11. Fingerprint the market so the index has real history to chart.
   //     Last, so it measures the state everything above just produced.
   steps.push(
     await run("index-snapshot", async () => {

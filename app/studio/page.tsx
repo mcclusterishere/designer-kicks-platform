@@ -15,7 +15,7 @@ import ProfileEditForm from "./ProfileEditForm";
 import PieceManager from "./PieceManager";
 import ClosetLookForm from "./ClosetLookForm";
 import ProfileMusic from "@/components/ProfileMusic";
-import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
+import { removeArtistShop, markSellsNowhere, respondCommissionRequest, commissionQueueAction } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
 import StudioAssistant from "./StudioAssistant";
@@ -46,8 +46,8 @@ export default async function StudioPage() {
     prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
     prisma.artistShop.findMany({ where: { artistId: profile.id }, orderBy: { createdAt: "asc" } }),
     prisma.commissionRequest.findMany({
-      where: { artistId: profile.id, status: "PENDING" },
-      orderBy: { createdAt: "asc" },
+      where: { artistId: profile.id, status: { in: ["PENDING", "WAITLIST"] } },
+      orderBy: [{ status: "asc" }, { queuePosition: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
       include: { user: { select: { name: true } } },
     }),
     // Ordered exactly the way the public page will hang them, so the
@@ -64,6 +64,7 @@ export default async function StudioPage() {
     }),
   ]);
   if (!data) redirect("/submit");
+  const waitlist = commissions.filter((c) => c.status === "WAITLIST");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const { artist, stats, votesSeries, followsLast14, soldSales } = data;
 
@@ -200,7 +201,7 @@ export default async function StudioPage() {
             Commission requests <span className="text-volt">({commissions.length})</span>
           </h2>
           <div className="mt-3 space-y-2">
-            {commissions.map((c) => (
+            {commissions.filter((c) => c.status === "PENDING").map((c) => (
               <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
                 <div className="min-w-0">
                   <p className="font-bold text-white">
@@ -220,8 +221,75 @@ export default async function StudioPage() {
                       Accept
                     </button>
                   </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "waitlist")}>
+                    <button className="rounded border border-heat px-3 py-1.5 tag text-heat transition hover:bg-heat/10">
+                      Waitlist
+                    </button>
+                  </form>
                   <form action={respondCommissionRequest.bind(null, c.id, false)}>
                     <button className="rounded border border-edge px-3 py-1.5 tag text-smoke">Pass</button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* The queue. A slot count tells somebody there's no room; a position
+          tells them how long the wait is, and that's the difference between
+          leaving and staying. */}
+      {waitlist.length > 0 && (
+        <div className="mt-8">
+          <p className="display text-xl text-white">
+            Waitlist <span className="text-heat">({waitlist.length})</span>
+          </p>
+          <p className="mt-1 max-w-2xl text-sm text-smoke">
+            Everyone here can see their own position. Move people up as slots open,
+            then accept when you&apos;re ready to start.
+          </p>
+          <div className="mt-3 space-y-2">
+            {waitlist.map((c, i) => (
+              <div key={c.id} className="flex items-center gap-3 rounded-lg border border-edge bg-panel p-2.5">
+                <span className="display w-8 shrink-0 text-center text-lg text-heat">
+                  #{c.queuePosition ?? i + 1}
+                </span>
+                <div className="flex shrink-0 flex-col gap-0.5">
+                  <form action={commissionQueueAction.bind(null, c.id, "up")}>
+                    <button
+                      disabled={i === 0}
+                      aria-label="Move up the queue"
+                      className="flex h-5 w-6 items-center justify-center rounded border border-edge text-[10px] text-smoke hover:text-white disabled:opacity-30"
+                    >
+                      ▲
+                    </button>
+                  </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "down")}>
+                    <button
+                      disabled={i === waitlist.length - 1}
+                      aria-label="Move down the queue"
+                      className="flex h-5 w-6 items-center justify-center rounded border border-edge text-[10px] text-smoke hover:text-white disabled:opacity-30"
+                    >
+                      ▼
+                    </button>
+                  </form>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-white">{c.baseName}</p>
+                  <p className="truncate text-xs text-smoke">
+                    {c.user.name ?? "a fan"}
+                    {c.budgetCents ? ` · ${formatUsd(c.budgetCents)} budget` : ""}
+                    {c.note ? ` — "${c.note}"` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <form action={commissionQueueAction.bind(null, c.id, "accept")}>
+                    <button className="rounded border border-volt px-3 py-1.5 tag font-bold text-volt transition hover:bg-volt/10">
+                      Start
+                    </button>
+                  </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "decline")}>
+                    <button className="rounded border border-edge px-3 py-1.5 tag text-smoke">Drop</button>
                   </form>
                 </div>
               </div>

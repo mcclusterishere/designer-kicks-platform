@@ -53,6 +53,8 @@ function PostCard({
   const [reactions, setReactions] = useState(item.reactions);
   const [mine, setMine] = useState(item.mine);
   const [comments, setComments] = useState(item.comments);
+  // Which comment the composer is answering, if any.
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const [commentCount, setCommentCount] = useState(item.commentCount);
   const [draft, setDraft] = useState("");
   const [talkOpen, setTalkOpen] = useState(false);
@@ -72,9 +74,19 @@ function PostCard({
   async function submitComment() {
     const body = draft.trim();
     if (!body) return;
-    const res = await addFeedComment(item.id, body);
+    const res = await addFeedComment(item.id, body, replyTo?.id ?? null);
     if (res.ok) {
-      setComments((prev) => [...prev.slice(-4), res.comment]);
+      // A reply slots in under its parent rather than at the end, so the
+      // thread on screen matches the thread the server just recorded.
+      setComments((prev) => {
+        if (!res.comment.parentId) return [...prev.slice(-6), res.comment];
+        const at = prev.findIndex((c) => c.id === res.comment.parentId);
+        if (at === -1) return [...prev.slice(-6), res.comment];
+        let insert = at + 1;
+        while (insert < prev.length && prev[insert].parentId === res.comment.parentId) insert++;
+        return [...prev.slice(0, insert), res.comment, ...prev.slice(insert)];
+      });
+      setReplyTo(null);
       setCommentCount((n) => n + 1);
       setDraft("");
     }
@@ -169,10 +181,25 @@ function PostCard({
       {(talkOpen || comments.length > 0) && (
         <div className="border-t border-edge/60 px-4 py-3">
           {comments.map((c) => (
-            <p key={c.id} className="flex items-baseline gap-1.5 py-1 text-sm">
+            <p
+              key={c.id}
+              className={`flex items-baseline gap-1.5 py-1 text-sm ${
+                c.parentId ? "ml-4 border-l border-edge pl-2.5" : ""
+              }`}
+            >
               <span className="min-w-0">
                 <span className="font-bold text-white">{c.name}</span>{" "}
                 <span className="text-smoke">{c.body}</span>
+                {/* Replies attach to the top-level comment, so a reply's own
+                    reply button targets the same parent — the thread stays one
+                    level deep instead of marching off the screen. */}
+                <button
+                  type="button"
+                  onClick={() => setReplyTo({ id: c.parentId ?? c.id, name: c.name })}
+                  className="ml-1.5 tag text-smoke underline hover:text-volt"
+                >
+                  reply
+                </button>
               </span>
               <ModTools
                 kind="feed_comment"
@@ -191,8 +218,8 @@ function PostCard({
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && submitComment()}
                   maxLength={500}
-                  aria-label="Write a comment"
-                  placeholder="Say something…"
+                  aria-label={replyTo ? `Reply to ${replyTo.name}` : "Write a comment"}
+                  placeholder={replyTo ? `Reply to ${replyTo.name}…` : "Say something…"}
                   className="min-w-0 flex-1 rounded-lg border border-edge bg-panel px-3 py-2 text-sm text-white placeholder:text-smoke focus:border-volt focus:outline-none"
                 />
                 <button type="button" onClick={submitComment} className="tag shrink-0 text-volt underline">

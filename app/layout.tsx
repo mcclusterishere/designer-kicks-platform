@@ -93,6 +93,8 @@ export default async function RootLayout({
       .catch(() => null);
     needsPma = Boolean(member && !member.pmaAcceptedAt);
   }
+  const { unreadCount } = await import("@/lib/messages");
+  const unread = session?.user?.id ? await unreadCount(session.user.id).catch(() => 0) : 0;
   return (
     <html
       lang="en"
@@ -142,6 +144,7 @@ export default async function RootLayout({
                   ? session.user.name?.split(" ")[0] ?? "Account"
                   : "Sign In",
               }}
+              unread={unread}
             />
             {/* Mobile: tab bar handles navigation; header keeps the
                 account chip + the day/night switch */}
@@ -149,9 +152,17 @@ export default async function RootLayout({
               <ThemeToggle />
               <Link
                 href={session?.user ? "/profile" : "/signin"}
-                className="tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
+                className="relative tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
               >
                 {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+                {unread > 0 && (
+                  <span
+                    aria-label={`${unread} unread messages`}
+                    className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-volt px-1 text-[10px] font-bold text-ink"
+                  >
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
               </Link>
             </div>
           </div>

@@ -487,6 +487,53 @@ model FeedComment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   body      String
   createdAt DateTime @default(now())
+
+  // Replies, one level deep. Deeper nesting reads badly on a phone and
+  // invites the kind of thread nobody finishes, so a reply to a reply
+  // attaches to the same parent rather than indenting further.
+  parentId  String?
+  parent    FeedComment?  @relation("commentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   FeedComment[] @relation("commentReplies")
+
+  @@index([postId, parentId])
+}
+
+// A direct line between a fan and an artist. Custom work is negotiated, and
+// negotiating it in public comments is how deals die — so this exists to keep
+// the conversation on the platform instead of pushing it to Instagram DMs
+// where nothing is recorded and nobody is protected.
+model DirectMessage {
+  id         String   @id @default(cuid())
+  fromUserId String
+  fromUser   User     @relation("sentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User     @relation("receivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([toUserId, readAt])
+  @@index([fromUserId, createdAt])
+  @@index([toUserId, fromUserId, createdAt])
+}
+
+// A browser or installed app that agreed to be notified. Endpoints go stale
+// constantly — people clear data, uninstall, revoke — so a 404/410 from the
+// push service is treated as a withdrawal and the row is deleted rather than
+// retried forever.
+model PushSub {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  lastSentAt DateTime?
+  failures  Int      @default(0)
+
+  @@index([userId])
 }
 
 // App-store UGC safety (Apple 1.2): members can flag content for the
@@ -571,13 +618,20 @@ model Vote {
   battle       Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
   submissionId String
   submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  voterKey     String // the voting user's id (or a seed key for demo votes)
+  voterKey     String // the voting user's id, a guest device key, or a seed key
   userId       String?
+  // Anonymous votes count toward the visible split and nothing else. The
+  // Heat List and battle winners read account votes only, because a device
+  // key can be rotated and an artist's standing has to be defensible when
+  // they ask why they lost. Keeping both means the signup wall comes down
+  // without the league becoming spoofable.
+  guest        Boolean @default(false)
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
 
   @@unique([battleId, voterKey])
   @@index([battleId, submissionId])
+  @@index([battleId, guest])
 }
 
 // ---------- Accounts & auth (NextAuth models + profile fields) ----------
@@ -670,6 +724,12 @@ model User {
   feedReactions FeedReaction[]
   feedComments  FeedComment[]
   pollVotes     PollVote[]
+  // Direct messages in both directions, plus the devices that agreed to be
+  // notified. Both cascade on account deletion so "delete my account"
+  // actually removes the conversation and stops the notifications.
+  sentMessages     DirectMessage[] @relation("sentMessages")
+  receivedMessages DirectMessage[] @relation("receivedMessages")
+  pushSubs         PushSub[]
 
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
@@ -849,10 +909,18 @@ model CommissionRequest {
   catalogSku  String? // set when the fan started from a catalog page
   budgetCents Int?
   note        String?
-  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | WAITLIST | DONE
   createdAt   DateTime @default(now())
 
+  // Where they sit in the queue when the artist is booked out. A slot count
+  // tells somebody there's no room; a position tells them how long the wait
+  // is, which is the difference between leaving and staying. Null until the
+  // artist actually waitlists them.
+  queuePosition Int?
+  artistNote    String?
+
   @@index([artistId, status])
+  @@index([artistId, status, queuePosition])
   @@index([userId])
 }
 

@@ -1593,13 +1593,40 @@ export async function toggleFollowArtist(artistId: string): Promise<ActionResult
 
 // ---------- Voting ----------
 
+/**
+ * Cast a vote. Signed in or not.
+ *
+ * The account requirement was the single biggest thing between a link on
+ * Instagram and a vote, so it's gone. Anonymous votes are recorded and shown
+ * in the live split, but they don't feed the Heat List or decide a battle,
+ * because a device key can be rotated and an artist's standing has to hold up
+ * when they ask why they lost. Both numbers exist, and the page says which is
+ * which rather than blending them.
+ *
+ * Guests are rate-limited harder than accounts — an account is a thing
+ * somebody had to create, a device key isn't.
+ */
 export async function castVote(battleId: string, submissionId: string): Promise<ActionResult> {
   const session = await auth();
-  if (!session?.user?.id) {
-    return { ok: false, error: "Sign in to vote — it takes 10 seconds and your vote counts." };
-  }
-  if (!allowAttempt("vote", session.user.id, 30, 60 * 1000)) {
-    return { ok: false, error: "Slow down — try again in a minute." };
+  const { guestKey } = await import("@/lib/guest");
+
+  let voterKey: string;
+  let userId: string | null = null;
+  let guest = false;
+
+  if (session?.user?.id) {
+    voterKey = session.user.id;
+    userId = session.user.id;
+    if (!allowAttempt("vote", voterKey, 30, 60 * 1000)) {
+      return { ok: false, error: "Slow down — try again in a minute." };
+    }
+  } else {
+    const g = await guestKey();
+    voterKey = g.key;
+    guest = true;
+    if (!allowAttempt("guestvote", voterKey, 10, 60 * 1000)) {
+      return { ok: false, error: "Slow down — try again in a minute." };
+    }
   }
 
   await finalizeExpiredBattles();
@@ -1611,10 +1638,9 @@ export async function castVote(battleId: string, submissionId: string): Promise<
     return { ok: false, error: "That shoe isn't in this battle." };
   }
 
-  const voterKey = session.user.id;
   try {
     await prisma.vote.create({
-      data: { battleId, submissionId, voterKey, userId: session.user.id },
+      data: { battleId, submissionId, voterKey, userId, guest },
     });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -1626,7 +1652,12 @@ export async function castVote(battleId: string, submissionId: string): Promise<
   revalidatePath(`/battles/${battleId}`);
   revalidatePath("/battles");
   revalidatePath("/");
-  return { ok: true };
+  return {
+    ok: true,
+    note: guest
+      ? "Counted. Sign in and your votes start counting toward the Heat List too."
+      : undefined,
+  };
 }
 
 // ---------- Admin ----------
@@ -3189,6 +3220,185 @@ export async function refreshEverythingNow(): Promise<import("@/lib/refreshAll")
   return report;
 }
 
+
+// ---------- Direct messages ----------
+
+/**
+ * Send a message. Blocks are honoured in both directions, self-messaging is
+ * refused, and the recipient gets a push if they've allowed one — the reply
+ * still saves if the notification fails, because a message is the thing that
+ * matters and the ping is a courtesy.
+ */
+export async function sendMessage(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to send a message." };
+  const me = session.user.id;
+
+  const toUserId = String(formData.get("toUserId") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim().slice(0, 2000);
+  if (!toUserId) return { ok: false, error: "Who's it for?" };
+  if (toUserId === me) return { ok: false, error: "That's your own inbox." };
+  if (!body) return { ok: false, error: "Write something first." };
+  if (!allowAttempt("dm", me, 40, 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of messages this hour — try again later." };
+  }
+
+  const { blockedBetween } = await import("@/lib/messages");
+  if (await blockedBetween(me, toUserId)) {
+    return { ok: false, error: "You can't message this member." };
+  }
+  const recipient = await prisma.user.findUnique({ where: { id: toUserId }, select: { id: true, name: true } });
+  if (!recipient) return { ok: false, error: "That member doesn't exist." };
+
+  await prisma.directMessage.create({ data: { fromUserId: me, toUserId, body } });
+
+  const { pushTo } = await import("@/lib/push");
+  pushTo(toUserId, {
+    title: `${session.user.name?.split(" ")[0] ?? "Someone"} messaged you`,
+    body: body.slice(0, 120),
+    url: `/messages/${me}`,
+    tag: `dm-${me}`,
+  }).catch(() => {});
+
+  revalidatePath("/messages");
+  revalidatePath(`/messages/${toUserId}`);
+  return { ok: true, note: "Sent." };
+}
+
+// ---------- Push notifications ----------
+
+/** Register a browser or installed app to be notified. */
+export async function savePushSub(
+  endpoint: string,
+  p256dh: string,
+  auth_: string,
+  userAgent?: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  if (!endpoint || !p256dh || !auth_) return { ok: false, error: "Incomplete subscription." };
+
+  // Endpoint is unique, so the same device re-subscribing updates rather
+  // than duplicating — otherwise reinstalling would double every alert.
+  await prisma.pushSub.upsert({
+    where: { endpoint },
+    create: { userId: session.user.id, endpoint, p256dh, auth: auth_, userAgent: userAgent?.slice(0, 200) },
+    update: { userId: session.user.id, p256dh, auth: auth_, failures: 0 },
+  });
+  return { ok: true, note: "You'll get the alerts that matter." };
+}
+
+export async function removePushSub(endpoint: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  // Scoped to the caller so an endpoint string can't unsubscribe someone else.
+  await prisma.pushSub.deleteMany({ where: { endpoint, userId: session.user.id } });
+  return { ok: true, note: "Alerts off." };
+}
+
+// ---------- Commission waitlist ----------
+
+/**
+ * Put a request in the queue, or move it.
+ *
+ * A slot count tells somebody there's no room. A queue position tells them
+ * how long the wait is, which is the difference between leaving and staying.
+ * Positions are renumbered across the whole queue on every change so the list
+ * stays a total order rather than drifting into ties.
+ */
+export async function setCommissionQueue(
+  requestId: string,
+  action: "waitlist" | "up" | "down" | "accept" | "decline" | "done"
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, displayName: true },
+  });
+  if (!profile) return { ok: false, error: "Artists only." };
+
+  // Ownership enforced in the WHERE, never checked after the fact.
+  const req = await prisma.commissionRequest.findFirst({
+    where: { id: requestId, artistId: profile.id },
+    select: { id: true, userId: true, baseName: true, status: true },
+  });
+  if (!req) return { ok: false, error: "That request isn't on your desk." };
+
+  if (action === "accept" || action === "decline" || action === "done") {
+    const status = action === "accept" ? "ACCEPTED" : action === "decline" ? "DECLINED" : "DONE";
+    await prisma.commissionRequest.update({
+      where: { id: req.id },
+      data: { status, queuePosition: null },
+    });
+    const { pushTo } = await import("@/lib/push");
+    if (action !== "done") {
+      pushTo(req.userId, {
+        title: action === "accept" ? "Your commission was accepted" : "Commission update",
+        body: `${profile.displayName} ${action === "accept" ? "took on" : "passed on"} your ${req.baseName}.`,
+        url: "/profile",
+        tag: `commission-${req.id}`,
+      }).catch(() => {});
+    }
+    revalidatePath("/studio");
+    return { ok: true, note: "Updated." };
+  }
+
+  const queue = await prisma.commissionRequest.findMany({
+    where: { artistId: profile.id, status: "WAITLIST" },
+    orderBy: [{ queuePosition: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+
+  let order = queue.map((q) => q.id);
+  if (action === "waitlist") {
+    if (!order.includes(req.id)) order.push(req.id);
+    await prisma.commissionRequest.update({ where: { id: req.id }, data: { status: "WAITLIST" } });
+  } else {
+    const at = order.indexOf(req.id);
+    if (at === -1) return { ok: false, error: "That request isn't on the waitlist." };
+    const to = action === "up" ? at - 1 : at + 1;
+    if (to < 0 || to >= order.length) return { ok: true, note: "Already at the end." };
+    [order[at], order[to]] = [order[to], order[at]];
+  }
+
+  await prisma.$transaction(
+    order.map((id, i) =>
+      prisma.commissionRequest.update({ where: { id }, data: { queuePosition: i + 1 } })
+    )
+  );
+
+  if (action === "waitlist") {
+    const position = order.indexOf(req.id) + 1;
+    const { pushTo } = await import("@/lib/push");
+    pushTo(req.userId, {
+      title: "You're on the waitlist",
+      body: `${profile.displayName} put your ${req.baseName} at #${position} in the queue.`,
+      url: "/profile",
+      tag: `commission-${req.id}`,
+    }).catch(() => {});
+  }
+
+  revalidatePath("/studio");
+  return { ok: true, note: "Queue updated." };
+}
+
+/**
+ * Form-friendly wrapper. A plain <form action> must resolve to void, so the
+ * Studio's queue buttons go through here while anything that wants the
+ * result (a client component with useActionState) calls the action directly.
+ */
+export async function commissionQueueAction(
+  requestId: string,
+  action: "waitlist" | "up" | "down" | "accept" | "decline" | "done"
+): Promise<void> {
+  await setCommissionQueue(requestId, action);
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour
@@ -4045,13 +4255,21 @@ export async function toggleFeedReaction(
 }
 
 export type FeedCommentResult =
-  | { ok: true; comment: { id: string; name: string; body: string; userId: string } }
+  | { ok: true; comment: { id: string; name: string; body: string; userId: string; parentId: string | null } }
   | { ok: false; error: string };
 
-/** Anyone signed in can talk under a post. */
+/**
+ * Comment, or reply to one.
+ *
+ * Replies go one level deep and no further: a reply to a reply attaches to
+ * the same parent. Deeper nesting reads badly on a phone and produces the
+ * kind of thread nobody finishes, and flattening it there is far better than
+ * indenting a conversation off the right edge of the screen.
+ */
 export async function addFeedComment(
   postId: string,
-  bodyRaw: string
+  bodyRaw: string,
+  parentIdRaw?: string | null
 ): Promise<FeedCommentResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Sign in to comment." };
@@ -4062,13 +4280,49 @@ export async function addFeedComment(
   }
   const post = await prisma.feedPost.findUnique({ where: { id: postId } });
   if (!post) return { ok: false, error: "Post is gone." };
+
+  let parentId: string | null = null;
+  if (parentIdRaw) {
+    // Scoped to this post, so a comment id from elsewhere can't graft a
+    // thread across posts. Replying to a reply collapses to its parent.
+    const parent = await prisma.feedComment.findFirst({
+      where: { id: parentIdRaw, postId },
+      select: { id: true, parentId: true },
+    });
+    if (parent) parentId = parent.parentId ?? parent.id;
+  }
+
   const comment = await prisma.feedComment.create({
-    data: { postId, userId: session.user.id, body },
+    data: { postId, userId: session.user.id, body, parentId },
     include: { user: { select: { id: true, name: true } } },
   });
+
+  // Tell the person being replied to, if it isn't their own thread.
+  if (parentId) {
+    const parent = await prisma.feedComment.findUnique({
+      where: { id: parentId },
+      select: { userId: true },
+    });
+    if (parent && parent.userId !== session.user.id) {
+      const { pushTo } = await import("@/lib/push");
+      pushTo(parent.userId, {
+        title: `${session.user.name?.split(" ")[0] ?? "Someone"} replied`,
+        body: body.slice(0, 120),
+        url: "/battles",
+        tag: `reply-${parentId}`,
+      }).catch(() => {});
+    }
+  }
+
   return {
     ok: true,
-    comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body, userId: comment.user.id },
+    comment: {
+      id: comment.id,
+      name: comment.user.name ?? "A fan",
+      body: comment.body,
+      userId: comment.user.id,
+      parentId,
+    },
   };
 }
 

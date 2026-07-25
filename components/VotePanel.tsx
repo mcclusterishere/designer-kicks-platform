@@ -27,11 +27,13 @@ type Props = {
   b: Side;
   active: boolean;
   isAuthed: boolean;
+  /** Anonymous tallies — shown, but never part of the ranked split. */
+  guestVotes?: { a: number; b: number };
   yourVote: string | null; // submissionId you voted for, if any
   winnerId: string | null;
 };
 
-export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, winnerId }: Props) {
+export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, winnerId, guestVotes }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [localVote, setLocalVote] = useState<string | null>(yourVote);
@@ -63,6 +65,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
   const bVotes = b.votes + bump(b.submissionId);
   const total = aVotes + bVotes;
   const myVote = yourVote ?? localVote;
+  const guestTotal = (guestVotes?.a ?? 0) + (guestVotes?.b ?? 0);
 
   function vote(submissionId: string) {
     setError(null);
@@ -156,7 +159,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                       <p className="tag mt-2 text-volt">Your vote</p>
                     )}
                   </div>
-                ) : isAuthed ? (
+                ) : (
                   <button
                     onClick={() => vote(side.submissionId)}
                     disabled={pending}
@@ -164,13 +167,6 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                   >
                     {pending && pressed === side.submissionId ? "Counting…" : "Vote"}
                   </button>
-                ) : (
-                  <a
-                    href="/signin"
-                    className="mt-3 block w-full rounded-lg border border-volt py-3 text-center tag font-bold text-volt transition hover:btn-hard hover:text-ink sm:mt-4"
-                  >
-                    Sign In
-                  </a>
                 )}
               </div>
             </div>
@@ -180,6 +176,26 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
       {error && (
         <p role="alert" className="mt-4 rounded border border-heat/40 bg-heat/10 px-4 py-2 text-sm text-heat">
           {error}
+        </p>
+      )}
+
+      {/* Two numbers, stated separately rather than blended. The bars are the
+          ranked result; anonymous votes are real and counted, they just don't
+          move an artist's standing, and saying so is the only way the Heat
+          List stays defensible when somebody asks how they lost. */}
+      {showResults && guestTotal > 0 && (
+        <p className="mt-3 tag text-smoke">
+          {guestTotal} anonymous vote{guestTotal === 1 ? "" : "s"} also cast
+          {guestVotes ? ` (${guestVotes.a}–${guestVotes.b})` : ""} · bars show
+          signed-in votes, which are the ones that count toward the Heat List
+        </p>
+      )}
+
+      {showResults && !isAuthed && (
+        <p className="mt-2 tag text-volt">
+          Your vote counted.{" "}
+          <a href="/signin" className="underline">Sign in</a> and it starts
+          counting toward the Heat List and the Draft too.
         </p>
       )}
     </div>

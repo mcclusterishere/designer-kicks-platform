@@ -177,7 +177,17 @@ export default async function ArtistPage({ params }: Props) {
             </blockquote>
           )}
           {!isOwnPage && session?.user && (
-            <CommissionForm artistId={artist.id} artistName={artist.displayName} />
+            <>
+              <CommissionForm artistId={artist.id} artistName={artist.displayName} />
+              {/* A direct line, so the negotiation that follows a commission
+                  request doesn't have to leave for Instagram. */}
+              <Link
+                href={`/messages/${artist.userId}`}
+                className="mt-2 inline-block rounded-lg border border-edge px-4 py-2 tag font-bold text-white transition hover:border-volt hover:text-volt"
+              >
+                ✉ Message {artist.displayName.split(" ")[0]}
+              </Link>
+            </>
           )}
         </div>
         <div className="flex flex-col items-end gap-2">
