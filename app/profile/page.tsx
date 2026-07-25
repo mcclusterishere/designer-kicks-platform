@@ -1,6 +1,7 @@
 import Money from "@/components/Money";
 import PushToggle from "@/components/PushToggle";
 import { unreadCount } from "@/lib/messages";
+import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -126,7 +127,13 @@ export default async function ProfilePage() {
             Sizes, base pairs and budgets — on the record, on your account.
           </p>
         </Link>
-        <PushToggle vapidKey={process.env.VAPID_PUBLIC_KEY ?? null} />
+        {/* Both halves or nothing. The public key alone is enough to let a
+            browser subscribe, but sending needs the private one — offering the
+            switch in that state would take someone's permission and then never
+            deliver. Only the public key is ever passed to the client. */}
+        <PushToggle
+          vapidKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null}
+        />
       </div>
 
       {/* Artist account comes first — this is the maker's home base. */}

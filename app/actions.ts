@@ -3281,6 +3281,14 @@ export async function savePushSub(
   if (!session?.user?.id) return { ok: false, error: "Sign in first." };
   if (!endpoint || !p256dh || !auth_) return { ok: false, error: "Incomplete subscription." };
 
+  // Refuse to bank a subscription we can't send to. Storing one while the
+  // signing key is missing means holding a permission we can't honour, and
+  // the member would sit waiting for alerts that never come.
+  const { pushConfigured } = await import("@/lib/push");
+  if (!pushConfigured()) {
+    return { ok: false, error: "Alerts aren't switched on yet on our side — nothing to subscribe to." };
+  }
+
   // Endpoint is unique, so the same device re-subscribing updates rather
   // than duplicating — otherwise reinstalling would double every alert.
   await prisma.pushSub.upsert({
