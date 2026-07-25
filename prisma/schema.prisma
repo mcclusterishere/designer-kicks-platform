@@ -96,6 +96,10 @@ model ArtistProfile {
   instagram   String?
   city        String?
   portfolioUrl String?
+  // Maker's own photo/logo for their page. Uploaded through the Studio and
+  // stored like any other upload, so it rides the same normalisation and
+  // persistence as piece photos.
+  avatarUrl    String?
   // Fan accounts are instant; artist accounts are reviewed (payout
   // rails later require vetted identities). Existing/seed artists
   // default APPROVED; applications are created PENDING.

@@ -1757,7 +1757,16 @@ export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJE
  */
 export async function deleteSubmissionCascade(id: string) {
   await requireAdmin();
+  await deleteSubmissionCascadeInternal(id);
+}
 
+/**
+ * The cascade itself, with no auth of its own — every caller must have
+ * already established the right to delete this piece (admin, or the artist
+ * who made it). Kept in one place so both paths clear the same non-cascading
+ * Battle/Tournament references and free the same stored media.
+ */
+async function deleteSubmissionCascadeInternal(id: string) {
   const sub = await prisma.submission.findUnique({
     where: { id },
     select: { imageUrl: true, extraImages: true, videoUrl: true },
@@ -2594,6 +2603,130 @@ export async function saveJob(
 }
 
 // ---------- Artist shops (where they already sell) ----------
+
+/**
+ * Edit your own page: bio, city, socials, and a profile photo. Everything
+ * here is the maker's to change without going through the office — the one
+ * thing they can't touch is displayName/slug, since the Heat List record,
+ * claim links and existing URLs all hang off those.
+ */
+export async function updateArtistProfile(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+
+  const clean = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
+  const bio = clean("bio", 1000);
+  const city = clean("city", 80);
+  const instagram = clean("instagram", 60).replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "");
+  let portfolioUrl = clean("portfolioUrl", 300);
+  if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) portfolioUrl = `https://${portfolioUrl}`;
+  if (portfolioUrl) {
+    try {
+      new URL(portfolioUrl);
+    } catch {
+      return { ok: false, error: "That portfolio link doesn't look like a valid URL." };
+    }
+  }
+
+  // Optional new profile photo — same pipeline as every other upload, so
+  // it's normalised to a web-safe JPEG and stored where uploads persist.
+  let avatarUrl: string | undefined;
+  const photo = formData.get("avatar");
+  if (photo instanceof File && photo.size > 0) {
+    if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Profile photo must be under 6MB." };
+    const ext = ALLOWED_TYPES[photo.type];
+    if (!ext) return { ok: false, error: "Profile photo must be a JPEG, PNG, WebP or HEIC." };
+    avatarUrl = await saveUpload(
+      Buffer.from(await photo.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      photo.type
+    );
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      bio: bio || null,
+      city: city || null,
+      instagram: instagram || null,
+      portfolioUrl: portfolioUrl || null,
+      ...(avatarUrl ? { avatarUrl } : {}),
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  revalidatePath("/artists");
+  return { ok: true, note: "Page updated." };
+}
+
+/**
+ * Change a piece you made: what it's asking, its size, its description.
+ * Scoped by artistId in the WHERE clause, so a crafted id can only ever
+ * match your own work — the price on someone else's piece is unreachable
+ * from here.
+ */
+export async function updateMyPiece(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const id = String(formData.get("pieceId") ?? "");
+  if (!id) return { ok: false, error: "Which piece?" };
+
+  const mine = await prisma.submission.findFirst({
+    where: { id, artistId: profile.id },
+    select: { id: true },
+  });
+  if (!mine) return { ok: false, error: "That piece isn't yours to edit." };
+
+  const rawAsk = String(formData.get("askingPrice") ?? "").replace(/[^0-9.]/g, "").trim();
+  let askingPriceCents: number | null = null;
+  if (rawAsk) {
+    const n = Math.round(Number(rawAsk) * 100);
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "That asking price doesn't look right." };
+    askingPriceCents = Math.min(n, 1_000_000_00);
+  }
+  const size = String(formData.get("size") ?? "").trim().slice(0, 24);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
+
+  await prisma.submission.update({
+    where: { id: mine.id },
+    data: {
+      askingPriceCents,
+      size: size || null,
+      description: description || null,
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath("/market");
+  revalidatePath("/available");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: askingPriceCents ? "Piece updated — it's listed." : "Piece updated — taken off the market." };
+}
+
+/** Remove your own piece. Same cascade-safe path the admin delete uses. */
+export async function deleteMyPiece(pieceId: string) {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") return;
+  const mine = await prisma.submission.findFirst({
+    where: { id: pieceId, artistId: profile.id },
+    select: { id: true },
+  });
+  if (!mine) return; // not yours — nothing happens
+  await deleteSubmissionCascadeInternal(mine.id);
+  revalidatePath("/studio");
+  revalidatePath("/market");
+  revalidatePath("/available");
+  revalidatePath(`/artists/${profile.slug}`);
+}
 
 async function myApprovedArtist() {
   const session = await auth();

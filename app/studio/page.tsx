@@ -11,6 +11,8 @@ import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
 import ProfileMusicForm from "./ProfileMusicForm";
 import CommissionDeskForm from "./CommissionDeskForm";
+import ProfileEditForm from "./ProfileEditForm";
+import PieceManager from "./PieceManager";
 import ProfileMusic from "@/components/ProfileMusic";
 import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
@@ -31,11 +33,12 @@ export default async function StudioPage() {
       id: true, status: true, sellsOnline: true, spotifyUrl: true,
       commissionOpen: true, commissionMinCents: true, commissionMaxCents: true,
       commissionDays: true, commissionSlots: true,
+      bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
     },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat, myDrops, myShops, commissions] = await Promise.all([
+  const [data, heat, myDrops, myShops, commissions, myPieces] = await Promise.all([
     getStudioData(profile.id),
     getHeatList(),
     prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
@@ -44,6 +47,15 @@ export default async function StudioPage() {
       where: { artistId: profile.id, status: "PENDING" },
       orderBy: { createdAt: "asc" },
       include: { user: { select: { name: true } } },
+    }),
+    prisma.submission.findMany({
+      where: { artistId: profile.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true, title: true, imageUrl: true, size: true, description: true,
+        askingPriceCents: true, category: true,
+        sales: { where: { status: "CONFIRMED" }, select: { id: true }, take: 1 },
+      },
     }),
   ]);
   if (!data) redirect("/submit");
@@ -109,6 +121,43 @@ export default async function StudioPage() {
             <p className="tag mt-1 text-smoke">{t.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Your page — editable without going through the office */}
+      <div id="your-page" className="mt-8 scroll-mt-24">
+        <p className="display text-xl text-white">Your page</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Your story, your city, your links, your photo. Name and page URL stay put so your
+          record and every link people already have keep working.
+        </p>
+        <div className="mt-3 rounded-xl border border-edge bg-surface p-5">
+          <ProfileEditForm current={profile} />
+        </div>
+      </div>
+
+      {/* Closet control — repricing without resubmitting */}
+      <div id="your-closet" className="mt-10 scroll-mt-24">
+        <p className="display text-xl text-white">
+          Your closet <span className="text-smoke">({myPieces.length})</span>
+        </p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Reprice, resize, rewrite or remove any piece — no resubmitting. Clear the price to
+          take something off the market and keep it on your page.
+        </p>
+        <div className="mt-3">
+          <PieceManager
+            pieces={myPieces.map((p) => ({
+              id: p.id,
+              title: p.title,
+              imageUrl: p.imageUrl,
+              size: p.size,
+              description: p.description,
+              askingPriceCents: p.askingPriceCents,
+              category: p.category,
+              sold: p.sales.length > 0,
+            }))}
+          />
+        </div>
       </div>
 
       {/* The artist's private AI corner — knows their standing */}
