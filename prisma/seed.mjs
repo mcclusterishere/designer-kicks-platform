@@ -2238,9 +2238,15 @@ async function main() {
     // Two banks now: the culture trivia and the markets curriculum. Same
     // upsert either way — keyed on question text, additive, and never
     // touching the admin's active toggle.
+    // Three banks: the culture trivia, the market-mechanics curriculum, and
+    // the instrument curriculum ported from the Street Credit Bureau
+    // taxonomy (WARRANT-TRACER). The last two are both the markets track —
+    // mechanics on rungs 1-5, instruments on 6-8 — so they deal as one
+    // laddered game rather than as two separate products bolted together.
     const bank = [
       ...loadQuestions().map((q) => ({ ...q, track: "culture" })),
       ...loadQuestions("market-questions.json").map((q) => ({ ...q, track: "markets" })),
+      ...loadQuestions("instrument-questions.json").map((q) => ({ ...q, track: "markets" })),
     ];
     const existingTrivia = await prisma.quizQuestion.findMany({
       where: { articleId: null },

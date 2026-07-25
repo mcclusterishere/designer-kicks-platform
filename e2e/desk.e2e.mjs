@@ -105,6 +105,29 @@ try {
   check("profile now shows a desk rank", /Retail Buyer/.test(after));
   check("profile shows the next rung", /to make Resale Trader/i.test(after));
 
+  // ---------- The partnership ----------
+  check("Street Credit Bureau is credited", /Street Credit Bureau/.test(after));
+  // With no NEXT_PUBLIC_PARTNER_URL set, the card must credit without
+  // linking — pointing people at a destination that isn't finished would
+  // spend the credibility the card exists to build.
+  const partnerLinks = await page.locator('a[href*="streetcredit"]').count();
+  const configured = Boolean(process.env.NEXT_PUBLIC_PARTNER_URL);
+  check(
+    configured ? "partner card links out when configured" : "partner card credits without a dead link",
+    configured ? partnerLinks > 0 : partnerLinks === 0,
+    `links=${partnerLinks} configured=${configured}`
+  );
+
+  // ---------- The instrument rungs exist and are gated ----------
+  const instrumentLevels = await prisma.quizQuestion.groupBy({
+    by: ["level"],
+    where: { track: "markets", level: { gte: 6 } },
+    _count: true,
+  });
+  check("instrument rungs 6-8 are loaded",
+    instrumentLevels.length === 3 && instrumentLevels.every((l) => l._count >= 5),
+    JSON.stringify(instrumentLevels.map((l) => `${l.level}:${l._count}`)));
+
   check("no console or page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 } finally {
   await browser.close();

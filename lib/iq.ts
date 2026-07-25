@@ -64,6 +64,14 @@ export const DESK_RANKS: { level: number; title: string; blurb: string; from: nu
   { level: 3, title: "Market Maker", blurb: "You quote both sides and carry the inventory.", from: 16 },
   { level: 4, title: "Position Trader", blurb: "You hold risk over time, and you hedge it.", from: 24 },
   { level: 5, title: "Desk Head", blurb: "You read the whole book, not just your own position.", from: 32 },
+  // Rungs 6-8 change subject. One to five teach how a market works; these
+  // teach what actually trades on one — the instruments themselves, from
+  // the Street Credit Bureau taxonomy. Mechanics first, then the zoo,
+  // because knowing what a warrant is means nothing until you know what a
+  // strike and an expiry are.
+  { level: 6, title: "Product Specialist", blurb: "You know what each instrument is, not just what it's called.", from: 40 },
+  { level: 7, title: "Structurer", blurb: "You can see what an instrument is built out of.", from: 48 },
+  { level: 8, title: "Partner", blurb: "You've seen the whole zoo. Everything after this is depth.", from: 56 },
 ];
 
 /** How many correct markets answers it takes to unlock the next rung. */

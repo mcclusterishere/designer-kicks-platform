@@ -12,6 +12,7 @@ import {
 import { verifyCheckoutSession, buildState } from "@/app/quiz-actions";
 import type { QuizState } from "@/app/quiz-actions";
 import QuizGame from "./QuizGame";
+import DeskPartner, { partnerUrl } from "@/components/DeskPartner";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
@@ -104,6 +105,11 @@ export default async function QuizPage({
           cultureCount={cultureCount}
           marketsCount={marketsCount}
         />
+        {initialState?.track === "markets" && (
+          <div className="mt-4">
+            <DeskPartner href={partnerUrl()} />
+          </div>
+        )}
       </div>
 
       <Leaderboard entries={leaderboard} />

@@ -3,6 +3,7 @@ import PushToggle from "@/components/PushToggle";
 import PlayLimits from "@/components/PlayLimits";
 import CreditStatement from "@/components/CreditStatement";
 import DeskRank from "@/components/DeskRank";
+import DeskPartner, { partnerUrl } from "@/components/DeskPartner";
 import { unreadCount } from "@/lib/messages";
 import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
@@ -157,6 +158,8 @@ export default async function ProfilePage() {
           stakedToday={todayStaked}
         />
         <DeskRank iq={mkt} rank={deskRank} />
+        {/* Credit for the instrument rungs, and the door to the full library. */}
+        <DeskPartner href={partnerUrl()} compact />
         <CreditStatement entries={ledgerEntries} balance={creditUser?.credits ?? 0} />
       </div>
 

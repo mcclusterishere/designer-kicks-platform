@@ -22,7 +22,12 @@ const check = (name, ok, extra = "") => {
 };
 
 const culture = load("questions.json");
-const markets = load("market-questions.json");
+const markets = [
+  ...load("market-questions.json"),
+  // Instruments, ported from the Street Credit Bureau taxonomy. Same bank,
+  // same rules — anything that teaches has to survive the same checks.
+  ...load("instrument-questions.json"),
+];
 
 // ---------- Structure ----------
 for (const [bank, rows, needsLesson] of [
@@ -48,8 +53,8 @@ for (const [bank, rows, needsLesson] of [
       if (!q.concept?.trim()) problems.push(`${at} missing concept`);
       else if (seenConcept.has(q.concept)) problems.push(`${at} duplicate concept ${q.concept}`);
       else seenConcept.add(q.concept);
-      if (!Number.isInteger(q.level) || q.level < 1 || q.level > 5)
-        problems.push(`${at} level must be 1-5`);
+      if (!Number.isInteger(q.level) || q.level < 1 || q.level > 8)
+        problems.push(`${at} level must be 1-8`);
     }
   }
   check(`${bank} bank is structurally sound (${rows.length} questions)`, problems.length === 0,
@@ -59,7 +64,7 @@ for (const [bank, rows, needsLesson] of [
 // Every level should actually be populated, or the ladder has a dead rung.
 const byLevel = {};
 for (const q of markets) byLevel[q.level] = (byLevel[q.level] ?? 0) + 1;
-check("every level 1-5 has questions", [1, 2, 3, 4, 5].every((l) => (byLevel[l] ?? 0) >= 5),
+check("every level 1-8 has questions", [1, 2, 3, 4, 5, 6, 7, 8].every((l) => (byLevel[l] ?? 0) >= 5),
   JSON.stringify(byLevel));
 
 // ---------- Arithmetic ----------

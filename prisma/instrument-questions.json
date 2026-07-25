@@ -1,0 +1,374 @@
+[
+  {
+    "question": "A one-of-one custom has no equal — there's exactly one, and its market is quoted off whatever the last comparable piece sold for. Which instrument works the same way?",
+    "options": ["A share of stock", "An NFT", "A stablecoin", "An index fund"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "nft",
+    "lesson": "A non-fungible token is unique and non-interchangeable — uniqueness is the entire point, so no two are equal and none substitutes for another. The market gauge is the collection's floor price, the cheapest one currently offered, which is the same thing the customs board means by an artist's entry price.",
+    "explanation": "Shares and stablecoins are fungible — any one is as good as any other. A one-of-one and an NFT are both priced off comparables because nothing is identical to them."
+  },
+  {
+    "question": "A token is engineered to hold a $1 peg. What's the single number that tells you whether it's working?",
+    "options": ["Its trading volume", "How far it has drifted from $1", "Its market cap", "The number of holders"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "stablecoin",
+    "lesson": "A stablecoin is built to hold a peg — backed by fiat reserves, over-collateralised in crypto, or algorithmically. Peg deviation is THE risk metric: everything else is noise if the thing that's supposed to be worth a dollar isn't. Reserve attestations separate the credible from the hopeful, and algorithmic pegs have a graveyard.",
+    "explanation": "Volume, market cap and holder counts all looked healthy on stablecoins that later broke. Distance from the peg is the only measure of the one promise it makes."
+  },
+  {
+    "question": "A token's entire pitch is the joke, the community and the momentum — the team says so openly. What is it?",
+    "options": ["A utility token", "A meme coin", "A security token", "A wrapped token"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "meme-coin",
+    "lesson": "A meme coin's value proposition is attention, on purpose — no cash flow, no utility claim, just the crowd. That makes it reflexive: the price rising is itself the reason people buy, which works in both directions. Rug pulls and liquidity games are endemic to the category.",
+    "explanation": "Utility and security tokens at least claim a use or a cash flow. A meme coin doesn't, and is honest about it — which makes attention the only fundamental."
+  },
+  {
+    "question": "You want one purchase that gives you a slice of 500 companies, tradeable any second the market is open. What are you buying?",
+    "options": ["An ETF", "A mutual fund", "A single share", "A futures contract"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "etf",
+    "lesson": "An exchange-traded fund holds a basket of assets and trades on an exchange like a stock. Authorised participants keep it near its net asset value by arbitraging creation and redemption baskets — the same arbitrage you learned on the resale floor, doing a job.",
+    "explanation": "A mutual fund also holds the basket but only prices once a day. Intraday tradeability is the ETF's defining feature."
+  },
+  {
+    "question": "You place an order in a mutual fund at 10am on a day the market swings hard. What price do you get?",
+    "options": ["The 10am price", "That day's closing NAV", "The next day's open", "Whatever you bid"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 6,
+    "concept": "mutual-fund",
+    "lesson": "An open-end mutual fund is bought from and redeemed with the fund itself, priced once daily at net asset value. There is no intraday price to hit — everyone transacting that day gets the same number, and capital-gains distributions hit every holder whether they sold or not.",
+    "explanation": "Timing the intraday swing is impossible in a mutual fund. That's the structural difference from an ETF, not a detail."
+  },
+  {
+    "question": "You want option exposure but you're sick of watching a one-month contract bleed value every week. What's built for that?",
+    "options": ["LEAPS", "A perpetual future", "A stablecoin", "A rights issue"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 6,
+    "concept": "leaps",
+    "lesson": "LEAPS are ordinary exchange options with expiries out to roughly three years. The long tail means slower theta decay — time value bleeds away more gently — which is why deep in-the-money LEAPS get used as a stock substitute.",
+    "explanation": "Same instrument, longer clock. That's the entire trade-off, and it costs more premium up front."
+  },
+  {
+    "question": "You take the other side of a futures contract and the price moves against you. Can you walk away like you would from an option?",
+    "options": ["Yes, you lose the premium", "No — a future is an obligation", "Only before expiry", "Only with a broker's permission"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "futures-obligation",
+    "lesson": "A futures contract is a standardised, exchange-cleared obligation to buy or sell at a set price on a set date, marked to market daily. Options permit; futures oblige. That one word is why a future's losses are open-ended in both directions while an option buyer's stop at the premium.",
+    "explanation": "There is no premium to forfeit and no walking away. You post margin and settle daily until the position is closed."
+  },
+  {
+    "question": "Two parties privately agree to trade 200 pairs at a fixed price in six months — their own terms, no exchange involved. That's a:",
+    "options": ["Futures contract", "Forward contract", "Call option", "Swap"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 6,
+    "concept": "forward-contract",
+    "lesson": "A forward is a private, customised agreement to trade at a set price on a future date — the over-the-counter ancestor of the future. Any size, any date, any asset the two sides want, and settled once at the end. The catch is counterparty risk: no clearing house stands behind it.",
+    "explanation": "Bespoke terms and no exchange make it a forward. A future would be standardised, cleared, and marked to market every day."
+  },
+  {
+    "question": "Gold bars in a vault cost money to store and insure every year. Which lesson from the resale floor is this?",
+    "options": ["Slippage", "Cost of carry", "Adverse selection", "Survivorship bias"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "spot-commodity",
+    "lesson": "A spot commodity is the physical thing for immediate delivery — bullion, barrels, bushels. Storage, insurance and transport are real, recurring costs, exactly like the storage unit full of deadstock. That's why futures on physical goods usually price above spot.",
+    "explanation": "It's the same cost of carry you met holding sneakers, just with a vault instead of a storage unit."
+  },
+  {
+    "question": "A company owns shopping centres, trades on the stock exchange, and is legally required to pay out most of its taxable income. What is it?",
+    "options": ["A REIT", "A closed-end fund", "An ETN", "A hedge fund"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 6,
+    "concept": "reit",
+    "lesson": "A REIT owns income-producing real estate and must distribute 90% or more of taxable income as dividends, while trading like a stock. It's real-estate exposure with stock-market liquidity — and because of the payout rule, funds from operations replaces earnings per share as the metric that matters.",
+    "explanation": "The forced distribution is the giveaway. No other structure on the list is obliged to pay out that share of its income."
+  },
+  {
+    "question": "A fund promises no stock-picking at all — it just mechanically matches an index. How is it graded?",
+    "options": ["By beating the index", "By how closely it tracks the index", "By its dividend yield", "By its manager's record"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "index-fund",
+    "lesson": "An index fund tracks an index instead of picking securities, so its report card is tracking error — how far it drifts from the thing it's copying — and its fees, which are near zero by design. Beating the index isn't the goal; matching it cheaply is.",
+    "explanation": "Judging an index fund on outperformance misunderstands the product. Drift and cost are what it can actually control."
+  },
+  {
+    "question": "Your job grants you shares that arrive only after you've stayed two years. Nothing is yours until then. That's a:",
+    "options": ["Stock option", "Restricted Stock Unit", "Warrant", "SAFE"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 6,
+    "concept": "rsu",
+    "lesson": "A restricted stock unit is a company promise to deliver shares once vesting conditions are met — the default equity compensation at public tech companies. You own nothing until delivery, and it's taxed as income at vest. Unlike an option, an RSU has value at any share price.",
+    "explanation": "An option below its strike is worthless; an RSU still delivers shares worth something. The promise-then-deliver structure is what makes it a unit."
+  },
+
+  {
+    "question": "The company itself issues you the right to buy shares at a set price for the next ten years. When you exercise, where do the shares come from?",
+    "options": ["Another trader's holdings", "Newly created shares", "The company's treasury only", "An exchange's inventory"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "warrant-dilution",
+    "lesson": "A company-issued warrant is a right to buy NEW shares at a set exercise price, often five to fifteen years out. Exercising mints shares that didn't exist, which dilutes everyone already holding. That dilution is the defining difference from an exchange-traded call, and it's why warrant terms are bespoke — you read the warrant agreement, not a standard contract.",
+    "explanation": "An exchange call is written by traders against existing shares. A company warrant creates new ones, so every existing holder owns a slightly smaller slice."
+  },
+  {
+    "question": "A trader writes you a call on shares that already exist, cleared through an exchange on standard terms. How does that differ from a company warrant?",
+    "options": ["No dilution, standardised, shorter-dated", "It lasts longer", "It creates new shares too", "There's no difference"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "warrant-vs-call",
+    "lesson": "The two look identical on a payoff diagram and are opposite in structure. An exchange call is written by traders on existing shares — centrally cleared, standardised strikes and expiries, no dilution. A warrant is issued by the company on new shares — dilutive, bespoke, and far longer-dated. Even LEAPS top out near three years; warrants run five to fifteen.",
+    "explanation": "Who issues it decides everything downstream: where the shares come from, who bears the dilution, and whether the terms are negotiable."
+  },
+  {
+    "question": "A bank — not the company — issues a warrant over a company's shares. What does exercising it do to existing shareholders?",
+    "options": ["Dilutes them", "Nothing — no new shares are created", "Doubles their holding", "Forces a buyback"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "covered-warrant",
+    "lesson": "A covered warrant is issued by a financial institution rather than the underlying company, over shares, indices, currencies or commodities. It settles in cash or existing shares, so it never dilutes — the bank sources the exposure itself. Puts exist as well as calls, and retail markets in Hong Kong, Germany and Singapore are enormous.",
+    "explanation": "The bank is on the hook, not the company. No new shares are minted, so the share count is untouched."
+  },
+  {
+    "question": "Existing shareholders are offered new shares at a discount, pro rata, and the offer dies in three weeks. What is that?",
+    "options": ["A warrant", "A rights issue", "A stock split", "A dividend"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "rights-issue",
+    "lesson": "Subscription rights let existing holders buy new shares at a discount, pro rata, usually within a few weeks — an anti-dilution courtesy to the people already in. They trade separately during the window, and they expire worthless if you neither exercise nor sell. Warrants, by contrast, are long-dated and usually go to outside investors or lenders.",
+    "explanation": "Short life, discounted price, offered to existing holders in proportion to what they own — that combination is a rights issue, not a warrant."
+  },
+  {
+    "question": "A SPAC IPO sells you one share plus a fraction of a warrant, bundled together as one ticket. That bundle is called a:",
+    "options": ["Unit", "Tranche", "Basket", "Block"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "unit-bundle",
+    "lesson": "A unit is an IPO bundle — typically one share plus a fraction of a warrant — that later splits into its components on an unbundling date, after which each piece trades separately. It's the standard SPAC IPO format, and it's the clearest everyday example of an instrument that is literally assembled from parts.",
+    "explanation": "Buying the unit is buying two instruments at once. The unbundling date is when they go their separate ways."
+  },
+  {
+    "question": "A SPAC warrant typically carries a $11.50 strike — and the company can often force your hand if the stock runs. What's that feature?",
+    "options": ["A margin call", "A redemption that forces early exercise", "A stock split", "A dividend"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "spac-warrant",
+    "lesson": "SPAC warrants are the semi-standardised corner of the warrant world: $11.50 strike by convention, roughly five years after the merger. Many are redeemable by the company once the stock trades high enough, which effectively forces early exercise and caps your upside. If the SPAC liquidates instead of merging, they expire worthless.",
+    "explanation": "A redemption clause lets the issuer call the warrants, pushing holders to exercise sooner than they'd choose. The optionality isn't entirely yours."
+  },
+  {
+    "question": "Two products track the same index. One holds the actual assets; the other is a bank's unsecured promise to pay the index's return. What's the second one?",
+    "options": ["An ETF", "An ETN", "A mutual fund", "A REIT"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "etf-vs-etn",
+    "lesson": "An ETF owns assets. An exchange-traded note owns nothing — it is unsecured bank debt promising an index's return. That buys you zero tracking error and hands you full issuer credit risk in exchange. Lehman's ETNs went down with the bank, which is the entire lesson in one sentence.",
+    "explanation": "Identical payoff on paper, completely different thing you're holding. With an ETN you are a creditor of the bank."
+  },
+  {
+    "question": "A crypto future never expires. Without a delivery date to pull it back to spot, what keeps it tethered?",
+    "options": ["The exchange sets it", "A funding rate paid between longs and shorts", "Daily settlement", "Nothing"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "perpetual-future",
+    "lesson": "A perpetual future has no expiry and no delivery, so the convergence that normally drags a future to spot at maturity never happens. A funding rate paid between longs and shorts every few hours does that job instead — and because it's paid by whichever side is crowded, the funding rate doubles as a crowding meter.",
+    "explanation": "Ordinary futures converge because delivery forces it. Perps replace that with a recurring payment from the crowded side to the other."
+  },
+  {
+    "question": "A bank offers a note that guarantees your principal back at maturity plus some of an index's upside. What is it built out of?",
+    "options": ["Two stocks", "A zero-coupon bond plus a call option", "A future plus a swap", "Cash only"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "principal-protected-note",
+    "lesson": "A principal-protected note is a zero-coupon bond plus a call option. The bond matures back to your principal; whatever was left over bought the upside. Two things follow. 'Protected' means the issuer's promise, not collateral — Lehman's PPNs paid pennies. And the protection costs you yield and caps your upside; you are paying for it.",
+    "explanation": "Once you see the two components, the trade-offs stop being surprising: the bond eats the yield, the option is all you have left for upside."
+  },
+  {
+    "question": "A note pays a very fat coupon. In exchange, if the stock falls through a barrier you receive shares instead of your money back. What have you actually done?",
+    "options": ["Bought insurance", "Sold insurance", "Bought a bond", "Hedged your portfolio"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "reverse-convertible",
+    "lesson": "A reverse convertible pays a fat coupon in exchange for you selling a put. If the stock breaches the barrier, you get shares rather than principal. You are the insurance company: the yield is compensation for taking tail risk, not free money — and the risk shows up all at once, exactly when the market is already against you.",
+    "explanation": "Receiving a premium and being obliged to take delivery on a fall is the position of a put seller, which is the position of an insurer."
+  },
+  {
+    "question": "You deposit two assets into an automated market maker and get a receipt token. The pool then rebalances against you as prices move. That drag is:",
+    "options": ["Slippage", "Impermanent loss", "The spread", "Contango"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "lp-token",
+    "lesson": "An LP token is a receipt for assets deposited into an automated-market-maker pool, entitling you to a share of trading fees. The pool automatically sells whichever asset is rising and buys whichever is falling, so you end up with more of the loser — impermanent loss. Your real yield is fees plus incentives minus that loss.",
+    "explanation": "The fees are the visible half. Impermanent loss is the invisible half that decides whether the position actually made money."
+  },
+  {
+    "question": "A token on one chain is backed 1:1 by an asset locked on another. What is the thing that can actually go wrong?",
+    "options": ["The price of the underlying", "The custodian or bridge holding the locked asset", "Gas fees", "The token standard"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "wrapped-token",
+    "lesson": "A wrapped token is backed 1:1 by an asset locked elsewhere, letting Bitcoin move through Ethereum's DeFi. The custodian or bridge holding that locked asset is the whole story: if it fails or is drained, the wrapper is backed by nothing. Bridge hacks are a recurring catastrophe genre, not a freak event.",
+    "explanation": "Price risk you already had by owning the underlying. The wrapper adds one new risk — whoever is holding the real thing."
+  },
+  {
+    "question": "An investor puts money into a startup now and gets equity later at the next priced round. There's no interest and no maturity date. What did they sign?",
+    "options": ["A convertible note", "A SAFE", "A warrant", "A bond"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 7,
+    "concept": "safe-vs-note",
+    "lesson": "A SAFE is money now for equity later, converting at the next priced round via a valuation cap and/or a discount — and it is not debt: no interest, no maturity, it just waits. A convertible note is debt with the same intent, carrying interest and a maturity date, and that date creates a real leverage moment when it arrives.",
+    "explanation": "No interest and no maturity is the tell. A convertible note has both, which is what makes it a loan on paper."
+  },
+
+  {
+    "question": "You buy a bank's structured note whose payout is a formula on an index. How many kinds of risk are you actually holding?",
+    "options": ["One — the index", "Two — the index and the bank's solvency", "None, it's a note", "Three — index, bank, and currency"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "structured-note",
+    "lesson": "A structured note is unsecured bank debt whose return is a formula on an underlying. That makes you a bank creditor AND a derivatives holder at the same time — if the bank fails, the formula is irrelevant. Complexity is where the fees hide, and secondary liquidity is thin, so exiting early is expensive if it's possible at all.",
+    "explanation": "The formula only pays if the issuer is still standing. Two risks, and the second one is invisible in the marketing."
+  },
+  {
+    "question": "A product is banned for US retail investors, and regulators elsewhere force the seller to disclose that most retail accounts lose money on it. What is it?",
+    "options": ["An ETF", "A contract for difference", "A REIT", "An index fund"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "cfd",
+    "lesson": "A contract for difference pays the difference between an asset's price when you open and close — leveraged exposure with no ownership. It's banned for US retail and huge in the UK, EU and Australia. Overnight financing charges accrue against you, and the mandated disclosure that most retail accounts lose money is a regulator making the base rate impossible to ignore.",
+    "explanation": "When a regulator forces a firm to print its own customers' loss rate on the tin, that's the product being described accurately."
+  },
+  {
+    "question": "A fund IPO'd a fixed number of shares and has no redemption mechanism. Its shares have traded 15% below the value of what it owns for years. Why doesn't that gap close?",
+    "options": ["Nobody has noticed", "Nothing forces it to — you can't redeem at NAV", "It's a pricing error", "The fund is failing"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "closed-end-fund",
+    "lesson": "A closed-end fund issues a fixed share count that then trades on exchange. With no redemption mechanism, no arbitrage drags the price back to net asset value — which is exactly why ETFs stay close to NAV and CEFs don't. Persistent discounts and premiums are normal, and many CEFs are leveraged with large distribution yields on top.",
+    "explanation": "An ETF's authorised participants can create and redeem, which forces convergence. A closed-end fund has no such mechanism, so a discount can simply persist."
+  },
+  {
+    "question": "In April 2020 a crude oil futures contract traded below zero — sellers paying buyers to take it. What made that possible?",
+    "options": ["A software glitch", "Physical delivery is real, and storage ran out", "Short sellers", "A regulatory change"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "commodity-future",
+    "lesson": "Commodity futures are the standard way commodities actually trade, and physical delivery is real. When storage capacity ran out in April 2020, holders of expiring crude contracts faced taking delivery of oil they had nowhere to put, and paid to escape. Contango and backwardation shape the cost of rolling a position, and hedgers — farmers, airlines — meet speculators in this market.",
+    "explanation": "A futures contract is an obligation to take the physical barrels. Once storage is full, that obligation is a liability, and the price can go negative."
+  },
+  {
+    "question": "You buy shares in a private company from an employee on a secondary platform. What two things should worry you most?",
+    "options": ["Fees and taxes", "Company approval rights, and pricing that's stale between rounds", "Currency and timing", "Nothing — it's equity"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "pre-ipo-secondary",
+    "lesson": "Pre-IPO secondary shares are existing private-company shares bought from employees or early investors. The company usually holds a right of first refusal, so the transfer may simply not be permitted. And pricing is sparse and stale between funding rounds — the last round's valuation can be a year old and no longer true in either direction.",
+    "explanation": "You can be blocked from completing the purchase, and the number you're paying against may be badly out of date. Both are structural, not bad luck."
+  },
+  {
+    "question": "Restricted stock and RSUs both vest over time. What's the difference on day one?",
+    "options": ["Nothing", "Restricted stock you own from day one; an RSU is only a promise", "RSUs vest faster", "Restricted stock can't be taxed"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "restricted-stock",
+    "lesson": "Restricted stock is actual shares issued to you subject to vesting and transfer restrictions — you own them from day one, which is why an 83(b) election can start the tax clocks early. An RSU delivers nothing until vest; it's a promise. Founder stock is usually restricted stock, which is why founders can file an 83(b) and employees with RSUs cannot.",
+    "explanation": "Ownership from day one versus a promise to deliver later is the whole distinction, and it's what makes the tax treatment diverge."
+  },
+  {
+    "question": "An algorithmic stablecoin holds its $1 peg with no reserves — the mechanism itself is supposed to do it. What does history say?",
+    "options": ["It's the safest design", "The design has a graveyard behind it", "It's identical to fiat-backed", "It can't lose the peg"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "algorithmic-peg",
+    "lesson": "Stablecoins hold their peg three ways: fiat reserves, crypto over-collateralisation, or algorithmically. The algorithmic version has repeatedly failed, most infamously UST in 2022 — when confidence goes, the mechanism that was supposed to defend the peg accelerates its collapse instead. Reserve attestations are what separate the credible from the hopeful.",
+    "explanation": "A peg defended by a mechanism rather than by assets depends on belief. When belief goes, so does the peg — and the reflexivity works against it."
+  },
+  {
+    "question": "Your forward contract counterparty agreed to buy at a fixed price. Prices collapse and they walk away. Who makes you whole?",
+    "options": ["The clearing house", "Nobody — that's the point of a forward", "The exchange", "The regulator"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "clearing-house",
+    "lesson": "A forward is private and bespoke, with no clearing house standing behind it — so counterparty risk is yours entirely. A futures exchange removes that by interposing a clearing house between every buyer and seller, backed by margin and daily settlement. That's what you're buying with standardisation: not convenience, but a guarantee that the other side pays.",
+    "explanation": "Bespoke terms come at the price of no guarantor. The clearing house is precisely the thing a forward doesn't have."
+  },
+  {
+    "question": "A leveraged crypto market falls hard, forcing liquidations that sell into the fall and force more liquidations. That's a:",
+    "options": ["Short squeeze", "Liquidation cascade", "Rug pull", "Roll cost"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "liquidation-cascade",
+    "lesson": "When leveraged positions are force-closed, the closing itself is selling pressure, which pushes the price to the next tier of liquidations. Perps amplify this because leverage is easy and positions are marked continuously. It's the mirror image of a short squeeze: the same mechanical, non-voluntary flow, running the other way.",
+    "explanation": "Nobody in the cascade is choosing to sell — they're being closed out. That's what separates it from ordinary panic selling."
+  },
+  {
+    "question": "On the other side of a farmer selling wheat futures is a speculator. What is the farmer actually buying with that trade?",
+    "options": ["Profit", "Certainty about the price he'll receive", "Leverage", "A dividend"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "risk-transfer",
+    "lesson": "Derivatives markets exist to move risk from someone who doesn't want it to someone who'll take it for a price. The farmer and the airline hedge to make their costs and revenues predictable; the speculator takes the other side hoping to be paid for it. Neither is the villain — the market only works because both show up.",
+    "explanation": "The farmer gives up the upside of a price rise to remove the risk of a price fall. He's buying certainty, and the speculator is selling it."
+  },
+  {
+    "question": "A commodity ETF tracks oil but keeps rolling expiring futures into later, more expensive ones. Over a year of contango, what happens?",
+    "options": ["It matches spot oil exactly", "It bleeds relative to spot from roll cost", "It outperforms spot", "Nothing measurable"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "roll-cost",
+    "lesson": "A commodity fund can't hold barrels, so it holds futures and must roll them before delivery. In contango — later contracts priced above nearer ones — every roll sells low and buys high, and that cost compounds. It's why a long-term holder of an oil ETF can be right about oil and still lose money.",
+    "explanation": "The fund is repeatedly paying up to stay in the position. Over a year that drag can swamp the move in the underlying."
+  },
+  {
+    "question": "Across warrants, ETNs, structured notes and principal-protected notes, one question separates them from ETFs and exchange options. What is it?",
+    "options": ["What they cost", "Whether you're relying on an issuer's promise or on assets", "How long they last", "Which exchange lists them"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 8,
+    "concept": "issuer-risk",
+    "lesson": "The single question that organises the whole zoo: are you holding assets, or someone's promise? An ETF owns things; an ETN is a bank IOU. An exchange option is cleared; a structured note is unsecured bank debt. 'Principal protected' means the issuer promises, not that collateral exists — which is why Lehman's paid pennies. Learn to ask it and half the category sorts itself.",
+    "explanation": "Payoff diagrams look alike across these products. Who has to survive for you to get paid is what actually differs."
+  }
+]

@@ -91,6 +91,12 @@ with object storage. Cloudflare R2 (free 10GB) or AWS S3:
 - `GOOGLE_PLACES_API_KEY` — Store Scout zip scans.
 - `NEXT_PUBLIC_INSTAGRAM_URL` / `NEXT_PUBLIC_FACEBOOK_URL` /
   `NEXT_PUBLIC_YOUTUBE_URL` — footer social links (hidden until set).
+- `NEXT_PUBLIC_PARTNER_URL` — Street Credit Bureau, the partner credited on
+  the desk track (its instrument rungs are taught from their library).
+  Unset, the card still gives the credit but renders no link, so nobody is
+  sent to a destination that isn't ready. Set it to `streetcreditbureau.com`
+  when it is, and the card becomes a door. Note it's a `NEXT_PUBLIC_` var:
+  it's baked in at build time, so Railway has to rebuild, not just restart.
 
 ## The 30-second test after each key
 
