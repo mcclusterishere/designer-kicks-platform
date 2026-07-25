@@ -507,10 +507,10 @@ time, .tabular {
   /* Daylight contrast: borders you can see, secondary text near-black,
      and the accents re-tuned for paper — night-club red and champagne
      sit at 3.5:1 and 1.9:1 on white, which reads as fog. */
-  --color-edge: #d7d4ca;
-  --color-smoke: #40454d;
+  --color-edge: #cfccc1;
+  --color-smoke: #363b42;
   --color-volt: #c9342c;
-  --color-heat: #8a6a1f;
+  --color-heat: #7d5f18;
 }
 [data-theme="light"] body {
   background: #ffffff;
@@ -529,7 +529,7 @@ time, .tabular {
   color: #15171a !important;
 }
 [data-theme="light"] [class*="text-white/"] {
-  color: rgba(21, 23, 26, 0.72) !important;
+  color: rgba(21, 23, 26, 0.86) !important;
 }
 [data-theme="light"] [class*="border-white"] {
   border-color: rgba(21, 23, 26, 0.16) !important;
@@ -537,10 +537,14 @@ time, .tabular {
 [data-theme="light"] [class*="hover:text-white"]:hover {
   color: #15171a !important;
 }
-/* White badges over photos become ink chips on paper. */
-[data-theme="light"] .bg-white {
+/* White badges over photos become ink chips on paper — except a printable
+   document, which is white paper by definition and keeps its own ink. */
+[data-theme="light"] .bg-white:not(.paper-sheet) {
   background: #15171a !important;
   color: #ffffff !important;
+}
+[data-theme="light"] .paper-sheet :is(h1, h2, h3, strong) {
+  color: #0d0f12;
 }
 [data-theme="light"] .glass {
   background: rgba(255, 255, 255, 0.72);
@@ -566,6 +570,45 @@ time, .tabular {
   background: linear-gradient(100deg, #e05a4a 0%, #c9342c 45%, #8a0f13 100%);
   -webkit-background-clip: text;
   background-clip: text;
+}
+
+/* ── Long-form reading ──────────────────────────────────────────────
+   Article prose is the one place on the site where someone reads for
+   minutes rather than glances for seconds, so it gets its own token
+   instead of borrowing a utility. It had been pinned to a literal pale
+   grey, which is legible on black and effectively invisible on paper —
+   and since the theme defaults to light between 7am and 7pm, that meant
+   most daytime readers got a blank page. Body copy now lands near-black
+   on paper (about 15:1) and warm off-white at night (about 14:1).
+   ─────────────────────────────────────────────────────────────────── */
+.article-body {
+  color: #e7e5e0;
+}
+[data-theme="light"] .article-body {
+  color: #16181c;
+}
+[data-theme="light"] .article-body :is(h2, h3, h4, strong, b) {
+  color: #0d0f12 !important;
+}
+[data-theme="light"] .article-body :is(blockquote, figcaption) {
+  color: #363b42 !important;
+}
+/* Links in running text need to beat the body copy they sit in, not tie it. */
+[data-theme="light"] .article-body a {
+  color: #b02a22 !important;
+  text-decoration-thickness: 0.09em;
+  text-underline-offset: 0.16em;
+}
+
+/* A literal pale neutral is always a dark-mode assumption. On paper it
+   reads as an empty page, so remap the whole family rather than trust
+   every future call site to remember. Card interiors that are genuinely
+   white in both themes opt out with .on-dark. */
+[data-theme="light"]
+  :is(.text-neutral-100, .text-neutral-200, .text-neutral-300, .text-neutral-400,
+      .text-gray-100, .text-gray-200, .text-gray-300, .text-gray-400,
+      .text-zinc-100, .text-zinc-200, .text-zinc-300, .text-zinc-400):not(.on-dark *):not(.on-dark) {
+  color: #363b42 !important;
 }
 
 /* Members who ask their device for more contrast get more contrast. */

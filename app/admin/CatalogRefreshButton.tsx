@@ -24,12 +24,14 @@ export default function CatalogRefreshButton() {
             disabled={pending}
             className="rounded-lg border border-volt px-4 py-2.5 tag font-bold text-volt disabled:opacity-50"
           >
-            {pending ? "Refreshing prices + eBay…" : "Refresh prices + eBay now"}
+            {pending ? "Running tonight's rotation…" : "Run tonight's brand rotation"}
           </button>
         </form>
-        <p className="text-xs text-smoke">
-          Rotates a batch of brands from KicksDB and pulls live eBay new/used prices —
-          same job as the daily cron. Run it a few times to cover every brand.
+        <p className="max-w-md text-xs text-smoke">
+          The nightly job: a few brands from KicksDB plus live eBay prices. The brands
+          are picked by the calendar, so running this twice in one day covers the same
+          ones twice — use <span className="text-white">Refresh the whole database</span> at
+          the top of the page to sweep every brand in one pass.
         </p>
       </div>
 

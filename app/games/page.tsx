@@ -94,7 +94,7 @@ export default async function ArcadePage() {
 
       <p className="mt-10 text-center text-sm text-smoke">
         New pairs cycle in as the catalog updates.{" "}
-        <Link href="/catalog" className="text-volt underline">Browse the whole shoe database →</Link>
+        <Link href="/market?board=catalog" className="text-volt underline">Browse the whole shoe database →</Link>
       </p>
     </div>
   );

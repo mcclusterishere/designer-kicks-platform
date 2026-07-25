@@ -74,6 +74,52 @@ export async function getPriceSeries(shoeId: string, days = 365): Promise<Series
   return [...byDay.values()].sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
+export type TrackPoint = { at: Date; cents: number; kind: "retail" | "recorded" | "live" };
+
+/**
+ * One pair's price track, anchored at its drop.
+ *
+ * The daily log only knows what it has recorded since we switched it on,
+ * which on a young install is a single point — nothing to draw. But two
+ * more points are known facts rather than guesses: on release day the pair
+ * cost retail, by definition, and right now it trades at the price on the
+ * board. Anchoring on those means every pair with a release date and a
+ * retail price has a real chart from day one, and the recorded readings
+ * fill in the middle as they accumulate.
+ *
+ * Each point is labelled with where it came from, so the chart can show
+ * the difference between an observation and an anchor instead of quietly
+ * blending them into one line.
+ */
+export async function getPriceTrack(shoe: {
+  id: string;
+  retailPriceCents: number | null;
+  marketPriceCents: number | null;
+  ebayNewCents: number | null;
+  releaseDate: Date | null;
+}): Promise<TrackPoint[]> {
+  const points: TrackPoint[] = [];
+
+  if (shoe.releaseDate && shoe.retailPriceCents && shoe.retailPriceCents > 0) {
+    points.push({ at: shoe.releaseDate, cents: shoe.retailPriceCents, kind: "retail" });
+  }
+
+  for (const p of await getPriceSeries(shoe.id)) {
+    const cents = p.market ?? p.ebayNew ?? p.ebayUsed;
+    if (cents && cents > 0) points.push({ at: p.at, cents, kind: "recorded" });
+  }
+
+  const live = shoe.marketPriceCents || shoe.ebayNewCents;
+  if (live && live > 0) {
+    const last = points[points.length - 1];
+    // Only add "now" if the newest recorded reading isn't already today's.
+    const sameDay = last && last.at.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+    if (!sameDay) points.push({ at: new Date(), cents: live, kind: "live" });
+  }
+
+  return points.sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
 /**
  * Return since release — computable TODAY without any history, because
  * both ends are known facts: what it cost at retail on drop day, and what

@@ -9,6 +9,8 @@ import { getExchangeBoard, getIndexStats, getMovers, getIndexHistory, type SortK
 import ExchangeTable from "@/components/ExchangeTable";
 import TickerTape from "@/components/TickerTape";
 import IndexHero from "@/components/IndexHero";
+import CatalogBoard from "@/components/CatalogBoard";
+import PairChart from "@/components/PairChart";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
@@ -282,18 +284,29 @@ function CustomTile({
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string }>;
+  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string }>;
 }) {
   await finalizeExpiredBattles();
-  const { board = "customs", category = "all", q = "", sort = "hot", brand = "all", page = "1" } = await searchParams;
-  const og = board === "og";
+  const sp = await searchParams;
+  const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "" } = sp;
+
+  // One tab, four views. The exchange leads because the chart is the thing
+  // people came to look at; "og" is kept as an alias so every link already
+  // in the wild still lands on the book.
+  const raw = sp.board ?? "exchange";
+  const board: "exchange" | "catalog" | "customs" = raw === "customs"
+    ? "customs"
+    : raw === "catalog"
+      ? "catalog"
+      : "exchange";
+  const og = board === "exchange";
   const needle = q.trim().toLowerCase();
 
   const [session, customsBoard, ogBoard, heat, hotBases] = await Promise.all([
     auth(),
-    og ? null : getMarketBoard(),
+    board === "customs" ? getMarketBoard() : null,
     og ? getExchangeBoard({ q, brand: brand === "all" ? undefined : brand, sort: (["last","change","spread","volume","name","recent"].includes(sort) ? sort : "last") as SortKey, page: Number(page) || 1 }) : null,
-    og ? Promise.resolve([]) : getHeatList(),
+    board === "customs" ? getHeatList() : Promise.resolve([]),
     og ? getHotBases() : Promise.resolve([]),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
@@ -315,9 +328,11 @@ export default async function MarketPage({
           <p className="tag text-volt">Live board</p>
           <h1 className="display mt-1 text-4xl text-white">The Market</h1>
           <p className="mt-1 text-sm text-smoke">
-            {og
-              ? "OG retail drops tracked against live resale value."
-              : "One-of-one customs priced by the artists who built them."}
+            {board === "exchange"
+              ? "Retail drops tracked against live resale — chart, book and spread."
+              : board === "catalog"
+                ? "The same pairs, laid out to browse."
+                : "One-of-one customs priced by the artists who built them."}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Link
@@ -335,32 +350,37 @@ export default async function MarketPage({
           </div>
         </div>
 
-        {/* The switch: customs by night, OG drops by day */}
+        {/* One market, three ways to read it. The catalog used to be its own
+            top-level tab, which asked people to know that two words meant one
+            set of shoes — it's a view here now. */}
         <div
-          className="flex w-full max-w-xs items-center rounded-full border border-edge bg-surface p-1 sm:w-auto"
+          className="flex w-full items-center rounded-full border border-edge bg-surface p-1 sm:w-auto"
           role="tablist"
-          aria-label="Which market"
+          aria-label="How to view the market"
         >
-          <Link
-            href="/market"
-            role="tab"
-            aria-selected={!og}
-            className={`${switchBase} ${!og ? "bg-volt text-ink" : "text-smoke hover:text-white"}`}
-          >
-            Customs
-          </Link>
-          <Link
-            href="/market?board=og"
-            role="tab"
-            aria-selected={og}
-            className={`${switchBase} ${og ? "bg-heat text-ink" : "text-smoke hover:text-white"}`}
-          >
-            OG Drops
-          </Link>
+          {(
+            [
+              { key: "exchange", label: "📈 Chart", tone: "bg-heat text-ink" },
+              { key: "catalog", label: "▦ Browse", tone: "bg-volt text-ink" },
+              { key: "customs", label: "✦ Customs", tone: "bg-volt text-ink" },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.key}
+              href={t.key === "exchange" ? "/market" : `/market?board=${t.key}`}
+              role="tab"
+              aria-selected={board === t.key}
+              className={`${switchBase} ${board === t.key ? t.tone : "text-smoke hover:text-white"}`}
+            >
+              {t.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      {og && ogBoard ? (
+      {board === "catalog" ? (
+        <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
+      ) : og && ogBoard ? (
         <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />
       ) : customsBoard ? (
         <CustomsBoardView
@@ -376,7 +396,7 @@ export default async function MarketPage({
       ) : null}
 
       <p className="mt-10 rounded-lg border border-edge bg-surface px-4 py-3 text-xs leading-relaxed text-smoke">
-        {og
+        {board !== "customs"
           ? "Market values are live resale figures (average / lowest ask) captured from our pricing providers and refreshed on re-import. Premium is resale vs retail. Figures are informational, not quotes."
           : "HX is the Heat Index — our proprietary score per piece. Votes, battle wins, standing bids, and sales push it up; cold ratings pull it down. The arrow is the last 7 days of movement. Bids are standing orders: the seller can execute at the high bid any time (Sell Now), which records the sale for the buyer to confirm — payment settles directly between members. ✓ means a sale was substantiated with evidence. Seller fee is 1% when on-platform checkout opens; the book is free forever."}
       </p>
@@ -554,6 +574,41 @@ function CustomsBoardView({
 
 /* ---------- OG board ---------- */
 
+/**
+ * Pick the pair worth putting a chart on: the one that has moved furthest
+ * from retail among pairs we can actually draw. The index needs days of
+ * history before it has a shape, but a single pair's track is drawable the
+ * moment it has a release date and a retail price, so the floor always has
+ * a real graph on it rather than an empty frame.
+ */
+async function getSpotlightTrack() {
+  const candidates = await prisma.catalogShoe.findMany({
+    where: {
+      releaseDate: { not: null },
+      retailPriceCents: { gt: 0 },
+      OR: [{ marketPriceCents: { gt: 0 } }, { ebayNewCents: { gt: 0 } }],
+    },
+    orderBy: { marketPriceCents: "desc" },
+    take: 60,
+    select: {
+      id: true, sku: true, name: true, releaseDate: true,
+      retailPriceCents: true, marketPriceCents: true, ebayNewCents: true,
+    },
+  });
+  if (candidates.length === 0) return null;
+
+  const best = candidates
+    .map((s) => ({
+      s,
+      gap: Math.abs(((s.marketPriceCents ?? s.ebayNewCents ?? 0) - s.retailPriceCents!) / s.retailPriceCents!),
+    }))
+    .sort((a, b) => b.gap - a.gap)[0].s;
+
+  const { getPriceTrack } = await import("@/lib/priceHistory");
+  const points = await getPriceTrack(best);
+  return points.length >= 2 ? { points, name: best.name, sku: best.sku } : null;
+}
+
 async function ExchangeFloor({
   exchange,
   hotBases,
@@ -568,7 +623,12 @@ async function ExchangeFloor({
   brand: string;
 }) {
   const { rows, total, page, pages, brands } = exchange;
-  const [index, movers, history] = await Promise.all([getIndexStats(), getMovers(), getIndexHistory(30)]);
+  const [index, movers, history, spotlight] = await Promise.all([
+    getIndexStats(),
+    getMovers(),
+    getIndexHistory(30),
+    getSpotlightTrack(),
+  ]);
 
   return (
     <>
@@ -586,6 +646,17 @@ async function ExchangeFloor({
         decliners={index.decliners}
       />
 
+      {/* The pair chart. The index needs days before it has a shape; this
+          is drawable today, so the floor is never a chartless "market". */}
+      {spotlight && (
+        <PairChart
+          points={spotlight.points}
+          name={spotlight.name}
+          sku={spotlight.sku}
+          className="mt-5"
+        />
+      )}
+
       {/* Hot bases — what the culture actually builds on */}
       {hotBases.length > 0 && (
         <div className="mt-5">
@@ -594,7 +665,7 @@ async function ExchangeFloor({
             {hotBases.map((hb) => (
               <Link
                 key={hb.silhouette}
-                href={`/market?board=og&q=${encodeURIComponent(hb.silhouette)}`}
+                href={`/market?q=${encodeURIComponent(hb.silhouette)}`}
                 className="shrink-0 rounded-lg border border-edge bg-surface px-3 py-2 transition hover:border-volt/50"
               >
                 <p className="text-xs font-bold text-white">{hb.silhouette}</p>

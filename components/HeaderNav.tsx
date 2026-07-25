@@ -12,8 +12,9 @@ const LINKS = [
     match: ["/battles", "/outfits", "/rate", "/games", "/tournaments", "/artists", "/heat-list", "/quiz", "/giveaway"],
   },
   { href: "/drops", label: "Drops", match: ["/drops", "/news"] },
-  { href: "/catalog", label: "Catalog", match: ["/catalog"] },
-  { href: "/market", label: "Market", match: ["/market", "/predict", "/collectors", "/shop"] },
+  // Catalog is a view inside the Market now, not a door of its own —
+  // one set of shoes shouldn't need two words in the nav.
+  { href: "/market", label: "Market", match: ["/market", "/catalog", "/predict", "/collectors", "/shop"] },
 ];
 
 function lit(pathname: string, match: string[]): boolean {

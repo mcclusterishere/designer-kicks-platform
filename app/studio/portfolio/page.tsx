@@ -108,7 +108,9 @@ export default async function PortfolioStatementPage() {
       </div>
 
       {/* The document itself — white paper, dark ink, prints as-is. */}
-      <div className="rounded-xl bg-white p-8 text-neutral-900 shadow-2xl print:rounded-none print:p-6 print:shadow-none sm:p-12">
+      {/* paper-sheet opts this out of the light-theme .bg-white flip: it is a
+          printable document, so it stays white paper in both themes. */}
+      <div className="paper-sheet rounded-xl bg-white p-8 text-neutral-900 shadow-2xl print:rounded-none print:p-6 print:shadow-none sm:p-12">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-neutral-900 pb-6">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-neutral-500">

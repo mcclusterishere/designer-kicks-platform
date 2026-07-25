@@ -246,5 +246,61 @@ export async function getIndexHistory(days = 30): Promise<{ at: Date; value: num
     orderBy: { at: "asc" },
     select: { at: true, value: true },
   });
-  return rows;
+  // The purpose-built index table only starts filling the day the nightly
+  // job first runs, so a young install has one row and draws nothing. The
+  // per-pair price history is older and covers the same ground, so rebuild
+  // the curve from it rather than show an empty frame on the busiest page.
+  if (rows.length >= 2) return rows;
+
+  const derived = await deriveIndexHistory(days);
+  return derived.length >= 2 ? derived : rows;
+}
+
+/**
+ * Rebuild the index from the per-pair price log.
+ *
+ * Same arithmetic the live index uses — median premium over retail — just
+ * grouped by the day each price was observed instead of computed once at
+ * close. Median, not mean, for the same reason as everywhere else here: one
+ * Off-White grail at +2795% drags an average into fiction.
+ *
+ * Every point is a real recorded observation. Days nobody logged a price
+ * simply don't appear; the line is never interpolated to look busier.
+ */
+async function deriveIndexHistory(days: number): Promise<{ at: Date; value: number }[]> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const snaps = await prisma.priceSnapshot.findMany({
+    where: { at: { gte: since }, cents: { gt: 0 } },
+    orderBy: { at: "asc" },
+    select: { at: true, cents: true, shoeId: true },
+  });
+  if (snaps.length === 0) return [];
+
+  const retails = new Map(
+    (
+      await prisma.catalogShoe.findMany({
+        where: { id: { in: [...new Set(snaps.map((s) => s.shoeId))] }, retailPriceCents: { gt: 0 } },
+        select: { id: true, retailPriceCents: true },
+      })
+    ).map((s) => [s.id, s.retailPriceCents!])
+  );
+
+  // One reading per pair per day — the last one observed that day wins.
+  const perDay = new Map<string, Map<string, number>>();
+  for (const s of snaps) {
+    const retail = retails.get(s.shoeId);
+    if (!retail) continue;
+    const day = s.at.toISOString().slice(0, 10);
+    if (!perDay.has(day)) perDay.set(day, new Map());
+    perDay.get(day)!.set(s.shoeId, Math.round(((s.cents - retail) / retail) * 100));
+  }
+
+  return [...perDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, byShoe]) => {
+      const vals = [...byShoe.values()].sort((a, b) => a - b);
+      const mid = Math.floor(vals.length / 2);
+      const median = vals.length % 2 ? vals[mid] : Math.round((vals[mid - 1] + vals[mid]) / 2);
+      return { at: new Date(`${day}T00:00:00.000Z`), value: median };
+    });
 }

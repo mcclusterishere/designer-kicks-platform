@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import PriceHistoryCard from "@/components/PriceHistoryCard";
-import { getPriceSeries, sinceRelease } from "@/lib/priceHistory";
+import { getPriceSeries, getPriceTrack, sinceRelease } from "@/lib/priceHistory";
+import PairChart from "@/components/PairChart";
 import { retailKind } from "@/lib/taxonomy";
 import { buyLinks } from "@/lib/affiliates";
 
@@ -69,7 +70,7 @@ export default async function CatalogShoePage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <Link href="/catalog" className="tag text-smoke hover:text-white">← The Catalog</Link>
+      <Link href="/market?board=catalog" className="tag text-smoke hover:text-white">← The Market</Link>
 
       <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start">
         {/* Product PNG shown whole on a light plate — no square-crop butchery */}
@@ -86,6 +87,15 @@ export default async function CatalogShoePage({
           {shoe.brand && <p className="tag text-volt">{shoe.brand}</p>}
           <h1 className="display mt-1 text-3xl text-white sm:text-4xl">{shoe.name}</h1>
           <p className="mt-1 font-mono text-sm text-smoke">{shoe.sku}</p>
+
+          {/* The drop-to-today chart, drawable from the release anchor even
+              before the daily log has depth. */}
+          <PairChart
+            points={await getPriceTrack(shoe)}
+            name={shoe.name}
+            sku={shoe.sku}
+            className="mt-4"
+          />
 
           <PriceHistoryCard
             series={await getPriceSeries(shoe.id)}

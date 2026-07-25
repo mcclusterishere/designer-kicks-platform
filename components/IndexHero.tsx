@@ -64,9 +64,9 @@ export default function IndexHero({
       {/* the curve */}
       <div className="relative mt-5">
         {enough ? (
-          <AreaChart points={history.map((h) => h.value)} up={up} />
+          <AreaChart points={history} up={up} />
         ) : (
-          <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-edge">
+          <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-edge">
             <p className="px-4 text-center text-xs text-smoke">
               Index history starts today — the chart draws itself as real daily
               readings land. {history.length === 1 ? "1 reading so far." : "No readings yet."}
@@ -109,44 +109,132 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "up
   );
 }
 
-/** Area chart with a gradient fill and a stroke that draws itself in. */
-function AreaChart({ points, up }: { points: number[]; up: boolean }) {
-  const W = 600, H = 96, PAD = 6;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const xy = points.map((v, i) => {
-    const x = PAD + (i * (W - PAD * 2)) / Math.max(1, points.length - 1);
-    const y = H - PAD - ((v - min) * (H - PAD * 2)) / span;
-    return [x, y] as const;
-  });
-  const line = xy.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const area = `${line} L${xy[xy.length - 1][0].toFixed(1)},${H} L${xy[0][0].toFixed(1)},${H} Z`;
+/**
+ * The index chart.
+ *
+ * A bare sparkline reads as decoration; a chart needs a scale you can
+ * actually read a number off. So this carries a gridded plot area, a
+ * labelled y-axis in percent, dated ends on the x-axis, and a dashed
+ * zero-line wherever the window straddles retail — that line is the whole
+ * story on a resale index, since above it means pairs are trading over
+ * retail and below it means they aren't.
+ *
+ * Nothing here is interpolated. Each vertex is one recorded daily reading.
+ */
+function AreaChart({ points, up }: { points: Point[]; up: boolean }) {
+  const W = 720, H = 220;
+  const L = 44, R = 12, T = 14, B = 26; // gutters for the axes
+  const plotW = W - L - R;
+  const plotH = H - T - B;
+
+  const vals = points.map((p) => p.value);
+  const rawMin = Math.min(...vals);
+  const rawMax = Math.max(...vals);
+  // Pad the band so the line never rides the frame, and always include 0
+  // when the data sits near it — a resale chart that hides the retail line
+  // is hiding the only reference point that means anything.
+  const padding = Math.max(2, (rawMax - rawMin) * 0.15);
+  let lo = rawMin - padding;
+  let hi = rawMax + padding;
+  if (rawMin > 0 && rawMin < padding * 3) lo = Math.min(lo, 0);
+  if (rawMax < 0 && rawMax > -padding * 3) hi = Math.max(hi, 0);
+  const span = hi - lo || 1;
+
+  const x = (i: number) => L + (i * plotW) / Math.max(1, points.length - 1);
+  const y = (v: number) => T + plotH - ((v - lo) * plotH) / span;
+
+  const xy = points.map((p, i) => [x(i), y(p.value)] as const);
+  const line = xy.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+  const area = `${line} L${xy[xy.length - 1][0].toFixed(1)},${T + plotH} L${xy[0][0].toFixed(1)},${T + plotH} Z`;
+
   const stroke = up ? "#d9b96a" : "#f04e45";
   const id = up ? "gUp" : "gDown";
+  const ticks = [hi, lo + span * 0.5, lo].map((v) => Math.round(v));
+  const dayLabel = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-24 w-full" preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#${id})`} className="area-fade" />
-      <path
-        d={line}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="line-draw"
-        style={{ filter: `drop-shadow(0 0 6px ${stroke}66)` }}
-      />
-      {/* live dot on the latest reading */}
-      <circle cx={xy[xy.length - 1][0]} cy={xy[xy.length - 1][1]} r="3.5" fill={stroke} className="pulse-dot" />
-    </svg>
+    <figure className="m-0">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-52 w-full sm:h-56"
+        role="img"
+        aria-label={`Resale index over the last ${points.length} recorded readings, from ${Math.round(vals[0])} percent to ${Math.round(vals[vals.length - 1])} percent over retail.`}
+      >
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={stroke} stopOpacity="0.38" />
+            <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* gridlines + y scale */}
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={L}
+              x2={W - R}
+              y1={y(t)}
+              y2={y(t)}
+              stroke="currentColor"
+              strokeWidth="1"
+              className="text-edge"
+              opacity="0.55"
+            />
+            <text
+              x={L - 8}
+              y={y(t)}
+              textAnchor="end"
+              dominantBaseline="middle"
+              className="fill-current text-smoke"
+              style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}
+            >
+              {t > 0 ? `+${t}%` : `${t}%`}
+            </text>
+          </g>
+        ))}
+
+        {/* retail line — the reference that makes the rest mean something */}
+        {lo < 0 && hi > 0 && (
+          <line
+            x1={L}
+            x2={W - R}
+            y1={y(0)}
+            y2={y(0)}
+            stroke="currentColor"
+            strokeDasharray="4 4"
+            strokeWidth="1.25"
+            className="text-smoke"
+            opacity="0.8"
+          />
+        )}
+
+        <path d={area} fill={`url(#${id})`} className="area-fade" />
+        <path
+          d={line}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="line-draw"
+          style={{ filter: `drop-shadow(0 0 6px ${stroke}66)` }}
+        />
+        <circle cx={xy[xy.length - 1][0]} cy={xy[xy.length - 1][1]} r="4" fill={stroke} className="pulse-dot" />
+
+        {/* dated ends */}
+        <text x={L} y={H - 6} className="fill-current text-smoke" style={{ fontSize: 11 }}>
+          {dayLabel(points[0].at)}
+        </text>
+        <text x={W - R} y={H - 6} textAnchor="end" className="fill-current text-smoke" style={{ fontSize: 11 }}>
+          {dayLabel(points[points.length - 1].at)}
+        </text>
+      </svg>
+      <figcaption className="tag mt-1 text-smoke">
+        {points.length} recorded reading{points.length === 1 ? "" : "s"} · median premium over retail · gaps are days
+        nobody logged a price, never filled in
+      </figcaption>
+    </figure>
   );
 }
 

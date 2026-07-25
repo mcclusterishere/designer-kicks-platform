@@ -185,7 +185,7 @@ export default async function ArticlePage({ params }: Props) {
       )}
 
       <article
-        className="prose-invert mt-8 max-w-none space-y-4 leading-relaxed text-neutral-200
+        className="article-body mt-8 max-w-none space-y-4 leading-relaxed
           [&_h2]:display [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:text-white
           [&_h3]:mt-6 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-white
           [&_a]:text-volt [&_a]:underline

@@ -3055,6 +3055,29 @@ export async function refreshCatalogNow(): Promise<CatalogRefreshResult> {
   };
 }
 
+/**
+ * Refresh the whole database, not a slice of it.
+ *
+ * The button above rotates a few brands, which is the right behaviour for a
+ * nightly job and the wrong behaviour for someone sitting there clicking it.
+ * This runs the deep pass: every catalog brand, a much deeper eBay sweep,
+ * release dates, drop drafts, orphan repair, price history, call settlement,
+ * league rollover and a fresh index reading — the same pipeline the cron
+ * calls, turned all the way up.
+ *
+ * It reports per step, including steps that failed or ran dormant, so a
+ * half-finished run is never mistaken for a clean one.
+ */
+export async function refreshEverythingNow(): Promise<import("@/lib/refreshAll").RefreshReport> {
+  await requireAdmin();
+  const { refreshEverything } = await import("@/lib/refreshAll");
+  const report = await refreshEverything("deep");
+  for (const p of ["/admin", "/market", "/catalog", "/drops", "/news", "/predict", "/league", "/heat-list"]) {
+    revalidatePath(p);
+  }
+  return report;
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour

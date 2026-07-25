@@ -64,6 +64,7 @@ import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
 import MatchPhotosButton from "./MatchPhotosButton";
 import FixPhotosButton from "./FixPhotosButton";
+import FullRefreshButton from "./FullRefreshButton";
 import StorageHealthPanel from "@/components/StorageHealthPanel";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
@@ -502,8 +503,12 @@ export default async function AdminPage({
         <h1 className="display text-4xl text-white">Command Center</h1>
         <p className="mt-1.5 text-smoke">Everything that runs The Heat Chart, one room at a time.</p>
 
-        {/* Always-visible: is storage even holding the photos? then rescue HEIC. */}
+        {/* Always-visible: is storage even holding the photos? then rescue HEIC.
+            The full refresh sits here rather than inside the Market tab — it
+            rebuilds every section, so burying it under one of them was the
+            reason it read as a catalog-only button. */}
         <div className="mt-5 space-y-3">
+          <FullRefreshButton />
           <StorageHealthPanel />
           <FixPhotosButton />
         </div>
