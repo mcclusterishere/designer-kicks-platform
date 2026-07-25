@@ -4,15 +4,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { fitsMember } from "@/lib/shoeSize";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { getMarketBoard, getOgBoard, getHotBases, formatUsd, type MarketItem, type OgItem, type HotBase } from "@/lib/market";
+import { getMarketBoard, getHotBases, formatUsd, type MarketItem, type HotBase } from "@/lib/market";
+import { getExchangeBoard, getIndexStats, getMovers, type SortKey } from "@/lib/exchange";
+import ExchangeTable from "@/components/ExchangeTable";
+import TickerTape from "@/components/TickerTape";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
 
 export const metadata = {
-  title: "Market — Custom Heat & OG Drops, Priced Live | The Heat Chart",
+  title: "The Market — Live Sneaker Exchange, Bid/Ask & Resale Index | The Heat Chart",
   description:
-    "The two sides of the sneaker market on one board: one-of-one customs priced by their artists, and OG retail drops tracked against live resale. Last sales, asks, offers, premiums.",
+    "The sneaker exchange: every tracked pair as a live symbol with last price, premium over retail, and a real two-sided bid/ask from the used and new market. Plus one-of-one customs priced by the artists who built them.",
 };
 export const dynamic = "force-dynamic";
 
@@ -272,75 +275,23 @@ function CustomTile({
   );
 }
 
-/* ---------- OG tile ---------- */
-
-function OgTile({ item }: { item: OgItem }) {
-  return (
-    <Link
-      href={`/catalog/${encodeURIComponent(item.sku)}`}
-      className="group flex flex-col rounded-lg border border-edge bg-surface transition hover:border-smoke/60"
-    >
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg bg-white p-3">
-        {item.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.04]"
-          />
-        ) : (
-          <span className="text-4xl">👟</span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-3">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-tight text-white" title={item.name}>
-          {item.name}
-        </p>
-        <div className="mt-2.5 border-t border-edge pt-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">Market Value</p>
-          <div className="flex items-baseline justify-between">
-            <p className="text-xl font-bold tabular-nums text-white">{formatUsd(item.marketCents)}</p>
-            {item.premiumPct !== null && <Delta pct={item.premiumPct} />}
-          </div>
-          <LocalMoney usd={item.marketCents / 100} />
-        </div>
-        {/* The spread: retail → eBay new → eBay used. Live medians from
-            the auto-matcher; dashes until the eBay keys connect. */}
-        <div className="mt-1.5 space-y-0.5 text-[11px] tabular-nums text-smoke">
-          <p className="flex justify-between">
-            <span>Retail</span>
-            <span className="text-white">{item.retailCents ? formatUsd(item.retailCents) : "—"}</span>
-          </p>
-          <p className="flex justify-between">
-            <span>eBay new</span>
-            <span className="text-white">{item.ebayNewCents ? formatUsd(item.ebayNewCents) : "—"}</span>
-          </p>
-          <p className="flex justify-between">
-            <span>eBay used</span>
-            <span className="text-white">{item.ebayUsedCents ? formatUsd(item.ebayUsedCents) : "—"}</span>
-          </p>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 /* ---------- page ---------- */
 
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string }>;
+  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string }>;
 }) {
   await finalizeExpiredBattles();
-  const { board = "customs", category = "all", q = "", sort = "hot", brand = "all" } = await searchParams;
+  const { board = "customs", category = "all", q = "", sort = "hot", brand = "all", page = "1" } = await searchParams;
   const og = board === "og";
   const needle = q.trim().toLowerCase();
 
   const [session, customsBoard, ogBoard, heat, hotBases] = await Promise.all([
     auth(),
     og ? null : getMarketBoard(),
-    og ? getOgBoard() : null,
+    og ? getExchangeBoard({ q, brand: brand === "all" ? undefined : brand, sort: (["last","change","spread","volume","name","recent"].includes(sort) ? sort : "last") as SortKey, page: Number(page) || 1 }) : null,
     og ? Promise.resolve([]) : getHeatList(),
     og ? getHotBases() : Promise.resolve([]),
   ]);
@@ -401,7 +352,7 @@ export default async function MarketPage({
       </div>
 
       {og && ogBoard ? (
-        <OgBoardView board={ogBoard} hotBases={hotBases} q={q} needle={needle} sort={sort} brand={brand} />
+        <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />
       ) : customsBoard ? (
         <CustomsBoardView
           board={customsBoard}
@@ -594,44 +545,63 @@ function CustomsBoardView({
 
 /* ---------- OG board ---------- */
 
-function OgBoardView({
-  board,
+async function ExchangeFloor({
+  exchange,
   hotBases,
   q,
-  needle,
   sort,
   brand,
 }: {
-  board: Awaited<ReturnType<typeof getOgBoard>>;
+  exchange: Awaited<ReturnType<typeof getExchangeBoard>>;
   hotBases: HotBase[];
   q: string;
-  needle: string;
   sort: string;
   brand: string;
 }) {
-  const { items, stats, brands } = board;
-  const filtered = items
-    .filter((i) => brand === "all" || i.brand === brand)
-    .filter((i) => !needle || i.name.toLowerCase().includes(needle) || i.sku.toLowerCase().includes(needle))
-    .sort((a, b) =>
-      sort === "price-low"
-        ? a.marketCents - b.marketCents
-        : sort === "premium"
-          ? (b.premiumPct ?? -Infinity) - (a.premiumPct ?? -Infinity)
-          : b.marketCents - a.marketCents
-    );
-  const page = filtered.slice(0, OG_PAGE_SIZE);
+  const { rows, total, page, pages, brands } = exchange;
+  const [index, movers] = await Promise.all([getIndexStats(), getMovers()]);
+  const idxUp = (index.indexValue ?? 0) >= 0;
 
   return (
     <>
-      {/* Hot Bases — what the culture is actually building on. Price
-          feeds say what a pair costs; this says what pairs get CHOSEN,
-          and what the work turns them into. */}
+      {/* The tape */}
+      <div className="mt-5 -mx-4">
+        <TickerTape movers={movers} />
+      </div>
+
+      {/* The index — one number for how far over retail the street is */}
+      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3 rounded-xl border border-edge bg-surface p-5">
+        <div>
+          <p className="tag text-smoke">THC Resale Index</p>
+          <p className={`display text-4xl ${idxUp ? "text-emerald-400" : "text-red-400"}`}>
+            {index.indexValue === null ? "—" : `${idxUp ? "+" : ""}${index.indexValue}%`}
+          </p>
+          <p className="tag text-smoke">median premium over retail</p>
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <div>
+            <p className="tag text-smoke">Listed</p>
+            <p className="text-lg font-bold tabular-nums text-white">{index.listed.toLocaleString("en-US")}</p>
+          </div>
+          <div>
+            <p className="tag text-smoke">Two-sided quotes</p>
+            <p className="text-lg font-bold tabular-nums text-white">{index.quoted.toLocaleString("en-US")}</p>
+          </div>
+          <div>
+            <p className="tag text-smoke">Advancing</p>
+            <p className="text-lg font-bold tabular-nums text-emerald-400">{index.advancers.toLocaleString("en-US")}</p>
+          </div>
+          <div>
+            <p className="tag text-smoke">Declining</p>
+            <p className="text-lg font-bold tabular-nums text-red-400">{index.decliners.toLocaleString("en-US")}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Hot bases — what the culture actually builds on */}
       {hotBases.length > 0 && (
         <div className="mt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">
-            Hot bases — most customized in the league
-          </p>
+          <p className="tag text-smoke">Hot bases — most customized in the league</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
             {hotBases.map((hb) => (
               <Link
@@ -643,9 +613,6 @@ function OgBoardView({
                 <p className="mt-0.5 text-[11px] tabular-nums text-smoke">
                   {hb.customsBuilt} custom{hb.customsBuilt === 1 ? "" : "s"}
                   {hb.recentBuilds > 0 && <span className="text-volt"> · {hb.recentBuilds} this month</span>}
-                  {hb.avgCustomAskCents && (
-                    <span> · avg ask {formatUsd(hb.avgCustomAskCents)}</span>
-                  )}
                 </p>
               </Link>
             ))}
@@ -653,80 +620,41 @@ function OgBoardView({
         </div>
       )}
 
-      <StatStrip
-        stats={[
-          { label: "Pairs Tracked", value: stats.tracked.toLocaleString("en-US") },
-          { label: "Avg Premium", value: stats.avgPremiumPct !== null ? `${stats.avgPremiumPct > 0 ? "+" : ""}${stats.avgPremiumPct}%` : "—" },
-          {
-            label: "Top Gainer",
-            value: stats.topGainer ? `+${stats.topGainer.premiumPct}%` : "—",
-          },
-          { label: "Source", value: "Live resale" },
-        ]}
+      {/* Search / filter the floor */}
+      <form method="GET" action="/market" className="mt-5 flex flex-wrap gap-2">
+        <input type="hidden" name="board" value="og" />
+        <input type="hidden" name="sort" value={sort} />
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Search ticker or pair…"
+          aria-label="Search symbols"
+          className="min-w-0 flex-1 rounded-md border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50"
+        />
+        <select
+          name="brand"
+          defaultValue={brand}
+          aria-label="Filter by brand"
+          className="rounded-md border border-edge bg-surface px-2 py-2 text-sm text-white"
+        >
+          <option value="all">All brands</option>
+          {brands.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+        </select>
+        <button className="rounded-md btn-hard px-4 py-2 tag font-bold">Go</button>
+      </form>
+
+      <ExchangeTable
+        rows={rows}
+        sort={(sort as SortKey) ?? "last"}
+        query={q || undefined}
+        brand={brand === "all" ? undefined : brand}
+        page={page}
+        pages={pages}
+        total={total}
       />
-
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <form method="GET" action="/market" className="flex min-w-0 flex-1 flex-wrap gap-2">
-          <input type="hidden" name="board" value="og" />
-          <select
-            name="brand"
-            defaultValue={brand}
-            aria-label="Filter by brand"
-            className="rounded-md border border-edge bg-surface px-2 py-1.5 text-xs text-white"
-          >
-            <option value="all">All brands</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            aria-label="Search name or SKU"
-            placeholder="Search name or SKU…"
-            className="min-w-0 flex-1 rounded-md border border-edge bg-surface px-3 py-1.5 text-sm text-white placeholder:text-smoke/60 focus:border-volt focus:outline-none"
-          />
-          <select
-            name="sort"
-            defaultValue={sort === "hot" ? "price-high" : sort}
-            aria-label="Sort the board"
-            className="rounded-md border border-edge bg-surface px-2 py-1.5 text-xs text-white"
-          >
-            {SORTS.filter((s) => s.key !== "hot").map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="rounded-md border border-edge px-3 py-1.5 text-xs font-semibold text-white transition hover:border-volt"
-          >
-            Go
-          </button>
-        </form>
-      </div>
-
-      {page.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-dashed border-edge bg-surface p-10 text-center">
-          <p className="display text-2xl text-white">No pairs match</p>
-          <p className="mt-2 text-sm text-smoke">Loosen the search or switch brands.</p>
-        </div>
-      ) : (
-        <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {page.map((item) => (
-              <OgTile key={item.sku} item={item} />
-            ))}
-          </div>
-          {filtered.length > page.length && (
-            <p className="mt-4 text-center text-xs text-smoke">
-              Showing {page.length} of {filtered.length.toLocaleString("en-US")} — search or filter to narrow it, or
-              browse the full{" "}
-              <Link href="/catalog" className="text-volt underline">catalog</Link>.
-            </p>
-          )}
-        </>
-      )}
     </>
   );
 }
+

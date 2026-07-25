@@ -602,3 +602,18 @@ time, .tabular {
   .float-slow, .float-slower, .marquee-x { animation: none; }
   .reveal-item { transition: none !important; }
 }
+
+/* The tape: one seamless loop of the movers across the trading floor.
+   The track holds the list twice, so translating exactly -50% lands on an
+   identical frame and the scroll never visibly jumps. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track {
+  animation: ticker-scroll 45s linear infinite;
+}
+.ticker-track:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+}

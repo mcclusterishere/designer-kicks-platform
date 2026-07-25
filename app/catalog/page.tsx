@@ -180,8 +180,15 @@ export default async function CatalogPage({
         Every release we track — real style codes, retail prices, verified dates.
         The culture rates them in{" "}
         <Link href="/rate" className="text-volt underline">the Rate game</Link>;
-        the flames land here.
+        the flames land here. This is the browsing view — every pair here is
+        also a live symbol on the exchange.
       </p>
+      <Link
+        href="/market?board=og"
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-volt px-4 py-2 tag font-bold text-volt transition hover:bg-volt/10"
+      >
+        📈 Open the exchange — last, bid/ask, spread
+      </Link>
 
       {/* Who you're shopping for — For You weights toward your lane */}
       <div className="mt-6 flex flex-wrap items-center gap-1.5">
