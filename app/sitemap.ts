@@ -30,7 +30,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/battles`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/heat-list`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/shop`, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${base}/catalog`, changeFrequency: "daily", priority: 0.8 },
+    // The catalog index is a redirect into /market now, so it's left out —
+    // a sitemap should list destinations, not hops. Per-shoe /catalog/[sku]
+    // pages are still listed below; those are the real indexable assets.
     { url: `${base}/submit`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${base}/customs/sink-or-swim`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/games`, changeFrequency: "weekly", priority: 0.7 },
