@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db";
+import GalleryRun from "@/components/GalleryRun";
 import { isAdmin, adminAccountOk, totpEnabled } from "@/lib/admin";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { finalizeExpiredOutfitBattles } from "@/lib/outfits";
 import {
   adminLogout,
+  scoutGalleriesAction,
   setSubmissionStatus,
   setAmbassadorStatus,
   endBattleNow,
@@ -417,6 +419,9 @@ export default async function AdminPage({
 
   // Store Scout (beta): the prospecting board, grouped by pipeline stage.
   const storeLeads = await prisma.storeLead.findMany({
+    // Galleries share this table but not this board — without the filter
+    // they'd silently pad the store pipeline and skew every count on it.
+    where: { kind: "STORE" },
     orderBy: [{ createdAt: "desc" }],
     take: 150,
   });
@@ -1287,6 +1292,35 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+      )}
+
+      {/* Gallery Run: outreach to the rooms that decide what counts as art */}
+      {show("roster") && (
+      <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Gallery <span className="text-gradient-heat">Run</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          A show is provenance. A gallery relationship is what turns
+          &ldquo;sneaker guy&rdquo; into a represented artist — and it&apos;s what makes
+          the sale record mean something to anyone outside the culture.
+          Scan a city, then work the queue: the letter is written for you
+          from confirmed sales only.
+        </p>
+
+        <form action={scoutGalleriesAction} className="mt-4 flex flex-wrap gap-2">
+          <input
+            name="where"
+            placeholder="Atlanta, GA or 30310"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50"
+          />
+          <button className="rounded-lg btn-hard px-5 py-2 tag font-bold">Scan for galleries</button>
+        </form>
+
+        <div className="mt-4">
+          <GalleryRun />
+        </div>
       </section>
       )}
 

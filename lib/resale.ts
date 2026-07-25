@@ -17,12 +17,19 @@ export const RESALE_ARTIST_ROYALTY_PCT = 10;
 export const RESALE_PLATFORM_FEE_PCT = 10;
 
 /**
- * Half of the platform's cut goes to whoever brought the seller onto the
- * platform, for as long as that member keeps trading. An artist who
- * onboards his own customers therefore earns twice on a resale of his own
- * work: the artist royalty AND half the platform fee.
+ * There is no separate referral cut, and that is deliberate.
+ *
+ * The first sketch gave whoever onboarded a member half the platform's fee
+ * on everything they ever sold. The royalty already does that job better:
+ * an artist earns on every resale of his own work, forever, without anyone
+ * having to track who introduced whom. Dropping the referral layer removes
+ * a whole category of argument — double attribution, a member onboarded by
+ * two people, what happens when the referrer leaves — for a mechanic that
+ * pays the maker for making rather than for recruiting.
+ *
+ * So the split is three numbers and they add to a hundred:
+ *   10% artist royalty · 10% platform · 80% seller, less Stripe.
  */
-export const REFERRER_SHARE_OF_PLATFORM_PCT = 50;
 
 /**
  * Stripe's published US card rate. Passed through to the seller rather
@@ -37,22 +44,41 @@ export function stripeFeeCents(amountCents: number): number {
   return Math.round((amountCents * STRIPE_PCT) / 100) + STRIPE_FLAT_CENTS;
 }
 
-/** Every cent of a resale, accounted for. Nothing hidden in a rounding. */
+/**
+ * Every cent of a resale, accounted for. Nothing hidden in a rounding.
+ *
+ * The seller's share is computed as the remainder rather than as its own
+ * percentage, so the parts always sum to exactly the price. Taking 80% and
+ * hoping it lines up leaves a stray cent somewhere, and a stray cent in a
+ * payout is a support ticket.
+ */
 export function resaleBreakdown(priceCents: number) {
   const artistRoyalty = Math.round((priceCents * RESALE_ARTIST_ROYALTY_PCT) / 100);
   const platformFee = Math.round((priceCents * RESALE_PLATFORM_FEE_PCT) / 100);
   const stripe = stripeFeeCents(priceCents);
-  const referrerShare = Math.round((platformFee * REFERRER_SHARE_OF_PLATFORM_PCT) / 100);
   return {
     priceCents,
     artistRoyalty,
     platformFee,
-    // The house keeps what's left of its own fee after the referrer's half.
-    platformNet: platformFee - referrerShare,
-    referrerShare,
     stripe,
     sellerNet: priceCents - artistRoyalty - platformFee - stripe,
   };
+}
+
+/**
+ * The same numbers as a sentence somebody can check.
+ *
+ * Every seller sees this before they list. A resale market where people
+ * discover the fee after the sale is a resale market people use once.
+ */
+export function resaleQuote(priceCents: number): string {
+  const b = resaleBreakdown(priceCents);
+  const usd = (c: number) => `$${(c / 100).toFixed(2)}`;
+  return (
+    `On ${usd(b.priceCents)}: you keep ${usd(b.sellerNet)}. ` +
+    `${usd(b.artistRoyalty)} royalty to the maker, ` +
+    `${usd(b.platformFee)} platform, ${usd(b.stripe)} card processing.`
+  );
 }
 
 export function resaleSplitLabel(): string {

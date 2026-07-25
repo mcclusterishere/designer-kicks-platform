@@ -5274,3 +5274,70 @@ export async function repairArtistAccount(formData: FormData): Promise<RepairRes
   revalidatePath("/admin");
   return { ok: true, note: notes.join(" ") || "No changes — fill the target email or a new handle." };
 }
+
+// ---------- Gallery Run (admin-only): outreach to the rooms that
+// decide what counts as art ----------
+
+export type GalleryScoutResult = ActionResult & { added?: number; scanned?: number };
+
+/**
+ * Sweep a city or zip for galleries worth showing this work to.
+ *
+ * Runs every search angle rather than one, because "contemporary gallery"
+ * and "gallery accepting submissions" surface almost disjoint sets and the
+ * second one is where the yes lives. placeId dedupes the overlap.
+ */
+export async function scoutGalleries(
+  _prev: GalleryScoutResult | null,
+  formData: FormData
+): Promise<GalleryScoutResult> {
+  await requireAdmin();
+  const where = String(formData.get("where") ?? "").trim();
+  if (where.length < 2) return { ok: false, error: "Enter a city or zip to scan." };
+
+  try {
+    const { scanGalleries } = await import("@/lib/galleryOutreach");
+    const results = await scanGalleries(where);
+    const added = results.reduce((n, r) => n + r.saved, 0);
+    const scanned = results.reduce((n, r) => n + r.found, 0);
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      added,
+      scanned,
+      note: added
+        ? `Found ${scanned} places across ${results.length} searches, ${added} new galleries staged.`
+        : `Found ${scanned} places — all of them already on the board.`,
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gallery scan failed." };
+  }
+}
+
+/**
+ * Record that a gallery was actually contacted.
+ *
+ * The queue is computed from the follow-up clock, so a send that isn't
+ * recorded means the same gallery resurfaces tomorrow and gets pitched
+ * twice — which is worse than not pitching at all.
+ */
+export async function galleryTouchAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "") || undefined;
+  if (!id) return;
+  const { markGalleryTouched } = await import("@/lib/galleryOutreach");
+  await markGalleryTouched(id, status);
+  revalidatePath("/admin");
+}
+
+/**
+ * Plain-form wrapper for the gallery scan.
+ *
+ * A <form action> handler must return void; scoutGalleries returns a
+ * result object for useActionState callers. Same split the commission
+ * queue needed — one action, two call shapes.
+ */
+export async function scoutGalleriesAction(formData: FormData): Promise<void> {
+  await scoutGalleries(null, formData);
+}

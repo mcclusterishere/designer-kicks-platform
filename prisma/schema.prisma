@@ -252,6 +252,13 @@ model GroupLead {
 model StoreLead {
   id          String  @id @default(cuid())
   placeId     String? @unique // Google Place id — dedupes rescans
+  /**
+   * What kind of room this is. A gallery and a sneaker store sit in the
+   * same pipeline because the mechanics are identical — find it, qualify
+   * it, pitch it, circle back — but they are pitched on completely
+   * different grounds, so the kind decides which letter gets written.
+   */
+  kind        String  @default("STORE") // STORE | GALLERY
   name        String
   address     String?
   zip         String?
@@ -271,8 +278,14 @@ model StoreLead {
   invitedAt DateTime?
   createdAt DateTime  @default(now())
 
+  // Follow-up clock: the pipeline dies when nobody circles back, so the
+  // due-today queue sorts on these.
+  lastTouchAt DateTime?
+  touchCount  Int       @default(0)
+
   @@index([status, createdAt])
   @@index([zip])
+  @@index([kind, status])
 }
 
 // Every outbound purchase click, logged before the 302 — the receipts
