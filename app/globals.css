@@ -700,8 +700,23 @@ time, .tabular {
 @keyframes ladder-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .ladder-grow { transform-origin: left; animation: ladder-grow .7s cubic-bezier(.22,.61,.36,1) both; }
 
+/* Modal scrim.
+   NOT bg-ink/N. --color-ink flips to #ffffff under [data-theme="light"],
+   so an ink scrim over a light page is a white wash: it doesn't dim
+   anything, the content behind stays fully legible, and the dialog loses
+   its separation from the page. A scrim's whole job is to darken, so this
+   one is a literal that both themes share. */
+.scrim { background-color: rgba(11, 11, 12, 0.72); }
+
+/* Explainer sheet: rises from the bottom on a phone, fades in on a desktop
+   where there's no edge for it to rise from. */
+.sheet-rise { animation: sheet-up .28s cubic-bezier(.22,.61,.36,1) both; }
+@media (min-width: 640px) {
+  .sheet-rise { animation: sheet-fade .2s ease-out both; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .line-draw, .area-fade, .pulse-dot, .breadth-grow, .row-in, .ladder-grow {
+  .line-draw, .area-fade, .pulse-dot, .breadth-grow, .row-in, .ladder-grow, .sheet-rise {
     animation: none;
     stroke-dashoffset: 0;
     opacity: 1;

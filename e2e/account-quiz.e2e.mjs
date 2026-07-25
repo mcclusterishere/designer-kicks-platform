@@ -56,9 +56,17 @@ const dbUser = await prisma.user.findUnique({ where: { email: EMAIL } });
 check("profile saves contact info", dbUser?.phone === "+1 555 010 2030" && dbUser?.marketingOptIn === true);
 
 // ---------- Voting requires + uses account ----------
-await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
-await page.locator("a[href^='/battles/']").first().click();
-await page.waitForURL("**/battles/**");
+// Go straight at a battle that is actually open. "The first battles link
+// on the page" used to work and then quietly stopped: finished battles are
+// listed first, inside a collapsed <details> that correctly hides them, so
+// the moment anything expired the suite started clicking an invisible link.
+const liveBattle = await prisma.battle.findFirst({
+  where: { status: "ACTIVE" },
+  orderBy: { endsAt: "asc" },
+  select: { id: true },
+});
+if (!liveBattle) throw new Error("no ACTIVE battle to vote in — seed the database");
+await page.goto(`${BASE}/battles/${liveBattle.id}`, { waitUntil: "networkidle" });
 const voteBtns = page.getByRole("button", { name: "Vote", exact: true });
 if ((await voteBtns.count()) === 2) {
   await voteBtns.first().click();
@@ -194,9 +202,7 @@ check("purchases-never-affect-odds language present", await page.getByText(/purc
 await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.waitForTimeout(1500);
-await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
-await page.locator("a[href^='/battles/']").first().click();
-await page.waitForURL("**/battles/**");
+await page.goto(`${BASE}/battles/${liveBattle.id}`, { waitUntil: "networkidle" });
 const guestBtns = page.getByRole("button", { name: "Vote", exact: true });
 check("guests are offered a vote", (await guestBtns.count()) === 2);
 const guestVotesBefore = await prisma.vote.count({ where: { guest: true } });

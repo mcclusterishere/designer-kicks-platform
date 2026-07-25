@@ -27,11 +27,25 @@ export type TradeTarget = {
   sub: string;
   imageUrl: string | null;
   priceCents: number | null;
+  /**
+   * The live two-sided quote, where one exists. Retail pairs have both legs
+   * (used bids, deadstock asks); a one-of-one has neither, because there's
+   * one unit and no queue on either side. That absence is itself the lesson
+   * about illiquid assets, so it's modelled rather than hidden.
+   */
+  bidCents: number | null;
+  askCents: number | null;
   /** What it cost when it started — retail, or the artist's first ask. */
   originCents: number | null;
   originLabel: string;
   originAt: Date | null;
   changePct: number | null;
+  /**
+   * Days since the origin. Computed here rather than in the component:
+   * reading the clock during render is impure, and the cost-of-carry
+   * lesson only needs the age, not the instant it was measured.
+   */
+  heldDays: number | null;
   track: TrackPoint[];
   /** How the open calls are split right now. The crowd, visible. */
   crowd: { up: number; down: number };
@@ -46,6 +60,10 @@ export type TradeTarget = {
     resolveAt: Date;
   }[];
 };
+
+function daysSince(at: Date | null): number | null {
+  return at ? Math.floor((Date.now() - at.getTime()) / 86_400_000) : null;
+}
 
 function pct(from: number | null, to: number | null): number | null {
   if (!from || from <= 0 || !to || to <= 0) return null;
@@ -62,7 +80,7 @@ export async function getTradeTarget(
       where: { sku: symbol },
       select: {
         id: true, sku: true, name: true, brand: true, imageUrl: true, releaseDate: true,
-        retailPriceCents: true, marketPriceCents: true, ebayNewCents: true,
+        retailPriceCents: true, marketPriceCents: true, ebayNewCents: true, ebayUsedCents: true,
       },
     });
     if (!shoe) return null;
@@ -91,10 +109,13 @@ export async function getTradeTarget(
       sub: shoe.brand ?? shoe.sku,
       imageUrl: shoe.imageUrl,
       priceCents: price,
+      bidCents: shoe.ebayUsedCents,
+      askCents: shoe.ebayNewCents,
       originCents: shoe.retailPriceCents,
       originLabel: "Retail at release",
       originAt: shoe.releaseDate,
       changePct: pct(shoe.retailPriceCents, price),
+      heldDays: daysSince(shoe.releaseDate),
       track,
       crowd: { up: crowdUp, down: crowdDown },
       yourCalls: yours,
@@ -153,10 +174,15 @@ export async function getTradeTarget(
     sub: piece.artistName,
     imageUrl: piece.imageUrl,
     priceCents: price,
+    // No two-sided quote on a one-of-one: one unit, no queue of buyers or
+    // sellers standing ready. Valued off comparable sales instead.
+    bidCents: null,
+    askCents: null,
     originCents: firstSale?.priceCents ?? null,
     originLabel: firstSale ? "First sale" : "No sale on record yet",
     originAt: firstSale?.soldAt ?? piece.createdAt,
     changePct: pct(firstSale?.priceCents ?? null, price),
+    heldDays: daysSince(firstSale?.soldAt ?? piece.createdAt),
     track,
     crowd: { up: crowdUp, down: crowdDown },
     yourCalls: yours,

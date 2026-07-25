@@ -22,7 +22,15 @@ const EMAIL = `money-e2e-${process.pid}@example.invalid`;
 const PASS = "MoneySuite!2026";
 
 const member = await prisma.user.create({
-  data: { email: EMAIL, name: "Money Suite", passwordHash: await hash(PASS, 10) },
+  data: {
+    email: EMAIL,
+    name: "Money Suite",
+    passwordHash: await hash(PASS, 10),
+    // Registration stamps this; a member created straight in the database
+    // hasn't got it, and the PMA gate then covers every page and swallows
+    // every click. Real members have accepted, so the fixture does too.
+    pmaAcceptedAt: new Date(),
+  },
 });
 // Funded the way the app funds people, so the suite never leaves the books
 // disagreeing with themselves.
@@ -96,6 +104,49 @@ try {
     await page.screenshot({ path: `${SHOTS}/money-trade-panel.png`, fullPage: false });
   } else {
     check("a priced symbol exists to open the panel on", false, "no priced catalog shoe");
+  }
+
+  // ---------- The market explains itself ----------
+  // A pair with both legs quoted, so the spread lesson has real numbers to
+  // work with rather than falling back to the concept alone.
+  const quoted = await prisma.catalogShoe.findFirst({
+    where: { ebayUsedCents: { gt: 0 }, ebayNewCents: { gt: 0 } },
+    select: { sku: true, ebayUsedCents: true, ebayNewCents: true },
+  });
+  if (quoted) {
+    await page.goto(`${BASE}/market?sym=${encodeURIComponent(quoted.sku)}`, { waitUntil: "networkidle" });
+    const triggers = await page.getByRole("button", { name: /What does .* mean\?/ }).count();
+    check("lessons are attached to the market numbers", triggers >= 5, `${triggers} found`);
+
+    await page.getByRole("button", { name: /What does Spread mean\?/ }).first().click();
+    const sheet = page.getByRole("dialog");
+    await sheet.waitFor({ timeout: 5000 });
+    const text = (await sheet.textContent()).replace(/\s+/g, " ");
+    check("lesson names the concept", /bid-ask spread/i.test(text));
+    check("lesson gives the street term", /cost of being in a hurry/i.test(text));
+
+    // The whole point: it explains using this pair's real figures.
+    const bid = `$${Math.round(quoted.ebayUsedCents / 100).toLocaleString("en-US")}`;
+    const ask = `$${Math.round(quoted.ebayNewCents / 100).toLocaleString("en-US")}`;
+    check("lesson quotes this pair's real bid", text.includes(bid), bid);
+    check("lesson quotes this pair's real ask", text.includes(ask), ask);
+
+    // The scrim must darken. --color-ink flips to white in light mode, so
+    // an ink-based scrim silently stops dimming anything.
+    const scrimBg = await sheet.locator("xpath=..").evaluate((el) => getComputedStyle(el).backgroundColor);
+    const rgb = scrimBg.match(/\d+/g)?.map(Number) ?? [];
+    check("scrim is dark, not a white wash", rgb[0] < 60 && rgb[1] < 60 && rgb[2] < 60, scrimBg);
+
+    // Portalled out of the .tag ancestry, so prose reads as prose.
+    const transform = await sheet.evaluate((el) => getComputedStyle(el).textTransform);
+    check("lesson prose is not uppercased by inheritance", transform === "none", transform);
+
+    // Capture it open — a screenshot of the closed page proves nothing.
+    await page.screenshot({ path: `${SHOTS}/money-lesson-sheet.png` });
+    await page.keyboard.press("Escape");
+    check("Escape closes the lesson", (await sheet.count()) === 0);
+  } else {
+    check("a two-sided quote exists to teach the spread on", false, "no shoe with both legs");
   }
 
   check("no console or page errors anywhere", errors.length === 0, errors.slice(0, 3).join(" | "));

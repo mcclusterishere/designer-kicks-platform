@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { makePredictionCall } from "@/app/actions";
 import Money from "@/components/Money";
+import Explain from "@/components/Explain";
 
 const STAKES = [0, 5, 10, 25, 50];
 
@@ -97,6 +98,11 @@ export default function CallTicket({
           </div>
           <p className="tag mt-1 text-smoke">
             {upPct}% of {total} open call{total === 1 ? "" : "s"} say higher
+            {/* Why the small side pays more is a real markets idea — a view
+                everyone already holds is already in the price. Worth naming
+                at the exact moment someone is deciding whether to fade the
+                room. */}
+            <Explain lesson="crowd" values={{ crowdUp: crowd.up, crowdDown: crowd.down }} />
           </p>
         </div>
       )}

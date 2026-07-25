@@ -1,17 +1,22 @@
 import Money from "@/components/Money";
+import Explain from "@/components/Explain";
 import CurrencyNote, { UsdSubLine } from "@/components/CurrencyNote";
 import Link from "next/link";
 import { formatUsd } from "@/lib/market";
 import type { Row, SortKey } from "@/lib/exchange";
 
-const COLS: { key: SortKey | null; label: string; align?: string; hide?: string }[] = [
+// Every column that carries a market concept also carries the lesson for
+// it. The table is a real order book — bid, ask, spread, last, primary
+// price — so the vocabulary is right there to be picked up by anyone who
+// wonders what a column means.
+const COLS: { key: SortKey | null; label: string; align?: string; hide?: string; lesson?: string }[] = [
   { key: "name", label: "Symbol / Pair" },
-  { key: "last", label: "Last", align: "text-right" },
-  { key: "change", label: "Chg%", align: "text-right" },
-  { key: null, label: "Bid", align: "text-right", hide: "hidden sm:table-cell" },
-  { key: null, label: "Ask", align: "text-right", hide: "hidden sm:table-cell" },
-  { key: "spread", label: "Spread", align: "text-right", hide: "hidden lg:table-cell" },
-  { key: null, label: "Retail", align: "text-right", hide: "hidden lg:table-cell" },
+  { key: "last", label: "Last", align: "text-right", lesson: "last" },
+  { key: "change", label: "Chg%", align: "text-right", lesson: "change" },
+  { key: null, label: "Bid", align: "text-right", hide: "hidden sm:table-cell", lesson: "bid" },
+  { key: null, label: "Ask", align: "text-right", hide: "hidden sm:table-cell", lesson: "ask" },
+  { key: "spread", label: "Spread", align: "text-right", hide: "hidden lg:table-cell", lesson: "spread" },
+  { key: null, label: "Retail", align: "text-right", hide: "hidden lg:table-cell", lesson: "retail" },
 ];
 
 function href(base: Record<string, string | undefined>, patch: Record<string, string | undefined>) {
@@ -68,6 +73,7 @@ export default function ExchangeTable({
                   ) : (
                     c.label
                   )}
+                  {c.lesson && <Explain lesson={c.lesson} />}
                 </th>
               ))}
             </tr>
