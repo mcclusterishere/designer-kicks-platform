@@ -219,7 +219,20 @@ export default async function ArtistPage({ params }: Props) {
 
       {/* What it costs and how long it takes — answered before anyone asks. */}
       <div className="mt-6">
-        <CommissionDesk desk={artist} />
+        {/* A LITERAL, never the entity. Handing a Prisma record to a
+            client component is what published the artist's password hash:
+            the prop type is narrower, TypeScript accepts the wider object
+            structurally, and types erase — so React serialises whatever
+            was actually passed. Five fields in, five fields out. */}
+        <CommissionDesk
+          desk={{
+            commissionOpen: artist.commissionOpen,
+            commissionMinCents: artist.commissionMinCents,
+            commissionMaxCents: artist.commissionMaxCents,
+            commissionDays: artist.commissionDays,
+            commissionSlots: artist.commissionSlots,
+          }}
+        />
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">

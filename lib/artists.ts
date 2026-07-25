@@ -136,6 +136,10 @@ export async function getArtistBySlug(slug: string) {
         // maker's if they've arranged one, newest-first if they haven't.
         where: { status: "APPROVED", closetHidden: false },
         orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+        // The submitter's contact details are not public. An `include`
+        // with no omit returns every scalar on Submission, so these two
+        // rode along into the page payload.
+        omit: { email: true, socialHandle: true },
         include: {
           _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
@@ -151,9 +155,19 @@ export async function getArtistBySlug(slug: string) {
           },
           ratings: { select: { stars: true } },
           collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
-          // The open bid book, high bid first — powers Sell Now.
-          offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" } },
-          consignment: true,
+          // The open bid book, high bid first — powers Sell Now. Amounts
+          // only: who bid is nobody else's business.
+          offers: {
+            where: { status: "OPEN" },
+            orderBy: { amountCents: "desc" },
+            select: { id: true, amountCents: true, createdAt: true },
+          },
+          // Consignment carries consignorName, which the schema itself
+          // says is "kept private — shown publicly as 'a private
+          // collector'". Selecting the whole row contradicted that.
+          consignment: {
+            select: { id: true, status: true, floorCents: true, splitPct: true, priorSaleCents: true },
+          },
         },
       },
       // Pieces this artist co-built on someone else's page — the

@@ -27,6 +27,13 @@ const FORBIDDEN = [
   { name: "resetToken", re: /resetTokenHash|resetToken"/ },
   { name: "session token", re: /authjs\.session-token/ },
   { name: "API key shape", re: /sk_live_|sk_test_[A-Za-z0-9]{16,}|AIza[0-9A-Za-z_-]{30,}/ },
+  // The second wave, found by an adversarial review after the hash fix:
+  // an `include` with no omit returns every scalar, so the submitter's
+  // contact details and the consignor's name rode into the payload too.
+  // Consignment's own schema comment promises consignorName stays private.
+  { name: "socialHandle key", re: /socialHandle/ },
+  { name: "consignorName key", re: /consignorName/ },
+  { name: "any email address", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(com|net|org|io|co)\b/ },
 ];
 
 async function sweep(label, url) {
