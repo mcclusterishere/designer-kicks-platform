@@ -184,7 +184,23 @@ export async function refreshEverything(mode: RefreshMode = "nightly"): Promise<
     })
   );
 
-  // 12. Prove the books balance. Recomputes every balance from the ledger
+  // 12. Fill the calendar backwards from the catalog. Only ever uses a
+  //     release date the SKU feed gave us, so coverage grows with the
+  //     catalog and no day is ever guessed.
+  steps.push(
+    await run("backfill-drop-history", async () => {
+      const { backfillDropHistory } = await import("./dropHistory");
+      const r = await backfillDropHistory();
+      return {
+        checked: r.scanned,
+        detail: r.dated
+          ? `dated ${r.dated} past drop${r.dated === 1 ? "" : "s"} from catalog release dates`
+          : "no undated article matched a catalog release date",
+      };
+    })
+  );
+
+  // 13. Prove the books balance. Recomputes every balance from the ledger
   //     and reports disagreement rather than repairing it — a silent repair
   //     would destroy the evidence of whatever caused the drift.
   steps.push(
