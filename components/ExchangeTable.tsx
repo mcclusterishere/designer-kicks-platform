@@ -1,5 +1,5 @@
 import Money from "@/components/Money";
-import { useMoney } from "@/components/MoneyProvider";
+import CurrencyNote, { UsdSubLine } from "@/components/CurrencyNote";
 import Link from "next/link";
 import { formatUsd } from "@/lib/market";
 import type { Row, SortKey } from "@/lib/exchange";
@@ -44,7 +44,6 @@ export default function ExchangeTable({
   pages: number;
   total: number;
 }) {
-  const money = useMoney();
   const base = { board: "og", q: query, brand, sort };
 
   return (
@@ -108,10 +107,8 @@ export default function ExchangeTable({
                       {/* The dollar price under the local one: this column is
                           the headline number, so both belong here even though
                           the narrower columns only carry one. */}
-                      {r.lastCents && money.currency !== "USD" ? (
-                        <span className="block text-[10px] font-normal text-smoke">
-                          ${Math.round(r.lastCents / 100).toLocaleString("en-US")}
-                        </span>
+                      {r.lastCents ? (
+                        <UsdSubLine cents={r.lastCents} />
                       ) : null}
                     </td>
                     <td className={`whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums font-bold ${r.changePct === null ? "text-smoke" : up ? "text-emerald-400" : "text-red-400"}`}>
@@ -150,11 +147,7 @@ export default function ExchangeTable({
           <span className="ml-2 hidden sm:inline">· Bid/Ask = live eBay used/new</span>
           {/* The columns are too narrow to carry a dollar reference beside
               every figure, so the unit is stated once for the whole table. */}
-          {money.currency !== "USD" && (
-            <span className="ml-2">
-              · figures converted to {money.currency} from USD{money.live ? "" : " (approximate table)"}
-            </span>
-          )}
+          <CurrencyNote />
         </p>
         <div className="flex gap-2">
           {page > 1 && (
