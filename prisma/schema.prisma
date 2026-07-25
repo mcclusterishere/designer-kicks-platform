@@ -1384,3 +1384,87 @@ model Prediction {
   @@index([userId, status])
   @@index([shoeId])
 }
+
+
+// ---------- Distribution: the drip feed ----------
+
+/**
+ * Somewhere we post, and the rules that place actually has.
+ *
+ * Every subreddit is its own publication with its own editorial policy, and
+ * the ones worth being in are precisely the ones that enforce it. r/Customsneakers
+ * bans self-promo in titles, affiliate links, and bulk posting — three rules
+ * that a naive "blast the same thing everywhere" loop breaks on every post.
+ * So the destination carries its rules, the queue checks against them before
+ * anything is scheduled, and a post that would break one never gets sent.
+ *
+ * A banned account distributes nothing, which makes compliance the
+ * highest-throughput strategy rather than the cautious one.
+ */
+model SocialTarget {
+  id       String  @id @default(cuid())
+  platform String  // REDDIT | X | BLUESKY | TELEGRAM | DISCORD
+  /** Subreddit name without the r/, handle, or channel. Null = the default account. */
+  name     String?
+  label    String
+
+  active   Boolean @default(true)
+
+  // The house rules, as the destination states them.
+  allowLinks      Boolean @default(true)  // false = text/image posts only
+  allowSelfPromo  Boolean @default(true)  // false = brand name can't lead
+  allowAffiliate  Boolean @default(true)
+  requireFlair    Boolean @default(false)
+  /** Minimum gap between our posts here. The anti-bulk-posting rule, enforced. */
+  minHoursBetween Int     @default(24)
+  maxPerWeek      Int     @default(3)
+  /** Whatever else the sidebar says, kept where whoever queues can read it. */
+  rulesNote       String?
+
+  lastPostedAt DateTime?
+  posts        SocialPost[]
+
+  @@unique([platform, name])
+  @@index([platform, active])
+}
+
+/**
+ * One queued post.
+ *
+ * Content is rendered per platform rather than shared, because the same piece
+ * is a different post in each place: Reddit wants the maker's name and the
+ * work, X wants a hook and an image, Discord wants a card. Storing the
+ * rendered copy means a human can read exactly what will go out before it
+ * goes out, and edit it if it reads wrong.
+ *
+ * BLOCKED is a first-class status, not an error. A post that would break the
+ * destination's rules is kept with the reason attached so the pattern is
+ * visible, instead of being silently dropped or — worse — sent.
+ */
+model SocialPost {
+  id       String @id @default(cuid())
+  targetId String
+  target   SocialTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  /** What this is about, so the same source is never queued twice per target. */
+  sourceKind String  // ARTICLE | PIECE | BATTLE | SHOE
+  sourceId   String
+
+  title    String
+  body     String?
+  link     String?
+  mediaUrl String?
+  flair    String?
+
+  scheduledFor DateTime
+  status       String   @default("QUEUED") // QUEUED | POSTED | FAILED | BLOCKED | SKIPPED
+  blockedReason String?
+  result       String?
+  postedAt     DateTime?
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([targetId, sourceKind, sourceId])
+  @@index([status, scheduledFor])
+  @@index([targetId, status])
+}

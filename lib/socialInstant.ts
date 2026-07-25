@@ -85,7 +85,7 @@ function oauth1Header(method: string, url: string, extraParams: Record<string, s
   );
 }
 
-async function postToX(input: BlastInput): Promise<BlastResult> {
+export async function postToX(input: BlastInput): Promise<BlastResult> {
   if (!xConfigured()) return skip("X");
   try {
     // 1) Upload up to two photos (v1.1 accepts base64 form fields —
@@ -135,7 +135,7 @@ export function blueskyConfigured(): boolean {
   return Boolean(process.env.BSKY_HANDLE && process.env.BSKY_APP_PASSWORD);
 }
 
-async function postToBluesky(input: BlastInput): Promise<BlastResult> {
+export async function postToBluesky(input: BlastInput): Promise<BlastResult> {
   if (!blueskyConfigured()) return skip("Bluesky");
   try {
     const service = process.env.BSKY_SERVICE || "https://bsky.social";
@@ -202,7 +202,7 @@ export function telegramConfigured(): boolean {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHANNEL);
 }
 
-async function postToTelegram(input: BlastInput): Promise<BlastResult> {
+export async function postToTelegram(input: BlastInput): Promise<BlastResult> {
   if (!telegramConfigured()) return skip("Telegram");
   try {
     const api = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
@@ -241,7 +241,7 @@ export function discordConfigured(): boolean {
   return Boolean(process.env.DISCORD_WEBHOOK_URL);
 }
 
-async function postToDiscord(input: BlastInput): Promise<BlastResult> {
+export async function postToDiscord(input: BlastInput): Promise<BlastResult> {
   if (!discordConfigured()) return skip("Discord");
   try {
     const res = await fetch(process.env.DISCORD_WEBHOOK_URL!, {
@@ -331,6 +331,23 @@ export function instantChannelStatus(): { channel: string; configured: boolean }
     { channel: "Discord", configured: discordConfigured() },
     { channel: "Reddit", configured: redditConfigured() },
   ];
+}
+
+/**
+ * Send to exactly one channel.
+ *
+ * The drip feed needs this: blasting all five and discarding four is how
+ * one queued post becomes five posts, which is the spam behaviour the
+ * queue exists to prevent.
+ */
+export async function postToOne(channel: string, input: BlastInput): Promise<BlastResult> {
+  switch (channel.toUpperCase()) {
+    case "X": return postToX(input);
+    case "BLUESKY": return postToBluesky(input);
+    case "TELEGRAM": return postToTelegram(input);
+    case "DISCORD": return postToDiscord(input);
+    default: return { channel, ok: false, detail: `unknown channel ${channel}` };
+  }
 }
 
 /** Fire every configured instant channel; nothing throws, all report. */

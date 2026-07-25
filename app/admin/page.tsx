@@ -65,6 +65,7 @@ import FindSkuButton from "./FindSkuButton";
 import MatchPhotosButton from "./MatchPhotosButton";
 import FixPhotosButton from "./FixPhotosButton";
 import FullRefreshButton from "./FullRefreshButton";
+import DripFeed from "./DripFeed";
 import StorageHealthPanel from "@/components/StorageHealthPanel";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
@@ -72,6 +73,43 @@ import { editorRefLink } from "@/lib/editor";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+/** Distribution: destinations, their rules, and what's queued for each. */
+async function DripSection() {
+  const [targets, queue] = await Promise.all([
+    prisma.socialTarget.findMany({ orderBy: [{ platform: "asc" }, { label: "asc" }] }),
+    prisma.socialPost.findMany({
+      where: { status: { in: ["QUEUED", "BLOCKED", "FAILED"] } },
+      orderBy: [{ status: "asc" }, { scheduledFor: "asc" }],
+      take: 40,
+      include: { target: { select: { label: true } } },
+    }),
+  ]);
+
+  const counts = await prisma.socialPost.groupBy({
+    by: ["targetId", "status"],
+    _count: true,
+  });
+  const tally = (id: string, status: string) =>
+    counts.find((c) => c.targetId === id && c.status === status)?._count ?? 0;
+
+  return (
+    <DripFeed
+      targets={targets.map((t) => ({
+        id: t.id, platform: t.platform, name: t.name, label: t.label, active: t.active,
+        allowLinks: t.allowLinks, allowSelfPromo: t.allowSelfPromo,
+        allowAffiliate: t.allowAffiliate, requireFlair: t.requireFlair,
+        minHoursBetween: t.minHoursBetween, maxPerWeek: t.maxPerWeek, rulesNote: t.rulesNote,
+        queued: tally(t.id, "QUEUED"), blocked: tally(t.id, "BLOCKED"), posted: tally(t.id, "POSTED"),
+      }))}
+      queue={queue.map((q) => ({
+        id: q.id, targetLabel: q.target.label, title: q.title, status: q.status,
+        scheduledFor: q.scheduledFor.toISOString(),
+        blockedReason: q.blockedReason, result: q.result,
+      }))}
+    />
+  );
+}
 
 // The shoe knowledge base — its own async section so its queries only
 // run when the Market tab is open.
@@ -1967,6 +2005,7 @@ export default async function AdminPage({
       )}
 
       {show("market") && <CatalogSection />}
+      {show("content") && <DripSection />}
 
       {/* Sales ledger */}
       {show("market") && (

@@ -3407,6 +3407,89 @@ export async function commissionQueueAction(
   await setCommissionQueue(requestId, action);
 }
 
+
+// ---------- The drip feed ----------
+
+/**
+ * Create or update a destination and the rules it actually enforces.
+ *
+ * The rule toggles are the point. r/Customsneakers bans self-promo in
+ * titles, affiliate links and bulk posting; recording that here is what
+ * lets the queue refuse a post before a moderator has to.
+ */
+export async function saveSocialTarget(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const platform = String(formData.get("platform") ?? "").toUpperCase();
+  if (!["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD"].includes(platform)) {
+    return { ok: false, error: "Pick a platform." };
+  }
+  const name = String(formData.get("name") ?? "").trim().replace(/^r\//, "").slice(0, 80) || null;
+  const label = String(formData.get("label") ?? "").trim().slice(0, 80) || (name ? `r/${name}` : platform);
+
+  const data = {
+    platform,
+    name,
+    label,
+    active: formData.get("active") === "on",
+    allowLinks: formData.get("allowLinks") === "on",
+    allowSelfPromo: formData.get("allowSelfPromo") === "on",
+    allowAffiliate: formData.get("allowAffiliate") === "on",
+    requireFlair: formData.get("requireFlair") === "on",
+    minHoursBetween: Math.max(1, Math.min(720, Number(formData.get("minHoursBetween")) || 24)),
+    maxPerWeek: Math.max(1, Math.min(50, Number(formData.get("maxPerWeek")) || 3)),
+    rulesNote: String(formData.get("rulesNote") ?? "").trim().slice(0, 1000) || null,
+  };
+
+  // A compound unique with a nullable column can't be addressed by upsert,
+  // so find-then-write. Nulls are how the default account for a platform is
+  // represented — an X target has no "name" the way a subreddit does.
+  const existing = await prisma.socialTarget.findFirst({ where: { platform, name } });
+  if (existing) {
+    await prisma.socialTarget.update({ where: { id: existing.id }, data });
+  } else {
+    await prisma.socialTarget.create({ data });
+  }
+  revalidatePath("/admin");
+  return { ok: true, note: `${label} saved.` };
+}
+
+export type FillResult =
+  | { ok: true; queued: number; blocked: number; details: { source: string; status: string; note: string; when?: string }[] }
+  | { ok: false; error: string };
+
+/** Queue a batch of existing content for one destination. */
+export async function fillDripQueue(targetId: string, kind: string, count: number): Promise<FillResult> {
+  await requireAdmin();
+  if (!["ARTICLE", "PIECE"].includes(kind)) return { ok: false, error: "Unknown content type." };
+  const { fillQueue } = await import("@/lib/dripFeed");
+  try {
+    const out = await fillQueue(targetId, kind as "ARTICLE" | "PIECE", Math.max(1, Math.min(50, count)));
+    revalidatePath("/admin");
+    return { ok: true, queued: out.queued, blocked: out.blocked, details: out.details };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't build the queue." };
+  }
+}
+
+/** Drop one queued post — a human overriding the machine. */
+export async function cancelDripPost(id: string): Promise<void> {
+  await requireAdmin();
+  await prisma.socialPost.deleteMany({ where: { id, status: { in: ["QUEUED", "BLOCKED", "FAILED"] } } });
+  revalidatePath("/admin");
+}
+
+/** Send what's due right now, without waiting for the schedule. */
+export async function drainDripNow(): Promise<{ sent: number; failed: number; skipped: number }> {
+  await requireAdmin();
+  const { drainQueue } = await import("@/lib/dripFeed");
+  const out = await drainQueue();
+  revalidatePath("/admin");
+  return out;
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour

@@ -174,7 +174,17 @@ export async function refreshEverything(mode: RefreshMode = "nightly"): Promise<
     })
   );
 
-  // 11. Fingerprint the market so the index has real history to chart.
+  // 11. Release whatever the drip feed says is due. Paced per destination,
+  //     so this sends at most one post per place per run no matter how
+  //     often it runs.
+  steps.push(
+    await run("drip-feed", async () => {
+      const { drainQueue } = await import("./dripFeed");
+      return drainQueue();
+    })
+  );
+
+  // 12. Fingerprint the market so the index has real history to chart.
   //     Last, so it measures the state everything above just produced.
   steps.push(
     await run("index-snapshot", async () => {
