@@ -1206,3 +1206,20 @@ model LeaguePick {
   @@index([entryId])
   @@index([assetType, refId])
 }
+
+// A daily fingerprint of the whole market, so the index can be CHARTED
+// instead of just quoted. We only store current prices per shoe, which
+// means history has to be accumulated going forward — this table is that
+// record. Written once per day by the cron; the chart draws real points
+// only and says it's still building until there are enough of them.
+model IndexSnapshot {
+  id         String   @id @default(cuid())
+  at         DateTime @default(now())
+  value      Int // median premium % across measurable pairs
+  listed     Int
+  quoted     Int
+  advancers  Int
+  decliners  Int
+
+  @@index([at])
+}

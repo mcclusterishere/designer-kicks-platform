@@ -99,6 +99,14 @@ export async function GET(req: NextRequest) {
     })
   );
 
+  // 6. Fingerprint the market so the index has real history to chart.
+  steps.push(
+    await run("index-snapshot", async () => {
+      const { recordIndexSnapshot } = await import("@/lib/exchange");
+      return recordIndexSnapshot();
+    })
+  );
+
   const failed = steps.filter((s) => !s.ok).length;
   return NextResponse.json({
     ok: failed === 0,

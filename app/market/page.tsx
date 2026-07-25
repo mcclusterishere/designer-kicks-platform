@@ -5,9 +5,10 @@ import { prisma } from "@/lib/db";
 import { fitsMember } from "@/lib/shoeSize";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getMarketBoard, getHotBases, formatUsd, type MarketItem, type HotBase } from "@/lib/market";
-import { getExchangeBoard, getIndexStats, getMovers, type SortKey } from "@/lib/exchange";
+import { getExchangeBoard, getIndexStats, getMovers, getIndexHistory, type SortKey } from "@/lib/exchange";
 import ExchangeTable from "@/components/ExchangeTable";
 import TickerTape from "@/components/TickerTape";
+import IndexHero from "@/components/IndexHero";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
@@ -559,8 +560,7 @@ async function ExchangeFloor({
   brand: string;
 }) {
   const { rows, total, page, pages, brands } = exchange;
-  const [index, movers] = await Promise.all([getIndexStats(), getMovers()]);
-  const idxUp = (index.indexValue ?? 0) >= 0;
+  const [index, movers, history] = await Promise.all([getIndexStats(), getMovers(), getIndexHistory(30)]);
 
   return (
     <>
@@ -569,34 +569,14 @@ async function ExchangeFloor({
         <TickerTape movers={movers} />
       </div>
 
-      {/* The index — one number for how far over retail the street is */}
-      <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3 rounded-xl border border-edge bg-surface p-5">
-        <div>
-          <p className="tag text-smoke">THC Resale Index</p>
-          <p className={`display text-4xl ${idxUp ? "text-emerald-400" : "text-red-400"}`}>
-            {index.indexValue === null ? "—" : `${idxUp ? "+" : ""}${index.indexValue}%`}
-          </p>
-          <p className="tag text-smoke">median premium over retail</p>
-        </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          <div>
-            <p className="tag text-smoke">Listed</p>
-            <p className="text-lg font-bold tabular-nums text-white">{index.listed.toLocaleString("en-US")}</p>
-          </div>
-          <div>
-            <p className="tag text-smoke">Two-sided quotes</p>
-            <p className="text-lg font-bold tabular-nums text-white">{index.quoted.toLocaleString("en-US")}</p>
-          </div>
-          <div>
-            <p className="tag text-smoke">Advancing</p>
-            <p className="text-lg font-bold tabular-nums text-emerald-400">{index.advancers.toLocaleString("en-US")}</p>
-          </div>
-          <div>
-            <p className="tag text-smoke">Declining</p>
-            <p className="text-lg font-bold tabular-nums text-red-400">{index.decliners.toLocaleString("en-US")}</p>
-          </div>
-        </div>
-      </div>
+      <IndexHero
+        value={index.indexValue}
+        history={history.map((h) => ({ at: h.at.toISOString(), value: h.value }))}
+        listed={index.listed}
+        quoted={index.quoted}
+        advancers={index.advancers}
+        decliners={index.decliners}
+      />
 
       {/* Hot bases — what the culture actually builds on */}
       {hotBases.length > 0 && (

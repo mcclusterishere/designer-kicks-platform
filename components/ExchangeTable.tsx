@@ -78,10 +78,14 @@ export default function ExchangeTable({
                 </td>
               </tr>
             ) : (
-              rows.map((r) => {
+              rows.map((r, i) => {
                 const up = (r.changePct ?? 0) >= 0;
                 return (
-                  <tr key={r.sku} className="border-b border-edge/50 transition hover:bg-panel/60">
+                  <tr
+                    key={r.sku}
+                    className="row-in border-b border-edge/50 transition hover:bg-panel/70"
+                    style={{ "--i": i } as React.CSSProperties}
+                  >
                     <td className="px-3 py-2.5">
                       <Link href={`/catalog/${encodeURIComponent(r.sku)}`} className="flex items-center gap-2.5">
                         {r.imageUrl ? (
@@ -108,8 +112,15 @@ export default function ExchangeTable({
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke sm:table-cell">
                       {r.askCents ? formatUsd(r.askCents) : "—"}
                     </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke lg:table-cell">
-                      {r.spreadCents ? formatUsd(r.spreadCents) : "—"}
+                    <td className="hidden whitespace-nowrap px-3 py-2.5 text-right lg:table-cell">
+                      {r.spreadCents && r.bidCents && r.askCents ? (
+                        <span className="inline-flex flex-col items-end gap-1">
+                          <span className="font-mono tabular-nums text-smoke">{formatUsd(r.spreadCents)}</span>
+                          <Ladder bid={r.bidCents} ask={r.askCents} last={r.lastCents} />
+                        </span>
+                      ) : (
+                        <span className="font-mono tabular-nums text-smoke">—</span>
+                      )}
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke lg:table-cell">
                       {r.retailCents ? formatUsd(r.retailCents) : "—"}
@@ -141,5 +152,26 @@ export default function ExchangeTable({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Where the last price sits inside the live bid/ask band. Pure real data:
+ * the rail spans used→new and the marker is the last traded price clamped
+ * into that range, so a wide spread visibly reads as a loose market.
+ */
+function Ladder({ bid, ask, last }: { bid: number; ask: number; last: number | null }) {
+  const span = ask - bid;
+  const pos = last && span > 0 ? Math.min(1, Math.max(0, (last - bid) / span)) : null;
+  return (
+    <span className="relative block h-1 w-16 overflow-hidden rounded-full bg-panel" aria-hidden>
+      <span className="ladder-grow absolute inset-0 bg-gradient-to-r from-volt/50 via-smoke/30 to-heat/60" />
+      {pos !== null && (
+        <span
+          className="absolute top-1/2 h-2 w-[2px] -translate-y-1/2 bg-white"
+          style={{ left: `calc(${(pos * 100).toFixed(0)}% - 1px)` }}
+        />
+      )}
+    </span>
   );
 }

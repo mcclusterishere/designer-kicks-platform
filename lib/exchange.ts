@@ -208,3 +208,43 @@ export async function getMovers(limit = 14): Promise<{ sku: string; name: string
     .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
     .slice(0, limit);
 }
+
+/**
+ * Write today's index fingerprint — once per day, so the chart is built
+ * from real observations rather than a modelled curve. Idempotent: a
+ * second call on the same UTC day updates that day's row instead of
+ * stacking duplicates.
+ */
+export async function recordIndexSnapshot(): Promise<{ recorded: boolean; value: number | null }> {
+  const s = await getIndexStats();
+  if (s.indexValue === null) return { recorded: false, value: null };
+
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+
+  const existing = await prisma.indexSnapshot.findFirst({
+    where: { at: { gte: dayStart } },
+    select: { id: true },
+  });
+  const data = {
+    value: s.indexValue,
+    listed: s.listed,
+    quoted: s.quoted,
+    advancers: s.advancers,
+    decliners: s.decliners,
+  };
+  if (existing) await prisma.indexSnapshot.update({ where: { id: existing.id }, data });
+  else await prisma.indexSnapshot.create({ data });
+  return { recorded: true, value: s.indexValue };
+}
+
+/** Real observed history, oldest → newest. Empty until the cron has run. */
+export async function getIndexHistory(days = 30): Promise<{ at: Date; value: number }[]> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const rows = await prisma.indexSnapshot.findMany({
+    where: { at: { gte: since } },
+    orderBy: { at: "asc" },
+    select: { at: true, value: true },
+  });
+  return rows;
+}
