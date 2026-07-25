@@ -287,7 +287,7 @@ export type HotBase = {
 export async function getHotBases(limit = 8): Promise<HotBase[]> {
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const pieces = await prisma.submission.findMany({
-    where: { status: "APPROVED", silhouette: { not: null }, category: "sneakers" },
+    where: { status: "APPROVED", artistId: { not: null }, silhouette: { not: null }, category: "sneakers" },
     select: { silhouette: true, createdAt: true, askingPriceCents: true },
   });
 

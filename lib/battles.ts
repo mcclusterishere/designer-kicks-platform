@@ -68,7 +68,10 @@ export type HeatEntry = {
  */
 export async function getHeatList(): Promise<HeatEntry[]> {
   const submissions = await prisma.submission.findMany({
-    where: { status: "APPROVED" },
+    // Attributable artist work only. artistId is SetNull on delete, so a
+    // removed artist leaves orphaned pieces behind — those aren't customs
+    // anyone can be credited for and don't belong on the league table.
+    where: { status: "APPROVED", artistId: { not: null } },
     include: {
       _count: { select: { votes: true, battlesWon: true } },
       battlesAsA: { select: { status: true } },

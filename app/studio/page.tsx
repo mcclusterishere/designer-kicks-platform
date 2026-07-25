@@ -297,6 +297,7 @@ export default async function StudioPage() {
           live once the league office approves it.
         </p>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <span id="drops" className="block scroll-mt-24" />
           <AnnounceDropForm />
         </div>
         {myDrops.length > 0 && (
@@ -336,6 +337,7 @@ export default async function StudioPage() {
           your page so voters can buy straight from you.
         </p>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <span id="shops" className="block scroll-mt-24" />
           <AddShopForm />
           {myShops.length > 0 && (
             <div className="mt-4 space-y-2 border-t border-edge pt-4">
@@ -374,7 +376,7 @@ export default async function StudioPage() {
       </div>
 
       {/* Commission desk — price + turnaround, stated upfront */}
-      <div className="mt-12">
+      <div id="commission-desk" className="mt-12 scroll-mt-24">
         <p className="display text-xl text-white">Your commission desk</p>
         <p className="mt-1 max-w-2xl text-sm text-smoke">
           What stops most buyers isn&apos;t your price — it&apos;s not knowing it. Post your

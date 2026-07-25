@@ -1895,6 +1895,29 @@ async function seedOgCatalog() {
   }
 }
 
+// Re-attach pieces that lost their maker link. artistId is SetNull on
+// delete, and some staged pieces were created before the link existed, so
+// a real custom can end up with an artistName but no artistId — which the
+// Heat List (rightly) won't credit to anyone. Match the name back to an
+// artist page and restore the link rather than hiding the work.
+async function relinkOrphanPieces() {
+  const orphans = await prisma.submission.findMany({
+    where: { artistId: null },
+    select: { id: true, artistName: true },
+  });
+  if (orphans.length === 0) return;
+  const artists = await prisma.artistProfile.findMany({ select: { id: true, displayName: true } });
+  const byName = new Map(artists.map((a) => [a.displayName.trim().toLowerCase(), a.id]));
+  let fixed = 0;
+  for (const s of orphans) {
+    const id = byName.get((s.artistName || "").trim().toLowerCase());
+    if (!id) continue;
+    await prisma.submission.update({ where: { id: s.id }, data: { artistId: id } }).catch(() => {});
+    fixed++;
+  }
+  if (fixed) console.log(`Re-linked ${fixed} piece(s) to their artist page.`);
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1903,6 +1926,7 @@ async function main() {
 
   // Team + careers seed runs in every mode (idempotent top-up).
   await seedTeamAndCareers();
+  await relinkOrphanPieces();
   await retireContent();
   await seedOgCatalog();
   await backfillCatalogLanes();

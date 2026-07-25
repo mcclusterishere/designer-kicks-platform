@@ -104,6 +104,50 @@ export default async function ProfilePage() {
         </form>
       </div>
 
+      {/* Artist account comes first — this is the maker's home base. */}
+      {user.artistProfile?.status === "APPROVED" && (
+        <div className="glow-volt mt-6 rounded-2xl border border-volt bg-volt/10 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="tag text-volt">✓ Artist account</p>
+              <p className="display mt-0.5 text-2xl text-white">
+                {user.artistProfile.displayName}
+              </p>
+              <p className="mt-0.5 text-sm text-smoke">
+                Your work, your rates, your drops — all controlled from the Studio.
+              </p>
+            </div>
+            <Link
+              href="/studio"
+              className="shrink-0 rounded-lg btn-hard px-5 py-2.5 tag font-bold"
+            >
+              Open Studio →
+            </Link>
+          </div>
+
+          {/* Straight into the controls, no hunting */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { href: "/submit", label: "Post a piece", icon: "＋" },
+              { href: "/studio#commission-desk", label: "Rates & turnaround", icon: "＄" },
+              { href: "/studio#drops", label: "Announce a drop", icon: "◎" },
+              { href: "/studio/portfolio", label: "Portfolio", icon: "▦" },
+              { href: "/studio#shops", label: "Your shops", icon: "⇗" },
+              { href: `/artists/${user.artistProfile.slug}`, label: "Public page", icon: "◉" },
+            ].map((a) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="rounded-lg border border-edge bg-ink/40 px-3 py-2.5 transition hover:border-volt/60"
+              >
+                <span className="block text-lg leading-none text-volt">{a.icon}</span>
+                <span className="mt-1 block text-xs font-bold text-white">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {user.role === "EDITOR" && (
         <Link
           href="/editor"
@@ -161,18 +205,7 @@ export default async function ProfilePage() {
 
       {/* Account type */}
       <div className="mt-4 rounded-xl border border-edge bg-surface p-4 text-sm">
-        {user.artistProfile?.status === "APPROVED" ? (
-          <p className="text-smoke">
-            <span className="tag text-volt">✓ Artist account</span> — posting as{" "}
-            <Link href={`/artists/${user.artistProfile.slug}`} className="font-bold text-volt">
-              {user.artistProfile.displayName}
-            </Link>
-            {" · "}
-            <Link href="/studio" className="text-volt underline">
-              Studio →
-            </Link>
-          </p>
-        ) : user.artistProfile?.status === "PENDING" ? (
+        {user.artistProfile?.status === "APPROVED" ? null : user.artistProfile?.status === "PENDING" ? (
           <p className="text-smoke">
             <span className="tag text-heat">Artist application under review</span> —
             you&apos;ll be able to submit customs once approved.
