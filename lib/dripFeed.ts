@@ -29,7 +29,7 @@ import { siteUrl } from "./articles";
  */
 
 export type SourceKind = "ARTICLE" | "PIECE" | "BATTLE" | "SHOE";
-export type Platform = "REDDIT" | "X" | "BLUESKY" | "TELEGRAM" | "DISCORD";
+export type Platform = "REDDIT" | "X" | "BLUESKY" | "TELEGRAM" | "DISCORD" | "YOUTUBE";
 
 export type Rendered = {
   title: string;
@@ -161,6 +161,16 @@ export function renderPiece(p: PieceSource, platform: Platform): Rendered {
         link,
         mediaUrl: p.imageUrl,
       };
+    case "YOUTUBE":
+      // Shorts titles are read in a scroll, so the hook is the silhouette
+      // and the maker. The link lives in the description, where YouTube
+      // tolerates it and Reddit wouldn't.
+      return {
+        title: `${p.title} — custom ${p.baseShoe}`.slice(0, 100),
+        body: `${cleanDesc ? `${cleanDesc}\n\n` : ""}Built by ${p.artistName}.\n${link}`,
+        link,
+        mediaUrl: p.imageUrl,
+      };
     default:
       return {
         title: `${p.title} by ${p.artistName}`,
@@ -266,16 +276,33 @@ export async function fillQueue(
 
   if (kind === "PIECE") {
     const pieces = await prisma.submission.findMany({
-      where: { status: "APPROVED", id: { notIn: [...already] } },
+      // YouTube can only take pieces with a clip — a Short with no video is
+      // nothing. Filtering here means the queue never fills with items that
+      // are guaranteed to fail at send time.
+      where: {
+        status: "APPROVED",
+        id: { notIn: [...already] },
+        ...(platform === "YOUTUBE" ? { videoUrl: { not: null } } : {}),
+      },
       orderBy: { createdAt: "desc" },
       take: limit * 2,
       select: {
         id: true, title: true, artistName: true, baseShoe: true, imageUrl: true,
-        description: true, artist: { select: { slug: true } },
+        videoUrl: true, description: true, artist: { select: { slug: true } },
       },
     });
-    for (const p of pieces) items.push({ id: p.id, rendered: renderPiece(p, platform) });
+    for (const p of pieces) {
+      const rendered = renderPiece(p, platform);
+      // The clip is the payload on YouTube; everywhere else the still is.
+      if (platform === "YOUTUBE" && p.videoUrl) rendered.mediaUrl = p.videoUrl;
+      items.push({ id: p.id, rendered });
+    }
   } else if (kind === "ARTICLE") {
+    if (platform === "YOUTUBE") {
+      // No clip, no Short. Saying so beats queueing items that can't send.
+      out.details.push({ source: "articles", status: "BLOCKED", note: "YouTube takes clips, not articles" });
+      return out;
+    }
     const articles = await prisma.article.findMany({
       where: { status: "PUBLISHED", id: { notIn: [...already] } },
       orderBy: { publishedAt: "desc" },

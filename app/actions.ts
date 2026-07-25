@@ -3423,7 +3423,7 @@ export async function saveSocialTarget(
 ): Promise<ActionResult> {
   await requireAdmin();
   const platform = String(formData.get("platform") ?? "").toUpperCase();
-  if (!["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD"].includes(platform)) {
+  if (!["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD", "YOUTUBE"].includes(platform)) {
     return { ok: false, error: "Pick a platform." };
   }
   const name = String(formData.get("name") ?? "").trim().replace(/^r\//, "").slice(0, 80) || null;

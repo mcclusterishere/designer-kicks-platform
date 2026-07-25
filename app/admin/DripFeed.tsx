@@ -253,7 +253,7 @@ function TargetForm({ target }: { target: TargetRow | null }) {
         <div>
           <label className="tag text-smoke">Platform</label>
           <select name="platform" defaultValue={t?.platform ?? "REDDIT"} className={field}>
-            {["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD"].map((p) => (
+            {["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD", "YOUTUBE"].map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>

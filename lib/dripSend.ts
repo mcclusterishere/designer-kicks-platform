@@ -107,7 +107,21 @@ async function sendViaInstant(post: SocialPost, platform: string): Promise<SendR
   return { ok: res.ok, detail: res.detail };
 }
 
+/**
+ * A Short. The queued mediaUrl is the clip, and the body is the description.
+ */
+async function sendYouTube(post: SocialPost): Promise<SendResult> {
+  if (!post.mediaUrl) return { ok: false, detail: "no clip on this piece" };
+  const { uploadShort } = await import("./youtube");
+  return uploadShort({
+    title: post.title,
+    description: post.body ?? post.title,
+    videoUrl: post.mediaUrl,
+  });
+}
+
 export async function sendOne(post: SocialPost, target: SocialTarget): Promise<SendResult> {
   if (target.platform === "REDDIT") return sendReddit(post, target);
+  if (target.platform === "YOUTUBE") return sendYouTube(post);
   return sendViaInstant(post, target.platform);
 }
