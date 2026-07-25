@@ -17,7 +17,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma db push --skip-generate --accept-data-loss",
     "db:seed": "node prisma/seed.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verify:league": "rm -rf node_modules/.verifyl && tsc scripts/verify-league.ts --outDir node_modules/.verifyl --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file=.env node_modules/.verifyl/scripts/verify-league.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

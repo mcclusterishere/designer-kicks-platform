@@ -25,7 +25,17 @@ async function metricForCustoms(ids: string[]): Promise<Map<string, number>> {
   ids.forEach((id) => m.set(id, 0));
   if (ids.length === 0) return m;
   const [votes, wins, sales] = await Promise.all([
-    prisma.vote.groupBy({ by: ["submissionId"], where: { submissionId: { in: ids } }, _count: true }),
+    // guest: false is load-bearing, not tidiness. The Draft pays real
+    // credits and giveaway entries, and this is the number that decides
+    // who wins them. The slate below already filtered guest votes and
+    // said so in a comment; this scorer did not, so the board showed one
+    // number and paid out on another. A guest vote costs a browser and
+    // nothing else, which made the prize farmable by anyone patient.
+    prisma.vote.groupBy({
+      by: ["submissionId"],
+      where: { submissionId: { in: ids }, guest: false },
+      _count: true,
+    }),
     prisma.battle.groupBy({ by: ["winnerId"], where: { winnerId: { in: ids } }, _count: true }),
     prisma.sale.groupBy({ by: ["submissionId"], where: { submissionId: { in: ids }, status: "CONFIRMED" }, _count: true }),
   ]);
