@@ -1095,6 +1095,9 @@ model CatalogShoe {
   ebayNewCents  Int?
   ebayUsedCents Int?
   ebayCheckedAt DateTime?
+  // Affiliate-tagged eBay listing URL captured with the price sync, so a
+  // buy click off the exchange is credited to our EPN campaign.
+  ebayItemUrl   String?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.
@@ -1104,6 +1107,7 @@ model CatalogShoe {
   updatedAt        DateTime  @updatedAt
 
   ratings CatalogRating[]
+  priceHistory PriceSnapshot[]
 
   @@index([brand])
   @@index([silhouette])
@@ -1221,5 +1225,24 @@ model IndexSnapshot {
   advancers  Int
   decliners  Int
 
+  @@index([at])
+}
+
+// Daily price observation for one pair, per source. This is how the shoe
+// charts get built: nobody sells retroactive sneaker history for free, so
+// the only honest path is to record the market every day from now on. One
+// row per shoe per source per UTC day, written by the cron.
+//
+// source: ebay_new | ebay_used | market (KicksDB aggregate of StockX/GOAT)
+model PriceSnapshot {
+  id     String @id @default(cuid())
+  shoeId String
+  shoe   CatalogShoe @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+  source String
+  cents  Int
+  at     DateTime @default(now())
+
+  @@unique([shoeId, source, at])
+  @@index([shoeId, at])
   @@index([at])
 }

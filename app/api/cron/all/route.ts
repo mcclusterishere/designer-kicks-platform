@@ -99,7 +99,17 @@ export async function GET(req: NextRequest) {
     })
   );
 
-  // 6. Fingerprint the market so the index has real history to chart.
+  // 6. Sweep today's market prices into per-pair history. Retroactive
+  // sneaker pricing can't be bought for free, so the charts are built by
+  // never missing a day from here on.
+  steps.push(
+    await run("price-history", async () => {
+      const { snapshotMarketPrices } = await import("@/lib/priceHistory");
+      return snapshotMarketPrices(500);
+    })
+  );
+
+  // 7. Fingerprint the market so the index has real history to chart.
   steps.push(
     await run("index-snapshot", async () => {
       const { recordIndexSnapshot } = await import("@/lib/exchange");

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import PriceHistoryCard from "@/components/PriceHistoryCard";
+import { getPriceSeries, sinceRelease } from "@/lib/priceHistory";
 import { retailKind } from "@/lib/taxonomy";
 import { buyLinks } from "@/lib/affiliates";
 
@@ -84,6 +86,17 @@ export default async function CatalogShoePage({
           {shoe.brand && <p className="tag text-volt">{shoe.brand}</p>}
           <h1 className="display mt-1 text-3xl text-white sm:text-4xl">{shoe.name}</h1>
           <p className="mt-1 font-mono text-sm text-smoke">{shoe.sku}</p>
+
+          <PriceHistoryCard
+            series={await getPriceSeries(shoe.id)}
+            since={sinceRelease(
+              shoe.retailPriceCents,
+              shoe.marketPriceCents || shoe.ebayNewCents || null,
+              shoe.releaseDate
+            )}
+            retailCents={shoe.retailPriceCents}
+            lastCents={shoe.marketPriceCents || shoe.ebayNewCents || null}
+          />
 
           {avg !== null && (
             <div className="mt-4 inline-flex items-baseline gap-2 rounded-xl border border-volt/40 bg-volt/10 px-4 py-2.5">
