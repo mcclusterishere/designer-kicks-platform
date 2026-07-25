@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -103,7 +104,7 @@ export default async function PredictPage() {
                         ? `${c.direction === "UP" ? "▲ higher" : "▼ lower"} in ${c.horizonDays}d`
                         : `called ${formatUsd(c.predictedCents ?? 0)} in ${c.horizonDays}d`}
                       {" · from "}
-                      {formatUsd(c.basisCents)}
+                      <Money cents={c.basisCents} showUsd={false} />
                       {settled && c.actualCents ? ` · landed ${formatUsd(c.actualCents)}` : ""}
                     </p>
                   </div>

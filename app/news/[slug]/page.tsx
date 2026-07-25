@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -153,13 +154,13 @@ export default async function ArticlePage({ params }: Props) {
             <div>
               <p className="tag text-smoke">Retail</p>
               <p className="text-lg font-bold tabular-nums text-white">
-                {shoe.retailPriceCents ? formatUsd(shoe.retailPriceCents) : "—"}
+                <Money cents={shoe.retailPriceCents} />
               </p>
             </div>
             <div>
               <p className="tag text-smoke">Resale</p>
               <p className="text-lg font-bold tabular-nums text-white">
-                {shoe.marketPriceCents ? formatUsd(shoe.marketPriceCents) : "—"}
+                <Money cents={shoe.marketPriceCents} />
                 {premiumPct !== null && (
                   <span className={`ml-1.5 text-xs font-semibold ${premiumPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                     {premiumPct >= 0 ? "▲" : "▼"} {Math.abs(premiumPct)}%
@@ -170,13 +171,13 @@ export default async function ArticlePage({ params }: Props) {
             <div>
               <p className="tag text-smoke">eBay new</p>
               <p className="text-lg font-bold tabular-nums text-white">
-                {shoe.ebayNewCents ? formatUsd(shoe.ebayNewCents) : "—"}
+                <Money cents={shoe.ebayNewCents} />
               </p>
             </div>
             <div>
               <p className="tag text-smoke">eBay used</p>
               <p className="text-lg font-bold tabular-nums text-white">
-                {shoe.ebayUsedCents ? formatUsd(shoe.ebayUsedCents) : "—"}
+                <Money cents={shoe.ebayUsedCents} />
               </p>
             </div>
           </div>

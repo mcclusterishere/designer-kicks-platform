@@ -35,13 +35,38 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [localVote, setLocalVote] = useState<string | null>(yourVote);
+  // Which side you actually pressed, so only that button says "Counting…"
+  // instead of both going busy on one tap.
+  const [pressed, setPressed] = useState<string | null>(null);
 
   const voted = localVote !== null;
   const showResults = voted || !active;
-  const total = a.votes + b.votes;
+
+  /**
+   * Count your own vote the moment it lands.
+   *
+   * The vote counts arrive as props from the server. Flipping to the
+   * results view the instant the action returns — but before the server
+   * re-render catches up — meant reading the pre-vote numbers, so a first
+   * vote on a fresh battle showed "50% · 0 votes" on both sides and then
+   * snapped to 100/0 when the refresh arrived. That flash is the bug.
+   *
+   * `yourVote` is the signal for whether the server has counted you yet:
+   * while it's still null and we know we voted, add our own vote in. Once
+   * the refresh lands, `yourVote` is set, the bump switches off, and the
+   * prop already includes it — so it's never counted twice, and the number
+   * stays right even if the refresh never arrives at all.
+   */
+  const counted = yourVote !== null;
+  const bump = (id: string) => (!counted && localVote === id ? 1 : 0);
+  const aVotes = a.votes + bump(a.submissionId);
+  const bVotes = b.votes + bump(b.submissionId);
+  const total = aVotes + bVotes;
+  const myVote = yourVote ?? localVote;
 
   function vote(submissionId: string) {
     setError(null);
+    setPressed(submissionId);
     startTransition(async () => {
       const res = await castVote(battleId, submissionId);
       if (res.ok) {
@@ -49,6 +74,9 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
         setLocalVote(submissionId);
       } else {
         setError(res.error ?? "Something went wrong.");
+        // Already voted from another tab or device: show the standings, but
+        // don't claim a side we can't identify — and don't add a phantom
+        // vote to the count.
         if (res.error?.includes("already voted")) setLocalVote("unknown");
       }
     });
@@ -60,8 +88,9 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
           never one under the other. */}
       <div className="grid grid-cols-2 gap-2 md:gap-6">
         {[a, b].map((side, i) => {
-          const pct = total === 0 ? 50 : Math.round((side.votes / total) * 100);
-          const isYours = localVote === side.submissionId;
+          const sideVotes = i === 0 ? aVotes : bVotes;
+          const pct = total === 0 ? 50 : Math.round((sideVotes / total) * 100);
+          const isYours = myVote === side.submissionId;
           const isWinner = winnerId === side.submissionId;
           return (
             <div
@@ -114,7 +143,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                     <div className="flex items-baseline justify-between">
                       <span className="display text-2xl text-volt">{pct}%</span>
                       <span className="tag text-smoke">
-                        {side.votes} vote{side.votes === 1 ? "" : "s"}
+                        {sideVotes} vote{sideVotes === 1 ? "" : "s"}
                       </span>
                     </div>
                     <div className="mt-2 h-2 w-full overflow-hidden rounded bg-panel">
@@ -133,7 +162,7 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                     disabled={pending}
                     className="mt-3 w-full rounded-lg btn-hard py-3 tag font-bold transition hover:opacity-90 disabled:opacity-50 sm:mt-4"
                   >
-                    {pending ? "Counting…" : "Vote"}
+                    {pending && pressed === side.submissionId ? "Counting…" : "Vote"}
                   </button>
                 ) : (
                   <a

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Money from "@/components/Money";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
@@ -295,11 +296,8 @@ export default async function CatalogBoard({
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {shoes.map((s) => {
               const f = flameMap.get(s.id);
-              const price = s.marketPriceCents
-                ? `≈$${Math.round(s.marketPriceCents / 100)}`
-                : s.retailPriceCents
-                  ? `$${Math.round(s.retailPriceCents / 100)}`
-                  : null;
+              // Whichever number we have, rendered in the reader's money.
+              const priceCents = s.marketPriceCents || s.retailPriceCents || null;
               return (
                 <Link
                   key={s.id}
@@ -322,7 +320,9 @@ export default async function CatalogBoard({
                       {s.name}
                     </p>
                     <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
-                      <span className="font-bold text-volt">{price ?? fmtDate(s.releaseDate) ?? "—"}</span>
+                      <span className="font-bold text-volt">
+                        {priceCents ? <Money cents={priceCents} showUsd={false} /> : fmtDate(s.releaseDate) ?? "—"}
+                      </span>
                       <span className="text-smoke">
                         {f ? `🔥 ${Math.round((f._avg.stars ?? 0) * 10) / 10} (${f._count})` : fmtDate(s.releaseDate)}
                       </span>

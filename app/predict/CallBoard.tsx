@@ -1,5 +1,6 @@
 "use client";
 
+import Money from "@/components/Money";
 import { useState, useEffect } from "react";
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,7 +70,7 @@ export default function CallBoard({ slate }: { slate: Shoe[] }) {
               <p className="truncate font-mono text-[10px] font-bold text-white">{s.sku}</p>
               <p className="truncate text-[11px] text-smoke">{s.name}</p>
               <p className="mt-0.5 font-mono text-xs font-bold tabular-nums text-heat">
-                {formatUsd(s.lastCents)}
+                <Money cents={s.lastCents} showUsd={false} />
               </p>
             </div>
           </button>
@@ -93,7 +94,7 @@ export default function CallBoard({ slate }: { slate: Shoe[] }) {
           <p className="text-sm text-white">
             <span className="font-bold">{pick.name}</span>
             <span className="text-smoke"> — calling against </span>
-            <span className="font-mono font-bold text-heat">{formatUsd(pick.lastCents)}</span>
+            <span className="font-mono font-bold text-heat"><Money cents={pick.lastCents} /></span>
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">

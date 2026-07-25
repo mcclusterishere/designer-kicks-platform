@@ -9,6 +9,8 @@ import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
+import MoneyProvider from "@/components/MoneyProvider";
+import CurrencyPicker from "@/components/CurrencyPicker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import PmaGate from "@/components/PmaGate";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -74,8 +76,14 @@ export default async function RootLayout({
   const session = await auth();
   // Inside the iOS shell: no third-party analytics at all — the app's
   // privacy story stays exactly what the nutrition label says.
-  const { headers } = await import("next/headers");
+  const { headers, cookies: nextCookies } = await import("next/headers");
   const inAppShell = ((await headers()).get("user-agent") ?? "").includes("HeatChartApp");
+  // The reader's money, resolved here so every price below renders in it on
+  // the first paint rather than flashing dollars and correcting itself.
+  const { resolveMoney } = await import("@/lib/currencyServer");
+  const { TZ_COOKIE } = await import("@/lib/currency");
+  const money = await resolveMoney();
+  const knownTz = (await nextCookies()).get(TZ_COOKIE)?.value ?? null;
   // Equity Uprise PMA: members who joined through a door with no
   // checkbox (OAuth, pre-association accounts) accept via the gate.
   let needsPma = false;
@@ -110,6 +118,7 @@ export default async function RootLayout({
         )}
       </head>
       <body className="min-h-full flex flex-col">
+        <MoneyProvider money={money} knownTz={knownTz}>
         <Suspense fallback={null}>
           <TrackPageview />
         </Suspense>
@@ -219,6 +228,13 @@ export default async function RootLayout({
               their respective owners; customs featured here are independent
               artist work and not affiliated with the brands.
             </p>
+            {/* Detection is right most of the time and wrong some of the
+                time — travellers, VPNs, phones set to another country. The
+                picker is the only thing that's always right, so it's here on
+                every page rather than buried in settings. */}
+            <div className="mt-4 border-t border-edge/60 pt-4">
+              <CurrencyPicker />
+            </div>
             <p className="mt-3 text-xs">
               © 2026 McCluster Corp · The Heat Chart is a McCluster Corp /
               Equity Uprise project supporting creative opportunity and
@@ -233,6 +249,7 @@ export default async function RootLayout({
         </footer>
         <MobileTabBar />
         <AddToHomeScreen />
+        </MoneyProvider>
       </body>
     </html>
   );

@@ -1,5 +1,7 @@
-import { formatUsd } from "@/lib/market";
-import LocalMoney from "@/components/LocalMoney";
+"use client";
+
+import { useMoney } from "@/components/MoneyProvider";
+import { formatMoney, type Money as Wallet } from "@/lib/currency";
 
 export type DeskInfo = {
   commissionOpen: boolean;
@@ -9,13 +11,19 @@ export type DeskInfo = {
   commissionSlots: number | null;
 };
 
-/** "From $180" / "$180–$450" / "Ask" — never a number we don't actually have. */
-export function priceLabel(d: DeskInfo): string {
+/**
+ * "From ₵2,800" / "₵2,800–₵7,000" / "Ask" — never a number we don't have.
+ *
+ * A price range has to read as one phrase, so this returns a string rather
+ * than elements, which means it needs the reader's currency passed in.
+ */
+export function priceLabel(d: DeskInfo, wallet: Wallet): string {
+  const f = (c: number) => formatMoney(c, wallet);
   if (d.commissionMinCents && d.commissionMaxCents) {
-    return `${formatUsd(d.commissionMinCents)}–${formatUsd(d.commissionMaxCents)}`;
+    return `${f(d.commissionMinCents)}–${f(d.commissionMaxCents)}`;
   }
-  if (d.commissionMinCents) return `From ${formatUsd(d.commissionMinCents)}`;
-  if (d.commissionMaxCents) return `Up to ${formatUsd(d.commissionMaxCents)}`;
+  if (d.commissionMinCents) return `From ${f(d.commissionMinCents)}`;
+  if (d.commissionMaxCents) return `Up to ${f(d.commissionMaxCents)}`;
   return "Ask";
 }
 
@@ -34,6 +42,7 @@ export function waitLabel(d: DeskInfo): string {
  * the artist hasn't set read "Ask" rather than inventing a number.
  */
 export default function CommissionDesk({ desk, compact = false }: { desk: DeskInfo; compact?: boolean }) {
+  const wallet = useMoney();
   const stated = desk.commissionMinCents || desk.commissionDays;
 
   if (compact) {
@@ -47,7 +56,7 @@ export default function CommissionDesk({ desk, compact = false }: { desk: DeskIn
         {stated && (
           <>
             {" · "}
-            {priceLabel(desk)}
+            {priceLabel(desk, wallet)}
             {desk.commissionDays ? ` · ${waitLabel(desk)}` : ""}
           </>
         )}
@@ -71,10 +80,7 @@ export default function CommissionDesk({ desk, compact = false }: { desk: DeskIn
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div>
           <p className="tag text-smoke">Price</p>
-          <p className="text-lg font-bold text-white">{priceLabel(desk)}</p>
-          {desk.commissionMinCents ? (
-            <LocalMoney usd={desk.commissionMinCents / 100} className="block text-[10px] text-smoke" />
-          ) : null}
+          <p className="text-lg font-bold text-white">{priceLabel(desk, wallet)}</p>
         </div>
         <div>
           <p className="tag text-smoke">Turnaround</p>

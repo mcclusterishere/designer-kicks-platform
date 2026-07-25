@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { formatUsd } from "@/lib/market";
 
@@ -26,7 +27,7 @@ export default function TickerTape({
               className="flex shrink-0 items-center gap-2 font-mono text-xs"
             >
               <span className="font-bold tracking-wider text-white">{m.sku}</span>
-              <span className="tabular-nums text-smoke">{formatUsd(m.lastCents)}</span>
+              <span className="tabular-nums text-smoke"><Money cents={m.lastCents} showUsd={false} /></span>
               <span className={`tabular-nums font-bold ${up ? "text-emerald-400" : "text-red-400"}`}>
                 {up ? "▲" : "▼"} {Math.abs(m.changePct)}%
               </span>

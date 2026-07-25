@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -153,14 +154,14 @@ export default async function CatalogShoePage({
             {shoe.marketPriceCents && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Market value</dt>
-                <dd className="font-bold text-volt">≈ ${Math.round(shoe.marketPriceCents / 100)}</dd>
+                <dd className="font-bold text-volt"><Money cents={shoe.marketPriceCents} /></dd>
               </div>
             )}
             {shoe.retailPriceCents && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Retail</dt>
                 <dd className={shoe.marketPriceCents ? "text-white" : "font-bold text-volt"}>
-                  ${Math.round(shoe.retailPriceCents / 100)}
+                  <Money cents={shoe.retailPriceCents} />
                 </dd>
               </div>
             )}

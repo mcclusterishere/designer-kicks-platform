@@ -1,5 +1,5 @@
+import Money from "@/components/Money";
 import { formatUsd } from "@/lib/market";
-import LocalMoney from "@/components/LocalMoney";
 import type { SeriesPoint } from "@/lib/priceHistory";
 
 /**
@@ -51,16 +51,14 @@ export default function PriceHistoryCard({
           <div>
             <p className="tag text-smoke">Retail</p>
             <p className="font-mono text-lg font-bold tabular-nums text-white">
-              {retailCents ? formatUsd(retailCents) : "—"}
+              <Money cents={retailCents} />
             </p>
-            {retailCents ? <LocalMoney usd={retailCents / 100} className="block text-[10px] text-smoke" /> : null}
           </div>
           <div>
             <p className="tag text-smoke">Last</p>
             <p className="font-mono text-lg font-bold tabular-nums text-white">
-              {lastCents ? formatUsd(lastCents) : "—"}
+              <Money cents={lastCents} />
             </p>
-            {lastCents ? <LocalMoney usd={lastCents / 100} className="block text-[10px] text-smoke" /> : null}
           </div>
         </div>
       </div>

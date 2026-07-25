@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -399,7 +400,7 @@ export default async function ProfilePage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-white">{o.submission.title}</p>
                   <p className="text-sm text-smoke">
-                    <span className="display text-lg text-volt">{formatUsd(o.amountCents)}</span>{" "}
+                    <span className="display text-lg text-volt"><Money cents={o.amountCents} /></span>{" "}
                     from {o.buyer.name ?? "a collector"}
                   </p>
                 </div>
@@ -434,7 +435,7 @@ export default async function ProfilePage() {
                 className="flex items-center justify-between rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
               >
                 <p className="text-smoke">
-                  <span className="text-white">{formatUsd(o.amountCents)}</span> on{" "}
+                  <span className="text-white"><Money cents={o.amountCents} /></span> on{" "}
                   <span className="text-white">{o.submission.title}</span> — waiting on the seller
                 </p>
                 <form action={withdrawOffer.bind(null, o.id)}>

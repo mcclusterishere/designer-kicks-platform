@@ -1,6 +1,7 @@
+import Money from "@/components/Money";
+import { useMoney } from "@/components/MoneyProvider";
 import Link from "next/link";
 import { formatUsd } from "@/lib/market";
-import LocalMoney from "@/components/LocalMoney";
 import type { Row, SortKey } from "@/lib/exchange";
 
 const COLS: { key: SortKey | null; label: string; align?: string; hide?: string }[] = [
@@ -43,6 +44,7 @@ export default function ExchangeTable({
   pages: number;
   total: number;
 }) {
+  const money = useMoney();
   const base = { board: "og", q: query, brand, sort };
 
   return (
@@ -102,24 +104,29 @@ export default function ExchangeTable({
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums font-bold text-white">
-                      {r.lastCents ? formatUsd(r.lastCents) : "—"}
-                      {r.lastCents ? (
-                        <LocalMoney usd={r.lastCents / 100} className="block text-[10px] font-normal text-smoke" />
+                      <Money cents={r.lastCents} showUsd={false} />
+                      {/* The dollar price under the local one: this column is
+                          the headline number, so both belong here even though
+                          the narrower columns only carry one. */}
+                      {r.lastCents && money.currency !== "USD" ? (
+                        <span className="block text-[10px] font-normal text-smoke">
+                          ${Math.round(r.lastCents / 100).toLocaleString("en-US")}
+                        </span>
                       ) : null}
                     </td>
                     <td className={`whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums font-bold ${r.changePct === null ? "text-smoke" : up ? "text-emerald-400" : "text-red-400"}`}>
                       {r.changePct === null ? "—" : `${up ? "+" : ""}${r.changePct}%`}
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke sm:table-cell">
-                      {r.bidCents ? formatUsd(r.bidCents) : "—"}
+                      <Money cents={r.bidCents} showUsd={false} />
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke sm:table-cell">
-                      {r.askCents ? formatUsd(r.askCents) : "—"}
+                      <Money cents={r.askCents} showUsd={false} />
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right lg:table-cell">
                       {r.spreadCents && r.bidCents && r.askCents ? (
                         <span className="inline-flex flex-col items-end gap-1">
-                          <span className="font-mono tabular-nums text-smoke">{formatUsd(r.spreadCents)}</span>
+                          <span className="font-mono tabular-nums text-smoke"><Money cents={r.spreadCents} showUsd={false} /></span>
                           <Ladder bid={r.bidCents} ask={r.askCents} last={r.lastCents} />
                         </span>
                       ) : (
@@ -127,7 +134,7 @@ export default function ExchangeTable({
                       )}
                     </td>
                     <td className="hidden whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums text-smoke lg:table-cell">
-                      {r.retailCents ? formatUsd(r.retailCents) : "—"}
+                      <Money cents={r.retailCents} showUsd={false} />
                     </td>
                   </tr>
                 );
@@ -141,6 +148,13 @@ export default function ExchangeTable({
         <p className="tag text-smoke">
           {total.toLocaleString("en-US")} symbols listed · page {page} of {pages}
           <span className="ml-2 hidden sm:inline">· Bid/Ask = live eBay used/new</span>
+          {/* The columns are too narrow to carry a dollar reference beside
+              every figure, so the unit is stated once for the whole table. */}
+          {money.currency !== "USD" && (
+            <span className="ml-2">
+              · figures converted to {money.currency} from USD{money.live ? "" : " (approximate table)"}
+            </span>
+          )}
         </p>
         <div className="flex gap-2">
           {page > 1 && (

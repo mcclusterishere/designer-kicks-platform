@@ -1,11 +1,11 @@
 "use client";
 
+import Money from "@/components/Money";
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { rateDesign, rateCatalogShoe, moreRateCards } from "@/app/actions";
 import SwipeGallery from "@/components/SwipeGallery";
 import PieceMedia from "@/components/PieceMedia";
-import LocalMoney from "@/components/LocalMoney";
 
 export type RateCard = {
   id: string;
@@ -183,7 +183,7 @@ export default function RateDeck({ cards, ratedBefore }: { cards: RateCard[]; ra
             {card.value && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-lg border border-volt/50 bg-volt/10 px-3 py-1.5 tag font-bold text-volt">{card.value}</span>
-                {card.usdValue ? <LocalMoney usd={card.usdValue} /> : null}
+                {card.usdValue ? <Money cents={Math.round(card.usdValue * 100)} /> : null}
               </div>
             )}
             {card.chips.length > 0 && (

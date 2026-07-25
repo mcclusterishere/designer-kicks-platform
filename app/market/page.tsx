@@ -1,4 +1,4 @@
-import LocalMoney from "@/components/LocalMoney";
+import Money from "@/components/Money";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -238,16 +238,15 @@ function CustomTile({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">{headlineLabel}</p>
           <div className="flex items-baseline justify-between">
             <p className="text-xl font-bold tabular-nums text-white">
-              {headline ? formatUsd(headline) : "—"}
+              <Money cents={headline} />
             </p>
             {salePct !== null && <Delta pct={salePct} />}
           </div>
-          {headline ? <LocalMoney usd={headline / 100} /> : null}
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums text-smoke">
           <span>
             Last sale:{" "}
-            <span className="text-white">{item.lastSaleCents ? formatUsd(item.lastSaleCents) : "—"}</span>
+            <span className="text-white"><Money cents={item.lastSaleCents} /></span>
             {item.lastSaleCents !== null && item.lastSaleVerified && (
               <span className="ml-1 text-emerald-400" title="Substantiated with evidence or admin-verified">✓</span>
             )}
@@ -256,10 +255,10 @@ function CustomTile({
             {item.bidCount > 0 ? (
               <>
                 {item.bidCount} bid{item.bidCount === 1 ? "" : "s"} · high{" "}
-                <span className="font-bold text-emerald-400">{formatUsd(item.topOfferCents!)}</span>
+                <span className="font-bold text-emerald-400"><Money cents={item.topOfferCents!} /></span>
               </>
             ) : item.consignment ? (
-              <>Bids from <span className="font-bold text-white">{formatUsd(item.consignment.floorCents)}</span></>
+              <>Bids from <span className="font-bold text-white"><Money cents={item.consignment.floorCents} /></span></>
             ) : (
               "No bids yet"
             )}
@@ -464,12 +463,12 @@ function CustomsBoardView({
               Confirmed volume · all-time
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums text-white sm:text-5xl">
-              {formatUsd(stats.volumeCents)}
+              <Money cents={stats.volumeCents} showUsd={false} />
             </p>
             <p className="mt-1 text-xs tabular-nums text-smoke">
               {stats.salesCount} sale{stats.salesCount === 1 ? "" : "s"} ·{" "}
               {stats.verifiedCount} verified · avg{" "}
-              {stats.salesCount ? formatUsd(stats.avgCents) : "—"}
+              <Money cents={stats.salesCount ? stats.avgCents : null} showUsd={false} />
             </p>
           </div>
           {indexSeries.length > 1 && (

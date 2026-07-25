@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -406,7 +407,7 @@ export default async function ArtistPage({ params }: Props) {
                   {viewerCanChallenge && <ChallengeButton targetSubmissionId={s.id} />}
                   {lastSale && (
                     <p className="mt-1 text-sm">
-                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      <span className="font-bold text-white"><Money cents={lastSale.priceCents} /></span>{" "}
                       {lastSale.verified ? (
                         <span className="tag text-volt" title="Sale substantiated with evidence or admin-verified">✓ verified sale</span>
                       ) : (
@@ -432,7 +433,7 @@ export default async function ArtistPage({ params }: Props) {
                   {s.offers.length > 0 && (
                     <p className="mt-1.5 text-sm tabular-nums text-smoke">
                       {s.offers.length} standing bid{s.offers.length === 1 ? "" : "s"} · high{" "}
-                      <span className="font-bold text-emerald-400">{formatUsd(s.offers[0].amountCents)}</span>
+                      <span className="font-bold text-emerald-400"><Money cents={s.offers[0].amountCents} /></span>
                     </p>
                   )}
                   {s.consignment?.status === "OPEN" && (
@@ -442,7 +443,7 @@ export default async function ArtistPage({ params }: Props) {
                         ? ` — previously sold at ${formatUsd(s.consignment.priorSaleCents)}`
                         : ""}
                       {" · bids from "}
-                      {formatUsd(s.consignment.floorCents)} · proceeds split with a private collector
+                      <Money cents={s.consignment.floorCents} /> · proceeds split with a private collector
                     </p>
                   )}
                   {(isOwnPage || admin) && (
