@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cronAuth";
 import { postToThreads, todaysPost, threadsConfigured, programDay } from "@/lib/threads";
 
 /**
@@ -11,8 +12,7 @@ import { postToThreads, todaysPost, threadsConfigured, programDay } from "@/lib/
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!threadsConfigured()) {

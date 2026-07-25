@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cronAuth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles } from "@/lib/battles";
 
@@ -12,8 +13,7 @@ import { finalizeExpiredBattles } from "@/lib/battles";
  * from any scheduler with the same header.
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
