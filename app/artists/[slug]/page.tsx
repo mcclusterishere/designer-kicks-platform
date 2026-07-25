@@ -93,7 +93,7 @@ export default async function ArtistPage({ params }: Props) {
   const viewerCanChallenge =
     viewerProfile?.status === "APPROVED" && viewerProfile.id !== artist.id;
   // Pre-loaded pages stay claimable until the artist sets a login.
-  const claimable = !artist.user.passwordHash && artist.user._count.accounts === 0;
+  const claimable = !artist.hasPassword && artist.user._count.accounts === 0;
 
   // Raw page-view counting for the Studio dashboard — own visits excluded.
   if (!isOwnPage) {
