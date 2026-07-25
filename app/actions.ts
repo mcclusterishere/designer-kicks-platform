@@ -3495,6 +3495,57 @@ export async function drainDripNow(): Promise<{ sent: number; failed: number; sk
   return out;
 }
 
+
+// ---------- Play limits ----------
+
+/**
+ * A member binding their own future behaviour.
+ *
+ * The daily limit can be raised or removed freely — it's a budgeting tool.
+ * Self-exclusion cannot be shortened, only set or extended, and that
+ * asymmetry is the entire point: a break somebody can cancel at the moment
+ * they most want to cancel it isn't a break. Under every regime that allows
+ * staking, an operator that lets people undo their own exclusion on a whim
+ * is the operator that gets made an example of.
+ */
+export async function setPlayLimits(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const userId = session.user.id;
+
+  const rawLimit = String(formData.get("dailyStakeLimit") ?? "").trim();
+  const dailyStakeLimit = rawLimit === "" ? null : Math.max(0, Math.min(100000, Number(rawLimit) || 0));
+
+  const days = Number(formData.get("excludeDays")) || 0;
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { selfExcludedUntil: true },
+  });
+
+  let selfExcludedUntil = current?.selfExcludedUntil ?? null;
+  if (days > 0) {
+    const requested = new Date(Date.now() + days * 86400000);
+    // Only ever extends. An existing exclusion further out always wins.
+    if (!selfExcludedUntil || requested > selfExcludedUntil) selfExcludedUntil = requested;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailyStakeLimit, selfExcludedUntil },
+  });
+  revalidatePath("/profile");
+  revalidatePath("/market");
+  return {
+    ok: true,
+    note: selfExcludedUntil && selfExcludedUntil.getTime() > Date.now()
+      ? `Saved. You're taking a break until ${selfExcludedUntil.toDateString()} — this can be extended but not shortened.`
+      : "Saved.",
+  };
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour
@@ -4522,12 +4573,9 @@ export async function clearQuizMiss(answerId: string): Promise<ClearMissResult> 
       data: { cleared: true },
     });
     if (flip.count === 0) return "already"; // a concurrent clear got it first
-    const dec = await tx.user.updateMany({
-      where: { id: userId, credits: { gte: 1 } },
-      data: { credits: { decrement: 1 } },
-    });
-    if (dec.count === 0) throw new Error("no-credit"); // rolls back the flip
-    await tx.creditTransaction.create({ data: { userId, delta: -1, reason: "iq-clear" } });
+    const { postCreditsIn } = await import("@/lib/ledger");
+    const spend = await postCreditsIn(tx, { userId, delta: -1, reason: "iq-clear" });
+    if (!spend.ok) throw new Error("no-credit"); // rolls back the flip
     return "ok";
   }).catch((e) => (e instanceof Error && e.message === "no-credit" ? "no-credit" : Promise.reject(e)));
   if (result === "no-credit") {

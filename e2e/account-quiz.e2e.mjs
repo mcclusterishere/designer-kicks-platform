@@ -24,8 +24,24 @@ await page.fill("#name", "E2E Tester");
 await page.fill("#email", EMAIL);
 await page.fill("#password", "supersecret1");
 await page.check("#age13");
+// Every account is an Equity Uprise PMA member; registration refuses
+// without the agreement, so the suite has to tick it like a real signup.
+await page.check("#pma");
 await page.getByRole("button", { name: "Create Account" }).click();
-await page.waitForURL("**/profile", { timeout: 15000 });
+
+// @test.example isn't a mail service the domain guard recognises, so it
+// raises the "is this really your email" interstitial and blocks the
+// submit until it's confirmed twice. Walk it exactly as a member with
+// their own domain would.
+const domainGuard = page.getByRole("alertdialog");
+if (await domainGuard.isVisible().catch(() => false)) {
+  check("unknown-domain guard intercepts the signup", true);
+  await page.getByRole("button", { name: /this is my own domain/i }).click();
+  await page.getByRole("button", { name: /^Confirm: sign me up/i }).click();
+}
+// router.push is a same-document navigation, so match on the URL itself
+// rather than waiting for a load event that never comes.
+await page.waitForURL(/\/profile/, { timeout: 15000 });
 check("register creates account and signs in", true);
 
 // ---------- Profile ----------
@@ -43,7 +59,7 @@ check("profile saves contact info", dbUser?.phone === "+1 555 010 2030" && dbUse
 await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
 await page.locator("a[href^='/battles/']").first().click();
 await page.waitForURL("**/battles/**");
-const voteBtns = page.getByRole("button", { name: "Vote This Piece" });
+const voteBtns = page.getByRole("button", { name: "Vote", exact: true });
 if ((await voteBtns.count()) === 2) {
   await voteBtns.first().click();
   await page.getByText("Your vote").first().waitFor({ timeout: 10000 });
@@ -170,14 +186,27 @@ await page.goto(`${BASE}/giveaway`, { waitUntil: "networkidle" });
 check("giveaway page shows your entries", await page.getByText(/You have 1 entr/).isVisible());
 check("purchases-never-affect-odds language present", await page.getByText(/purchases never affect your odds/i).first().isVisible());
 
-// ---------- Sign out → voting gated ----------
+// ---------- Sign out → guests can still vote ----------
+// Voting used to be gated behind an account. It isn't any more: a guest
+// can vote, their vote is stored flagged as a guest vote, and the Heat
+// Score ranking ignores flagged votes so opening the door didn't open a
+// ballot box. Both halves are worth holding onto.
 await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.waitForTimeout(1500);
 await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
 await page.locator("a[href^='/battles/']").first().click();
 await page.waitForURL("**/battles/**");
-check("logged-out users see Sign In To Vote", (await page.getByText("Sign In To Vote").count()) > 0);
+const guestBtns = page.getByRole("button", { name: "Vote", exact: true });
+check("guests are offered a vote", (await guestBtns.count()) === 2);
+const guestVotesBefore = await prisma.vote.count({ where: { guest: true } });
+if ((await guestBtns.count()) === 2) {
+  await guestBtns.first().click();
+  await page.getByText("Your vote").first().waitFor({ timeout: 10000 }).catch(() => {});
+}
+const guestVotesAfter = await prisma.vote.count({ where: { guest: true } });
+check("a guest vote is recorded and flagged as a guest vote", guestVotesAfter > guestVotesBefore,
+  `${guestVotesBefore} → ${guestVotesAfter}`);
 
 // ---------- Password reset (via mailer log fallback) ----------
 await page.goto(`${BASE}/forgot-password`, { waitUntil: "networkidle" });

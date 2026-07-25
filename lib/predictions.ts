@@ -83,6 +83,18 @@ export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?:
   const onCustom = Boolean(input.submissionId);
   if (onOg === onCustom) return { ok: false, error: "Pick one pair to call." };
 
+  // Self-exclusion blocks the act, not just the stake. A free call is still
+  // play, and honouring a break only when money is involved isn't honouring
+  // it — the ledger's own check would miss this case entirely.
+  const { isExcluded } = await import("./ledger");
+  const breakUntil = await isExcluded(input.userId);
+  if (breakUntil) {
+    return {
+      ok: false,
+      error: `You're on a break until ${breakUntil.toDateString()}.`,
+    };
+  }
+
   // The line you're calling against, from whichever floor this is.
   let basis: number | null = null;
   if (onOg) {
@@ -131,18 +143,25 @@ export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?:
     ? input.stakeCredits!
     : 0;
 
-  // Debit first, and only if the balance covers it. The conditional update
-  // is the guard: two calls fired at once can't both pass because the
-  // second one's WHERE no longer matches once the first has decremented.
+  // One movement through the ledger: balance and entry written together,
+  // self-exclusion and the daily limit checked on the way in. Nothing here
+  // can leave the balance and the record disagreeing.
   if (stake > 0) {
-    const paid = await prisma.user.updateMany({
-      where: { id: input.userId, credits: { gte: stake } },
-      data: { credits: { decrement: stake } },
+    const { postCredits } = await import("./ledger");
+    const paid = await postCredits({
+      userId: input.userId,
+      delta: -stake,
+      reason: "call-stake",
     });
-    if (paid.count === 0) return { ok: false, error: "Not enough credits for that stake." };
-    await prisma.creditTransaction
-      .create({ data: { userId: input.userId, delta: -stake, reason: "call-stake" } })
-      .catch(() => {});
+    if (!paid.ok) {
+      return {
+        ok: false,
+        error:
+          paid.reason === "insufficient"
+            ? "Not enough credits for that stake."
+            : paid.detail,
+      };
+    }
   }
 
   try {
@@ -161,15 +180,18 @@ export async function makeCall(input: CallInput): Promise<{ ok: boolean; error?:
         resolveAt: new Date(Date.now() + horizon * DAY),
       },
     });
-  } catch (e) {
-    // Never keep somebody's stake for a call that didn't get written.
+  } catch {
+    // Never keep somebody's stake for a call that didn't get written. The
+    // refund bypasses play limits: a limit governs risking credits, never
+    // getting your own back.
     if (stake > 0) {
-      await prisma.user
-        .update({ where: { id: input.userId }, data: { credits: { increment: stake } } })
-        .catch(() => {});
-      await prisma.creditTransaction
-        .create({ data: { userId: input.userId, delta: stake, reason: "call-stake-refund" } })
-        .catch(() => {});
+      const { postCredits } = await import("./ledger");
+      await postCredits({
+        userId: input.userId,
+        delta: stake,
+        reason: "call-stake-refund",
+        bypassLimits: true,
+      });
     }
     return { ok: false, error: "Couldn't place that call — your credits weren't touched." };
   }
@@ -238,12 +260,16 @@ export async function resolveDuePredictions(limit = 300): Promise<{
         data: { status: "VOID", settledAt: new Date(), payoutCredits: p.stakeCredits },
       }).catch(() => {});
       if (p.stakeCredits > 0) {
-        await prisma.user
-          .update({ where: { id: p.userId }, data: { credits: { increment: p.stakeCredits } } })
-          .catch(() => {});
-        await prisma.creditTransaction
-          .create({ data: { userId: p.userId, delta: p.stakeCredits, reason: "call-void-refund" } })
-          .catch(() => {});
+        const { postCredits } = await import("./ledger");
+        // Keyed on the call: a settlement pass that retries after a timeout
+        // loses the race at the database rather than refunding twice.
+        await postCredits({
+          userId: p.userId,
+          delta: p.stakeCredits,
+          reason: "call-void-refund",
+          idempotencyKey: `void:${p.id}`,
+          bypassLimits: true,
+        });
       }
       voided++;
       continue;
@@ -289,11 +315,23 @@ export async function resolveDuePredictions(limit = 300): Promise<{
       // Two separate credit events on a win: the staked payout, and the
       // small standing reward for being right that a no-stake call also
       // earns. Kept apart so the ledger reads honestly.
-      const { grantCredits } = await import("./quiz");
+      const { postCredits } = await import("./ledger");
       if (payout > 0) {
-        await grantCredits(p.userId, payout, "call-payout").catch(() => {});
+        await postCredits({
+          userId: p.userId,
+          delta: payout,
+          reason: "call-payout",
+          idempotencyKey: `payout:${p.id}`,
+          bypassLimits: true,
+        });
       }
-      await grantCredits(p.userId, Math.max(1, Math.round(points / 10)), "prediction").catch(() => {});
+      await postCredits({
+        userId: p.userId,
+        delta: Math.max(1, Math.round(points / 10)),
+        reason: "prediction",
+        idempotencyKey: `points:${p.id}`,
+        bypassLimits: true,
+      });
       pointsAwarded += points;
     }
 

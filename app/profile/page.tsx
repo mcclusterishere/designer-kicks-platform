@@ -1,5 +1,7 @@
 import Money from "@/components/Money";
 import PushToggle from "@/components/PushToggle";
+import PlayLimits from "@/components/PlayLimits";
+import CreditStatement from "@/components/CreditStatement";
 import { unreadCount } from "@/lib/messages";
 import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
@@ -93,6 +95,15 @@ export default async function ProfilePage() {
     prisma.user.findUnique({ where: { id: user.id }, select: { credits: true } }),
   ]);
   const unread = await unreadCount(user.id);
+  const { stakedToday, statement } = await import("@/lib/ledger");
+  const [limits, todayStaked, ledgerEntries] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { dailyStakeLimit: true, selfExcludedUntil: true },
+    }),
+    stakedToday(user.id),
+    statement(user.id, 25),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -134,6 +145,15 @@ export default async function ProfilePage() {
         <PushToggle
           vapidKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null}
         />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3">
+        <PlayLimits
+          dailyStakeLimit={limits?.dailyStakeLimit ?? null}
+          excludedUntil={limits?.selfExcludedUntil?.toISOString() ?? null}
+          stakedToday={todayStaked}
+        />
+        <CreditStatement entries={ledgerEntries} balance={creditUser?.credits ?? 0} />
       </div>
 
       {/* Artist account comes first — this is the maker's home base. */}

@@ -184,7 +184,25 @@ export async function refreshEverything(mode: RefreshMode = "nightly"): Promise<
     })
   );
 
-  // 12. Fingerprint the market so the index has real history to chart.
+  // 12. Prove the books balance. Recomputes every balance from the ledger
+  //     and reports disagreement rather than repairing it — a silent repair
+  //     would destroy the evidence of whatever caused the drift.
+  steps.push(
+    await run("reconcile-credits", async () => {
+      const { reconcile } = await import("./ledger");
+      const r = await reconcile();
+      if (r.drifted.length > 0) {
+        const worst = r.drifted
+          .slice(0, 3)
+          .map((d) => `${d.name ?? d.userId}: stored ${d.stored} vs ledger ${d.ledger}`)
+          .join("; ");
+        throw new Error(`${r.drifted.length} balance(s) disagree with the ledger — ${worst}`);
+      }
+      return { checked: r.checked, detail: "every balance matches its ledger" };
+    })
+  );
+
+  // 13. Fingerprint the market so the index has real history to chart.
   //     Last, so it measures the state everything above just produced.
   steps.push(
     await run("index-snapshot", async () => {

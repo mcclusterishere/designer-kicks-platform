@@ -732,6 +732,22 @@ model User {
   receivedMessages DirectMessage[] @relation("receivedMessages")
   pushSubs         PushSub[]
 
+  // Play limits. Every regime that lets people stake anything requires the
+  // account holder to be able to bind their own future behaviour, and
+  // requires the operator to honour it — so the fields exist now, enforced
+  // on the play they already have, rather than being retrofitted onto a
+  // live book later.
+  //
+  // selfExcludedUntil is deliberately one-way in the UI: a member can set it
+  // or extend it, and cannot shorten it. An exclusion somebody can undo in
+  // the moment they most want to undo it isn't an exclusion.
+  dailyStakeLimit   Int?
+  selfExcludedUntil DateTime?
+  /** Country/region as resolved at signup — the basis for any future gating. */
+  jurisdiction      String?
+  /** Set when age has actually been checked, not when a box was ticked. */
+  ageVerifiedAt     DateTime?
+
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
@@ -1052,14 +1068,41 @@ model QuizRun {
   completedAt  DateTime?
 }
 
+/**
+ * The ledger. Every credit that moves, and why.
+ *
+ * Two fields here exist for a future in which this has to be defensible to
+ * somebody outside the company.
+ *
+ * balanceAfter is the running balance at the moment of the entry, written in
+ * the same transaction as the balance change. It means the balance at any
+ * point in the past can be read directly rather than reconstructed by
+ * replaying every entry since the account opened, and it means a mismatch
+ * between the stored balance and the ledger is detectable rather than
+ * theoretical.
+ *
+ * idempotencyKey is replay protection. A settlement job that retries after a
+ * timeout must not pay twice, and the only way to guarantee that is to make
+ * the second write fail at the database rather than rely on the job
+ * remembering what it already did.
+ */
 model CreditTransaction {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   delta           Int
-  reason          String // purchase | strike | admin
+  reason          String // purchase | strike | admin | call-stake | call-payout | ...
+  /** Balance immediately after this entry was applied. */
+  balanceAfter    Int?
+  /** Stable key for an operation that must happen at most once. */
+  idempotencyKey  String?  @unique
+  /** Free text for an admin adjustment — who and why. */
+  note            String?
   stripeSessionId String?  @unique
   createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([reason, createdAt])
 }
 
 model Giveaway {

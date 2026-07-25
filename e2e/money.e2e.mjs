@@ -1,0 +1,110 @@
+// The money surfaces, rendered in a real browser as a signed-in member.
+//
+// This suite exists because of a specific failure: a client-only hook used
+// inside a server component typechecks cleanly and builds cleanly, and then
+// throws on every request. `npm run build` said the market was fine while
+// the market was down. Only actually loading the page catches that class of
+// bug, so the pages that move credits get loaded here, and any console or
+// page error fails the run.
+//
+// The ledger's own invariants — atomicity, idempotency, overdraft, limits,
+// reconciliation — are proved separately and without a browser by
+// `npm run verify:ledger`.
+import { PrismaClient } from "@prisma/client";
+import { hash } from "bcryptjs";
+import { BASE, SHOTS, makeChecker, launchBrowser } from "./helpers.mjs";
+
+const prisma = new PrismaClient();
+const results = [];
+const check = makeChecker(results);
+
+const EMAIL = `money-e2e-${process.pid}@example.invalid`;
+const PASS = "MoneySuite!2026";
+
+const member = await prisma.user.create({
+  data: { email: EMAIL, name: "Money Suite", passwordHash: await hash(PASS, 10) },
+});
+// Funded the way the app funds people, so the suite never leaves the books
+// disagreeing with themselves.
+await prisma.$transaction(async (tx) => {
+  await tx.user.update({ where: { id: member.id }, data: { credits: 120 } });
+  await tx.creditTransaction.create({
+    data: { userId: member.id, delta: 120, reason: "e2e-seed", balanceAfter: 120 },
+  });
+});
+
+const browser = await launchBrowser();
+const page = await browser.newPage();
+const errors = [];
+page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+
+try {
+  // networkidle before filling: the form is hydrated by React, and typing
+  // into it before hydration loses the values. Then wait for the landing
+  // page rather than for the page to "look idle" — networkidle after the
+  // click resolves before the POST is even in flight.
+  await page.goto(`${BASE}/signin`, { waitUntil: "networkidle" });
+  await page.fill('input[name="email"]', EMAIL);
+  await page.fill('input[name="password"]', PASS);
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/profile/, { timeout: 20000 }).catch(() => {});
+  check("member signs in", !page.url().includes("/signin"), page.url());
+
+  // ---------- Responsible play controls ----------
+  const profile = await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
+  check("/profile renders", profile.status() === 200, String(profile.status()));
+  const profileText = await page.textContent("body");
+  check("/profile is not an error page", !/Application error|Internal Server Error/i.test(profileText));
+  check("limits panel is on the page", /Your limits/i.test(profileText));
+  check("daily stake cap control present", (await page.locator('[name="dailyStakeLimit"]').count()) > 0);
+  check("take-a-break control present", (await page.locator('[name="excludeDays"]').count()) > 0);
+  check(
+    "break is described as extend-only",
+    /extended, not shortened/i.test(profileText) || /No break/i.test(profileText)
+  );
+  // A balance nobody can audit is just a number the house asserts.
+  check("credit statement is on the page", /Credit statement/i.test(profileText));
+  check("statement shows the seeded movement", /e2e seed|e2e-seed/i.test(profileText));
+  check("statement states credits are not cash", /never pay out as cash/i.test(profileText));
+  await page.screenshot({ path: `${SHOTS}/money-profile-limits.png`, fullPage: false });
+
+  // ---------- Market, both floors ----------
+  for (const path of ["/market", "/market?side=CUSTOM", "/predict"]) {
+    const r = await page.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    const t = await page.textContent("body");
+    check(`${path} renders`, r.status() === 200, String(r.status()));
+    check(`${path} is not an error page`, !/Application error|Internal Server Error/i.test(t));
+  }
+
+  // ---------- The trade panel, on a symbol that actually has a price ----------
+  const shoe = await prisma.catalogShoe.findFirst({
+    where: { OR: [{ marketPriceCents: { gt: 0 } }, { ebayNewCents: { gt: 0 } }] },
+    select: { sku: true },
+  });
+  if (shoe) {
+    const r = await page.goto(`${BASE}/market?sym=${encodeURIComponent(shoe.sku)}`, {
+      waitUntil: "networkidle",
+    });
+    const t = await page.textContent("body");
+    check(`trade panel renders on ${shoe.sku}`, r.status() === 200, String(r.status()));
+    check("trade panel is not an error page", !/Application error|Internal Server Error/i.test(t));
+    check("ticket offers a stake", /Stake/i.test(t));
+    // The line that keeps this a game. If it ever stops rendering, the
+    // product has quietly changed into something else.
+    check("ticket states credits are not cash", /never pay out as cash/i.test(t));
+    await page.screenshot({ path: `${SHOTS}/money-trade-panel.png`, fullPage: false });
+  } else {
+    check("a priced symbol exists to open the panel on", false, "no priced catalog shoe");
+  }
+
+  check("no console or page errors anywhere", errors.length === 0, errors.slice(0, 3).join(" | "));
+} finally {
+  await browser.close();
+  await prisma.creditTransaction.deleteMany({ where: { userId: member.id } });
+  await prisma.user.delete({ where: { id: member.id } }).catch(() => {});
+  await prisma.$disconnect();
+}
+
+console.log("\n=== MONEY SURFACES SUITE ===");
+for (const r of results) console.log(r);
