@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatUsd } from "@/lib/market";
+import LocalMoney from "@/components/LocalMoney";
 import type { Row, SortKey } from "@/lib/exchange";
 
 const COLS: { key: SortKey | null; label: string; align?: string; hide?: string }[] = [
@@ -102,6 +103,9 @@ export default function ExchangeTable({
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums font-bold text-white">
                       {r.lastCents ? formatUsd(r.lastCents) : "—"}
+                      {r.lastCents ? (
+                        <LocalMoney usd={r.lastCents / 100} className="block text-[10px] font-normal text-smoke" />
+                      ) : null}
                     </td>
                     <td className={`whitespace-nowrap px-3 py-2.5 text-right font-mono tabular-nums font-bold ${r.changePct === null ? "text-smoke" : up ? "text-emerald-400" : "text-red-400"}`}>
                       {r.changePct === null ? "—" : `${up ? "+" : ""}${r.changePct}%`}

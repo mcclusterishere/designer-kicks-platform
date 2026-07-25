@@ -3,6 +3,7 @@ import { getAvailableNow, formatUsd } from "@/lib/market";
 import { categoryLabel } from "@/lib/categories";
 import { prisma } from "@/lib/db";
 import CommissionDesk from "@/components/CommissionDesk";
+import LocalMoney from "@/components/LocalMoney";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,7 @@ export default async function AvailablePage() {
                   <p className="mt-1 text-lg font-bold tabular-nums text-white">
                     {formatUsd(p.askCents)}
                   </p>
+                  <LocalMoney usd={p.askCents / 100} className="block text-[10px] text-smoke" />
                 </div>
               </Link>
             ))}

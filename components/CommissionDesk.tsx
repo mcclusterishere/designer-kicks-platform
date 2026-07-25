@@ -1,4 +1,5 @@
 import { formatUsd } from "@/lib/market";
+import LocalMoney from "@/components/LocalMoney";
 
 export type DeskInfo = {
   commissionOpen: boolean;
@@ -71,6 +72,9 @@ export default function CommissionDesk({ desk, compact = false }: { desk: DeskIn
         <div>
           <p className="tag text-smoke">Price</p>
           <p className="text-lg font-bold text-white">{priceLabel(desk)}</p>
+          {desk.commissionMinCents ? (
+            <LocalMoney usd={desk.commissionMinCents / 100} className="block text-[10px] text-smoke" />
+          ) : null}
         </div>
         <div>
           <p className="tag text-smoke">Turnaround</p>

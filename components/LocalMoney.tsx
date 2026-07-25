@@ -11,12 +11,28 @@ import { useEffect, useState } from "react";
  * marker when the table is a stale fallback).
  */
 
+// Region → currency. Currencies marked (ECB) come back live from
+// Frankfurter; the rest resolve from the fallback table, which is why
+// every conversion is prefixed "≈" and never presented as a real quote.
 const REGION_CURRENCY: Record<string, string> = {
-  NG: "NGN", PH: "PHP", IN: "INR", GB: "GBP", MX: "MXN", BR: "BRL",
-  CO: "COP", KE: "KES", GH: "GHS", ZA: "ZAR", PK: "PKR", ID: "IDR",
-  VN: "VND", CA: "CAD", AU: "AUD", JP: "JPY", TR: "TRY", EG: "EGP",
-  AR: "ARS", DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", NL: "EUR",
-  PT: "EUR", IE: "EUR",
+  // Eurozone (ECB)
+  DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", NL: "EUR", PT: "EUR",
+  IE: "EUR", BE: "EUR", AT: "EUR", FI: "EUR", GR: "EUR", SK: "EUR",
+  SI: "EUR", LT: "EUR", LV: "EUR", EE: "EUR", LU: "EUR", CY: "EUR",
+  MT: "EUR", HR: "EUR",
+  // Rest of Europe (ECB)
+  GB: "GBP", CH: "CHF", SE: "SEK", NO: "NOK", DK: "DKK", PL: "PLN",
+  CZ: "CZK", HU: "HUF", RO: "RON", BG: "BGN", IS: "ISK", TR: "TRY",
+  // Americas
+  CA: "CAD", MX: "MXN", BR: "BRL", CO: "COP", AR: "ARS", CL: "CLP", PE: "PEN",
+  // Asia-Pacific (ECB)
+  JP: "JPY", CN: "CNY", HK: "HKD", SG: "SGD", KR: "KRW", IN: "INR",
+  ID: "IDR", MY: "MYR", TH: "THB", PH: "PHP", AU: "AUD", NZ: "NZD",
+  VN: "VND", PK: "PKR", BD: "BDT", LK: "LKR",
+  // Middle East + Africa
+  IL: "ILS", AE: "AED", SA: "SAR", QA: "QAR", KW: "KWD",
+  ZA: "ZAR", NG: "NGN", KE: "KES", GH: "GHS", EG: "EGP", MA: "MAD",
+  TZ: "TZS", UG: "UGX", ET: "ETB", CI: "XOF", SN: "XOF", CM: "XAF",
 };
 
 // One fetch per page, shared by every LocalMoney on it.
