@@ -227,26 +227,93 @@ export async function getCallerBoard(meId: string | null, minSettled = 3): Promi
     .slice(0, 25);
 }
 
-/** The slate: pairs with a live price worth calling, upcoming drops first. */
+export type SlateLane = "FRESH" | "MOVER" | "BLUE_CHIP";
+
+const SELECT = {
+  id: true, sku: true, name: true, brand: true, imageUrl: true,
+  marketPriceCents: true, ebayNewCents: true, retailPriceCents: true, releaseDate: true,
+} as const;
+
+const PRICED = { OR: [{ marketPriceCents: { gt: 0 } }, { ebayNewCents: { gt: 0 } }] };
+
+/**
+ * The slate. Three lanes rather than one, so the board doesn't read as
+ * "the newest 18" every single day:
+ *
+ *  - FRESH     — just released, where nobody has a settled read yet
+ *  - MOVER     — furthest from retail, so the most volatile to call
+ *  - BLUE_CHIP — the expensive end, where being right is hardest
+ *
+ * Pairs with a photo come first because a board of blank tiles is a board
+ * nobody plays, but a missing photo never hides an otherwise callable pair —
+ * if the illustrated pool comes up short we backfill from the priced pool
+ * rather than serve a half-empty board.
+ */
 export async function getCallSlate(limit = 18) {
-  const shoes = await prisma.catalogShoe.findMany({
-    where: {
-      OR: [{ marketPriceCents: { gt: 0 } }, { ebayNewCents: { gt: 0 } }],
-      imageUrl: { not: null },
-    },
-    orderBy: [{ releaseDate: { sort: "desc", nulls: "last" } }],
-    take: limit,
-    select: {
-      id: true, sku: true, name: true, brand: true, imageUrl: true,
-      marketPriceCents: true, ebayNewCents: true, retailPriceCents: true, releaseDate: true,
-    },
-  });
-  return shoes.map((s) => ({
+  const per = Math.max(4, Math.ceil(limit / 3));
+
+  const [fresh, expensive, spread] = await Promise.all([
+    prisma.catalogShoe.findMany({
+      where: PRICED,
+      orderBy: [{ releaseDate: { sort: "desc", nulls: "last" } }],
+      take: per * 3,
+      select: SELECT,
+    }),
+    prisma.catalogShoe.findMany({
+      where: PRICED,
+      orderBy: [{ marketPriceCents: { sort: "desc", nulls: "last" } }],
+      take: per * 3,
+      select: SELECT,
+    }),
+    // Widest retail-to-resale gap: computed in JS because the premium is a
+    // ratio of two columns, which Prisma can't order on directly.
+    prisma.catalogShoe.findMany({
+      where: { ...PRICED, retailPriceCents: { gt: 0 } },
+      orderBy: [{ marketPriceCents: "desc" }],
+      take: 400,
+      select: SELECT,
+    }),
+  ]);
+
+  const movers = [...spread]
+    .sort((a, b) => {
+      const gap = (s: (typeof spread)[number]) =>
+        Math.abs(((marketPrice(s) ?? 0) - (s.retailPriceCents ?? 0)) / (s.retailPriceCents || 1));
+      return gap(b) - gap(a);
+    })
+    .slice(0, per * 3);
+
+  const lanes: [SlateLane, typeof fresh][] = [
+    ["FRESH", fresh],
+    ["MOVER", movers],
+    ["BLUE_CHIP", expensive],
+  ];
+
+  const picked = new Map<string, { lane: SlateLane; shoe: (typeof fresh)[number] }>();
+  // Two passes: illustrated pairs claim their slots first, then anything
+  // priced backfills so the board fills even on a thin catalog.
+  for (const illustratedOnly of [true, false]) {
+    for (const [lane, pool] of lanes) {
+      let taken = 0;
+      for (const s of pool) {
+        if (picked.size >= limit) break;
+        if (taken >= per) break;
+        if (picked.has(s.id)) continue;
+        if (illustratedOnly && !s.imageUrl) continue;
+        picked.set(s.id, { lane, shoe: s });
+        taken++;
+      }
+    }
+    if (picked.size >= limit) break;
+  }
+
+  return [...picked.values()].map(({ lane, shoe: s }) => ({
     id: s.id,
     sku: s.sku,
     name: s.name,
     brand: s.brand,
     imageUrl: s.imageUrl,
+    lane,
     lastCents: marketPrice(s) ?? 0,
     retailCents: s.retailPriceCents,
     releaseDate: s.releaseDate,

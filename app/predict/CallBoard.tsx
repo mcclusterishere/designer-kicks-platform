@@ -12,8 +12,17 @@ type Shoe = {
   name: string;
   brand: string | null;
   imageUrl: string | null;
+  lane: "FRESH" | "MOVER" | "BLUE_CHIP";
   lastCents: number;
   retailCents: number | null;
+};
+
+// Why a pair is on the board. Saying it out loud turns a grid of shoes into
+// a set of arguments you can disagree with.
+const LANE: Record<Shoe["lane"], { label: string; cls: string }> = {
+  FRESH: { label: "Fresh", cls: "bg-volt/20 text-volt" },
+  MOVER: { label: "Mover", cls: "bg-heat/20 text-heat" },
+  BLUE_CHIP: { label: "Blue chip", cls: "bg-white/15 text-white" },
 };
 
 /**
@@ -47,9 +56,14 @@ export default function CallBoard({ slate }: { slate: Shoe[] }) {
               pick?.id === s.id ? "border-heat ring-2 ring-heat/40" : "border-edge hover:border-heat/50"
             }`}
           >
-            <div className="aspect-square bg-panel">
+            <div className="relative aspect-square bg-panel">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={s.imageUrl || "/seed/news-1.svg"} alt={s.name} className="h-full w-full object-cover" />
+              <span
+                className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide backdrop-blur ${LANE[s.lane].cls}`}
+              >
+                {LANE[s.lane].label}
+              </span>
             </div>
             <div className="p-2">
               <p className="truncate font-mono text-[10px] font-bold text-white">{s.sku}</p>
