@@ -5785,3 +5785,94 @@ export async function resendClaimLink(formData: FormData): Promise<void> {
   if (delivered) spendAttempt("claim-resend", saleId, WINDOW);
   revalidatePath("/studio");
 }
+
+// ---- CRM: timeline, tasks, and the contact record ----------------------
+
+/** Assert the signed-in artist owns this contact. Never trust an id. */
+async function ownedContact(contactId: string) {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return null;
+  const c = await prisma.contact.findFirst({
+    where: { id: contactId, artistId: artist.id },
+    select: { id: true, artistId: true },
+  });
+  return c;
+}
+
+/** Log a call, a DM, a note — whatever just happened. */
+export async function logActivityAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const contactId = String(formData.get("contactId") ?? "");
+  const owned = await ownedContact(contactId);
+  if (!owned) return { ok: false, error: "Not your contact." };
+
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return { ok: false, error: "Write what happened." };
+
+  const kind = String(formData.get("kind") ?? "NOTE");
+  const { ACTIVITY_KINDS, logActivity } = await import("@/lib/crm");
+  if (!(ACTIVITY_KINDS as readonly string[]).includes(kind)) {
+    return { ok: false, error: "Unknown activity type." };
+  }
+
+  // Backdating is allowed on purpose: somebody writing up yesterday's
+  // call needs yesterday's date, or the timeline quietly lies.
+  const whenRaw = String(formData.get("occurredAt") ?? "").trim();
+  const occurredAt = whenRaw ? new Date(`${whenRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(occurredAt.getTime())) return { ok: false, error: "That date isn't real." };
+
+  await logActivity({
+    contactId,
+    kind: kind as Parameters<typeof logActivity>[0]["kind"],
+    body,
+    occurredAt,
+  });
+  revalidatePath(`/studio/contacts/${contactId}`);
+  return { ok: true };
+}
+
+/** Set a follow-up with a date on it. */
+export async function addTaskAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const contactId = String(formData.get("contactId") ?? "");
+  const owned = await ownedContact(contactId);
+  if (!owned) return { ok: false, error: "Not your contact." };
+
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return { ok: false, error: "What's the follow-up?" };
+  const dueRaw = String(formData.get("dueAt") ?? "").trim();
+  const dueAt = dueRaw ? new Date(`${dueRaw}T12:00:00Z`) : new Date(Date.now() + 7 * 86400000);
+  if (Number.isNaN(dueAt.getTime())) return { ok: false, error: "That date isn't real." };
+
+  await prisma.contactTask.create({
+    data: { contactId, title: title.slice(0, 200), dueAt },
+  });
+  revalidatePath(`/studio/contacts/${contactId}`);
+  revalidatePath("/studio/contacts");
+  return { ok: true };
+}
+
+/** Tick a follow-up off. Scoped through the contact, never by task id alone. */
+export async function completeTaskAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("taskId") ?? "");
+  await prisma.contactTask.updateMany({
+    where: { id, contact: { artistId: artist.id } },
+    data: { doneAt: new Date() },
+  });
+  revalidatePath("/studio/contacts");
+}
+
+/** Pull sales, claims and offers onto every contact's timeline. */
+export async function syncTimelineAction(): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return;
+  const { syncTimelineFromPlatform } = await import("@/lib/crm");
+  await syncTimelineFromPlatform(artist.id);
+  revalidatePath("/studio/contacts");
+}

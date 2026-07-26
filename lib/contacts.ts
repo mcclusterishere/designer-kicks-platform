@@ -1,4 +1,10 @@
 import { prisma } from "./db";
+import {
+  mapHeaders,
+  parseTags,
+  parseMoneyCents,
+  parseShoeSize,
+} from "./crmImport";
 
 /**
  * Contact import — getting an artist's existing customer list in.
@@ -31,10 +37,19 @@ export type ParsedContact = {
   social: string | null;
   city: string | null;
   notes: string | null;
+  shoeSize: string | null;
+  tags: string[];
+  totalSpentCents: number | null;
+  /** Columns the file had that we have no field for — kept, never dropped. */
+  customFields: Record<string, string>;
 };
 
 export type ParseReport = {
   contacts: ParsedContact[];
+  /** Which CRM we recognised, purely so we can say so. */
+  source: string | null;
+  /** Extra columns preserved onto each contact rather than discarded. */
+  keptColumns: string[];
   /** Rows that couldn't be used, with the reason — shown, never silent. */
   skipped: { line: number; reason: string }[];
   /** Header names we didn't recognise, so the artist can see what was ignored. */
@@ -111,26 +126,6 @@ export function parseCsvRows(text: string): { cells: string[]; line: number }[] 
   return rows;
 }
 
-/**
- * Header aliases, because every exporter names these differently.
- * Google Contacts writes "E-mail 1 - Value"; Shopify writes "Email";
- * iPhone exports write "Given Name" and "Family Name" separately.
- */
-const FIELD_ALIASES: Record<keyof ParsedContact | "firstName" | "lastName", string[]> = {
-  name: ["name", "full name", "display name", "customer name", "contact name", "client"],
-  firstName: ["first name", "given name", "firstname", "first"],
-  lastName: ["last name", "family name", "surname", "lastname", "last"],
-  email: ["email", "e-mail", "email address", "e-mail 1 - value", "email1", "primary email"],
-  phone: ["phone", "phone number", "mobile", "cell", "phone 1 - value", "telephone"],
-  social: ["instagram", "ig", "social", "handle", "username", "instagram handle"],
-  city: ["city", "town", "location", "address city", "city/town"],
-  notes: ["notes", "note", "comment", "comments", "description"],
-};
-
-function normHeader(h: string): string {
-  return h.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-}
-
 /** Loose enough to catch typos in an export, strict enough not to send mail into the void. */
 export function looksLikeEmail(s: string): boolean {
   return /^[^\s@,;]+@[^\s@,;]+\.[A-Za-z]{2,}$/.test(s.trim());
@@ -152,46 +147,47 @@ export function normalizeHandle(s: string): string | null {
   return v || null;
 }
 
-/** Turn a CSV's text into contacts, reporting everything it couldn't use. */
+/**
+ * Turn a CSV's text into contacts, reporting everything it couldn't use.
+ *
+ * Column mapping is delegated to lib/crmImport, which knows the header
+ * names HubSpot, Salesforce, Pipedrive, Mailchimp, Shopify, Klaviyo,
+ * Square, Etsy, Google and Outlook actually write. Columns it can't
+ * place are kept as custom fields rather than dropped — losing six years
+ * of somebody's notes on the way in is the reason people refuse to
+ * migrate CRMs at all.
+ */
 export function parseContacts(text: string): ParseReport {
   const rows = parseCsvRows(text);
   const skipped: { line: number; reason: string }[] = [];
-  if (rows.length === 0) return { contacts: [], skipped, unmappedColumns: [] };
+  const empty: ParseReport = {
+    contacts: [], skipped, unmappedColumns: [], source: null, keptColumns: [],
+  };
+  if (rows.length === 0) return empty;
 
-  const headers = rows[0].cells.map(normHeader);
-  const index: Partial<Record<keyof typeof FIELD_ALIASES, number>> = {};
-  const matched = new Set<number>();
-
-  for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
-    // The aliases go through the same normaliser as the headers. They
-    // didn't at first, so "E-mail 1 - Value" normalised to "e mail 1
-    // value" and was compared against the raw alias "e-mail 1 - value" —
-    // which meant every Google Contacts export imported names with no
-    // email or phone attached, and said nothing about it.
-    const wanted = aliases.map(normHeader);
-    const at = headers.findIndex((h) => wanted.includes(h));
-    if (at >= 0) {
-      index[field as keyof typeof FIELD_ALIASES] = at;
-      matched.add(at);
-    }
-  }
-
-  const unmappedColumns = rows[0].cells
-    .map((h, i) => (matched.has(i) || !h.trim() ? null : h.trim()))
-    .filter((h): h is string => h !== null);
+  const map = mapHeaders(rows[0].cells);
+  const keptColumns = map.custom.map((c) => c.header);
 
   // A file with no recognisable name OR email column isn't a contacts
   // export — say so rather than importing a page of blanks.
-  if (index.name === undefined && index.firstName === undefined && index.email === undefined) {
+  if (
+    map.index.name === undefined &&
+    map.index.firstName === undefined &&
+    map.index.email === undefined
+  ) {
     return {
-      contacts: [],
-      skipped: [{ line: 1, reason: "No name or email column found — check the file's header row." }],
-      unmappedColumns,
+      ...empty,
+      source: map.source,
+      keptColumns,
+      unmappedColumns: keptColumns,
+      skipped: [
+        { line: 1, reason: "No name or email column found — check the file's header row." },
+      ],
     };
   }
 
-  const at = (row: string[], k: keyof typeof FIELD_ALIASES): string => {
-    const i = index[k];
+  const at = (row: string[], k: keyof typeof map.index): string => {
+    const i = map.index[k];
     return i === undefined ? "" : (row[i] ?? "").trim();
   };
 
@@ -205,8 +201,6 @@ export function parseContacts(text: string): ParseReport {
     const joined = [at(row, "firstName"), at(row, "lastName")].filter(Boolean).join(" ");
     const rawEmail = at(row, "email");
     const email = rawEmail && looksLikeEmail(rawEmail) ? rawEmail.trim().toLowerCase() : null;
-    // A name column wins; otherwise first+last; otherwise fall back to the
-    // email's local part so a contact is never nameless in the list.
     const name = at(row, "name") || joined || (email ? email.split("@")[0] : "");
 
     if (!name) {
@@ -219,13 +213,23 @@ export function parseContacts(text: string): ParseReport {
       skipped.push({ line, reason: `Dropped an unusable email: "${rawEmail.slice(0, 40)}"` });
     }
 
-    // Within one file, the same person twice is one contact.
     const dedupeKey = email ?? `name:${name.toLowerCase()}`;
     if (seen.has(dedupeKey)) {
       skipped.push({ line, reason: `Duplicate of an earlier row (${name})` });
       continue;
     }
     seen.add(dedupeKey);
+
+    // Everything the file had that we have no column for.
+    const customFields: Record<string, string> = {};
+    for (const c of map.custom) {
+      const v = (row[c.at] ?? "").trim();
+      if (v) customFields[c.header] = v.slice(0, 500);
+    }
+    // A company name has no first-class home yet, so it rides along
+    // rather than vanishing.
+    const company = at(row, "company");
+    if (company) customFields["Company"] = company.slice(0, 200);
 
     contacts.push({
       name: name.slice(0, 120),
@@ -234,10 +238,14 @@ export function parseContacts(text: string): ParseReport {
       social: normalizeHandle(at(row, "social")),
       city: at(row, "city").slice(0, 80) || null,
       notes: at(row, "notes").slice(0, 500) || null,
+      shoeSize: parseShoeSize(at(row, "shoeSize")),
+      tags: parseTags(at(row, "tags")),
+      totalSpentCents: parseMoneyCents(at(row, "totalSpent")),
+      customFields,
     });
   }
 
-  return { contacts, skipped, unmappedColumns };
+  return { contacts, skipped, unmappedColumns: keptColumns, keptColumns, source: map.source };
 }
 
 export type ImportResult = {
@@ -268,11 +276,11 @@ export async function importContacts(
     const existing = c.email
       ? await prisma.contact.findUnique({
           where: { artistId_email: { artistId, email: c.email } },
-          select: { id: true },
+          select: { id: true, tags: true, customFields: true },
         })
       : await prisma.contact.findFirst({
           where: { artistId, name: c.name, email: null },
-          select: { id: true },
+          select: { id: true, tags: true, customFields: true },
         });
 
     if (existing) {
@@ -285,6 +293,20 @@ export async function importContacts(
           social: c.social ?? undefined,
           city: c.city ?? undefined,
           notes: c.notes ?? undefined,
+          shoeSize: c.shoeSize ?? undefined,
+          // Tags merge rather than replace: a second import from a
+          // different tool should add its labels, not wipe the first's.
+          ...(c.tags.length > 0
+            ? { tags: [...new Set([...(existing.tags ?? []), ...c.tags])] }
+            : {}),
+          ...(Object.keys(c.customFields).length > 0
+            ? {
+                customFields: {
+                  ...((existing.customFields as Record<string, string>) ?? {}),
+                  ...c.customFields,
+                },
+              }
+            : {}),
         },
       });
       updated++;
@@ -298,6 +320,10 @@ export async function importContacts(
           social: c.social,
           city: c.city,
           notes: c.notes,
+          shoeSize: c.shoeSize,
+          tags: c.tags,
+          customFields: Object.keys(c.customFields).length > 0 ? c.customFields : undefined,
+          importSource: report.source,
           source: "import",
           // Never true on import. Somebody's phone book has not opted in
           // to marketing, whatever the CSV says.
@@ -381,6 +407,12 @@ export async function syncContactsFromSales(artistId: string): Promise<{ touched
   return { touched: byEmail.size };
 }
 
+/**
+ * Superseded by contactList() in lib/crm.ts, which adds search and
+ * segments. Kept because the CSV export and the verify suite both read
+ * it, and because it is the one query guaranteed to return the whole
+ * book unfiltered.
+ */
 /** Days since a customer was last heard from, and who's overdue. */
 const DAY = 24 * 60 * 60 * 1000;
 

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { contactBook, contactStats } from "@/lib/contacts";
+import { contactStats } from "@/lib/contacts";
 import { isPro, PRICE_MONTHLY_CENTS, priceLabel } from "@/lib/plans";
-import { syncContactsAction, touchContactAction, deleteContactAction } from "@/app/actions";
+import { syncContactsAction, touchContactAction, deleteContactAction, syncTimelineAction, completeTaskAction } from "@/app/actions";
+import { contactList, todaysSignals, openTasks, SEGMENTS, type SegmentKey } from "@/lib/crm";
 import ContactImport from "./ContactImport";
 import ContactForm from "./ContactForm";
 
@@ -33,7 +34,14 @@ function usd(cents: number): string {
  * a maker will ever make is the second one to someone who already said
  * yes.
  */
-export default async function ContactsPage() {
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ segment?: string; q?: string }>;
+}) {
+  const sp = await searchParams;
+  const segment = (SEGMENTS.some((x) => x.key === sp.segment) ? sp.segment : "all") as SegmentKey;
+  const q = (sp.q ?? "").trim();
   const session = await auth();
   if (!session?.user?.id) redirect("/signin?next=/studio/contacts");
 
@@ -83,12 +91,13 @@ export default async function ContactsPage() {
     );
   }
 
-  const [book, stats] = await Promise.all([
-    contactBook(artist.id),
+  const [book, stats, signals, tasks] = await Promise.all([
+    contactList(artist.id, { segment, q }),
     contactStats(artist.id),
+    todaysSignals(artist.id),
+    openTasks(artist.id),
   ]);
-
-  const quiet = book.filter((c) => c.purchaseCount > 0 && (c.daysQuiet ?? 0) > 120);
+  const overdue = tasks.filter((t) => t.overdue);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -138,27 +147,93 @@ export default async function ContactsPage() {
               Add my buyers
             </button>
           </form>
+          {/* Sales and claims the platform already knows about, folded
+              onto each contact's timeline. Idempotent, so pressing it
+              twice never double-posts. */}
+          <form action={syncTimelineAction} className="mt-2">
+            <button className="rounded-lg border border-edge px-4 py-2 tag text-smoke transition hover:border-volt hover:text-white">
+              Pull sales onto their timelines
+            </button>
+          </form>
         </div>
       </section>
 
-      {quiet.length > 0 && (
+      {/* Why to call, not just who. Every line cites a fact from the
+          database — a live bid, a real silence, a reminder you set —
+          because a generic "it's been 90 days" nudge gets ignored. */}
+      {signals.length > 0 && (
         <section className="mt-6 rounded-xl border border-heat/40 bg-surface p-5">
-          <h2 className="display text-xl text-heat">Worth a message</h2>
-          <p className="mt-1 text-xs text-smoke">
-            {quiet.length} {quiet.length === 1 ? "person who bought" : "people who bought"} from
-            you and hasn&apos;t heard from you in four months. The second sale to someone who
-            already said yes is the cheapest one you&apos;ll ever make.
-          </p>
-          <ul className="mt-2 space-y-1 text-sm">
-            {quiet.slice(0, 8).map((c) => (
-              <li key={c.id} className="text-smoke">
-                <span className="text-white">{c.name}</span> · spent {usd(c.totalSpentCents)} ·{" "}
-                {c.daysQuiet}d quiet
+          <h2 className="display text-xl text-heat">Worth a message today</h2>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {signals.map((s) => (
+              <li key={s.contactId}>
+                <Link href={`/studio/contacts/${s.contactId}`} className="font-bold text-white hover:text-volt">
+                  {s.name}
+                </Link>{" "}
+                <span className="text-smoke">— {s.reason}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      {overdue.length > 0 && (
+        <section className="mt-6 rounded-xl border border-edge bg-surface p-5">
+          <h2 className="display text-xl text-white">Overdue follow-ups</h2>
+          <ul className="mt-2 space-y-1.5 text-sm">
+            {overdue.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3">
+                <span className="text-heat">
+                  {t.title} ·{" "}
+                  <Link href={`/studio/contacts/${t.contact.id}`} className="underline">
+                    {t.contact.name}
+                  </Link>
+                </span>
+                <form action={completeTaskAction}>
+                  <input type="hidden" name="taskId" value={t.id} />
+                  <button className="tag shrink-0 rounded border border-edge px-2 py-1 text-smoke transition hover:border-volt hover:text-white">
+                    Done
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Search + segments — the two controls a CRM list view lives on. */}
+      <section className="mt-6">
+        <form method="get" className="flex flex-wrap gap-2">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Search name, email, handle, city, notes, tag…"
+            aria-label="Search contacts"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
+          />
+          {segment !== "all" && <input type="hidden" name="segment" value={segment} />}
+          <button className="rounded-lg border border-edge px-4 py-2 tag text-white transition hover:border-volt">
+            Search
+          </button>
+        </form>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {SEGMENTS.map((sgm) => (
+            <Link
+              key={sgm.key}
+              href={`/studio/contacts?segment=${sgm.key}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              title={sgm.blurb}
+              className={`tag rounded-full px-3 py-1.5 transition ${
+                segment === sgm.key
+                  ? "bg-volt font-bold text-ink"
+                  : "border border-edge text-smoke hover:text-white"
+              }`}
+            >
+              {sgm.label}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="mt-6 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-xl text-white">Add someone</h2>
@@ -169,8 +244,13 @@ export default async function ContactsPage() {
 
       <section className="mt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="display text-xl text-white">The book</h2>
-          <p className="tag text-smoke">Biggest spenders first</p>
+          <h2 className="display text-xl text-white">
+            {SEGMENTS.find((x) => x.key === segment)?.label ?? "The book"}
+          </h2>
+          <p className="tag text-smoke">
+            {book.length} {book.length === 1 ? "contact" : "contacts"}
+            {q && ` matching “${q}”`}
+          </p>
         </div>
 
         {book.length === 0 ? (
@@ -184,7 +264,9 @@ export default async function ContactsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-bold text-white">
-                      {c.name}
+                      <Link href={`/studio/contacts/${c.id}`} className="hover:text-volt">
+                        {c.name}
+                      </Link>
                       {c.purchaseCount > 1 && (
                         <span className="ml-2 rounded-full border border-volt/50 px-2 py-0.5 tag text-volt">
                           repeat

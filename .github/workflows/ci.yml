@@ -130,6 +130,9 @@ jobs:
       - name: Buyer handoff
         run: npm run verify:handoff
 
+      - name: CRM import and intelligence
+        run: npm run verify:crm
+
       - name: Subscription metrics
         run: npm run verify:saas
 
