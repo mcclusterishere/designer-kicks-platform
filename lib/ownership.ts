@@ -87,6 +87,63 @@ export function validateOwnership(
 }
 
 /**
+ * The scope for "a piece I made AND still hold".
+ *
+ * Authorship is not authority. `artistId` is the credit line and it is
+ * permanent — it never moves, and it shouldn't. `ownerId` is the thing
+ * that moves, and once it has, the maker is no longer the person whose
+ * call it is what the piece costs, what it says about itself, or whether
+ * it goes on existing.
+ *
+ * The write actions in the Studio all used to scope on `artistId` alone,
+ * which quietly meant a maker kept full write access to a one-of-one for
+ * the rest of its life: re-price a pair sitting in a collector's closet,
+ * rewrite its description, re-point who owns it, or delete it outright
+ * and take the collector's sale record, offers and ratings down with it
+ * in the cascade.
+ *
+ * Two deliberate details:
+ *
+ *   - This is a WHERE fragment, meant to be spread into the query, not a
+ *     check run after the read. Ownership verified after loading a row is
+ *     ownership that can be forgotten on the next branch; ownership in
+ *     the query cannot be.
+ *   - A CONFIRMED sale disqualifies the piece even when `ownerId` is
+ *     null. A buyer deleting their account SetNulls that column, and a
+ *     collector closing their account must not hand their pair back to
+ *     the person who made it.
+ */
+export function stillHeldBy(artistId: string, pieceId: string) {
+  return {
+    id: pieceId,
+    artistId,
+    ownerId: null,
+    sales: { none: { status: "CONFIRMED" } },
+  } as const;
+}
+
+export const PIECE_HAS_MOVED_ON =
+  "That piece is in a collector's closet now — the owner controls its listing and its record. Your name stays on it forever; the decisions don't. If something looks wrong, message us and we'll sort it out with them.";
+
+/**
+ * Who may record the next sale of a piece: whoever is holding it.
+ *
+ * Returns null when nobody can — a CONFIRMED sale whose buyer has since
+ * deleted their account leaves a pair with no rightful seller, and that
+ * is an admin's problem to unpick, not an opening for the maker to take
+ * it back.
+ */
+export function holderOf(piece: {
+  ownerId: string | null;
+  artist?: { userId: string | null } | null;
+  sales: { status: string }[];
+}): string | null {
+  if (piece.ownerId) return piece.ownerId;
+  if (piece.sales.some((s) => s.status === "CONFIRMED")) return null;
+  return piece.artist?.userId ?? null;
+}
+
+/**
  * Pieces whose ownership question is still outstanding.
  *
  * Everything uploaded before the question existed is UNKNOWN. That's a

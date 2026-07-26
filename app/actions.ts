@@ -30,6 +30,8 @@ import {
   postToInstagram,
 } from "@/lib/social";
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
+import { stillHeldBy, holderOf, PIECE_HAS_MOVED_ON } from "@/lib/ownership";
+import { provesEmail } from "@/lib/authz";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
 import { isPieceCategory, categoryLabel, PIECE_CATEGORY_KEYS } from "@/lib/categories";
@@ -664,22 +666,43 @@ export async function recordSale(
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { artist: true, sales: { where: { status: "PENDING" } } },
+    include: {
+      artist: true,
+      sales: { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { status: true } },
+    },
   });
   if (!submission) return { ok: false, error: "Piece not found." };
-  if (submission.sales.length > 0) {
+  if (submission.sales.some((s) => s.status === "PENDING")) {
     return { ok: false, error: "This piece already has a sale pending the buyer's claim." };
   }
 
-  const isArtist = session?.user?.id && submission.artist?.userId === session.user.id;
-  const isCurrentOwner = session?.user?.id && submission.ownerId === session.user.id;
+  // Who is actually holding this pair right now.
+  //
+  // The right to sell a one-of-one belongs to whoever has it, and it
+  // transfers with the piece — it is not a permanent property of having
+  // made it. This used to be an OR that never expired: the maker's branch
+  // stayed true forever, so an artist could record a "sale" of a pair
+  // already sitting in a collector's closet, and the buyer's claim would
+  // then rewrite `ownerId` and take it. A CONFIRMED sale with no owner
+  // (the buyer deleted their account, SetNulling the column) doesn't hand
+  // authority back either — it goes to nobody, and an admin sorts it out.
+  const holderId = holderOf(submission);
+
   const admin = await isAdmin();
-  if (!isArtist && !isCurrentOwner && !admin) {
-    return { ok: false, error: "Only the piece's artist or current owner can record its sale." };
+  if (!admin && (!holderId || session?.user?.id !== holderId)) {
+    return {
+      ok: false,
+      error: submission.ownerId
+        ? "This piece is in a collector's closet — only its current owner can record its sale."
+        : "Only the piece's artist or current owner can record its sale.",
+    };
   }
 
-  const sellerId =
-    session?.user?.id ?? submission.ownerId ?? submission.artist?.userId;
+  // The seller of record is the holder, NOT whoever filled in the form.
+  // An admin recording a sale on someone's behalf must not end up as the
+  // seller on the receipt — that was silently rewriting provenance every
+  // time the office helped an artist out.
+  const sellerId = holderId;
   if (!sellerId) return { ok: false, error: "Couldn't determine the seller account." };
 
   const sellerUser = await prisma.user.findUnique({ where: { id: sellerId } });
@@ -765,6 +788,21 @@ export async function claimSale(saleId: string): Promise<ActionResult> {
     return { ok: false, error: "This sale is waiting on a different buyer account." };
   }
   if (sale.sellerId === user.id) return { ok: false, error: "You can't claim your own sale." };
+
+  // The piece must still be where the sale said it was.
+  //
+  // Claiming is the write that moves `ownerId`, so a PENDING sale is a
+  // loaded gun pointed at whoever holds the piece when it finally goes
+  // off. If the pair changed hands after this sale was recorded, the
+  // record is stale and firing it now would take the pair off the person
+  // who legitimately owns it today.
+  if (sale.submission.ownerId && sale.submission.ownerId !== sale.sellerId) {
+    return {
+      ok: false,
+      error:
+        "This piece has changed hands since that sale was recorded, so the record is out of date. Message us with your receipt and we'll straighten it out.",
+    };
+  }
 
   await prisma.$transaction([
     prisma.sale.update({
@@ -1146,9 +1184,25 @@ export async function outreachInvite(
     // let them claim via the banner instead of a password link.
     return { ok: false, error: "That email already has an account — have them use Claim This Page on their artist page instead." };
   }
-  if (profile.userId !== target.id) {
+  const reassigned = profile.userId !== target.id;
+  if (reassigned) {
     await prisma.artistProfile.update({ where: { id: profile.id }, data: { userId: target.id } });
     await prisma.submission.updateMany({ where: { artistId: profile.id }, data: { email } });
+
+    // Reassigning a page moves a whole body of work — every piece on it —
+    // to a different account, and hands the claim URL back to whoever
+    // ran the action. It is only ever used on unclaimed pre-loaded pages,
+    // which is why it's allowed, and it is the single widest-reaching
+    // thing an editor can do, which is why it's written down.
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "editor"),
+      action: "artist.page.reassign",
+      targetType: "artistProfile",
+      targetId: profile.id,
+      targetOwnerId: target.id,
+      summary: `Attached the ${profile.displayName} page to ${email} and sent a claim link`,
+    });
   }
 
   let token = (
@@ -1259,16 +1313,45 @@ export async function submitArtistClaim(
     zip,
   };
 
-  // Duplicate info merges, never dead-ends: a re-file from the same
-  // email refreshes the pending claim with the newest answers.
-  const existing = await prisma.artistClaim.findFirst({
-    where: { artistId, email, status: "PENDING" },
-  });
+  // Duplicate info merges, never dead-ends: a re-file refreshes the
+  // pending claim with the newest answers instead of filing a duplicate.
+  //
+  // But only for the person who filed it. This form is unauthenticated by
+  // design — the whole point is that the artist hasn't got an account yet
+  // — so "same email" is an assertion, not a fact, and anyone who knows a
+  // maker's address could overwrite their pending claim: replace the
+  // social proof that verifies them, and overwrite the phone number and
+  // street address sitting in the review queue. Typing an email is not
+  // proving one.
+  //
+  // So the merge needs a session on that address. Everyone else still
+  // gets through — their answers land as their own row, both show up in
+  // the queue, and a human decides. Nobody's filing gets destroyed by
+  // somebody else's.
+  const session = await auth();
+  const provenEmail = provesEmail(session?.user?.email, email);
+
+  const existing = provenEmail
+    ? await prisma.artistClaim.findFirst({ where: { artistId, email, status: "PENDING" } })
+    : null;
   if (existing) {
     await prisma.artistClaim.update({ where: { id: existing.id }, data: claimData });
     return {
       ok: true,
       note: "You already had a claim pending on this page — we merged in your newest answers instead of filing a duplicate. Still in the review queue.",
+    };
+  }
+
+  // Unproven re-files stack instead of overwriting, so cap the stack —
+  // otherwise "file a second row" is just a slower way to bury the review
+  // queue. Three is enough for a real person fixing a typo twice.
+  const alreadyPending = await prisma.artistClaim.count({
+    where: { artistId, email, status: "PENDING" },
+  });
+  if (alreadyPending >= 3) {
+    return {
+      ok: true,
+      note: "You've already got a claim in the queue on this page — we're on it. A human reviews every one by hand, so hang tight rather than re-filing.",
     };
   }
 
@@ -1307,6 +1390,22 @@ export async function respondArtistClaim(claimId: string, approve: boolean): Pro
     update: { name: claim.name },
     create: { name: claim.name, email: claim.email },
   });
+
+  // Approving hands a page — and every piece on it — to an account, and
+  // rejects everyone else's claim on the same page in the same breath.
+  // Whoever loses out deserves the decision to exist somewhere other
+  // than in the head of the person who made it.
+  {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "artist.claim.approve",
+      targetType: "artistProfile",
+      targetId: claim.artistId,
+      targetOwnerId: user.id,
+      summary: `Approved ${claim.email}'s claim on the ${claim.artist.displayName} page`,
+    });
+  }
   await prisma.$transaction([
     prisma.artistProfile.update({ where: { id: claim.artistId }, data: { userId: user.id } }),
     prisma.submission.updateMany({ where: { artistId: claim.artistId }, data: { email: claim.email } }),
@@ -1393,6 +1492,20 @@ export async function addSubmissionPhotos(
     where: { id: submissionId },
     data: { extraImages: { push: added } },
   });
+
+  // Staff editing somebody else's piece gets written down and the artist
+  // gets told. The permission is intended; doing it invisibly is not.
+  if (admin && !isArtistOwner && submission.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.photos.add",
+      targetType: "submission",
+      targetId: submission.id,
+      targetOwnerId: submission.artist.userId,
+      summary: `Added ${added.length} photo${added.length === 1 ? "" : "s"} to "${submission.title}"`,
+    });
+  }
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
   return { ok: true };
@@ -1517,8 +1630,25 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
   const admin = await isAdmin();
   if (!admin && (!session?.user?.id || session.user.id !== sellerUserId)) return;
 
+  // Staff answering an offer on somebody else's piece is a money
+  // decision made on their behalf. It gets recorded either way.
+  const actedForSomeoneElse = admin && session?.user?.id !== sellerUserId;
+  const logStaff = async (verb: string) => {
+    if (!actedForSomeoneElse) return;
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: `offer.${verb}`,
+      targetType: "offer",
+      targetId: offerId,
+      targetOwnerId: sellerUserId,
+      summary: `${verb === "accept" ? "Accepted" : "Declined"} an offer on "${offer.submission.title}" on the seller's behalf`,
+    });
+  };
+
   if (!accept) {
     await prisma.offer.update({ where: { id: offerId }, data: { status: "DECLINED" } });
+    await logStaff("decline");
     revalidatePath("/profile");
     return;
   }
@@ -1571,6 +1701,7 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
 
   if (offer.submission.artist) revalidatePath(`/artists/${offer.submission.artist.slug}`);
   revalidatePath("/market");
+  await logStaff("accept");
   revalidatePath("/profile");
 }
 
@@ -1613,7 +1744,7 @@ export async function createConsignment(
     include: {
       artist: { select: { id: true, userId: true, slug: true } },
       consignment: { select: { id: true, status: true } },
-      sales: { where: { status: "PENDING" }, select: { id: true } },
+      sales: { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { status: true } },
       owner: { select: { id: true } },
     },
   });
@@ -1621,14 +1752,19 @@ export async function createConsignment(
   if (piece.artist?.userId !== session.user.id) {
     return { ok: false, error: "Only the artist can open a consignment on their piece." };
   }
-  if (piece.owner) {
+  // Sold is sold, whether the buyer's account still exists or not. The
+  // owner check alone missed the case where a collector deletes their
+  // account and SetNulls `ownerId` — the pair doesn't come back.
+  if (piece.owner || piece.sales.some((s) => s.status === "CONFIRMED")) {
     return {
       ok: false,
       error:
         "This piece is in a collector's closet on-platform — they sell it from their side. Consignment relists are for pieces that came back to you from off-platform sales.",
     };
   }
-  if (piece.sales.length > 0) return { ok: false, error: "This piece has a sale pending." };
+  if (piece.sales.some((s) => s.status === "PENDING")) {
+    return { ok: false, error: "This piece has a sale pending." };
+  }
   if (piece.consignment && piece.consignment.status === "OPEN") {
     return { ok: false, error: "This piece already has an open consignment." };
   }
@@ -1899,7 +2035,35 @@ export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJE
  */
 export async function deleteSubmissionCascade(id: string) {
   await requireAdmin();
+
+  // Read it first. This is the single most destructive thing staff can
+  // do to somebody's work — it takes the piece, its photos, its votes,
+  // its battle history and any sale record with it, and there is no
+  // undo. Afterwards there is nothing left to write a log entry about,
+  // which is exactly why the entry has to be assembled beforehand.
+  const doomed = await prisma.submission.findUnique({
+    where: { id },
+    select: {
+      title: true,
+      ownerId: true,
+      artist: { select: { userId: true, displayName: true } },
+    },
+  });
+
   await deleteSubmissionCascadeInternal(id);
+
+  const affected = doomed?.ownerId ?? doomed?.artist?.userId;
+  if (doomed && affected) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.delete",
+      targetType: "submission",
+      targetId: id,
+      targetOwnerId: affected,
+      summary: `Deleted the piece "${doomed.title}" and everything attached to it`,
+    });
+  }
 }
 
 /**
@@ -2923,6 +3087,16 @@ export async function updatePieceInCloset(
   return { ok: true, note: "Closet updated." };
 }
 
+/**
+ * Why a piece didn't match — did they make it and sell it, or was it
+ * never theirs? Only ever asked about a row already scoped to their own
+ * artistId, so it tells them nothing about anybody else's work.
+ */
+async function notYoursReason(artistId: string, pieceId: string): Promise<string> {
+  const made = await prisma.submission.count({ where: { id: pieceId, artistId } });
+  return made > 0 ? PIECE_HAS_MOVED_ON : "That piece isn't yours to edit.";
+}
+
 export async function updateMyPiece(
   _prev: ActionResult | null,
   formData: FormData
@@ -2935,10 +3109,10 @@ export async function updateMyPiece(
   if (!id) return { ok: false, error: "Which piece?" };
 
   const mine = await prisma.submission.findFirst({
-    where: { id, artistId: profile.id },
+    where: stillHeldBy(profile.id, id),
     select: { id: true },
   });
-  if (!mine) return { ok: false, error: "That piece isn't yours to edit." };
+  if (!mine) return { ok: false, error: await notYoursReason(profile.id, id) };
 
   const rawAsk = String(formData.get("askingPrice") ?? "").replace(/[^0-9.]/g, "").trim();
   let askingPriceCents: number | null = null;
@@ -2965,15 +3139,23 @@ export async function updateMyPiece(
   return { ok: true, note: askingPriceCents ? "Piece updated — it's listed." : "Piece updated — taken off the market." };
 }
 
-/** Remove your own piece. Same cascade-safe path the admin delete uses. */
+/**
+ * Remove your own piece. Same cascade-safe path the admin delete uses.
+ *
+ * The cascade is exactly why this one is scoped to pieces the artist
+ * still holds. Deleting a sold piece doesn't just remove a photo — it
+ * destroys the collector's CONFIRMED sale, their offers, the consignment
+ * and every rating, and there is no undo. The Studio hides the button on
+ * sold pieces, but that lock lived only in the browser.
+ */
 export async function deleteMyPiece(pieceId: string) {
   const profile = await myApprovedArtist();
   if (!profile || profile.status !== "APPROVED") return;
   const mine = await prisma.submission.findFirst({
-    where: { id: pieceId, artistId: profile.id },
+    where: stillHeldBy(profile.id, pieceId),
     select: { id: true },
   });
-  if (!mine) return; // not yours — nothing happens
+  if (!mine) return; // not yours, or no longer yours — nothing happens
   await deleteSubmissionCascadeInternal(mine.id);
   revalidatePath("/studio");
   revalidatePath("/market");
@@ -4472,16 +4654,40 @@ export async function editorBroadcast(
 export async function deleteFeedPost(id: string) {
   // The admin (password cookie, no NextAuth session) can delete
   // anything; an artist can delete their own post.
-  if (!(await isAdmin())) {
+  const admin = await isAdmin();
+  // Read the post BEFORE deleting it: after the delete there is nothing
+  // left to describe, and a log entry saying "deleted a post" without
+  // saying whose or which is not a log, it's a tally.
+  const post = await prisma.feedPost.findUnique({
+    where: { id },
+    include: { artist: { select: { userId: true, displayName: true } } },
+  });
+  if (!post) return;
+
+  let deletingOwnPost = false;
+  if (!admin) {
     const session = await auth();
     if (!session?.user?.id) return;
-    const post = await prisma.feedPost.findUnique({
-      where: { id },
-      include: { artist: { select: { userId: true } } },
-    });
-    if (!post || post.artist?.userId !== session.user.id) return;
+    if (post.artist?.userId !== session.user.id) return;
+    deletingOwnPost = true;
   }
+
   await prisma.feedPost.delete({ where: { id } }).catch(() => {});
+
+  // Removing somebody else's post is the most consequential thing on
+  // this list — it is the one action whose evidence destroys itself.
+  if (admin && !deletingOwnPost && post.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "post.delete",
+      targetType: "feedPost",
+      targetId: id,
+      targetOwnerId: post.artist.userId,
+      summary: `Removed a feed post by ${post.artist.displayName}`,
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/admin");
 }
@@ -5368,6 +5574,21 @@ export async function repairArtistAccount(formData: FormData): Promise<RepairRes
         data: { userId: target.id },
       });
       notes.push(`Page reassigned to ${email} — they'll see it in their Studio now.`);
+
+      // A repair is still a page changing hands. It's nearly always the
+      // right call — the artist is locked out and asking for it — but
+      // "nearly always right" is precisely the kind of action that should
+      // leave a trail, because the rare wrong one looks identical while
+      // it's happening.
+      const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+      await recordStaffAction({
+        actor: actorFrom(await auth().catch(() => null), "admin"),
+        action: "artist.page.repair",
+        targetType: "artistProfile",
+        targetId: artist.id,
+        targetOwnerId: target.id,
+        summary: `Relinked the ${artist.displayName} page to ${email} (account repair)`,
+      });
     } else {
       notes.push(`${email} already owns this page.`);
     }
@@ -5930,11 +6151,32 @@ export async function setOwnershipAction(
 
   const id = String(formData.get("submissionId") ?? "");
   // Scoped in the query. A submission id in a form is attacker input.
+  //
+  // The scope is "made it AND still holds it", and that matters more here
+  // than anywhere else, because naming an owner is one step from becoming
+  // one: /own/[id] lets the named address confirm, and confirming writes
+  // `ownerId`. On a piece already transferred on-platform but not yet
+  // email-verified, re-pointing ownerEmail was a way for the maker to
+  // hand a collector's pair to an address of their choosing. An
+  // already-verified record is frozen too — correcting one is a support
+  // conversation, not a form post.
   const piece = await prisma.submission.findFirst({
-    where: { id, artistId: artist.id },
+    where: { ...stillHeldBy(artist.id, id), ownerVerifiedAt: null },
     select: { id: true, title: true, ownerEmail: true },
   });
-  if (!piece) return { ok: false, error: "Not your piece." };
+  if (!piece) {
+    const known = await prisma.submission.findFirst({
+      where: { id, artistId: artist.id },
+      select: { ownerVerifiedAt: true },
+    });
+    if (!known) return { ok: false, error: "Not your piece." };
+    return {
+      ok: false,
+      error: known.ownerVerifiedAt
+        ? "This piece's owner has already confirmed, so the record is locked. Message us if it needs correcting."
+        : PIECE_HAS_MOVED_ON,
+    };
+  }
 
   const { validateOwnership, ownerVerifyEmail } = await import("@/lib/ownership");
   const res = validateOwnership(String(formData.get("ownershipStatus") ?? ""), {

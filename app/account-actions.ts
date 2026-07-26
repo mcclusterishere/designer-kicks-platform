@@ -11,6 +11,7 @@ import { cookies, headers } from "next/headers";
 import { AuthError } from "next-auth";
 import type { ActionResult } from "./actions";
 import { checkEmailDomain } from "@/lib/emailDomains";
+import { mayAdoptExistingAccount } from "@/lib/authz";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -76,6 +77,27 @@ export async function registerUser(
   }
 
   if (existing) {
+    // A staff seat is never adopted by registering.
+    //
+    // `grantEditor` creates a passwordless row with role EDITOR and mails
+    // its holder a set-password link — that link is the door. This form
+    // was a second one: register with a known staff address and the
+    // adoption branch attached a password to the row without touching
+    // `role`, so the account came out of signup already an editor. From
+    // there `outreachInvite` reassigns unclaimed artist pages and hands
+    // back the claim URL, which turns one guessed work address into a
+    // roster takeover.
+    //
+    // Refuse and point at the real door. An editor who genuinely lost
+    // their link uses password recovery, which proves the mailbox.
+    if (!mayAdoptExistingAccount(existing)) {
+      return {
+        ok: false,
+        error:
+          "That email belongs to a Heat Chart staff account. Use the set-password link we sent you, or reset it from the sign-in page — staff accounts can't be created through signup.",
+      };
+    }
+
     // Duplicate info merges, never dead-ends — but only through the
     // verified door. A passwordless shell account exists for every
     // pre-loaded artist page; registering with its email ADOPTS it
@@ -104,12 +126,23 @@ export async function registerUser(
         name,
         passwordHash: await hash(password, 10),
         pmaAcceptedAt: new Date(),
+        // Written, not inherited. The guard above already refused any
+        // non-MEMBER row; stating it here means no future column default
+        // or half-provisioned record can turn signup into a promotion.
+        role: "MEMBER",
         ...(existing.signupSource ? {} : { signupSource }),
       },
     });
   } else {
     await prisma.user.create({
-      data: { name, email, passwordHash: await hash(password, 10), signupSource, pmaAcceptedAt: new Date() },
+      data: {
+        name,
+        email,
+        passwordHash: await hash(password, 10),
+        role: "MEMBER",
+        signupSource,
+        pmaAcceptedAt: new Date(),
+      },
     });
   }
 

@@ -8,6 +8,7 @@ import { isPro, daysLeft, needsAttention } from "@/lib/plans";
 import { pendingHandoffs, handoffMessage, handoffStats } from "@/lib/handoff";
 import HandoffDesk from "@/components/HandoffDesk";
 import OwnershipQueue from "@/components/OwnershipQueue";
+import StaffActivity from "@/components/StaffActivity";
 import { unansweredPieces } from "@/lib/ownership";
 import { formatUsd } from "@/lib/market";
 
@@ -181,6 +182,11 @@ export default async function StudioPage() {
       {/* Above the stats too: an unanswered piece has no provenance and
           no resale value, which costs more than a low vote count. */}
       <OwnershipQueue pieces={unanswered} />
+
+      {/* What we did to their work. Renders nothing when we've done
+          nothing, which is almost always — and that's the point: when it
+          DOES appear, it means something happened they should know about. */}
+      <StaffActivity userId={session.user.id} />
 
       {handoff.claimed > 0 && (
         <p className="mt-4 text-xs text-smoke">

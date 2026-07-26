@@ -1873,3 +1873,48 @@ model ContactTask {
   @@index([contactId, doneAt])
   @@index([doneAt, dueAt])
 }
+
+/// A record of staff acting on somebody else's content.
+///
+/// Admin power over user content is intended — a platform needs to be
+/// able to fix a broken photo, remove abuse, or correct a sale. What is
+/// NOT acceptable is that power being invisible. Before this table, an
+/// admin could add photos to an artist's piece, accept an offer on their
+/// behalf, or delete their post, and there was no record anywhere and no
+/// notification to the person whose work changed.
+///
+/// That is the difference between administration and interference, and
+/// the only thing that separates them is a log the operator cannot
+/// silently edit and the affected user can see.
+///
+/// Deliberately append-only in practice: nothing in the app updates or
+/// deletes these rows.
+model AuditLog {
+  id String @id @default(cuid())
+
+  /// Who did it. Null only for automated/system actions.
+  actorId    String?
+  actorEmail String?
+  /// admin | editor | system — what capability was exercised.
+  actorRole  String
+
+  /// A stable verb: "piece.photos.add", "offer.respond", "post.delete".
+  action String
+
+  /// What was acted on, and — crucially — WHOSE it was. The owner id is
+  /// what lets the affected person be shown their own entries without a
+  /// join through five tables.
+  targetType    String // submission | offer | feedPost | sale | artistProfile
+  targetId      String
+  targetOwnerId String?
+
+  /// One human sentence: "Added 2 photos to \"Afro Samurai\"".
+  summary String
+
+  createdAt DateTime @default(now())
+
+  /// The two reads this table has: the admin's full log, and one user's
+  /// "what was done to my stuff" view.
+  @@index([createdAt])
+  @@index([targetOwnerId, createdAt])
+}

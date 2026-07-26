@@ -41,6 +41,7 @@ import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
 import OwnerDesk from "./OwnerDesk";
+import AuditPanel from "./AuditPanel";
 import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
@@ -2069,6 +2070,12 @@ export default async function AdminPage({
       {show("roster") && (
         <section className="mt-8">
           <OwnerDesk />
+        </section>
+      )}
+
+      {show("settings") && (
+        <section className="mt-8">
+          <AuditPanel />
         </section>
       )}
 

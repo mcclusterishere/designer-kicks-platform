@@ -136,6 +136,15 @@ jobs:
       - name: Ownership and provenance
         run: npm run verify:ownership
 
+      # The two that answer "can somebody touch work that isn't theirs?"
+      # — one proves they can't, the other proves that when staff legally
+      # can, it's on the record.
+      - name: Access control
+        run: npm run verify:authz
+
+      - name: Staff action log
+        run: npm run verify:audit
+
       - name: Subscription metrics
         run: npm run verify:saas
 
