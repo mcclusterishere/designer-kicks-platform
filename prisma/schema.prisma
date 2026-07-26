@@ -91,6 +91,36 @@ model Submission {
   matchesAsA     TournamentMatch[] @relation("matchSubA")
   matchesAsB     TournamentMatch[] @relation("matchSubB")
 
+  /// Who physically has this piece — asked once, at upload.
+  ///
+  /// WITH_ARTIST is the common case and costs the uploader nothing: they
+  /// made it, they still have it, there is no owner to contact. SOLD
+  /// means somebody else has it and their details were captured. UNKNOWN
+  /// is only ever set by the grandfathering backfill, for the pieces that
+  /// existed before this question did — it is a question outstanding, not
+  /// a state anyone can choose.
+  ownershipStatus String @default("WITH_ARTIST") // WITH_ARTIST | SOLD | UNKNOWN
+
+  /// The owner's details, captured at upload when the piece is already
+  /// sold. Deliberately NOT a user account: most buyers never make one,
+  /// and the whole point is to reach them before they do.
+  ///
+  /// Address is optional on purpose. It is the highest-risk field on this
+  /// table, it triggers breach-notification duties in every US state, and
+  /// it is not what verifies ownership — the email is. Nothing ships from
+  /// this platform, so an address is collected only when someone has a
+  /// reason to give one.
+  ownerEmail   String?
+  ownerPhone   String?
+  ownerAddress String?
+  ownerName    String?
+
+  /// Set when the owner confirmed by email, or an admin confirmed by
+  /// hand. Until then the details are a claim by the artist, not a fact,
+  /// and anything downstream that treats them as proof should check this.
+  ownerVerifiedAt DateTime?
+  ownerVerifiedBy String? // "email" | "admin"
+
   // Hot paths: the Heat List / feed / analytics all filter APPROVED;
   // artist pages, call-outs, and the roster seed filter by artistId;
   // fan closets filter by ownerId.

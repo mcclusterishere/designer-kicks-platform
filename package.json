@@ -24,7 +24,8 @@
     "verify:contacts": "rm -rf node_modules/.verifyc && tsc scripts/verify-contacts.ts --outDir node_modules/.verifyc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyc/scripts/verify-contacts.js",
     "verify:saas": "rm -rf node_modules/.verifys && tsc scripts/verify-saas.ts --outDir node_modules/.verifys --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifys/scripts/verify-saas.js",
     "verify:handoff": "rm -rf node_modules/.verifyh && tsc scripts/verify-handoff.ts --outDir node_modules/.verifyh --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyh/scripts/verify-handoff.js",
-    "verify:crm": "rm -rf node_modules/.verifycrm && tsc scripts/verify-crm.ts --outDir node_modules/.verifycrm --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifycrm/scripts/verify-crm.js"
+    "verify:crm": "rm -rf node_modules/.verifycrm && tsc scripts/verify-crm.ts --outDir node_modules/.verifycrm --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifycrm/scripts/verify-crm.js",
+    "verify:ownership": "rm -rf node_modules/.verifyown && tsc scripts/verify-ownership.ts --outDir node_modules/.verifyown --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyown/scripts/verify-ownership.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

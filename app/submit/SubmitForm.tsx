@@ -12,6 +12,7 @@ type Props = {
 };
 
 export default function SubmitForm({ artistDefaults }: Props) {
+  const [sold, setSold] = useState(false);
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     createSubmission,
     null
@@ -207,6 +208,58 @@ export default function SubmitForm({ artistDefaults }: Props) {
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div>
+          {/* Who has it. One question, asked here because asked later it
+              never gets asked at all. The owner fields stay hidden unless
+              the answer is "sold" — a maker posting work they still have
+              should not meet six boxes about a buyer who doesn't exist. */}
+          <div className="sm:col-span-2">
+            <p className="tag text-smoke">Who has this piece?</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="ownershipStatus"
+                  value="WITH_ARTIST"
+                  defaultChecked
+                  className="peer sr-only"
+                  onChange={() => setSold(false)}
+                />
+                <span className="tag rounded-full border border-edge px-3.5 py-2 text-smoke peer-checked:border-volt peer-checked:bg-volt peer-checked:font-bold peer-checked:text-ink">
+                  I still have it
+                </span>
+              </label>
+              <label className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="ownershipStatus"
+                  value="SOLD"
+                  className="peer sr-only"
+                  onChange={() => setSold(true)}
+                />
+                <span className="tag rounded-full border border-edge px-3.5 py-2 text-smoke peer-checked:border-volt peer-checked:bg-volt peer-checked:font-bold peer-checked:text-ink">
+                  Someone already bought it
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {sold && (
+            <div className="space-y-2 rounded-lg border border-volt/40 bg-volt/5 p-3 sm:col-span-2">
+              <p className="text-xs text-white">
+                We&apos;ll email them to confirm. Once they do, the piece gets a collector page,
+                public provenance, and a real resale value.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input name="ownerEmail" type="email" required placeholder="Owner's email *" className={inputClass} />
+                <input name="ownerName" placeholder="Their name" className={inputClass} />
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <input name="ownerPhone" placeholder="Phone (optional)" className={inputClass} />
+                <input name="ownerAddress" placeholder="Address (only if you ship)" className={inputClass} />
+              </div>
+            </div>
+          )}
+
           <label htmlFor="provenanceType" className="tag text-smoke">
             Origin *
           </label>

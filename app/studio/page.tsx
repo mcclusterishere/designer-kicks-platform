@@ -7,6 +7,8 @@ import { getHeatList } from "@/lib/battles";
 import { isPro, daysLeft, needsAttention } from "@/lib/plans";
 import { pendingHandoffs, handoffMessage, handoffStats } from "@/lib/handoff";
 import HandoffDesk from "@/components/HandoffDesk";
+import OwnershipQueue from "@/components/OwnershipQueue";
+import { unansweredPieces } from "@/lib/ownership";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
@@ -89,6 +91,8 @@ export default async function StudioPage() {
     }),
   }));
   const handoff = await handoffStats(profile.id);
+  // The grandfathering backlog: pieces that went up before we asked.
+  const unanswered = await unansweredPieces(profile.id, 40);
 
 
   const bestRank = Math.min(
@@ -173,6 +177,10 @@ export default async function StudioPage() {
           unclaimed sale is real money that moved with nothing on the
           record to show for it — worth more attention than a vote count. */}
       <HandoffDesk items={handoffs} />
+
+      {/* Above the stats too: an unanswered piece has no provenance and
+          no resale value, which costs more than a low vote count. */}
+      <OwnershipQueue pieces={unanswered} />
 
       {handoff.claimed > 0 && (
         <p className="mt-4 text-xs text-smoke">

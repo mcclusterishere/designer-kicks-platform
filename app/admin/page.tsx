@@ -40,6 +40,7 @@ import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
+import OwnerDesk from "./OwnerDesk";
 import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
@@ -516,8 +517,27 @@ export default async function AdminPage({
   // scroll. Deep links still work — editing a product or article jumps
   // straight to its tab.
   const { tab: tabParam } = await searchParams;
-  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "desk", "saas", "team", "settings"];
-  const tab = editArticle ? "content" : edit ? "market" : TAB_IDS.includes(tabParam ?? "") ? (tabParam as string) : "pulse";
+  // Five rooms, not nine tabs.
+  //
+  // Nine top-level tabs is a menu you have to read every time. These are
+  // grouped by the question being asked rather than by which feature
+  // built them: who's on the platform, what we're selling, what we're
+  // publishing, how the business is doing, and the plumbing. Every old
+  // ?tab= link still resolves, because links to this panel exist in
+  // emails and nobody should hit a dead one.
+  const TAB_ALIAS: Record<string, string> = {
+    desk: "business", saas: "business", market: "selling",
+    games: "publishing", content: "publishing", team: "settings",
+  };
+  const TAB_IDS = ["pulse", "roster", "selling", "publishing", "business", "settings"];
+  const requested = TAB_ALIAS[tabParam ?? ""] ?? tabParam ?? "";
+  const tab = editArticle
+    ? "publishing"
+    : edit
+      ? "selling"
+      : TAB_IDS.includes(requested)
+        ? requested
+        : "pulse";
   const show = (t: string) => tab === t;
   const rosterAttention =
     pending.length +
@@ -561,16 +581,10 @@ export default async function AdminPage({
         <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-2xl border border-edge bg-surface p-2">
           {[
             { id: "pulse", label: "Pulse", icon: "📊", n: 0 },
-            { id: "roster", label: "Roster", icon: "👟", n: rosterAttention },
-            { id: "games", label: "Games", icon: "🎮", n: 0 },
-            { id: "content", label: "Content", icon: "📰", n: 0 },
-            { id: "market", label: "Market", icon: "💰", n: 0 },
-            // The desk is our own capital, which is why it sits apart from
-            // Market (affiliate links and the shoe catalog — other people's
-            // inventory). Different money, different room.
-            { id: "desk", label: "Reseller", icon: "📦", n: 0 },
-            { id: "saas", label: "Subscriptions", icon: "📈", n: 0 },
-            { id: "team", label: "Team", icon: "👥", n: 0 },
+            { id: "roster", label: "People", icon: "👟", n: rosterAttention },
+            { id: "selling", label: "Selling", icon: "💰", n: 0 },
+            { id: "publishing", label: "Publishing", icon: "📰", n: 0 },
+            { id: "business", label: "Business", icon: "📈", n: 0 },
             { id: "settings", label: "Settings", icon: "⚙️", n: 0 },
           ].map((t) => (
             <Link
@@ -688,7 +702,7 @@ export default async function AdminPage({
       )}
 
       {/* Team & Careers */}
-      {show("team") && (
+      {show("settings") && (
       <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">
           Team &amp; Careers{" "}
@@ -996,7 +1010,7 @@ export default async function AdminPage({
       )}
 
       {/* Broadcast: post to The Feed + every social channel at once */}
-      {show("content") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">Broadcast</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -1623,7 +1637,7 @@ export default async function AdminPage({
       )}
 
       {/* Create battle */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">Start A Battle</h2>
         <div className="mt-4">
@@ -1640,7 +1654,7 @@ export default async function AdminPage({
       )}
 
       {/* Battles */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Battles</h2>
         <div className="mt-4 space-y-2">
@@ -1674,7 +1688,7 @@ export default async function AdminPage({
       )}
 
       {/* Outfit Studio: assemble house fits, match fit battles */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Outfit <span className="text-gradient-volt">Studio</span>
@@ -1781,7 +1795,7 @@ export default async function AdminPage({
       )}
 
       {/* Tournaments */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Tournaments</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1829,7 +1843,7 @@ export default async function AdminPage({
       )}
 
       {/* Giveaways */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Giveaways</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1869,7 +1883,7 @@ export default async function AdminPage({
       )}
 
       {/* Quiz questions */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Quiz Questions{" "}
@@ -2045,27 +2059,35 @@ export default async function AdminPage({
       </section>
       )}
 
-      {show("market") && <CatalogSection />}
+      {show("selling") && <CatalogSection />}
 
       {/* The reseller desk: pairs the house owns outright. Its own room
           because it is the only section on this page describing our own
           capital rather than other people's inventory. */}
-      {show("desk") && (
+      {/* Ownership sits under People: it is a queue of humans to call,
+          not a report to read. */}
+      {show("roster") && (
+        <section className="mt-8">
+          <OwnerDesk />
+        </section>
+      )}
+
+      {show("business") && (
         <section className="mt-8">
           <ResellerDesk />
         </section>
       )}
 
       {/* The subscription business: funnel first, revenue second. */}
-      {show("saas") && (
+      {show("business") && (
         <section className="mt-8">
           <SaasPanel />
         </section>
       )}
-      {show("content") && <DripSection />}
+      {show("publishing") && <DripSection />}
 
       {/* Sales ledger */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Sales Ledger <span className="text-smoke">({sales.length})</span>
@@ -2121,7 +2143,7 @@ export default async function AdminPage({
       )}
 
       {/* Newsroom */}
-      {show("content") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Newsroom <span className="text-smoke">({articles.length})</span>
@@ -2231,7 +2253,7 @@ export default async function AdminPage({
       )}
 
       {/* Market Pulse: the affiliate money funnel */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12" data-testid="market-pulse">
         <h2 className="display text-2xl text-white">Market Pulse</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -2293,7 +2315,7 @@ export default async function AdminPage({
       )}
 
       {/* Products */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Shop Products <span className="text-smoke">({products.length})</span>

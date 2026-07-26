@@ -256,8 +256,21 @@ export async function createSubmission(
   const extra = await saveImageList(formData.getAll("morePhotos"), 4);
   if (!Array.isArray(extra)) return { ok: false, error: extra.error };
 
-  await prisma.submission.create({
+  // Who has it — asked once, here, because asked later it never gets
+  // asked at all. WITH_ARTIST is the default and costs the uploader
+  // nothing; the owner fields only matter when there is an owner.
+  const { validateOwnership } = await import("@/lib/ownership");
+  const ownership = validateOwnership(String(formData.get("ownershipStatus") ?? "WITH_ARTIST"), {
+    name: String(formData.get("ownerName") ?? ""),
+    email: String(formData.get("ownerEmail") ?? ""),
+    phone: String(formData.get("ownerPhone") ?? ""),
+    address: String(formData.get("ownerAddress") ?? ""),
+  });
+  if (!ownership.ok) return { ok: false, error: ownership.error };
+
+  const created = await prisma.submission.create({
     data: {
+      ...ownership.data,
       title,
       artistName: artist.displayName,
       socialHandle: artist.instagram ?? (socialHandle || null),
@@ -277,11 +290,33 @@ export async function createSubmission(
         ? { collaborators: { connect: collaboratorIds.map((id) => ({ id })) } }
         : {}),
     },
+    select: { id: true },
   });
 
   // Budget is spent here and nowhere earlier: the row exists, so a piece
   // genuinely landed. A throw anywhere above costs the artist nothing.
   spendAttempt("submit", user.id, SUBMIT_WINDOW);
+
+  // If an owner was named, reach them straight away. The artist saying
+  // "Marcus owns this" is a claim; the owner confirming makes it a fact,
+  // and nothing downstream treats it as proof until they do.
+  const namedOwner = ownership.data.ownerEmail as string | null;
+  if (namedOwner) {
+    const { ownerVerifyEmail } = await import("@/lib/ownership");
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+    sendMail({
+      to: namedOwner,
+      ...ownerVerifyEmail({
+        title,
+        artistName: artist.displayName,
+        verifyUrl: `${site}/own/${created.id}`,
+      }),
+    }).catch(() => {});
+    notifyAdmin(
+      "Owner named — needs verifying",
+      `${artist.displayName} listed ${namedOwner} as the owner of "${title}". Verify queue: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin?tab=roster`
+    );
+  }
 
   notifyAdmin(
     "New submission in the review queue",
@@ -5875,4 +5910,141 @@ export async function syncTimelineAction(): Promise<void> {
   const { syncTimelineFromPlatform } = await import("@/lib/crm");
   await syncTimelineFromPlatform(artist.id);
   revalidatePath("/studio/contacts");
+}
+
+// ---- Ownership: answering the question, and verifying the answer -------
+
+/**
+ * Answer "who has this?" for a piece already uploaded.
+ *
+ * Powers the grandfathering backfill — every piece that existed before
+ * the question did is UNKNOWN, and this is how that backlog gets cleared
+ * two seconds at a time.
+ */
+export async function setOwnershipAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return { ok: false, error: "Artist accounts only." };
+
+  const id = String(formData.get("submissionId") ?? "");
+  // Scoped in the query. A submission id in a form is attacker input.
+  const piece = await prisma.submission.findFirst({
+    where: { id, artistId: artist.id },
+    select: { id: true, title: true, ownerEmail: true },
+  });
+  if (!piece) return { ok: false, error: "Not your piece." };
+
+  const { validateOwnership, ownerVerifyEmail } = await import("@/lib/ownership");
+  const res = validateOwnership(String(formData.get("ownershipStatus") ?? ""), {
+    name: String(formData.get("ownerName") ?? ""),
+    email: String(formData.get("ownerEmail") ?? ""),
+    phone: String(formData.get("ownerPhone") ?? ""),
+    address: String(formData.get("ownerAddress") ?? ""),
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  await prisma.submission.update({ where: { id: piece.id }, data: res.data });
+
+  // Only mail a newly-named owner. Re-saving the same answer shouldn't
+  // re-badger somebody who already got the letter.
+  const email = res.data.ownerEmail as string | null;
+  if (email && email !== piece.ownerEmail) {
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+    const me = await prisma.artistProfile.findUnique({
+      where: { id: artist.id }, select: { displayName: true },
+    });
+    sendMail({
+      to: email,
+      ...ownerVerifyEmail({
+        title: piece.title,
+        artistName: me?.displayName ?? "The artist",
+        verifyUrl: `${site}/own/${piece.id}`,
+      }),
+    }).catch(() => {});
+  }
+
+  revalidatePath("/studio");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Admin confirms ownership by hand — after a call, a DM, a receipt. */
+export async function verifyOwnerAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("submissionId") ?? "");
+  if (!id) return;
+  await prisma.submission.updateMany({
+    where: { id, ownerVerifiedAt: null },
+    data: { ownerVerifiedAt: new Date(), ownerVerifiedBy: "admin" },
+  });
+  revalidatePath("/admin");
+}
+
+/** Re-send the owner their confirmation link. Capped per piece per day. */
+export async function resendOwnerVerifyAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("submissionId") ?? "");
+  const piece = await prisma.submission.findUnique({
+    where: { id },
+    select: { id: true, title: true, ownerEmail: true, ownerVerifiedAt: true, artist: { select: { displayName: true } } },
+  });
+  if (!piece?.ownerEmail || piece.ownerVerifiedAt) return;
+
+  const WINDOW = 24 * 60 * 60 * 1000;
+  if (!checkAttempt("owner-verify", id, 2, WINDOW).ok) return;
+
+  const { ownerVerifyEmail } = await import("@/lib/ownership");
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const { delivered } = await sendMail({
+    to: piece.ownerEmail,
+    ...ownerVerifyEmail({
+      title: piece.title,
+      artistName: piece.artist?.displayName ?? "The artist",
+      verifyUrl: `${site}/own/${piece.id}`,
+    }),
+  });
+  if (delivered) spendAttempt("owner-verify", id, WINDOW);
+  revalidatePath("/admin");
+}
+
+/** The owner confirms. This is the write that turns a claim into a fact. */
+export async function confirmOwnershipAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to confirm." };
+
+  const id = String(formData.get("submissionId") ?? "");
+  const piece = await prisma.submission.findUnique({
+    where: { id },
+    select: { id: true, ownershipStatus: true, ownerVerifiedAt: true, artistId: true, title: true },
+  });
+  if (!piece || piece.ownershipStatus !== "SOLD") return { ok: false, error: "Nothing to confirm." };
+  if (piece.ownerVerifiedAt) return { ok: true };
+
+  const { ensureCollectorSlug } = await import("@/lib/artists");
+
+  // Ownership moving and verification landing are one write. A half-done
+  // handover — verified but with no owner, or owned but unverified — is
+  // worse than neither, because the public page would then disagree with
+  // the record.
+  await prisma.$transaction([
+    prisma.submission.update({
+      where: { id: piece.id },
+      data: {
+        ownerId: session.user.id,
+        ownerVerifiedAt: new Date(),
+        ownerVerifiedBy: "email",
+      },
+    }),
+  ]);
+  await ensureCollectorSlug(session.user.id).catch(() => {});
+
+  revalidatePath(`/own/${piece.id}`);
+  revalidatePath("/profile");
+  revalidatePath("/market");
+  return { ok: true };
 }

@@ -133,6 +133,9 @@ jobs:
       - name: CRM import and intelligence
         run: npm run verify:crm
 
+      - name: Ownership and provenance
+        run: npm run verify:ownership
+
       - name: Subscription metrics
         run: npm run verify:saas
 
