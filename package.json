@@ -19,7 +19,9 @@
     "db:seed": "node prisma/seed.mjs",
     "postinstall": "prisma generate",
     "verify:league": "rm -rf node_modules/.verifyl && tsc scripts/verify-league.ts --outDir node_modules/.verifyl --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file=.env node_modules/.verifyl/scripts/verify-league.js",
-    "verify:reseller": "rm -rf node_modules/.verifyr && tsc scripts/verify-reseller.ts --outDir node_modules/.verifyr --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file=.env node_modules/.verifyr/scripts/verify-reseller.js"
+    "verify:reseller": "rm -rf node_modules/.verifyr && tsc scripts/verify-reseller.ts --outDir node_modules/.verifyr --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file=.env node_modules/.verifyr/scripts/verify-reseller.js",
+    "verify:limits": "rm -rf node_modules/.verifyl2 && tsc scripts/verify-limits.ts --outDir node_modules/.verifyl2 --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node node_modules/.verifyl2/scripts/verify-limits.js",
+    "verify:contacts": "rm -rf node_modules/.verifyc && tsc scripts/verify-contacts.ts --outDir node_modules/.verifyc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file=.env node_modules/.verifyc/scripts/verify-contacts.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

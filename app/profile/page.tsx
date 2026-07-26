@@ -199,6 +199,7 @@ export default async function ProfilePage() {
           <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {[
               { href: "/submit", label: "Post a piece", icon: "＋" },
+              { href: "/studio/contacts", label: "Your customers", icon: "☎" },
               { href: "/studio#commission-desk", label: "Rates & turnaround", icon: "＄" },
               { href: "/studio#drops", label: "Announce a drop", icon: "◎" },
               { href: "/studio/portfolio", label: "Portfolio", icon: "▦" },

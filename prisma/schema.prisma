@@ -191,6 +191,8 @@ model ArtistProfile {
   drops              ArtistDrop[]
   shops              ArtistShop[]
 
+  contacts Contact[]
+
   @@index([onboardedById])
 }
 
@@ -1670,4 +1672,69 @@ model InventoryItem {
   @@index([status])
   @@index([soldAt])
   @@index([catalogShoeId])
+}
+
+/// An artist's own customer list — the CRM spine.
+///
+/// Sales, offers, consignments and messages already exist, but they're
+/// separate rows with no shared subject, so nobody can ask the question
+/// that actually runs a custom business: who bought from me, what have
+/// they spent, and when did I last speak to them. This is that subject.
+///
+/// Deliberately owned by an artist rather than by the platform. Two
+/// artists who both know the same collector each keep their own record
+/// of that relationship, with their own notes and their own history —
+/// merging them would leak one maker's client list into another's.
+model Contact {
+  id       String        @id @default(cuid())
+  artistId String
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  name   String
+  email  String?
+  phone  String?
+  /// Whatever handle they actually talk on — for most of this roster the
+  /// relationship lives in Instagram DMs, not an inbox.
+  social String?
+  city   String?
+
+  /// Where this contact came from: import | sale | offer | commission |
+  /// manual. Provenance matters because a bought list and a real buyer
+  /// are not the same asset, and only one of them can be emailed.
+  source String @default("manual")
+
+  /// Pipeline: LEAD (never bought) → CUSTOMER (has) → REPEAT (more than
+  /// once) → LAPSED (bought, gone quiet). Computed on write from real
+  /// sales rather than typed, so it can't drift into fiction.
+  stage String @default("LEAD")
+
+  notes String?
+  tags  String[] @default([])
+
+  /// Consent, tracked per contact because CAN-SPAM and the platform's own
+  /// privacy policy both turn on it. An imported phone contact has NOT
+  /// opted in to marketing, and the import says so rather than assuming.
+  emailOptIn Boolean @default(false)
+
+  /// Relationship clock. lastContactAt is the follow-up trigger; the
+  /// totals are denormalised from Sale so a list of 500 doesn't need 500
+  /// joins to sort by value.
+  lastContactAt   DateTime?
+  totalSpentCents Int       @default(0)
+  purchaseCount   Int       @default(0)
+
+  /// Links to the account, if this person ever made one. Optional: most
+  /// of a maker's customers never sign up, and the CRM has to hold them
+  /// anyway or it's not a CRM.
+  userId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One row per person per artist. Email is the natural key when it
+  /// exists, which is what makes re-importing the same CSV idempotent
+  /// instead of duplicating the whole list.
+  @@unique([artistId, email])
+  @@index([artistId, stage])
+  @@index([artistId, lastContactAt])
 }

@@ -41,7 +41,7 @@ import { saveUpload } from "@/lib/storage";
 import { resaleSplitLabel } from "@/lib/resale";
 import { estimateFeeCents } from "@/lib/reseller";
 import { sendMail } from "@/lib/mailer";
-import { allowAttempt } from "@/lib/ratelimit";
+import { allowAttempt, checkAttempt, spendAttempt, retryLabel } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
@@ -72,6 +72,32 @@ const ALLOWED_TYPES: Record<string, string> = {
 };
 // 15-second clips: duration is gated in the browser (no ffprobe on the
 // server) — the 40MB cap is the hard backstop, sized for ~15s of 1080p.
+/**
+ * The MIME type a browser puts on a picked file, resolved defensively.
+ *
+ * Facebook's and Instagram's in-app browsers — which is where most of
+ * this roster actually opens the site — routinely hand over a File with
+ * an empty `type`, or "application/octet-stream". A straight lookup then
+ * rejects a perfectly good iPhone photo with "must be a JPG, PNG, or
+ * WebP", which reads as the site being broken, because from the artist's
+ * side it is. Falling back to the filename extension recovers those.
+ *
+ * saveUpload re-encodes every image to a clean JPEG anyway, so a wrong
+ * guess costs nothing: an undecodable file is caught downstream and kept
+ * as-is rather than lost.
+ */
+function imageExt(file: File): string | null {
+  const byMime = ALLOWED_TYPES[file.type];
+  if (byMime) return byMime;
+  const dot = file.name.lastIndexOf(".");
+  if (dot < 0) return null;
+  const byName: Record<string, string> = {
+    jpg: "jpg", jpeg: "jpg", png: "png", webp: "webp",
+    heic: "heic", heif: "heif",
+  };
+  return byName[file.name.slice(dot + 1).toLowerCase()] ?? null;
+}
+
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 const VIDEO_TYPES: Record<string, string> = {
   "video/mp4": "mp4",
@@ -111,11 +137,29 @@ export async function createSubmission(
 
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of your custom." };
   if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-  const ext = ALLOWED_TYPES[image.type];
-  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
+  const ext = imageExt(image);
+  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, HEIC, or WebP." };
 
-  if (!allowAttempt("submit", user.id, 10, 60 * 60 * 1000)) {
-    return { ok: false, error: "That's a lot of submissions — try again in an hour." };
+  // Counted on SUCCESS, not on attempt, and checked without spending.
+  //
+  // This used to charge a slot the moment it was reached — before the
+  // artist-status check, before the video cap, before the upload itself.
+  // So every failed upload, every "one video a day" rejection, every
+  // storage hiccup burned budget. An artist fighting a broken upload
+  // spent all ten retries and got locked out for an hour without a
+  // single piece landing, which is precisely backwards: the limit exists
+  // to stop a flood of posts, and it was punishing the absence of one.
+  //
+  // The ceiling is also higher now. Onboarding a back catalogue in one
+  // sitting is the behaviour we're actively asking artists for.
+  const SUBMIT_MAX = 40;
+  const SUBMIT_WINDOW = 60 * 60 * 1000;
+  const gate = checkAttempt("submit", user.id, SUBMIT_MAX, SUBMIT_WINDOW);
+  if (!gate.ok) {
+    return {
+      ok: false,
+      error: `That's ${SUBMIT_MAX} pieces in an hour — the rest can go up ${retryLabel(gate.retryAfterMs)}.`,
+    };
   }
 
   // Submitting requires an APPROVED artist account (fan accounts apply
@@ -235,6 +279,10 @@ export async function createSubmission(
     },
   });
 
+  // Budget is spent here and nowhere earlier: the row exists, so a piece
+  // genuinely landed. A throw anywhere above costs the artist nothing.
+  spendAttempt("submit", user.id, SUBMIT_WINDOW);
+
   notifyAdmin(
     "New submission in the review queue",
     `"${title}" by ${artist.displayName} just hit the queue. Review it at ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
@@ -273,8 +321,8 @@ async function saveImageList(
     if (!(f instanceof File) || f.size === 0) continue;
     if (urls.length >= max) break;
     if (f.size > MAX_UPLOAD_BYTES) return { error: "Each photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[f.type];
-    if (!ext) return { error: "Photos must be JPG, PNG, or WebP." };
+    const ext = imageExt(f);
+    if (!ext) return { error: "Photos must be JPG, PNG, HEIC, or WebP." };
     urls.push(
       await saveUpload(Buffer.from(await f.arrayBuffer()), `${randomUUID()}.${ext}`, f.type)
     );
@@ -413,8 +461,8 @@ export async function preloadArtist(
   if (!shoeTitle || !baseShoe) return { ok: false, error: "Shoe title and base shoe are required." };
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of the custom." };
   if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-  const ext = ALLOWED_TYPES[image.type];
-  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
+  const ext = imageExt(image);
+  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, HEIC, or WebP." };
 
   // Claimable account: no password until the artist sets one via the link.
   const user = await prisma.user.upsert({
@@ -607,8 +655,8 @@ export async function recordSale(
   let evidenceUrl: string | null = null;
   if (evidence instanceof File && evidence.size > 0) {
     if (evidence.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Evidence file must be under 6MB." };
-    const ext = ALLOWED_TYPES[evidence.type];
-    if (!ext) return { ok: false, error: "Evidence must be a JPG, PNG, or WebP (screenshot the receipt)." };
+    const ext = imageExt(evidence);
+    if (!ext) return { ok: false, error: "Evidence must be a JPG, PNG, HEIC, or WebP (screenshot the receipt)." };
     evidenceUrl = await saveUpload(
       Buffer.from(await evidence.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -2065,8 +2113,8 @@ export async function saveArticle(
   // it from our own domain.
   if (coverFile instanceof File && coverFile.size > 0) {
     if (coverFile.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Cover photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[coverFile.type];
-    if (!ext) return { ok: false, error: "Cover photo must be a JPG, PNG, or WebP." };
+    const ext = imageExt(coverFile);
+    if (!ext) return { ok: false, error: "Cover photo must be a JPG, PNG, HEIC, or WebP." };
     coverImage = await saveUpload(
       Buffer.from(await coverFile.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -2447,8 +2495,8 @@ export async function stageProspect(
   const file = formData.get("file");
   if (file instanceof File && file.size > 0) {
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: "File must be under 6MB." };
-    const ext = ALLOWED_TYPES[file.type];
-    if (!ext) return { ok: false, error: "Upload a JPG, PNG, or WebP." };
+    const ext = imageExt(file);
+    if (!ext) return { ok: false, error: "Upload a JPG, PNG, HEIC, or WebP." };
     fileUrl = await saveUpload(Buffer.from(await file.arrayBuffer()), `${randomUUID()}.${ext}`, file.type);
   }
 
@@ -2671,7 +2719,7 @@ export async function updateArtistProfile(
   const photo = formData.get("avatar");
   if (photo instanceof File && photo.size > 0) {
     if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Profile photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[photo.type];
+    const ext = imageExt(photo);
     if (!ext) return { ok: false, error: "Profile photo must be a JPEG, PNG, WebP or HEIC." };
     avatarUrl = await saveUpload(
       Buffer.from(await photo.arrayBuffer()),
@@ -4306,8 +4354,8 @@ async function runBroadcast(formData: FormData): Promise<BroadcastResult> {
   const photo = formData.get("photo");
   if (photo instanceof File && photo.size > 0) {
     if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[photo.type];
-    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
+    const ext = imageExt(photo);
+    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, HEIC, or WebP." };
     imageUrl = await saveUpload(
       Buffer.from(await photo.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -5511,4 +5559,147 @@ export async function toggleInventoryListing(formData: FormData): Promise<void> 
   });
   revalidatePath("/admin");
   revalidatePath("/available");
+}
+
+// ---- Contacts: an artist's own customer list ---------------------------
+
+/** The signed-in artist, or null. Contacts are per-artist, always. */
+async function currentArtist() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, status: true },
+  });
+}
+
+/**
+ * Import a contacts CSV.
+ *
+ * Re-importing the same file updates rather than duplicates, and every
+ * row that couldn't be used comes back with a reason and its real line
+ * number — a silent import that drops a quarter of someone's list is
+ * how a maker loses customers without ever knowing it happened.
+ */
+export async function importContactsAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") {
+    return { ok: false, error: "Artist accounts only." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose a CSV exported from your phone, Gmail, or Shopify." };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { ok: false, error: "That file is over 5MB — split it in half and import twice." };
+  }
+
+  const { parseContacts, importContacts } = await import("@/lib/contacts");
+  const report = parseContacts(await file.text());
+  if (report.contacts.length === 0) {
+    return {
+      ok: false,
+      error: report.skipped[0]?.reason ?? "No contacts found in that file.",
+    };
+  }
+
+  const result = await importContacts(artist.id, report);
+  revalidatePath("/studio/contacts");
+
+  const parts = [
+    `${result.created} added`,
+    result.updated > 0 ? `${result.updated} updated` : null,
+    result.skipped.length > 0 ? `${result.skipped.length} skipped` : null,
+  ].filter(Boolean);
+  return { ok: true, note: parts.join(", ") };
+}
+
+/** Pull the artist's confirmed sales into the contact list as real customers. */
+export async function syncContactsAction(): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return;
+  const { syncContactsFromSales } = await import("@/lib/contacts");
+  await syncContactsFromSales(artist.id);
+  revalidatePath("/studio/contacts");
+}
+
+/** Add or edit one contact by hand. */
+export async function saveContactAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") {
+    return { ok: false, error: "Artist accounts only." };
+  }
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "A contact needs a name." };
+
+  const { looksLikeEmail, normalizePhone, normalizeHandle } = await import("@/lib/contacts");
+  const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (rawEmail && !looksLikeEmail(rawEmail)) {
+    return { ok: false, error: "That email doesn't look right." };
+  }
+
+  const data = {
+    name: name.slice(0, 120),
+    email: rawEmail || null,
+    phone: normalizePhone(String(formData.get("phone") ?? "")),
+    social: normalizeHandle(String(formData.get("social") ?? "")),
+    city: String(formData.get("city") ?? "").trim().slice(0, 80) || null,
+    notes: String(formData.get("notes") ?? "").trim().slice(0, 2000) || null,
+    // Consent is a checkbox the artist ticks knowingly, never a default
+    // and never inherited from a file.
+    emailOptIn: formData.get("emailOptIn") === "on",
+  };
+
+  if (id) {
+    // Scoped to this artist: without the artistId in the where clause,
+    // any artist could edit any other artist's contact by guessing an id.
+    const owned = await prisma.contact.findFirst({
+      where: { id, artistId: artist.id },
+      select: { id: true },
+    });
+    if (!owned) return { ok: false, error: "Not your contact." };
+    await prisma.contact.update({ where: { id }, data });
+  } else {
+    const clash = data.email
+      ? await prisma.contact.findUnique({
+          where: { artistId_email: { artistId: artist.id, email: data.email } },
+          select: { id: true },
+        })
+      : null;
+    if (clash) return { ok: false, error: "You already have a contact with that email." };
+    await prisma.contact.create({ data: { ...data, artistId: artist.id, source: "manual" } });
+  }
+
+  revalidatePath("/studio/contacts");
+  return { ok: true };
+}
+
+/** Mark that you spoke to someone today — the follow-up clock resets. */
+export async function touchContactAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("id") ?? "");
+  await prisma.contact.updateMany({
+    where: { id, artistId: artist.id },
+    data: { lastContactAt: new Date() },
+  });
+  revalidatePath("/studio/contacts");
+}
+
+/** Delete a contact. Scoped, so it can only ever be one of yours. */
+export async function deleteContactAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("id") ?? "");
+  await prisma.contact.deleteMany({ where: { id, artistId: artist.id } });
+  revalidatePath("/studio/contacts");
 }
