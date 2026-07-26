@@ -9,7 +9,7 @@ import type { ActionResult } from "@/app/actions";
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
 
-export default function LoginForm() {
+export default function LoginForm({ next = "/profile" }: { next?: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     loginUser,
@@ -18,7 +18,7 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (state?.ok) {
-      router.push("/profile");
+      router.push(next);
       router.refresh();
     }
   }, [state?.ok, router]);

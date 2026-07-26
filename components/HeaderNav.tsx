@@ -14,7 +14,7 @@ const LINKS = [
   { href: "/drops", label: "Drops", match: ["/drops", "/news"] },
   // Catalog is a view inside the Market now, not a door of its own —
   // one set of shoes shouldn't need two words in the nav.
-  { href: "/market", label: "Market", match: ["/market", "/catalog", "/predict", "/collectors", "/shop"] },
+  { href: "/market", label: "Market", match: ["/market", "/catalog", "/predict", "/collectors"] },
 ];
 
 function lit(pathname: string, match: string[]): boolean {

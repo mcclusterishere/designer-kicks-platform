@@ -7,7 +7,6 @@ import GoogleAnalytics from "@/components/GoogleAnalytics";
 import HeaderNav from "@/components/HeaderNav";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
-import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
 import MoneyProvider from "@/components/MoneyProvider";
 import CurrencyPicker from "@/components/CurrencyPicker";
@@ -166,8 +165,13 @@ export default async function RootLayout({
                 ＋ Post
               </Link>
               <ThemeToggle />
+              {/* An unread badge has to open the inbox. It pointed at
+                  /profile, so the one control that says "you have
+                  messages" was the one control that didn't show them. */}
               <Link
-                href={session?.user ? "/profile" : "/signin"}
+                href={
+                  !session?.user ? "/signin" : unread > 0 ? "/messages" : "/profile"
+                }
                 className="relative tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
               >
                 {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
@@ -212,9 +216,7 @@ export default async function RootLayout({
                 <Link href="/drops" className="hover:text-white">Drops</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
-                {SHOP_LIVE && (
-                  <Link href="/shop" className="hover:text-white">Shop</Link>
-                )}
+                
                 <Link href="/story" className="hover:text-white">Our Story</Link>
                 <Link href="/sell" className="hover:text-white">Sell Your Customs</Link>
                 <Link href="/careers" className="hover:text-white">Careers</Link>

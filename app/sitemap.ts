@@ -29,16 +29,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/news`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/battles`, changeFrequency: "daily", priority: 0.9 },
     { url: `${base}/heat-list`, changeFrequency: "daily", priority: 0.8 },
-    { url: `${base}/shop`, changeFrequency: "weekly", priority: 0.7 },
     // The catalog index is a redirect into /market now, so it's left out —
     // a sitemap should list destinations, not hops. Per-shoe /catalog/[sku]
     // pages are still listed below; those are the real indexable assets.
     { url: `${base}/submit`, changeFrequency: "monthly", priority: 0.6 },
+    // The hubs whose leaves were already listed. Submitting /artists/[slug]
+    // and /news/[slug] while omitting /artists and /news told Google about
+    // the branches and hid the trunk.
+    { url: `${base}/artists`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${base}/tournaments`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/available`, changeFrequency: "daily", priority: 0.8 },
+    { url: `${base}/rate`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/quiz`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${base}/giveaway`, changeFrequency: "weekly", priority: 0.6 },
+    { url: `${base}/sell`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/story`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${base}/careers`, changeFrequency: "monthly", priority: 0.4 },
+    // Legal and trust pages: low priority, but they should be indexable —
+    // people search for them by name before trusting a platform.
+    { url: `${base}/terms`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/privacy`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${base}/rules`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${base}/pricing`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${base}/security`, changeFrequency: "monthly", priority: 0.4 },
-    { url: `${base}/customs/sink-or-swim`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${base}/games`, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${base}/predict`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/league`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/market`, changeFrequency: "daily", priority: 0.8 },
     { url: `${base}/drops`, changeFrequency: "daily", priority: 0.8 },

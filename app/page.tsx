@@ -8,11 +8,9 @@ import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getPublishedArticles } from "@/lib/articles";
 import { getActiveGiveaway } from "@/lib/quiz";
 import BattleCard from "@/components/BattleCard";
-import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
 import FeedScroller from "@/components/FeedScroller";
 import AdReel from "@/components/AdReel";
-import { SHOP_LIVE } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +29,7 @@ export default async function HomePage() {
     ? await getMemberNudges(session.user.id).catch(() => [])
     : [];
 
-  const [battles, heat, products, articles] = await Promise.all([
+  const [battles, heat, articles] = await Promise.all([
     prisma.battle.findMany({
       where: { status: "ACTIVE" },
       orderBy: { endsAt: "asc" },
@@ -39,11 +37,6 @@ export default async function HomePage() {
       include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
     }),
     getHeatList(),
-    prisma.product.findMany({
-      where: { featured: true },
-      orderBy: { sortOrder: "asc" },
-      take: 4,
-    }),
     getPublishedArticles(3),
   ]);
   const giveaway = await getActiveGiveaway();
@@ -381,31 +374,6 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
-
-      {/* Shop preview — stashed behind SHOP_LIVE until it's fully curated */}
-      {SHOP_LIVE && (
-        <section className="mx-auto max-w-6xl px-4 py-12">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="rule w-16" />
-              <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
-                Gear <span className="text-heat">&amp; Heat</span>
-              </h2>
-            </div>
-            <Link
-              href="/shop"
-              className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
-            >
-              Full shop →
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* The Feed — the infinite scroll machine */}
       <section className="border-t border-edge">

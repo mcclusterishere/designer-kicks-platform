@@ -62,7 +62,7 @@ export default async function AvailablePage() {
             {pieces.map((p) => (
               <Link
                 key={p.id}
-                href={`/market?piece=${p.id}`}
+                href={`/market?board=customs&sym=${p.id}`}
                 className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50"
               >
                 <div className="relative aspect-square bg-panel">

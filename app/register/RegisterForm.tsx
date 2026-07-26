@@ -9,7 +9,7 @@ import { checkEmailDomain } from "@/lib/emailDomains";
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
 
-export default function RegisterForm() {
+export default function RegisterForm({ next = "/profile" }: { next?: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     registerUser,
@@ -50,7 +50,7 @@ export default function RegisterForm() {
   // success goes straight through.
   useEffect(() => {
     if (state?.ok && !state.note) {
-      router.push("/profile");
+      router.push(next);
       router.refresh();
     }
   }, [state?.ok, state?.note, router]);
@@ -64,7 +64,7 @@ export default function RegisterForm() {
         <button
           type="button"
           onClick={() => {
-            router.push("/profile");
+            router.push(next);
             router.refresh();
           }}
           className="w-full rounded-lg btn-hard py-3 tag font-bold"

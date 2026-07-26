@@ -33,7 +33,7 @@ export default async function CareersPage() {
           <p className="text-white">No open roles right now.</p>
           <p className="mt-1 text-sm text-smoke">
             Check back — or introduce yourself on{" "}
-            <Link href="/feed" className="text-volt underline">the Feed</Link>.
+            <Link href="/" className="text-volt underline">the Feed</Link>.
           </p>
         </div>
       ) : (

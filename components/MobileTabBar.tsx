@@ -50,7 +50,7 @@ const TABS: Tab[] = [
   {
     href: "/market",
     label: "Market",
-    match: ["/market", "/catalog", "/quiz", "/giveaway", "/collectors", "/shop"],
+    match: ["/market", "/catalog", "/quiz", "/giveaway", "/collectors"],
     // Candlestick chart mark — the exchange.
     icon: (
       <IconSvg>

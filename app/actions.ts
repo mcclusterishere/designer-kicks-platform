@@ -6020,10 +6020,32 @@ export async function confirmOwnershipAction(
   const id = String(formData.get("submissionId") ?? "");
   const piece = await prisma.submission.findUnique({
     where: { id },
-    select: { id: true, ownershipStatus: true, ownerVerifiedAt: true, artistId: true, title: true },
+    select: {
+      id: true, ownershipStatus: true, ownerVerifiedAt: true, artistId: true, title: true,
+      ownerEmail: true,
+    },
   });
   if (!piece || piece.ownershipStatus !== "SOLD") return { ok: false, error: "Nothing to confirm." };
   if (piece.ownerVerifiedAt) return { ok: true };
+
+  // The confirmation must come from the person the artist actually named.
+  //
+  // Without this the /own/[id] URL was a bearer token for a one-of-one:
+  // anyone signed in who received a forwarded link took ownership, got a
+  // public collector page, and rewrote the provenance of somebody else's
+  // piece — while the page above it promised "Not yours? Close this and
+  // nothing happens." It did not do nothing.
+  //
+  // lib/ownership.ts lowercases ownerEmail on write, so this compares
+  // like for like.
+  const signedInEmail = (session.user.email ?? "").trim().toLowerCase();
+  if (!piece.ownerEmail || piece.ownerEmail !== signedInEmail) {
+    return {
+      ok: false,
+      error:
+        "This confirmation is waiting on a different email address. Sign in with the address the seller sent it to, or ask them to re-send it to this one.",
+    };
+  }
 
   const { ensureCollectorSlug } = await import("@/lib/artists");
 

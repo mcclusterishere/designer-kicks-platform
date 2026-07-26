@@ -6,9 +6,21 @@ import RegisterForm from "./RegisterForm";
 
 export const metadata = { title: "Create Account — The Heat Chart" };
 
-export default async function RegisterPage() {
+/** Same-origin only. `?next=` is attacker-supplied; see app/signin/page.tsx. */
+function safeNext(raw: string | undefined): string {
+  if (!raw) return "/profile";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/profile";
+  return raw;
+}
+
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const next = safeNext((await searchParams).next);
   const session = await auth();
-  if (session?.user) redirect("/profile");
+  if (session?.user) redirect(next);
 
   // Inside the iOS shell (App Store 4.8): email signup only — no
   // third-party login buttons.
@@ -64,7 +76,7 @@ export default async function RegisterPage() {
       )}
 
       <div className="mt-6">
-        <RegisterForm />
+        <RegisterForm next={next} />
       </div>
       <p className="mt-6 text-sm text-smoke">
         Already have an account?{" "}
