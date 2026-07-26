@@ -360,8 +360,15 @@ export default async function MarketPage({
         .catch(() => null))?.shoeSize ?? null
     : null;
 
+  // Four tabs, and on a 390px phone their labels simply do not fit across
+  // one row: `flex-1` cannot shrink a flex item below its content, so the
+  // last pill pushed 24px past the viewport and made the WHOLE market page
+  // scroll sideways — the one page where that matters most, because it is
+  // the page people are meant to shop on. Below sm the row scrolls
+  // horizontally on its own instead, which keeps every tab reachable and
+  // the document still. From sm up nothing changes: they share the width.
   const switchBase =
-    "flex-1 rounded-full px-5 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] transition";
+    "shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] transition sm:flex-1 sm:shrink sm:px-5";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -399,7 +406,7 @@ export default async function MarketPage({
             top-level tab, which asked people to know that two words meant one
             set of shoes — it's a view here now. */}
         <div
-          className="flex w-full items-center rounded-full border border-edge bg-surface p-1 sm:w-auto"
+          className="flex w-full max-w-full items-center overflow-x-auto rounded-full border border-edge bg-surface p-1 sm:w-auto sm:overflow-x-visible"
           role="tablist"
           aria-label="How to view the market"
         >
