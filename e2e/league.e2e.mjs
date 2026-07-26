@@ -3,7 +3,7 @@
 // retroactive sale flow — record → pending sticker → buyer claims on
 // their own account → verified badge, ownership transfer, market board.
 import { PrismaClient } from "@prisma/client";
-import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser, registerAccount } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -26,11 +26,7 @@ check("submit gated when logged out", await page.getByText("Sign in to submit").
 
 // Register → instant FAN account
 await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
-await page.fill("#name", "League Tester");
-await page.fill("#email", EMAIL);
-await page.fill("#password", "supersecret1");
-await page.check("#age13");
-await page.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(page, { name: "League Tester", email: EMAIL, password: "supersecret1" });
 await page.waitForURL("**/profile", { timeout: 15000 });
 check("fan account badge on profile", await page.getByText("Fan account").isVisible());
 
@@ -135,11 +131,7 @@ check("pending sale not on the market board", !marketBefore.includes("League Tes
 const buyerCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const buyerPage = await buyerCtx.newPage();
 await buyerPage.goto(`${BASE}/register`, { waitUntil: "networkidle" });
-await buyerPage.fill("#name", "Collector Fan");
-await buyerPage.fill("#email", BUYER_EMAIL);
-await buyerPage.fill("#password", "supersecret2");
-await buyerPage.check("#age13");
-await buyerPage.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(buyerPage, { name: "Collector Fan", email: BUYER_EMAIL, password: "supersecret2" });
 await buyerPage.waitForURL("**/profile", { timeout: 15000 });
 
 check("pending claim surfaces on buyer profile", await buyerPage.getByRole("heading", { name: "Pending Claims" }).isVisible());

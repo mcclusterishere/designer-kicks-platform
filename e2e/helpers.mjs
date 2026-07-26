@@ -38,3 +38,53 @@ export async function launchBrowser() {
     process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}
   );
 }
+
+/**
+ * Fill and submit the signup form the way a real person does.
+ *
+ * Two gates sit between "typed my details" and "have an account", and
+ * both were added after these suites were written, which is why every
+ * registering suite silently timed out waiting for a redirect that was
+ * never coming:
+ *
+ *   1. The PMA membership agreement. It is a `required` checkbox, so the
+ *      BROWSER refuses to submit and the server never sees the attempt —
+ *      no request, no error, no clue. Nothing on the page changes.
+ *   2. The unknown-domain guard. Every address these suites use lives on
+ *      @test.example, deliberately, because a real domain would send real
+ *      mail to a real inbox. Signup doesn't recognise it and puts up a
+ *      two-step "is that really your email?" dialog, which is exactly
+ *      what it should do for a human and exactly what stalls a script.
+ *
+ * Both are correct product behaviour. Encoding them once here means the
+ * next thing added to signup breaks one helper instead of five suites.
+ */
+export async function registerAccount(page, { name, email, password }) {
+  await page.fill("#name", name);
+  await page.fill("#email", email);
+  await page.fill("#password", password);
+  await page.check("#age13");
+  await page.check("#pma");
+  await page.getByRole("button", { name: "Create Account" }).click();
+  await passDomainGuard(page);
+}
+
+/**
+ * Click through the "is that really your email?" dialog if it appeared.
+ *
+ * Deliberately silent when there is no dialog — a suite using a domain
+ * signup does recognise should not have to care. The confirm is two taps
+ * on purpose: the first arms it, so nobody blows past the warning with
+ * one reflexive click on the address they'll need to reset their password.
+ */
+export async function passDomainGuard(page) {
+  const arm = page.getByRole("button", { name: /this is my own domain/i });
+  const appeared = await arm
+    .waitFor({ state: "visible", timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!appeared) return false;
+  await arm.click();
+  await page.getByRole("button", { name: /Confirm: sign me up/i }).click();
+  return true;
+}

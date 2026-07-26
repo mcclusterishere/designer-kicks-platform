@@ -3,7 +3,7 @@
 // member visibility.
 import { readFileSync } from "fs";
 import { PrismaClient } from "@prisma/client";
-import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser, passDomainGuard } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -28,6 +28,7 @@ await page.check("#age13");
 // without the agreement, so the suite has to tick it like a real signup.
 await page.check("#pma");
 await page.getByRole("button", { name: "Create Account" }).click();
+await passDomainGuard(page);
 
 // @test.example isn't a mail service the domain guard recognises, so it
 // raises the "is this really your email" interstitial and blocks the

@@ -107,8 +107,14 @@ jobs:
       - name: Prepare the database
         run: npx prisma db push --skip-generate --accept-data-loss
 
-      # Question arithmetic needs no database, so it runs first and fails
-      # fastest.
+      # Cheapest and most consequential: no database, no network, and it
+      # is the one failure you want to hear about before the commit is
+      # public rather than after.
+      - name: No committed secrets
+        run: npm run verify:secrets
+
+      # Question arithmetic needs no database, so it runs next and fails
+      # fast.
       - name: Question bank arithmetic
         run: npm run verify:questions
 

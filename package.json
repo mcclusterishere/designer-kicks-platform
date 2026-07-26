@@ -2,7 +2,7 @@
   "name": "the-heat-chart",
   "version": "0.1.0",
   "private": true,
-  "description": "The Heat Chart — a custom-sneaker culture platform for artists and fans, built by McCluster Corp's Equity Uprise program.",
+  "description": "The Heat Chart \u2014 a custom-sneaker culture platform for artists and fans, built by McCluster Corp's Equity Uprise program.",
   "homepage": "https://theheatchart.com",
   "author": "McCluster Corp",
   "scripts": {
@@ -27,7 +27,8 @@
     "verify:crm": "rm -rf node_modules/.verifycrm && tsc scripts/verify-crm.ts --outDir node_modules/.verifycrm --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifycrm/scripts/verify-crm.js",
     "verify:ownership": "rm -rf node_modules/.verifyown && tsc scripts/verify-ownership.ts --outDir node_modules/.verifyown --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyown/scripts/verify-ownership.js",
     "verify:audit": "rm -rf node_modules/.verifyaudit && tsc scripts/verify-audit.ts --outDir node_modules/.verifyaudit --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyaudit/scripts/verify-audit.js",
-    "verify:authz": "rm -rf node_modules/.verifyauthz && tsc scripts/verify-authz.ts --outDir node_modules/.verifyauthz --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyauthz/scripts/verify-authz.js"
+    "verify:authz": "rm -rf node_modules/.verifyauthz && tsc scripts/verify-authz.ts --outDir node_modules/.verifyauthz --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyauthz/scripts/verify-authz.js",
+    "verify:secrets": "node scripts/verify-secrets.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

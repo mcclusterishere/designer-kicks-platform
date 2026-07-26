@@ -30,6 +30,7 @@
 import { PrismaClient } from "@prisma/client";
 import { stillHeldBy, holderOf } from "../lib/ownership";
 import { mayAdoptExistingAccount, provesEmail, isStaffRole } from "../lib/authz";
+import { cronKeyAccepted } from "../lib/cronAuth";
 
 const prisma = new PrismaClient();
 
@@ -279,6 +280,40 @@ async function main() {
     "the row grantEditor actually creates is refused by name",
     !mayAdoptExistingAccount(staffRow),
     `role=${staffRow.role} passwordHash=${staffRow.passwordHash === null ? "null" : "set"}`
+  );
+
+  // ---- The scheduled endpoints ------------------------------------
+  // These finalise battles, spend metered API quota, and mail every
+  // active member. A missing secret used to mean "come in".
+  const cron = (secret: string | undefined, presented: string, production: boolean) =>
+    cronKeyAccepted({ secret, bearer: presented, key: "", production });
+
+  check("a blank CRON_SECRET locks production, it does not open it", !cron("", "", true));
+  check("undefined does the same", !cron(undefined, "", true));
+  check(
+    "and locks it even against someone presenting an empty key",
+    !cronKeyAccepted({ secret: "", bearer: "", key: "", production: true })
+  );
+  check("a laptop with no secret still runs the jobs", cron("", "", false));
+  check("the real secret is accepted", cron("s3cr3t-value", "s3cr3t-value", true));
+  check("a wrong secret is not", !cron("s3cr3t-value", "wrong-value!", true));
+  check(
+    "a near-miss of the same length is not",
+    !cron("s3cr3t-value", "s3cr3t-valuf", true),
+    "constant-time compare still has to be a compare"
+  );
+  check(
+    "no key at all is refused when one is configured",
+    !cron("s3cr3t-value", "", true)
+  );
+  check(
+    "a base64 secret whose + became a space in a URL still works",
+    cronKeyAccepted({ secret: "ab+cd/ef=", bearer: "", key: "ab cd/ef=", production: true }),
+    "pasting a key into a scheduler is how this is used in real life"
+  );
+  check(
+    "but a space-for-plus swap can't be used to guess a secret without one",
+    !cronKeyAccepted({ secret: "abXcd/ef=", bearer: "", key: "ab cd/ef=", production: true })
   );
 }
 
