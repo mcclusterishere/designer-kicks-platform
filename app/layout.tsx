@@ -131,8 +131,8 @@ export default async function RootLayout({
           Skip to content
         </a>
         <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/" className="display text-xl text-white">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+            <Link href="/" className="display shrink-0 text-xl text-white">
               The<span className="text-volt">Heat</span>
               Chart
             </Link>
@@ -157,10 +157,10 @@ export default async function RootLayout({
                 a phone had to vote through every open battle before a
                 submit button appeared. Artists are the supply side of
                 this market — their way in cannot be conditional. */}
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
               <Link
                 href="/submit"
-                className="btn-hard tag rounded-full px-3 py-2 font-bold md:hidden"
+                className="btn-hard tag shrink-0 rounded-full px-3 py-2 font-bold md:hidden"
               >
                 ＋ Post
               </Link>
@@ -172,9 +172,17 @@ export default async function RootLayout({
                 href={
                   !session?.user ? "/signin" : unread > 0 ? "/messages" : "/profile"
                 }
-                className="relative tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
+                className="relative tag min-w-0 rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
               >
-                {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+                {/* Truncated, because this is somebody's name and names are
+                    not a length we control. At "Justin" the header was
+                    already 1px wider than a 390px phone — enough to make
+                    every signed-in page drift sideways under the thumb.
+                    A longer first name pushes proportionally further, so
+                    the bug would have arrived one signup at a time. */}
+                <span className="block max-w-[5.5rem] truncate">
+                  {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+                </span>
                 {unread > 0 && (
                   <span
                     aria-label={`${unread} unread messages`}

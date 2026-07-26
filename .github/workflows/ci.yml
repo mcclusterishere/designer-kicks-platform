@@ -159,6 +159,10 @@ jobs:
       - name: The Founding 100
         run: npm run verify:founding
 
+      # Merging touches artists' catalogues and must never delete history.
+      - name: Duplicate piece merge
+        run: npm run verify:dupes
+
   build:
     name: Production build
     runs-on: ubuntu-latest

@@ -6212,6 +6212,55 @@ export async function setOwnershipAction(
   return { ok: true };
 }
 
+/**
+ * Fold duplicate listings of one shoe into a single piece.
+ *
+ * Staff acting on an artist's work, so it goes in the log and shows up in
+ * their Studio — consolidating somebody's catalogue is exactly the kind of
+ * helpful edit that should never happen silently.
+ */
+export async function mergePiecesAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const survivorId = String(formData.get("survivorId") ?? "");
+  const duplicateIds = formData.getAll("duplicateId").map(String).filter(Boolean);
+
+  const before = await prisma.submission.findUnique({
+    where: { id: survivorId },
+    select: { title: true, artist: { select: { userId: true, displayName: true } } },
+  });
+
+  const { mergePieces } = await import("@/lib/dupes");
+  const res = await mergePieces(survivorId, duplicateIds);
+  if (!res.ok) return { ok: false, error: res.error };
+
+  if (before?.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.merge",
+      targetType: "submission",
+      targetId: survivorId,
+      targetOwnerId: before.artist.userId,
+      summary:
+        `Merged ${res.retired} duplicate listing${res.retired === 1 ? "" : "s"} into ` +
+        `"${before.title}"${res.photosAdded > 0 ? `, keeping ${res.photosAdded} more photo${res.photosAdded === 1 ? "" : "s"}` : ""}`,
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  revalidatePath("/studio");
+  return {
+    ok: true,
+    note:
+      `Merged. ${res.retired} duplicate${res.retired === 1 ? "" : "s"} retired (not deleted — ` +
+      `their votes and history are intact), ${res.photosAdded} extra photo${res.photosAdded === 1 ? "" : "s"} kept.`,
+  };
+}
+
 /** Admin confirms ownership by hand — after a call, a DM, a receipt. */
 export async function verifyOwnerAction(formData: FormData): Promise<void> {
   await requireAdmin();

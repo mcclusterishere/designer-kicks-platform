@@ -221,7 +221,9 @@ export default async function CatalogBoard({
         ))}
         {mode === "foryou" && prefLabel && (
           <span className="tag ml-1 text-smoke">
-            {strict ? `${prefLabel} only` : `mostly ${prefLabel} + wild cards`} ·{" "}
+            {/* Same jargon, same fix: this badge is read by the people the
+                profile copy was just rewritten for. */}
+            {strict ? `${prefLabel} only` : `mostly ${prefLabel}, some of everything else`} ·{" "}
             <Link href="/profile" className="underline hover:text-white">tune</Link>
           </span>
         )}

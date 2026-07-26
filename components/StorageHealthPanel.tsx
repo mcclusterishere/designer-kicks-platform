@@ -14,10 +14,23 @@ export default async function StorageHealthPanel() {
 
   const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1) + " MB";
 
+  // `min-w-0 break-all` on the value is load-bearing, not decoration.
+  //
+  // A flex item refuses to shrink below its content by default, and an S3
+  // public URL is one unbreakable 60-character token. Without these two
+  // classes that single row pushed the whole ADMIN PAGE wider than the
+  // phone — every panel, the header and the tab bar shifted left with it,
+  // and the fix looked like a layout bug in six places at once.
+  //
+  // It only ever showed in production, because these rows are empty
+  // unless S3 is configured, and locally it isn't. That's what made it
+  // invisible until someone opened the admin on a real phone.
   const Row = ({ k, v, bad }: { k: string; v: string; bad?: boolean }) => (
     <div className="flex justify-between gap-4 border-t border-edge/60 py-1.5 text-sm">
-      <span className="text-smoke">{k}</span>
-      <span className={`text-right font-mono ${bad ? "text-heat" : "text-white"}`}>{v}</span>
+      <span className="shrink-0 text-smoke">{k}</span>
+      <span className={`min-w-0 break-all text-right font-mono ${bad ? "text-heat" : "text-white"}`}>
+        {v}
+      </span>
     </div>
   );
 

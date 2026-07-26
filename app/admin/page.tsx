@@ -42,6 +42,7 @@ import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
 import OwnerDesk from "./OwnerDesk";
 import AuditPanel from "./AuditPanel";
+import DuplicatePanel from "./DuplicatePanel";
 import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
@@ -2070,6 +2071,14 @@ export default async function AdminPage({
       {show("roster") && (
         <section className="mt-8">
           <OwnerDesk />
+        </section>
+      )}
+
+      {/* Duplicate cleanup sits under People: it's a queue of artists to
+          tidy up for, not a report to read. */}
+      {show("people") && (
+        <section className="mt-8">
+          <DuplicatePanel />
         </section>
       )}
 
