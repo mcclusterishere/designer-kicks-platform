@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { contactBook, contactStats } from "@/lib/contacts";
+import { isPro, PRICE_MONTHLY_CENTS, priceLabel } from "@/lib/plans";
 import { syncContactsAction, touchContactAction, deleteContactAction } from "@/app/actions";
 import ContactImport from "./ContactImport";
 import ContactForm from "./ContactForm";
@@ -38,9 +39,49 @@ export default async function ContactsPage() {
 
   const artist = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true, displayName: true },
+    select: {
+      id: true, status: true, displayName: true,
+      plan: true, planStatus: true, paidThrough: true,
+    },
   });
   if (!artist || artist.status !== "APPROVED") redirect("/submit");
+
+  // Gated, but never destructively. A lapsed artist's contacts are not
+  // deleted and not hidden from them forever — the list is still theirs
+  // and it's still here, they just can't open it until they're back on
+  // Pro. Holding someone's customer list hostage would be a reason to
+  // never trust the platform with it in the first place; deleting it
+  // would be worse.
+  if (!isPro(artist)) {
+    const held = await prisma.contact.count({ where: { artistId: artist.id } });
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-14">
+        <p className="tag text-volt">Artist Pro</p>
+        <h1 className="display mt-2 text-4xl text-white">Your customer list</h1>
+        <p className="mt-3 text-smoke">
+          Everyone who bought from you, what they spent, and who&apos;s gone quiet — with import
+          from your phone, Gmail or Shopify. It&apos;s part of Pro.
+        </p>
+        {held > 0 && (
+          <p className="mt-4 rounded-lg border border-volt/40 bg-volt/5 px-4 py-3 text-sm text-volt">
+            You already have {held} {held === 1 ? "contact" : "contacts"} saved here. Nothing was
+            deleted — it&apos;s waiting for you.
+          </p>
+        )}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/pricing" className="rounded-lg btn-hard px-6 py-3 tag font-bold">
+            See Pro — {priceLabel(PRICE_MONTHLY_CENTS)}/mo
+          </Link>
+          <Link
+            href="/studio"
+            className="rounded-lg border border-edge px-6 py-3 tag font-bold text-white transition hover:border-volt"
+          >
+            Back to the Studio
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const [book, stats] = await Promise.all([
     contactBook(artist.id),

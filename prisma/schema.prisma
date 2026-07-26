@@ -193,6 +193,29 @@ model ArtistProfile {
 
   contacts Contact[]
 
+  /// Subscription. `plan` is the entitlement the app reads on every
+  /// request; everything else is Stripe's state mirrored locally so a
+  /// page render never has to call Stripe to answer "can they use this".
+  ///
+  /// planStatus tracks Stripe's own subscription status rather than a
+  /// boolean, because "past_due" is not "cancelled" — a card that failed
+  /// on Tuesday shouldn't lock a maker out of their customer list while
+  /// Stripe is still retrying. Access is granted through paidThrough,
+  /// which is the only field the gate actually trusts.
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  planStatus           String? // active | past_due | canceled | incomplete
+  planPriceCents       Int? // what THIS artist pays, so founding rates survive a price change
+  planInterval         String? // month | year
+  /// Access runs to this instant regardless of billing state. Set on
+  /// payment, extended on renewal, left alone on cancellation so a
+  /// cancelling artist keeps what they already paid for.
+  paidThrough          DateTime?
+  /// Set once, the first time they ever subscribe — the cohort date for
+  /// retention maths, which a churned-and-returned artist would otherwise
+  /// scramble.
+  firstSubscribedAt    DateTime?
+
   @@index([onboardedById])
 }
 

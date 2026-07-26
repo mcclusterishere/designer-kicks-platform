@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getStudioData } from "@/lib/analytics";
 import { getHeatList } from "@/lib/battles";
+import { isPro, daysLeft, needsAttention } from "@/lib/plans";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
@@ -36,9 +37,14 @@ export default async function StudioPage() {
       commissionDays: true, commissionSlots: true,
       bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
       closetHeadline: true, featuredSubmissionId: true, accentColor: true, closetLayout: true,
+      plan: true, planStatus: true, paidThrough: true,
     },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
+
+  const onPro = isPro(profile);
+  const proDaysLeft = daysLeft(profile);
+  const billingTrouble = needsAttention(profile);
 
   const [data, heat, myDrops, myShops, commissions, myPieces] = await Promise.all([
     getStudioData(profile.id),
@@ -101,8 +107,34 @@ export default async function StudioPage() {
             {artist.displayName}
           </h1>
           <p className="mt-1 text-sm text-smoke">
-            Plan: <span className="text-volt">{artist.plan === "PRO" ? "Pro" : "Free — founding artist"}</span>
+            Plan:{" "}
+            <span className="text-volt">
+              {onPro ? "Pro" : "Free — founding artist"}
+            </span>
+            {onPro && proDaysLeft !== null && (
+              <span className="text-smoke"> · renews in {proDaysLeft} days</span>
+            )}
           </p>
+          {/* A failed card is a banner, never a lockout. Stripe retries for
+              days, and taking someone's tools away mid-retry turns a
+              billing hiccup into a cancellation. */}
+          {billingTrouble && (
+            <p className="mt-2 rounded-lg border border-heat/50 bg-heat/10 px-3 py-2 text-sm text-heat">
+              Your last payment didn&apos;t go through. Nothing&apos;s locked — update your card
+              when you get a minute.{" "}
+              <Link href="/studio/billing" className="underline">
+                Fix it
+              </Link>
+            </p>
+          )}
+          {!onPro && (
+            <p className="mt-2 text-sm text-smoke">
+              <Link href="/pricing" className="font-bold text-volt underline">
+                Artist Pro
+              </Link>{" "}
+              adds your customer list, real margins on every pair, and your own site.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Link

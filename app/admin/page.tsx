@@ -40,6 +40,7 @@ import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
+import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
 import DropRadar from "./DropRadar";
 import RosterRun from "./RosterRun";
@@ -515,7 +516,7 @@ export default async function AdminPage({
   // scroll. Deep links still work — editing a product or article jumps
   // straight to its tab.
   const { tab: tabParam } = await searchParams;
-  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "desk", "team", "settings"];
+  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "desk", "saas", "team", "settings"];
   const tab = editArticle ? "content" : edit ? "market" : TAB_IDS.includes(tabParam ?? "") ? (tabParam as string) : "pulse";
   const show = (t: string) => tab === t;
   const rosterAttention =
@@ -568,6 +569,7 @@ export default async function AdminPage({
             // Market (affiliate links and the shoe catalog — other people's
             // inventory). Different money, different room.
             { id: "desk", label: "Reseller", icon: "📦", n: 0 },
+            { id: "saas", label: "Subscriptions", icon: "📈", n: 0 },
             { id: "team", label: "Team", icon: "👥", n: 0 },
             { id: "settings", label: "Settings", icon: "⚙️", n: 0 },
           ].map((t) => (
@@ -2051,6 +2053,13 @@ export default async function AdminPage({
       {show("desk") && (
         <section className="mt-8">
           <ResellerDesk />
+        </section>
+      )}
+
+      {/* The subscription business: funnel first, revenue second. */}
+      {show("saas") && (
+        <section className="mt-8">
+          <SaasPanel />
         </section>
       )}
       {show("content") && <DripSection />}
