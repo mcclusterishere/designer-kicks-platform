@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { registerUser } from "@/app/account-actions";
 import type { ActionResult } from "@/app/actions";
 import { checkEmailDomain } from "@/lib/emailDomains";
+import PasswordField from "@/components/PasswordField";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
@@ -110,10 +111,13 @@ export default function RegisterForm({ next = "/profile" }: { next?: string }) {
           </div>
         )}
       </div>
-      <div>
-        <label htmlFor="password" className="tag text-smoke">Password (8+ characters)</label>
-        <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
-      </div>
+      <PasswordField
+        label="Password (8+ characters)"
+        autoComplete="new-password"
+        minLength={8}
+        confirm
+        confirmLabel="Type it again"
+      />
       <label htmlFor="age13" className="flex items-start gap-2 text-sm text-smoke">
         <input id="age13" name="age13" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
         <span>

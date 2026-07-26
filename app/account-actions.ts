@@ -26,6 +26,29 @@ function validPassword(password: string): string | null {
   return null;
 }
 
+/**
+ * The two boxes have to agree — checked here as well as in the browser.
+ *
+ * The form wires the mismatch through setCustomValidity so the browser
+ * refuses to submit, which is the right experience. It is not a
+ * guarantee: anything a client enforces, a client can skip, and a form
+ * post is a form post. Getting this wrong doesn't leak anything, it just
+ * silently sets a password to something the person didn't mean — which on
+ * this platform means an artist locked out of their own catalogue with no
+ * idea why.
+ *
+ * Deliberately tolerant of a MISSING second field rather than requiring
+ * it. Not every caller sets a password through a two-box form, and a
+ * check that hard-fails on absence would break the next one that doesn't.
+ * An empty confirm means "not asked"; a present-and-different one is the
+ * only failure.
+ */
+function passwordsAgree(password: string, confirm: string): string | null {
+  if (confirm === "") return null;
+  if (confirm !== password) return "Those two passwords don't match — check the second box.";
+  return null;
+}
+
 export async function registerUser(
   _prev: (ActionResult & { devResetLink?: string }) | null,
   formData: FormData
@@ -49,6 +72,8 @@ export async function registerUser(
   }
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+  const matchErr = passwordsAgree(password, String(formData.get("confirmPassword") ?? ""));
+  if (matchErr) return { ok: false, error: matchErr };
   // COPPA: the service is 13+. The affirmation is required at signup.
   if (!age13) return { ok: false, error: "You must confirm you're at least 13 to create an account." };
   // Membership is the door: every account is an Equity Uprise PMA
@@ -252,6 +277,8 @@ export async function resetPassword(
   const password = String(formData.get("password") ?? "");
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+  const matchErr = passwordsAgree(password, String(formData.get("confirmPassword") ?? ""));
+  if (matchErr) return { ok: false, error: matchErr };
 
   const row = await prisma.passwordResetToken.findUnique({ where: { token } });
   if (!row || row.expires < new Date()) {

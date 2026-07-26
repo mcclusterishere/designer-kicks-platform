@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { resetPassword } from "@/app/account-actions";
 import type { ActionResult } from "@/app/actions";
+import PasswordField from "@/components/PasswordField";
 
 export default function ResetForm({ token }: { token: string }) {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -28,18 +29,16 @@ export default function ResetForm({ token }: { token: string }) {
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="token" value={token} />
-      <div>
-        <label htmlFor="password" className="tag text-smoke">New password (8+ characters)</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          className="mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white focus:border-volt focus:outline-none"
-        />
-      </div>
+      {/* Recovery is the path where a mistyped password hurts most: it is
+          where someone already locked out goes, and getting it wrong here
+          locks them out again with no obvious reason why. */}
+      <PasswordField
+        label="New password (8+ characters)"
+        autoComplete="new-password"
+        minLength={8}
+        confirm
+        confirmLabel="Type it again"
+      />
       {state?.error && <p className="text-sm text-heat">{state.error}</p>}
       <button
         type="submit"
