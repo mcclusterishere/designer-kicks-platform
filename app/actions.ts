@@ -664,7 +664,7 @@ export async function recordSale(
     );
   }
 
-  await prisma.sale.create({
+  const sale = await prisma.sale.create({
     data: {
       submissionId: submission.id,
       sellerId,
@@ -674,11 +674,38 @@ export async function recordSale(
       note: note || null,
       evidenceUrl,
     },
+    select: { id: true },
   });
+
+  // Tell the BUYER. This is the whole handoff and it was missing.
+  //
+  // Recording a sale collected the buyer's address and then emailed
+  // nobody but us. The claim link existed, but only on the artist's own
+  // public page, which meant the maker had to go find it and send it by
+  // hand — so in practice nothing ever got claimed. Every sale sat
+  // PENDING forever, no ownership moved, no collector account was
+  // created, and the resale side of the market stayed empty because
+  // nobody ever came to own anything they could resell.
+  //
+  // Fire-and-forget: a mail outage must never fail a sale that already
+  // happened in real life. The artist still gets a copyable link either
+  // way, because for this roster the real channel is an Instagram DM.
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const sellerName = submission.artist?.displayName ?? sellerUser?.name ?? "The seller";
+  const { buyerClaimEmail, claimUrl } = await import("@/lib/handoff");
+  sendMail({
+    to: buyerEmail,
+    ...buyerClaimEmail({
+      title: submission.title,
+      sellerName,
+      priceCents: Math.round(price * 100),
+      claimUrl: claimUrl(sale.id, base),
+    }),
+  }).catch(() => {});
 
   notifyAdmin(
     "Sale recorded — pending buyer claim",
-    `"${submission.title}" recorded sold for $${price}${evidenceUrl ? " (evidence attached)" : " (no evidence)"}. It confirms when the buyer claims it; ledger: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+    `"${submission.title}" recorded sold for $${price}${evidenceUrl ? " (evidence attached)" : " (no evidence)"}. Buyer emailed a claim link. It confirms when they claim it; ledger: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
   );
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
@@ -5702,4 +5729,59 @@ export async function deleteContactAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   await prisma.contact.deleteMany({ where: { id, artistId: artist.id } });
   revalidatePath("/studio/contacts");
+}
+
+// ---- Handoff: chasing an unclaimed sale --------------------------------
+
+/**
+ * Re-send a buyer their claim link.
+ *
+ * Rate-limited per sale rather than per artist, so chasing three
+ * different buyers on the same day is fine but hammering one of them
+ * isn't. Uses the check/spend split: a mail that fails to send costs no
+ * budget, because the artist got nothing for it.
+ */
+export async function resendClaimLink(formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const saleId = String(formData.get("saleId") ?? "");
+  if (!saleId) return;
+
+  const sale = await prisma.sale.findFirst({
+    where: {
+      id: saleId,
+      status: "PENDING",
+      // Only the seller — the artist who recorded it, or whoever owned
+      // the piece at the time. Without this, any signed-in account could
+      // spray claim links for sales that aren't theirs.
+      OR: [{ sellerId: session.user.id }, { submission: { artist: { userId: session.user.id } } }],
+    },
+    select: {
+      id: true,
+      buyerEmail: true,
+      priceCents: true,
+      submission: { select: { title: true, artist: { select: { displayName: true } } } },
+    },
+  });
+  if (!sale) return;
+
+  const WINDOW = 24 * 60 * 60 * 1000;
+  if (!checkAttempt("claim-resend", saleId, 2, WINDOW).ok) return;
+
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const seller = sale.submission.artist?.displayName ?? "The seller";
+  const { buyerClaimEmail, claimUrl } = await import("@/lib/handoff");
+  const { delivered } = await sendMail({
+    to: sale.buyerEmail,
+    ...buyerClaimEmail({
+      title: sale.submission.title,
+      sellerName: seller,
+      priceCents: sale.priceCents,
+      claimUrl: claimUrl(sale.id, base),
+      reminder: true,
+    }),
+  });
+
+  if (delivered) spendAttempt("claim-resend", saleId, WINDOW);
+  revalidatePath("/studio");
 }

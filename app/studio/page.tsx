@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { getStudioData } from "@/lib/analytics";
 import { getHeatList } from "@/lib/battles";
 import { isPro, daysLeft, needsAttention } from "@/lib/plans";
+import { pendingHandoffs, handoffMessage, handoffStats } from "@/lib/handoff";
+import HandoffDesk from "@/components/HandoffDesk";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
@@ -73,6 +75,21 @@ export default async function StudioPage() {
   const waitlist = commissions.filter((c) => c.status === "WAITLIST");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const { artist, stats, votesSeries, followsLast14, soldSales } = data;
+
+  // The unfinished transactions. Money already moved in real life; the
+  // piece just isn't officially anybody's yet, which keeps it off the
+  // artist's record and out of the resale market entirely.
+  const { siteUrl: siteBase } = await import("@/lib/articles");
+  const handoffs = (await pendingHandoffs(profile.id, siteBase())).map((h) => ({
+    ...h,
+    message: handoffMessage({
+      title: h.title,
+      artistName: artist.displayName,
+      claimUrl: h.claimUrl,
+    }),
+  }));
+  const handoff = await handoffStats(profile.id);
+
 
   const bestRank = Math.min(
     ...artist.submissions.map((s) => heatRank.get(s.id) ?? Infinity)
@@ -151,6 +168,19 @@ export default async function StudioPage() {
           </Link>
         </div>
       </div>
+
+      {/* Unfinished handoffs sit above the vanity stats on purpose. An
+          unclaimed sale is real money that moved with nothing on the
+          record to show for it — worth more attention than a vote count. */}
+      <HandoffDesk items={handoffs} />
+
+      {handoff.claimed > 0 && (
+        <p className="mt-4 text-xs text-smoke">
+          {handoff.claimed} of your sales {handoff.claimed === 1 ? "has been" : "have been"}
+          {" "}claimed ({handoff.claimRatePct}%) — each one is a collector who now owns a piece
+          with your name on it.
+        </p>
+      )}
 
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((t) => (

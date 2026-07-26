@@ -169,11 +169,20 @@ function CustomTile({
             Consigned
           </span>
         )}
-        {item.ownerName && item.askCents && (
+        {item.ownerName && item.askCents ? (
           <span className="absolute bottom-2 right-2 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
             Resale
           </span>
-        )}
+        ) : item.askCents ? (
+          // The other half of the same fact, and it was missing. A piece
+          // with an ask and no owner is the maker selling their own work
+          // for the first time. Unlabelled, it reads identically to a
+          // collector resale — which made the board look like a
+          // secondary market when every listing on it was a first sale.
+          <span className="absolute bottom-2 right-2 rounded bg-volt px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            From the maker
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col p-3">
         <p className="truncate text-sm font-semibold text-white" title={item.title}>
@@ -209,11 +218,15 @@ function CustomTile({
             · proceeds split with a private collector
           </p>
         )}
-        {item.ownerName && item.askCents && (
+        {item.ownerName && item.askCents ? (
           <p className="mt-1 text-[11px] leading-relaxed text-smoke">
             Collector resale — {RESALE_ARTIST_ROYALTY_PCT}% royalty goes back to the artist
           </p>
-        )}
+        ) : item.askCents ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-smoke">
+            First sale, direct from {item.artistName} — never owned by anyone else
+          </p>
+        ) : null}
 
         {/* The proprietary number: Heat Index, its 8-week tape, its 7-day move */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded bg-ink/60 px-2 py-1">

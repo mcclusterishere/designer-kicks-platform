@@ -127,6 +127,9 @@ jobs:
       - name: Contact import
         run: npm run verify:contacts
 
+      - name: Buyer handoff
+        run: npm run verify:handoff
+
       - name: Subscription metrics
         run: npm run verify:saas
 

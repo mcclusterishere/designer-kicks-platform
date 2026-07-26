@@ -22,7 +22,8 @@
     "verify:reseller": "rm -rf node_modules/.verifyr && tsc scripts/verify-reseller.ts --outDir node_modules/.verifyr --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyr/scripts/verify-reseller.js",
     "verify:limits": "rm -rf node_modules/.verifyl2 && tsc scripts/verify-limits.ts --outDir node_modules/.verifyl2 --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node node_modules/.verifyl2/scripts/verify-limits.js",
     "verify:contacts": "rm -rf node_modules/.verifyc && tsc scripts/verify-contacts.ts --outDir node_modules/.verifyc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyc/scripts/verify-contacts.js",
-    "verify:saas": "rm -rf node_modules/.verifys && tsc scripts/verify-saas.ts --outDir node_modules/.verifys --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifys/scripts/verify-saas.js"
+    "verify:saas": "rm -rf node_modules/.verifys && tsc scripts/verify-saas.ts --outDir node_modules/.verifys --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifys/scripts/verify-saas.js",
+    "verify:handoff": "rm -rf node_modules/.verifyh && tsc scripts/verify-handoff.ts --outDir node_modules/.verifyh --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyh/scripts/verify-handoff.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
