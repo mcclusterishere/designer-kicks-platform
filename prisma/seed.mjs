@@ -1631,27 +1631,41 @@ async function restoreDekotaHandle() {
   console.log(`Handle restore: ${p.slug} now wears @the_gifted_7 (owner's real IG).`);
 }
 
+/**
+ * Staff seats are granted, never matched.
+ *
+ * This used to promote any MEMBER whose DISPLAY NAME matched a hard-coded
+ * pair of strings, on every boot. A display name is a free-text field the
+ * account holder controls: open /profile, type the name, wait for the
+ * next deploy, and the seed handed you EDITOR. Editors can reassign
+ * unclaimed artist pages with outreachInvite and get the claim URL back,
+ * so that is a roster takeover reachable by anyone with an account and a
+ * keyboard — the same escalation that was just closed at signup,
+ * re-opened through the back door.
+ *
+ * Names are not identity. The admin Team panel already grants editor by
+ * EMAIL, which at least requires control of a mailbox, and it writes an
+ * audit entry. That is the only door now; this function is deliberately
+ * empty of any promotion and kept only as the place this note lives.
+ *
+ * If a seat needs restoring after this change: Admin → Settings → Team →
+ * grant editor by email. One click, and it survives deploys because it
+ * is a real database grant rather than a string match re-applied at boot.
+ */
 async function promoteNamedEditors() {
-  const res = await prisma.user.updateMany({
-    where: {
-      role: "MEMBER",
-      OR: [
-        { name: { equals: "Benjamin Chase", mode: "insensitive" } },
-        { name: { equals: "Benji Chase", mode: "insensitive" } },
-      ],
-    },
-    data: { role: "EDITOR" },
-  });
-  if (res.count > 0) {
-    console.log(`Editor promotion: ${res.count} account(s) named Benjamin/Benji Chase → EDITOR.`);
-  }
+  // Intentionally does nothing. See the note above.
 }
 
 // The Editor's Pick — a quietly hand-picked feature, independent of the
-// Heat List. The designer is Hitman Benji (Benjamin Chase is the person
-// behind the alias); the giveaway is a 1-of-1 vest he builds for the
-// winner. Kept understated on purpose — prestige, not a flex. Idempotent:
-// once a human edits the name/note in admin, this stops overwriting it.
+// Heat List. The designer is Hitman Benji; the giveaway is a 1-of-1 vest
+// he builds for the winner. Kept understated on purpose — prestige, not a
+// flex. Idempotent: once a human edits the name/note in admin, this stops
+// overwriting it.
+//
+// The alias is the only name that belongs in this repository. It is
+// public, this file is public, and pairing a working alias with the legal
+// name behind it in source is a doxx that no feature needed — the code
+// never had to know who anyone really is to feature their work.
 const BENJI_EDITORIAL_NOTE =
   "Hitman Benji turns tactical vest blanks into one-of-one wearable armor — brocade, hand-laid lace, inked centerpieces, finished like couture. The kind of work you feel before anybody tells you to.";
 const BENJI_BIO =
@@ -1663,22 +1677,24 @@ async function featureBenjiChase() {
   let artist = await prisma.artistProfile.findFirst({
     where: {
       OR: [
-        { slug: "benji-chase" },
         { slug: "hitman-benji" },
-        { displayName: { in: ["Benji Chase", "Benjamin Chase", "Hitman Benji"], mode: "insensitive" } },
+        { displayName: { equals: "Hitman Benji", mode: "insensitive" } },
       ],
     },
   });
 
   // No page yet (fresh launch DB) — stand one up so the pick always exists.
   if (!artist) {
+    // Looked up by the account's own address, not by a display name:
+    // display names are free text that anybody can type into /profile, so
+    // matching on one lets a stranger inherit whatever the match confers.
     let user = await prisma.user.findFirst({
-      where: { name: { in: ["Benji Chase", "Benjamin Chase"], mode: "insensitive" } },
+      where: { email: "hitman.benji@theheatchart.com" },
       select: { id: true },
     });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: "benji.chase@theheatchart.com", name: "Benjamin Chase", role: "EDITOR" },
+        data: { email: "hitman.benji@theheatchart.com", name: "Hitman Benji" },
         select: { id: true },
       });
     }
@@ -1700,9 +1716,14 @@ async function featureBenjiChase() {
   }
   if (!artist) return;
 
-  // His designer name is Hitman Benji — keep it. Self-heal any page my
-  // earlier code had renamed to Benji/Benjamin Chase back to the alias,
-  // but never clobber a name a human deliberately set to something else.
+  // The designer name is Hitman Benji — keep it.
+  //
+  // The two strings below are a SCRUB LIST, not a record of who anyone
+  // is: earlier code published a legal name onto this public page, and
+  // this is what renames it back to the alias wherever that already
+  // happened in a live database. They stay until there is no chance a
+  // production row still carries one. Never clobbers a name a human
+  // deliberately set to something else.
   const data = { editorsPick: true, editorialNote: artist.editorialNote || BENJI_EDITORIAL_NOTE };
   if (artist.displayName === "Benji Chase" || artist.displayName === "Benjamin Chase")
     data.displayName = "Hitman Benji";
@@ -2035,9 +2056,51 @@ async function main() {
     // pieces are keyed by title and created when missing. Admin/artist
     // edits always survive — the seed only fills blanks and replaces
     // photos whose upload files no longer exist on this machine.
+    // Is this photo still really there?
+    //
+    // This question decides whether the seed overwrites an artist's own
+    // cover photo with the stock image from the repo, so getting it wrong
+    // destroys the exact thing the platform exists to hold. It WAS wrong.
+    //
+    // It only ever looked on the local filesystem. But uploads are stored
+    // in one of three places depending on configuration: S3 when it's
+    // set, otherwise a Postgres blob (bytea), and only as a last-ditch
+    // fallback the disk. Postgres-backed uploads still get a
+    // `/api/uploads/<name>` URL — the same shape as a disk file — so
+    // every one of them looked "missing" to a filesystem check, and the
+    // next deploy quietly reverted the maker's photo to repo stock and
+    // dropped their gallery shots with it.
+    //
+    // Production is currently on S3, whose absolute URLs take the early
+    // return, so this has not been firing there — but it is exactly the
+    // shape of the incident that lost Dakota's photos, and it re-arms the
+    // moment S3 is unset or a credential lapses.
+    //
+    // Now a name counts as present if the blob table has it OR the disk
+    // does. Loaded once up front rather than per-photo: a query inside a
+    // filter over every piece is its own kind of mistake.
+    let knownBlobs = new Set();
+    try {
+      const rows = await prisma.uploadBlob.findMany({ select: { name: true } });
+      knownBlobs = new Set(rows.map((r) => r.name));
+    } catch {
+      // No blob table yet (fresh database mid-migration). Fall through to
+      // the disk check — and note that an empty set can only make this
+      // MORE likely to call a photo missing, so pair it with the guard
+      // below, which refuses to "repair" anything when we cannot tell.
+    }
+    const blobLookupWorked = knownBlobs.size > 0;
+
     const uploadFileExists = (imageUrl) => {
-      if (!imageUrl?.startsWith("/api/uploads/")) return true; // seed/external URLs: not ours to judge
-      return existsSync(path.join(process.cwd(), "data", "uploads", path.basename(imageUrl)));
+      if (!imageUrl?.startsWith("/api/uploads/")) return true; // S3/seed/external URLs: not ours to judge
+      const base = path.basename(imageUrl);
+      if (knownBlobs.has(base)) return true;
+      if (existsSync(path.join(process.cwd(), "data", "uploads", base))) return true;
+      // Genuinely not found in either store. If we could not read the
+      // blob table at all, say "present" anyway: silently replacing a
+      // live photo is far worse than leaving a broken one on screen,
+      // where a human can see it and ask.
+      return !blobLookupWorked;
     };
 
     // Heal any legacy 'headwear' pieces: that category was briefly a
