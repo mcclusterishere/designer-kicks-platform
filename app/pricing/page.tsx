@@ -11,6 +11,7 @@ import {
   isPro,
 } from "@/lib/plans";
 import { startSubscription } from "@/app/billing-actions";
+import { foundingSeatsLeft, FOUNDING_SEATS, FOUNDING_MONTHS } from "@/lib/founding";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function PricingPage() {
     : null;
   const already = isPro(artist);
   const monthsFree = yearlyMonthsFree();
+  const seatsLeft = await foundingSeatsLeft();
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-14">
@@ -43,6 +45,26 @@ export default async function PricingPage() {
         customers are, what you actually cleared on a pair, and having a site with your name on
         it instead of ours.
       </p>
+
+      {/* The Founding 100. Shown only while seats exist — an expired offer
+          left on a pricing page is worse than no offer, because it tells
+          every artist who reads it that they arrived too late. */}
+      {seatsLeft > 0 && !already && (
+        <div className="mt-8 rounded-2xl border-2 border-volt bg-volt/[0.07] p-6">
+          <p className="tag text-volt">The Founding {FOUNDING_SEATS}</p>
+          <h2 className="display mt-1 text-3xl text-white">
+            The first {FOUNDING_SEATS} artists get Pro free for {FOUNDING_MONTHS} months.
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
+            Not a trial — a thank-you. Backing a platform before it&apos;s obvious is the hard
+            version, and the people who do it first are the reason there&apos;s anything here for
+            anyone else to join. No card, no subscription, nothing to remember to cancel.
+          </p>
+          <p className="mt-3 tag text-volt">
+            {seatsLeft} of {FOUNDING_SEATS} {seatsLeft === 1 ? "seat" : "seats"} left
+          </p>
+        </div>
+      )}
 
       <div className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Free, described properly rather than as a crippled teaser. */}
@@ -113,6 +135,21 @@ export default async function PricingPage() {
               </Link>
               <p className="mt-2 text-center text-xs text-smoke">
                 Pro is for approved artists — apply free, it takes a minute.
+              </p>
+            </div>
+          ) : seatsLeft > 0 ? (
+            /* While seats remain there is exactly one button, and it does
+               not mention a price, because there isn't one to pay. Two
+               buttons here — one free, one $29 — would just be a puzzle. */
+            <div className="mt-6">
+              <form action={startSubscription}>
+                <input type="hidden" name="interval" value="month" />
+                <button className="w-full rounded-lg btn-hard py-3.5 tag font-bold glow-volt">
+                  Claim your free year
+                </button>
+              </form>
+              <p className="mt-2 text-center text-xs text-smoke">
+                No card, nothing to cancel — we never take a payment method for this.
               </p>
             </div>
           ) : (

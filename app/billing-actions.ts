@@ -2,8 +2,10 @@
 
 import Stripe from "stripe";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { sendMail } from "@/lib/mailer";
 import { PRICE_MONTHLY_CENTS, PRICE_YEARLY_CENTS } from "@/lib/plans";
 
 /**
@@ -36,6 +38,38 @@ export async function startSubscription(formData: FormData): Promise<void> {
   });
   if (!artist) redirect("/submit");
   if (artist.plan === "PRO") redirect("/studio?billing=already");
+
+  // The Founding 100 come before the checkout, not after it.
+  //
+  // While seats remain, reaching for Pro doesn't open a payment form at
+  // all — it grants twelve months and a founding number. No card is
+  // collected, so there is no subscription to cancel later and no way for
+  // this to quietly start billing in a year.
+  //
+  // Ordered ahead of the Stripe branch deliberately: an artist should
+  // never see a price, decide it's too much, and leave, while a free seat
+  // with their name on it was sitting one line further down.
+  const { claimFoundingSeat, foundingEmail } = await import("@/lib/founding");
+  const claim = await claimFoundingSeat(artist.id);
+  if (claim.ok) {
+    if (!claim.alreadyHad) {
+      // Fire-and-forget: a mail outage must not undo a grant that already
+      // landed in the database. The Studio thanks them on screen anyway,
+      // so the email is the keepsake rather than the notification.
+      sendMail({
+        to: session.user.email ?? "",
+        ...foundingEmail({
+          artistName: artist.displayName,
+          number: claim.number,
+          through: claim.through,
+          siteUrl: siteBase(),
+        }),
+      }).catch(() => {});
+    }
+    revalidatePath("/pricing");
+    revalidatePath("/studio");
+    redirect(`/studio?founding=${claim.number}`);
+  }
 
   const stripe = stripeClient();
   if (!stripe) redirect("/pricing?billing=unconfigured");

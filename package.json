@@ -28,7 +28,8 @@
     "verify:ownership": "rm -rf node_modules/.verifyown && tsc scripts/verify-ownership.ts --outDir node_modules/.verifyown --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyown/scripts/verify-ownership.js",
     "verify:audit": "rm -rf node_modules/.verifyaudit && tsc scripts/verify-audit.ts --outDir node_modules/.verifyaudit --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyaudit/scripts/verify-audit.js",
     "verify:authz": "rm -rf node_modules/.verifyauthz && tsc scripts/verify-authz.ts --outDir node_modules/.verifyauthz --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyauthz/scripts/verify-authz.js",
-    "verify:secrets": "node scripts/verify-secrets.mjs"
+    "verify:secrets": "node scripts/verify-secrets.mjs",
+    "verify:founding": "rm -rf node_modules/.verifyfnd && tsc scripts/verify-founding.ts --outDir node_modules/.verifyfnd --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyfnd/scripts/verify-founding.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"

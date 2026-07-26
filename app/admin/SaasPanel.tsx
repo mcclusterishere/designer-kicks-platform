@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { saasMetrics, claimFunnel, monthsToGoal } from "@/lib/saas";
+import { FOUNDING_SEATS } from "@/lib/founding";
 import { priceLabel, PRICE_MONTHLY_CENTS } from "@/lib/plans";
 
 /**
@@ -51,7 +52,7 @@ export default async function SaasPanel() {
           <h2 className="display text-xl text-white">The funnel</h2>
           <p className="tag text-smoke">Pages → claimed → posting → paying</p>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           <Stat label="Artist pages" value={String(m.pages)} sub="Including ones we built" />
           <Stat
             label="Actually claimed"
@@ -60,11 +61,22 @@ export default async function SaasPanel() {
             sub={`${m.claimRatePct}% of pages`}
           />
           <Stat label="Claimed + posting" value={String(m.active)} sub="Real users" />
+          {/* Founding seats sit BESIDE paying, never inside it. They are
+              the answer to "will artists use the business tools", which
+              is the question that comes before "will they pay for them" —
+              and folding them together would report a hundred customers
+              against zero revenue. */}
+          <Stat
+            label="Founding 100"
+            value={`${m.founding} / ${FOUNDING_SEATS}`}
+            tone={m.founding > 0 ? "good" : "plain"}
+            sub={`${FOUNDING_SEATS - m.founding} seats left · free, no card`}
+          />
           <Stat
             label="Paying"
             value={String(m.paying)}
             tone={m.paying > 0 ? "good" : "plain"}
-            sub={`${m.conversionPct}% of claimed`}
+            sub={`${m.conversionPct}% of claimed · real money only`}
           />
         </div>
 

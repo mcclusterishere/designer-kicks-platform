@@ -39,7 +39,21 @@ export type SaasMetrics = {
   /** Claimed AND has posted work. The first honest sign of a user. */
   active: number;
   claimRatePct: number;
+  /** Artists paying real money. Founding seats are NOT in here. */
   paying: number;
+  /**
+   * Founding 100 seats in use — Pro, free, no card.
+   *
+   * Deliberately its own number rather than folded into `paying`. They
+   * are a live, entitled, engaged cohort and that is worth knowing, but
+   * counting them as customers would report a hundred subscribers against
+   * zero MRR, an ARPU of nothing, and a conversion rate of 100% — a
+   * dashboard that flatters in three places at once and is wrong in all
+   * three. What they actually are is the answer to "will artists use the
+   * business tools at all", which is a different and earlier question
+   * than "will they pay for them".
+   */
+  founding: number;
   mrrCents: number;
   arpuCents: number;
   /** Paid but in trouble — a failed card, still retrying. */
@@ -101,7 +115,10 @@ export async function saasMetrics(now: Date = new Date()): Promise<SaasMetrics> 
     (t, s) => t + monthlyValueCents(s.planPriceCents, s.planInterval),
     0
   );
-  const paying = live.length;
+  // Founding seats are live entitlements that nobody is paying for, so
+  // they belong in their own column and out of every revenue ratio.
+  const founding = live.filter((s) => s.planStatus === "founding").length;
+  const paying = live.length - founding;
 
   const thirtyAgo = new Date(now.getTime() - 30 * DAY);
   // Who was paying 30 days ago: anyone who had already subscribed by then
@@ -127,6 +144,7 @@ export async function saasMetrics(now: Date = new Date()): Promise<SaasMetrics> 
     active,
     claimRatePct: pct(claimed, pages),
     paying,
+    founding,
     mrrCents,
     arpuCents: paying > 0 ? Math.round(mrrCents / paying) : 0,
     atRisk: subs.filter((s) => s.planStatus === "past_due" || s.planStatus === "incomplete").length,

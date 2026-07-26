@@ -154,6 +154,11 @@ jobs:
       - name: Subscription metrics
         run: npm run verify:saas
 
+      # The cap is a promise with a number in it. A 101st founding member
+      # makes the offer a lie and every earlier seat worth less.
+      - name: The Founding 100
+        run: npm run verify:founding
+
   build:
     name: Production build
     runs-on: ubuntu-latest

@@ -26,13 +26,20 @@ import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
 import StudioAssistant from "./StudioAssistant";
 import { siteUrl } from "@/lib/articles";
+import { FOUNDING_SEATS, FOUNDING_MONTHS } from "@/lib/founding";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
 
-export default async function StudioPage() {
+export default async function StudioPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ founding?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
+
+  const justClaimed = (await searchParams)?.founding;
 
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
@@ -43,6 +50,7 @@ export default async function StudioPage() {
       bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
       closetHeadline: true, featuredSubmissionId: true, accentColor: true, closetLayout: true,
       plan: true, planStatus: true, paidThrough: true,
+      foundingNumber: true,
     },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
@@ -122,6 +130,40 @@ export default async function StudioPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
+      {/* The thank-you, shown the moment they land back from claiming.
+          Only on the redirect — a permanent congratulations banner stops
+          being a thank-you and becomes furniture. The seat number lives
+          in the plan line below it forever instead. */}
+      {justClaimed && profile.foundingNumber && (
+        <section className="mb-8 rounded-2xl border-2 border-volt bg-volt/[0.07] p-6">
+          <p className="tag text-volt">Founding Artist #{profile.foundingNumber}</p>
+          <h2 className="display mt-1 text-3xl text-white">Thank you.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
+            You&apos;re one of the first {FOUNDING_SEATS} artists on The Heat Chart. Backing this
+            before it was obvious is the hard version, and the people who do it first are the
+            reason there&apos;s anything here for anyone else to join.
+          </p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
+            Artist Pro is yours free for {FOUNDING_MONTHS} months
+            {profile.paidThrough ? (
+              <>
+                {" "}
+                — through{" "}
+                <span className="text-white">
+                  {profile.paidThrough.toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </>
+            ) : null}
+            . There&apos;s no card on file and nothing to cancel — we never took a payment
+            method, so we can&apos;t charge you. Everything below is open now.
+          </p>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="tag text-volt">Artist Studio</p>
@@ -131,10 +173,21 @@ export default async function StudioPage() {
           <p className="mt-1 text-sm text-smoke">
             Plan:{" "}
             <span className="text-volt">
-              {onPro ? "Pro" : "Free — founding artist"}
+              {profile.foundingNumber
+                ? `Pro — Founding Artist #${profile.foundingNumber}`
+                : onPro
+                  ? "Pro"
+                  : "Free"}
             </span>
+            {/* A founding seat doesn't renew, so it must never say
+                "renews" — that reads as a charge coming, which is the one
+                thing this offer promises isn't. */}
             {onPro && proDaysLeft !== null && (
-              <span className="text-smoke"> · renews in {proDaysLeft} days</span>
+              <span className="text-smoke">
+                {profile.foundingNumber
+                  ? ` · free for another ${proDaysLeft} days`
+                  : ` · renews in ${proDaysLeft} days`}
+              </span>
             )}
           </p>
           {/* A failed card is a banner, never a lockout. Stripe retries for

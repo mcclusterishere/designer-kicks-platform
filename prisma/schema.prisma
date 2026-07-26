@@ -246,6 +246,22 @@ model ArtistProfile {
   /// scramble.
   firstSubscribedAt    DateTime?
 
+  /// The Founding 100.
+  ///
+  /// Their seat number, 1 through 100, in the order they claimed it. It
+  /// is @unique for a reason beyond tidiness: it is what actually
+  /// enforces the cap. Two artists tapping "Go Pro" in the same instant
+  /// both compute the same next number, the database refuses the second,
+  /// and it retries into the next free seat — so the hundredth seat can
+  /// be handed out exactly once no matter how the requests interleave.
+  /// A counter in application code cannot promise that.
+  ///
+  /// Kept separate from the billing columns because it is not billing:
+  /// it is a fact about who showed up first, and it stays true long after
+  /// the twelve months run out.
+  foundingNumber    Int?      @unique
+  foundingGrantedAt DateTime?
+
   @@index([onboardedById])
 }
 
