@@ -91,6 +91,7 @@ export default function RegisterForm({ next = "/profile" }: { next?: string }) {
           required
           autoComplete="email"
           className={inputClass}
+          aria-describedby="email-privacy"
           onChange={() => {
             setTypo(null);
             approved.current = false;
@@ -110,6 +111,35 @@ export default function RegisterForm({ next = "/profile" }: { next?: string }) {
             </button>
           </div>
         )}
+        {/*
+          Said here, at the field people actually hesitate over, rather than
+          buried in a policy nobody opens mid-signup.
+
+          Deliberately specific instead of a warm blanket like "we respect
+          your privacy". A vague reassurance is worth nothing to somebody
+          deciding whether to hand over the address their whole life runs
+          through — and worse, it's the exact phrasing every company that
+          did sell your data also used. Naming what stays hidden AND what
+          shows is the only version that earns anything.
+
+          Every clause is checked before being written here: no public page
+          renders a member's email (e2e/leaks.e2e.mjs greps the real bytes
+          of every artist page, every collector closet and the claim page
+          for any address); "never sold, never to advertisers" restates
+          /privacy verbatim rather than inventing a new promise; and the
+          name really is public in exactly the places listed — comments,
+          the leaderboards, and a collector closet page.
+        */}
+        <p id="email-privacy" className="mt-2 text-xs leading-relaxed text-smoke">
+          <span aria-hidden="true">🔒</span> Your email is <span className="text-white">never
+          shown to other members</span>, never sold, and never handed to advertisers. It signs
+          you in and lets us reach you about your own pieces — nothing else. The only thing
+          other people see is the name above, and only if you comment, land on a leaderboard,
+          or open a collector closet.{" "}
+          <a href="/privacy" target="_blank" className="text-volt underline">
+            Privacy
+          </a>
+        </p>
       </div>
       <PasswordField
         label="Password (8+ characters)"
