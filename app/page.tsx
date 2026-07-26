@@ -98,11 +98,21 @@ export default async function HomePage() {
             <h1 className="display mt-2 max-w-3xl text-7xl sm:text-8xl">
               <span className="text-gradient-volt">The Heat Chart.</span>
             </h1>
+            {/* Four short sentences instead of one long one.
+                The old version was a single run-on carrying five separate
+                products — release dates, resale, games, the draft, and
+                the custom work — so a first-time reader got a list before
+                they got an idea, and had to hold all five to understand
+                any. Say the one thing that's actually different first;
+                the features can wait for the sections below. */}
             <p className="mt-6 max-w-xl text-lg text-smoke">
-              Sneaker culture, all of it. Release dates and drop coverage,
-              live resale on every pair worth chasing, free games and a
-              weekly draft — and the part nobody else has: wearable
-              one-of-one artwork, straight from the makers who build it.
+              Artists paint one-of-a-kind sneakers. You vote on which ones are best,
+              and buy the ones you want.
+            </p>
+            <p className="mt-3 max-w-xl text-lg text-smoke">
+              There&apos;s only ever one of each pair, and the person who made it
+              signed it. Release dates, resale prices and the games are all here
+              too — free.
             </p>
             <div className="mt-9 flex flex-wrap gap-5">
               <Link

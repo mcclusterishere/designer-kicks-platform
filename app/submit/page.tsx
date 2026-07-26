@@ -21,11 +21,21 @@ export default async function SubmitPage() {
       <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
         Submit Your <span className="text-volt">Customs</span>
       </h1>
+      {/* "Customs" stays — this page is read by people who make them and
+          that IS the word they use. What doesn't stay is assuming they
+          already know how the site works: "matched into vote battles" and
+          "league table" describe a mechanic they haven't seen yet. */}
       <p className="mt-3 text-smoke">
-        Painted, deconstructed, dyed, rebuilt — if you made it, we want to see
-        it. Approved submissions get matched into vote battles, and every
-        battle builds your artist record on the{" "}
-        <Link href="/artists" className="text-volt underline">league table</Link>.
+        Painted, deconstructed, dyed, rebuilt — if you made it, we want to see it.
+      </p>
+      <p className="mt-2 text-smoke">
+        Once we approve it, your piece goes head to head against another artist&apos;s
+        and people vote for the one they&apos;d rather own. Wins and losses build up your
+        record on the{" "}
+        <Link href="/artists" className="text-volt underline">
+          artist rankings
+        </Link>
+        .
       </p>
 
       <ul className="mt-6 space-y-1 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">

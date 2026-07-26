@@ -155,6 +155,11 @@ export default function RegisterForm({ next = "/profile" }: { next?: string }) {
           children under 13.
         </span>
       </label>
+      {/* The consent sentence itself is left exactly as written — it is a
+          legal agreement and softening the words someone is agreeing TO
+          would be the wrong kind of clarity. What was missing is the
+          plain-English answer to "what am I actually signing?", which is
+          a fair question to have and a bad one to have to guess at. */}
       <label htmlFor="pma" className="flex items-start gap-2 text-sm text-smoke">
         <input id="pma" name="pma" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
         <span>
@@ -165,6 +170,12 @@ export default function RegisterForm({ next = "/profile" }: { next?: string }) {
           and I&apos;m joining as a private member.
         </span>
       </label>
+      <p className="-mt-1 pl-6 text-xs leading-relaxed text-smoke/70">
+        In plain terms: The Heat Chart is run by a member association rather than being
+        open to the public, so every account holder joins as a member. The agreement is
+        the rulebook — what we owe you, what you agree to, and how either of us leaves.
+        It costs nothing and you can read it before you tick the box.
+      </p>
       {state?.error && <p role="alert" className="text-sm text-heat">{state.error}</p>}
 
       {unknownDomain && (

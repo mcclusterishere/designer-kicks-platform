@@ -105,8 +105,11 @@ export default async function PricingPage() {
             <span className="text-lg text-smoke">/month</span>
           </p>
           <p className="mt-2 text-sm text-smoke">
-            Or {priceLabel(PRICE_YEARLY_CENTS)} a year. Cancel whenever — you keep access through
-            what you&apos;ve already paid for.
+            {/* Explicit space: JSX drops the one in the source when the
+                expression and the words after it wrap to separate lines,
+                and this rendered as "$290a year" on the live pricing page. */}
+            Or {priceLabel(PRICE_YEARLY_CENTS)}{" "}
+            a year. Cancel whenever — you keep access through what you&apos;ve already paid for.
           </p>
 
           <ul className="mt-5 space-y-3 text-sm">

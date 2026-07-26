@@ -31,10 +31,19 @@ export default async function RegisterPage({
     <div className="mx-auto max-w-md px-4 py-12">
       <p className="tag text-volt">Join the culture</p>
       <h1 className="display mt-2 text-4xl text-white">Create Account</h1>
+      {/* "The Heat Check" and "collector closet" are names for things a
+          person meeting this page has never seen. Naming them here spends
+          the reader's attention on decoding instead of deciding. Say what
+          they DO; the names can introduce themselves later, attached to
+          the actual thing. */}
       <p className="mt-2 text-sm text-smoke">
-        A fan account is instant — vote in battles, play the Heat Check,
-        win giveaways, and build your collector closet. Artists apply for
-        an upgraded account after joining (approval required).
+        Free, and it takes a minute. You can vote on which customs are best, play the
+        sneaker-knowledge game, enter giveaways, and keep the pairs you own on your own
+        page.
+      </p>
+      <p className="mt-2 text-sm text-smoke">
+        Make custom sneakers yourself? Join first, then apply for an artist account —
+        we check every one by hand.
       </p>
 
       {hasOAuth && (
