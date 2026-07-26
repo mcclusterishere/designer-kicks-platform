@@ -246,6 +246,7 @@ export default async function RootLayout({
             <div className="mt-4 flex flex-wrap gap-4 text-xs">
               <Link href="/terms" className="hover:text-white">Terms</Link>
               <Link href="/privacy" className="hover:text-white">Privacy</Link>
+              <Link href="/security" className="hover:text-white">Security</Link>
               <Link href="/rules" className="hover:text-white">Giveaway Rules</Link>
             </div>
             <p className="mt-6 border-t border-edge pt-4 text-xs">
