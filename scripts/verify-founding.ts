@@ -20,6 +20,7 @@
  *
  * Run: npm run verify:founding   (dev database; every row it makes it deletes)
  */
+import { readFileSync } from "fs";
 import { PrismaClient } from "@prisma/client";
 import {
   claimFoundingSeat, foundingSeatsLeft, addMonths, foundingEmail,
@@ -216,6 +217,68 @@ async function main() {
   check(
     "an ordinary date is exactly a year later",
     addMonths(new Date("2026-07-26T12:00:00.000Z"), 12).toISOString() === "2027-07-26T12:00:00.000Z"
+  );
+
+  // ---- The charter ---------------------------------------------------
+  // Two artists were already here before the offer existed, so the honest
+  // count on day one is 98. The seed hands them #1 and #2 at deploy.
+  // These assertions read the seed file rather than run it, because
+  // running it would rewrite the whole development database.
+  const seed = readFileSync("prisma/seed.mjs", "utf8");
+  const charter = /const FOUNDING_CHARTER = \[([^\]]*)\]/.exec(seed)?.[1] ?? "";
+  const slugs = [...charter.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  check("the charter names exactly two artists", slugs.length === 2, slugs.join(", "));
+  check(
+    "and it identifies them by SLUG, never by display name",
+    slugs.every((s) => /^[a-z0-9-]+$/.test(s)),
+    "a display name is free text the holder can change; a slug is not"
+  );
+  check(
+    "the charter is applied at boot",
+    /await grantFoundingCharter\(\);/.test(seed)
+  );
+  check(
+    "granting is skipped for anyone who already holds a seat",
+    /a\.foundingNumber !== null/.test(seed),
+    "otherwise every deploy would silently extend their year"
+  );
+  check(
+    "the seed refuses to exceed the cap",
+    /taken >= 100/.test(seed)
+  );
+  check(
+    "and retries on the unique-index collision rather than throwing",
+    /P2002/.test(seed)
+  );
+
+  // The seed restates lib/founding's rules because plain ESM can't import
+  // TypeScript. Assert the restatement still matches, so the duplication
+  // is checked rather than trusted.
+  check(
+    "the seed grants the same 12 months this module does",
+    /addMonthsSeed\(now, 12\)/.test(seed) && FOUNDING_MONTHS === 12
+  );
+  check("the seed grants at price zero", /planPriceCents: 0/.test(seed));
+  check('the seed uses status "founding", not "active"', /planStatus: "founding"/.test(seed));
+  check(
+    "the seed clamps months the same way, so no grant is a day short",
+    /lastDay = new Date\(Date\.UTC/.test(seed)
+  );
+
+  // ---- Being thanked --------------------------------------------------
+  // A granted seat involves no click, so the note cannot depend on the
+  // redirect or the two people it is most owed to would never see it.
+  const studio = readFileSync("app/studio/page.tsx", "utf8");
+  check(
+    "the thank-you shows for any unthanked founding member",
+    /profile\.foundingNumber && !profile\.foundingThankedAt/.test(studio),
+    "not gated on the ?founding= redirect"
+  );
+  check("and it can be dismissed", /acknowledgeFounding/.test(studio));
+  const billing = readFileSync("app/billing-actions.ts", "utf8");
+  check(
+    "dismissing is scoped to the caller's own profile",
+    /userId: session\.user\.id, foundingNumber: \{ not: null \}, foundingThankedAt: null/.test(billing)
   );
 }
 

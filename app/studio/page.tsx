@@ -27,20 +27,19 @@ import ShareMyPage from "@/components/ShareMyPage";
 import StudioAssistant from "./StudioAssistant";
 import { siteUrl } from "@/lib/articles";
 import { FOUNDING_SEATS, FOUNDING_MONTHS } from "@/lib/founding";
+import { acknowledgeFounding } from "@/app/billing-actions";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
 
-export default async function StudioPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ founding?: string }>;
-}) {
+export default async function StudioPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
 
-  const justClaimed = (await searchParams)?.founding;
-
+  // Note that nothing reads `?founding=` any more. The redirect still
+  // carries it — it's a useful marker in analytics for "arrived by
+  // claiming" — but whether the thank-you renders is decided by the
+  // record, not the URL, so a granted seat gets thanked too.
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
     select: {
@@ -50,7 +49,7 @@ export default async function StudioPage({
       bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
       closetHeadline: true, featuredSubmissionId: true, accentColor: true, closetLayout: true,
       plan: true, planStatus: true, paidThrough: true,
-      foundingNumber: true,
+      foundingNumber: true, foundingThankedAt: true,
     },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
@@ -130,18 +129,25 @@ export default async function StudioPage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
-      {/* The thank-you, shown the moment they land back from claiming.
-          Only on the redirect — a permanent congratulations banner stops
-          being a thank-you and becomes furniture. The seat number lives
-          in the plan line below it forever instead. */}
-      {justClaimed && profile.foundingNumber && (
+      {/* The thank-you. Shown until they've read it, NOT only on the
+          redirect — a seat can arrive two ways and only one of them
+          involves a click. The charter members were handed theirs by a
+          deploy, so a note that rendered only on `?founding=` would never
+          reach the two people it was most owed to. Once dismissed it's
+          gone for good; the seat number lives in the plan line forever. */}
+      {profile.foundingNumber && !profile.foundingThankedAt && (
         <section className="mb-8 rounded-2xl border-2 border-volt bg-volt/[0.07] p-6">
           <p className="tag text-volt">Founding Artist #{profile.foundingNumber}</p>
           <h2 className="display mt-1 text-3xl text-white">Thank you.</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
-            You&apos;re one of the first {FOUNDING_SEATS} artists on The Heat Chart. Backing this
-            before it was obvious is the hard version, and the people who do it first are the
-            reason there&apos;s anything here for anyone else to join.
+            {/* The space after the count is written explicitly. JSX ate it
+                once already and shipped "the first 100artists" into the one
+                paragraph on the site whose entire job is to sound like a
+                person wrote it. */}
+            You&apos;re one of the first {FOUNDING_SEATS}{" "}
+            artists on The Heat Chart. Backing this before it was obvious is the hard version,
+            and the people who do it first are the reason there&apos;s anything here for anyone
+            else to join.
           </p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
             Artist Pro is yours free for {FOUNDING_MONTHS} months
@@ -161,6 +167,11 @@ export default async function StudioPage({
             . There&apos;s no card on file and nothing to cancel — we never took a payment
             method, so we can&apos;t charge you. Everything below is open now.
           </p>
+          <form action={acknowledgeFounding} className="mt-4">
+            <button className="rounded-lg btn-hard px-5 py-2.5 tag font-bold">
+              Got it — thank you
+            </button>
+          </form>
         </section>
       )}
 

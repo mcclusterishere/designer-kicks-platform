@@ -126,6 +126,29 @@ export async function startSubscription(formData: FormData): Promise<void> {
 }
 
 /**
+ * "Got it" on the founding note.
+ *
+ * The note has to be dismissible rather than tied to the redirect,
+ * because a seat can arrive two ways and only one of them involves a
+ * click. The charter members — the artists who were already here before
+ * the offer existed — are handed their seat by the deploy, so a thank-you
+ * that only rendered on `?founding=` would never reach the people it was
+ * most owed to. This way it waits in their Studio until they've read it.
+ *
+ * Scoped to the caller's own profile, and the write is a no-op once
+ * stamped, so it can't be used to poke at anybody else's record.
+ */
+export async function acknowledgeFounding(): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  await prisma.artistProfile.updateMany({
+    where: { userId: session.user.id, foundingNumber: { not: null }, foundingThankedAt: null },
+    data: { foundingThankedAt: new Date() },
+  });
+  revalidatePath("/studio");
+}
+
+/**
  * Send an artist to Stripe's own billing portal to change a card,
  * download invoices, or cancel.
  *

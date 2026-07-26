@@ -1656,6 +1656,84 @@ async function promoteNamedEditors() {
   // Intentionally does nothing. See the note above.
 }
 
+/**
+ * The charter members of the Founding 100.
+ *
+ * The offer says "the first hundred artists", and these two were here
+ * before it existed — so the honest seat count on day one is 98, not 100.
+ * Handing them #1 and #2 makes the number on the pricing page true rather
+ * than merely aspirational, and it costs nothing to be accurate about who
+ * showed up first.
+ *
+ * Ordered. Position in this list IS the seat number, so the list is the
+ * record of who was first and shouldn't be reordered casually.
+ *
+ * Keyed by SLUG, never by display name — a display name is free text the
+ * account holder can change, and the last thing anchored to one of those
+ * turned into a way for anybody to grant themselves a staff seat.
+ *
+ * The rules here mirror lib/founding.ts, which is the source of truth for
+ * the app: twelve months, price zero, status "founding", no Stripe object
+ * of any kind. They are restated rather than imported because this file
+ * is plain ESM run by node at boot and cannot load the TypeScript module.
+ * verify:founding asserts the two agree, so the duplication is checked
+ * rather than trusted.
+ */
+const FOUNDING_CHARTER = ["hitman-benji", "justin-dekota"];
+
+/** Mirrors addMonths() in lib/founding.ts — clamps to the last valid day. */
+function addMonthsSeed(from, months) {
+  const d = new Date(from.getTime());
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d;
+}
+
+async function grantFoundingCharter() {
+  const now = new Date();
+  const through = addMonthsSeed(now, 12);
+
+  for (const slug of FOUNDING_CHARTER) {
+    const a = await prisma.artistProfile.findUnique({
+      where: { slug },
+      select: { id: true, displayName: true, status: true, foundingNumber: true, firstSubscribedAt: true },
+    });
+    // Not on this database yet, already holds a seat, or not approved —
+    // all three mean "nothing to do", and re-granting on every boot is
+    // exactly the kind of thing that would silently extend their year.
+    if (!a || a.foundingNumber !== null || a.status !== "APPROVED") continue;
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const taken = await prisma.artistProfile.count({ where: { foundingNumber: { not: null } } });
+      if (taken >= 100) break; // room is full; the charter doesn't get to jump a real member
+      try {
+        await prisma.artistProfile.update({
+          where: { id: a.id },
+          data: {
+            foundingNumber: taken + 1,
+            foundingGrantedAt: now,
+            plan: "PRO",
+            planStatus: "founding",
+            planPriceCents: 0,
+            planInterval: null,
+            paidThrough: through,
+            firstSubscribedAt: a.firstSubscribedAt ?? now,
+          },
+        });
+        console.log(`Founding 100: ${a.displayName} seated at #${taken + 1}.`);
+        break;
+      } catch (e) {
+        // Somebody claimed that number in the gap — the unique index is
+        // what makes the cap real. Recount and try the next one.
+        if (e?.code !== "P2002") throw e;
+      }
+    }
+  }
+}
+
 // The Editor's Pick — a quietly hand-picked feature, independent of the
 // Heat List. The designer is Hitman Benji; the giveaway is a 1-of-1 vest
 // he builds for the winner. Kept understated on purpose — prestige, not a
@@ -1955,6 +2033,7 @@ async function main() {
   await mergeDuplicateArtists();
   await restoreDekotaHandle();
   await promoteNamedEditors();
+  await grantFoundingCharter();
   await featureBenjiChase();
   await refreshFeaturedGiveaway();
 

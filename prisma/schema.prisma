@@ -261,6 +261,14 @@ model ArtistProfile {
   /// the twelve months run out.
   foundingNumber    Int?      @unique
   foundingGrantedAt DateTime?
+  /// When they were actually thanked, i.e. when they closed the note.
+  ///
+  /// Needed because a seat can arrive two ways. Claiming it yourself ends
+  /// on a thank-you page; being GIVEN one — the charter members who were
+  /// already here before the offer existed — involves no click at all, so
+  /// without this they would be handed a year of Pro and never told. The
+  /// note waits in their Studio until they dismiss it.
+  foundingThankedAt DateTime?
 
   @@index([onboardedById])
 }
