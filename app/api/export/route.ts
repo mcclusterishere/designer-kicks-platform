@@ -78,16 +78,19 @@ async function battles(): Promise<Table> {
     include: {
       subA: { select: { id: true, title: true, artistName: true } },
       subB: { select: { id: true, title: true, artistName: true } },
+      ogShoe: { select: { name: true, brand: true } },
       winner: { select: { title: true } },
-      votes: { select: { submissionId: true } },
+      votes: { select: { side: true } },
     },
   });
   return {
     header: ["title", "status", "starts", "ends", "side_a", "artist_a", "votes_a", "side_b", "artist_b", "votes_b", "winner"],
     rows: rows.map((b) => [
       b.title, b.status, day(b.startsAt), day(b.endsAt),
-      b.subA.title, b.subA.artistName, b.votes.filter((v) => v.submissionId === b.subA.id).length,
-      b.subB.title, b.subB.artistName, b.votes.filter((v) => v.submissionId === b.subB.id).length,
+      b.subA.title, b.subA.artistName, b.votes.filter((v) => v.side === "A").length,
+      b.ogShoe?.name ?? b.subB?.title ?? null,
+      b.ogShoe?.brand ?? b.subB?.artistName ?? null,
+      b.votes.filter((v) => v.side === "B").length,
       b.winner?.title ?? null,
     ]),
   };

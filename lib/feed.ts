@@ -125,6 +125,7 @@ export async function getFeed(
       include: {
         subA: { include: { artist: { select: { displayName: true } } } },
         subB: { include: { artist: { select: { displayName: true } } } },
+        ogShoe: { select: { name: true, brand: true, imageUrl: true } },
         _count: { select: { votes: true } },
       },
       take: 25,
@@ -227,9 +228,11 @@ export async function getFeed(
           artistName: b.subA.artist?.displayName ?? b.subA.artistName,
         },
         b: {
-          title: b.subB.title,
-          imageUrl: b.subB.imageUrl,
-          artistName: b.subB.artist?.displayName ?? b.subB.artistName,
+          // custom, or the OG standing in for OG culture
+          title: b.ogShoe?.name ?? b.subB?.title ?? "",
+          imageUrl: b.ogShoe?.imageUrl ?? b.subB?.imageUrl ?? "",
+          artistName:
+            b.ogShoe?.brand ?? b.subB?.artist?.displayName ?? b.subB?.artistName ?? "OG",
         },
       },
     });

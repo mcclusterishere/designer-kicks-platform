@@ -10,15 +10,27 @@ type SubmissionLite = {
   imageUrl: string;
 };
 
+/** The retail original standing in the B corner of a custom-vs-OG card. */
+type OGLite = {
+  id: string;
+  name: string;
+  brand: string | null;
+  silhouette: string | null;
+  imageUrl: string | null;
+};
+
 type Props = {
   battle: {
     id: string;
     title: string | null;
     status: string;
+    type?: string;
     endsAt: Date;
     winnerId: string | null;
+    winnerSide?: string | null;
     subA: SubmissionLite;
-    subB: SubmissionLite;
+    subB: SubmissionLite | null;
+    ogShoe?: OGLite | null;
   };
   aVotes: number;
   bVotes: number;
@@ -67,6 +79,23 @@ function Crest({
 
 export default function BattleCard({ battle, aVotes, bVotes }: Props) {
   const completed = battle.status === "COMPLETED";
+  const isOG = battle.type === "CUSTOM_VS_OG" && Boolean(battle.ogShoe);
+  // Flatten whichever culture is in the B corner into one crest shape.
+  const bSub: SubmissionLite | null = isOG
+    ? {
+        id: battle.ogShoe!.id,
+        title: battle.ogShoe!.name,
+        artistName: battle.ogShoe!.brand ?? "OG",
+        baseShoe: battle.ogShoe!.silhouette ?? battle.ogShoe!.name,
+        category: "sneakers",
+        imageUrl: battle.ogShoe!.imageUrl ?? "/placeholder.svg",
+      }
+    : battle.subB;
+  if (!bSub) return null;
+  // winnerSide is the format-agnostic answer; winnerId only ever names a
+  // custom, so it can't mark an OG win on its own.
+  const aWon = battle.winnerSide ? battle.winnerSide === "A" : battle.winnerId === battle.subA.id;
+  const bWon = battle.winnerSide ? battle.winnerSide === "B" : battle.winnerId === bSub.id;
   return (
     <Link
       href={`/battles/${battle.id}`}
@@ -75,8 +104,13 @@ export default function BattleCard({ battle, aVotes, bVotes }: Props) {
       {/* Competition strip */}
       <div className="flex items-center justify-between border-b border-edge/70 px-4 py-2.5">
         <span className="truncate text-xs font-bold uppercase tracking-wide text-smoke">
-          {battle.title ?? `${battle.subA.baseShoe} vs ${battle.subB.baseShoe}`}
+          {battle.title ?? `${battle.subA.baseShoe} vs ${bSub.baseShoe}`}
         </span>
+        {isOG && (
+          <span className="mr-2 shrink-0 rounded-full bg-heat/15 px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-heat">
+            Custom vs OG
+          </span>
+        )}
         {completed ? (
           <span className="rounded-full bg-panel px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-smoke">
             FT
@@ -91,7 +125,7 @@ export default function BattleCard({ battle, aVotes, bVotes }: Props) {
 
       {/* The fixture: crest — score — crest */}
       <div className="flex items-center gap-2 px-4 py-5">
-        <Crest sub={battle.subA} isWinner={battle.winnerId === battle.subA.id} completed={completed} />
+        <Crest sub={battle.subA} isWinner={aWon} completed={completed} />
         <div className="flex shrink-0 flex-col items-center px-1">
           <p className="display text-3xl tabular-nums text-white sm:text-4xl">
             {aVotes}
@@ -100,7 +134,7 @@ export default function BattleCard({ battle, aVotes, bVotes }: Props) {
           </p>
           <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-smoke/70">votes</p>
         </div>
-        <Crest sub={battle.subB} isWinner={battle.winnerId === battle.subB.id} completed={completed} />
+        <Crest sub={bSub} isWinner={bWon} completed={completed} />
       </div>
 
       {/* Kickoff line */}

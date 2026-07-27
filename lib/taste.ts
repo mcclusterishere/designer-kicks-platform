@@ -192,7 +192,7 @@ export async function getTasteProfile(userId: string): Promise<TasteProfile | nu
     bump(colorways, tax.colorway, w);
   };
 
-  for (const v of votes) addPiece(v.submission, WEIGHTS.vote);
+  for (const v of votes) if (v.submission) addPiece(v.submission, WEIGHTS.vote);
   for (const r of ratings) addPiece(r.submission, ratingWeight(r.stars));
   for (const cr of catalogRatings) {
     const w = ratingWeight(cr.stars);

@@ -1573,14 +1573,33 @@ export async function castVote(battleId: string, submissionId: string): Promise<
   const battle = await prisma.battle.findUnique({ where: { id: battleId } });
   if (!battle) return { ok: false, error: "Battle not found." };
   if (battle.status !== "ACTIVE") return { ok: false, error: "This battle has ended." };
-  if (submissionId !== battle.subAId && submissionId !== battle.subBId) {
+
+  // The ballot names a corner. Customs still vote by submission id; the
+  // OG corner votes as the literal "og" (or the catalog id), because a
+  // retail silhouette has no submission row to point at.
+  let side: "A" | "B";
+  let votedSubmissionId: string | null;
+  if (submissionId === battle.subAId) {
+    side = "A";
+    votedSubmissionId = battle.subAId;
+  } else if (battle.subBId && submissionId === battle.subBId) {
+    side = "B";
+    votedSubmissionId = battle.subBId;
+  } else if (
+    battle.type === "CUSTOM_VS_OG" &&
+    battle.ogShoeId &&
+    (submissionId === "og" || submissionId === battle.ogShoeId)
+  ) {
+    side = "B";
+    votedSubmissionId = null;
+  } else {
     return { ok: false, error: "That shoe isn't in this battle." };
   }
 
   const voterKey = session.user.id;
   try {
     await prisma.vote.create({
-      data: { battleId, submissionId, voterKey, userId: session.user.id },
+      data: { battleId, side, submissionId: votedSubmissionId, voterKey, userId: session.user.id },
     });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -1787,18 +1806,64 @@ export async function createBattle(
   await requireAdmin();
   const subAId = String(formData.get("subAId") ?? "");
   const subBId = String(formData.get("subBId") ?? "");
+  const ogShoeId = String(formData.get("ogShoeId") ?? "");
+  const type = String(formData.get("type") ?? "CUSTOM_VS_CUSTOM");
   const days = Number(formData.get("days") ?? 7);
   const title = String(formData.get("title") ?? "").trim();
 
-  if (!subAId || !subBId) return { ok: false, error: "Pick two shoes." };
-  if (subAId === subBId) return { ok: false, error: "A shoe can't battle itself." };
+  if (type !== "CUSTOM_VS_CUSTOM" && type !== "CUSTOM_VS_OG") {
+    return { ok: false, error: "Unknown battle format." };
+  }
+  if (!subAId) return { ok: false, error: "Pick the custom in the A corner." };
   if (!Number.isFinite(days) || days < 1 || days > 30) return { ok: false, error: "Battle length must be 1–30 days." };
 
-  const [a, b] = await Promise.all([
-    prisma.submission.findUnique({ where: { id: subAId } }),
-    prisma.submission.findUnique({ where: { id: subBId } }),
-  ]);
-  if (!a || !b || a.status !== "APPROVED" || b.status !== "APPROVED") {
+  const a = await prisma.submission.findUnique({ where: { id: subAId } });
+  if (!a || a.status !== "APPROVED") {
+    return { ok: false, error: "The A corner must be an approved custom." };
+  }
+
+  // ---- custom culture vs OG culture ----
+  if (type === "CUSTOM_VS_OG") {
+    if (!ogShoeId) return { ok: false, error: "Pick the OG standing in the B corner." };
+    const og = await prisma.catalogShoe.findUnique({ where: { id: ogShoeId } });
+    if (!og) return { ok: false, error: "That OG isn't in the catalog." };
+    // The category wall still holds: only sneakers have a retail original
+    // in the catalog, so a hat can never be matched against one.
+    if (a.category !== "sneakers") {
+      return {
+        ok: false,
+        error: `Custom vs OG is a sneaker format — "${a.title}" is ${categoryLabel(a.category)}.`,
+      };
+    }
+    const battle = await prisma.battle.create({
+      data: {
+        type,
+        subAId,
+        ogShoeId,
+        title: title || null,
+        endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      },
+    });
+    notifyBattleStart({
+      battleId: battle.id,
+      aTitle: a.title,
+      aArtist: a.artistName,
+      bTitle: og.name,
+      bArtist: og.brand ?? "OG",
+      endsAt: battle.endsAt,
+    }).catch(() => {});
+    revalidatePath("/battles");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { ok: true };
+  }
+
+  // ---- customizer vs customizer ----
+  if (!subBId) return { ok: false, error: "Pick two shoes." };
+  if (subAId === subBId) return { ok: false, error: "A shoe can't battle itself." };
+
+  const b = await prisma.submission.findUnique({ where: { id: subBId } });
+  if (!b || b.status !== "APPROVED") {
     return { ok: false, error: "Both shoes must be approved submissions." };
   }
   // Category wall: hats never face shoes, vests never face hats.
@@ -1811,6 +1876,7 @@ export async function createBattle(
 
   const battle = await prisma.battle.create({
     data: {
+      type,
       subAId,
       subBId,
       title: title || null,

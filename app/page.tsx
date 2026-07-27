@@ -20,7 +20,7 @@ export default async function HomePage() {
       where: { status: "ACTIVE" },
       orderBy: { endsAt: "asc" },
       take: 4,
-      include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
+      include: { subA: true, subB: true, ogShoe: true, votes: { select: { side: true } } },
     }),
     getHeatList(),
     prisma.product.findMany({
@@ -198,8 +198,8 @@ export default async function HomePage() {
                 )}
                 <BattleCard
                   battle={b}
-                  aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-                  bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+                  aVotes={b.votes.filter((v) => v.side === "A").length}
+                  bVotes={b.votes.filter((v) => v.side === "B").length}
                 />
               </div>
             ))}

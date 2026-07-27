@@ -4,7 +4,7 @@ import { finalizeExpiredBattles } from "@/lib/battles";
 import BattleCard from "@/components/BattleCard";
 
 export const metadata = {
-  title: "Battle Arena — Vote On Custom Sneaker Matchups | The Heat Chart",
+  title: "Battle Arena — Custom Culture vs OG Culture | The Heat Chart",
 };
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export default async function BattlesPage() {
   const [battles, activeTournaments] = await Promise.all([
     prisma.battle.findMany({
       orderBy: [{ status: "asc" }, { endsAt: "desc" }],
-      include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
+      include: { subA: true, subB: true, ogShoe: true, votes: { select: { side: true } } },
     }),
     prisma.tournament.findMany({ where: { status: "ACTIVE" } }),
   ]);
@@ -30,7 +30,10 @@ export default async function BattlesPage() {
         Battle Arena
       </h1>
       <p className="mt-3 max-w-xl text-smoke">
-        Two customs enter. The culture votes. Winners take a spot on the{" "}
+        Custom culture against OG culture — and customizer against customizer.
+        A one-of-one takes on the untouched retail silhouette it was cut from,
+        or squares up with another maker. The culture votes. Winners take a
+        spot on the{" "}
         <Link href="/heat-list" className="text-volt underline">
           Heat List
         </Link>
@@ -99,8 +102,8 @@ export default async function BattlesPage() {
             <BattleCard
               key={b.id}
               battle={b}
-              aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-              bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+              aVotes={b.votes.filter((v) => v.side === "A").length}
+              bVotes={b.votes.filter((v) => v.side === "B").length}
             />
           ))}
         </div>
@@ -114,8 +117,8 @@ export default async function BattlesPage() {
               <BattleCard
                 key={b.id}
                 battle={b}
-                aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-                bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+                aVotes={b.votes.filter((v) => v.side === "A").length}
+                bVotes={b.votes.filter((v) => v.side === "B").length}
               />
             ))}
           </div>
