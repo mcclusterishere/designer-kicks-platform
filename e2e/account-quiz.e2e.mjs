@@ -3,7 +3,7 @@
 // member visibility.
 import { readFileSync } from "fs";
 import { PrismaClient } from "@prisma/client";
-import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser, passDomainGuard } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -24,8 +24,25 @@ await page.fill("#name", "E2E Tester");
 await page.fill("#email", EMAIL);
 await page.fill("#password", "supersecret1");
 await page.check("#age13");
+// Every account is an Equity Uprise PMA member; registration refuses
+// without the agreement, so the suite has to tick it like a real signup.
+await page.check("#pma");
 await page.getByRole("button", { name: "Create Account" }).click();
-await page.waitForURL("**/profile", { timeout: 15000 });
+await passDomainGuard(page);
+
+// @test.example isn't a mail service the domain guard recognises, so it
+// raises the "is this really your email" interstitial and blocks the
+// submit until it's confirmed twice. Walk it exactly as a member with
+// their own domain would.
+const domainGuard = page.getByRole("alertdialog");
+if (await domainGuard.isVisible().catch(() => false)) {
+  check("unknown-domain guard intercepts the signup", true);
+  await page.getByRole("button", { name: /this is my own domain/i }).click();
+  await page.getByRole("button", { name: /^Confirm: sign me up/i }).click();
+}
+// router.push is a same-document navigation, so match on the URL itself
+// rather than waiting for a load event that never comes.
+await page.waitForURL(/\/profile/, { timeout: 15000 });
 check("register creates account and signs in", true);
 
 // ---------- Profile ----------
@@ -40,10 +57,18 @@ const dbUser = await prisma.user.findUnique({ where: { email: EMAIL } });
 check("profile saves contact info", dbUser?.phone === "+1 555 010 2030" && dbUser?.marketingOptIn === true);
 
 // ---------- Voting requires + uses account ----------
-await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
-await page.locator("a[href^='/battles/']").first().click();
-await page.waitForURL("**/battles/**");
-const voteBtns = page.getByRole("button", { name: "Vote This Piece" });
+// Go straight at a battle that is actually open. "The first battles link
+// on the page" used to work and then quietly stopped: finished battles are
+// listed first, inside a collapsed <details> that correctly hides them, so
+// the moment anything expired the suite started clicking an invisible link.
+const liveBattle = await prisma.battle.findFirst({
+  where: { status: "ACTIVE" },
+  orderBy: { endsAt: "asc" },
+  select: { id: true },
+});
+if (!liveBattle) throw new Error("no ACTIVE battle to vote in — seed the database");
+await page.goto(`${BASE}/battles/${liveBattle.id}`, { waitUntil: "networkidle" });
+const voteBtns = page.getByRole("button", { name: "Vote", exact: true });
 if ((await voteBtns.count()) === 2) {
   await voteBtns.first().click();
   await page.getByText("Your vote").first().waitFor({ timeout: 10000 });
@@ -170,14 +195,25 @@ await page.goto(`${BASE}/giveaway`, { waitUntil: "networkidle" });
 check("giveaway page shows your entries", await page.getByText(/You have 1 entr/).isVisible());
 check("purchases-never-affect-odds language present", await page.getByText(/purchases never affect your odds/i).first().isVisible());
 
-// ---------- Sign out → voting gated ----------
+// ---------- Sign out → guests can still vote ----------
+// Voting used to be gated behind an account. It isn't any more: a guest
+// can vote, their vote is stored flagged as a guest vote, and the Heat
+// Score ranking ignores flagged votes so opening the door didn't open a
+// ballot box. Both halves are worth holding onto.
 await page.goto(`${BASE}/profile`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.waitForTimeout(1500);
-await page.goto(`${BASE}/battles`, { waitUntil: "networkidle" });
-await page.locator("a[href^='/battles/']").first().click();
-await page.waitForURL("**/battles/**");
-check("logged-out users see Sign In To Vote", (await page.getByText("Sign In To Vote").count()) > 0);
+await page.goto(`${BASE}/battles/${liveBattle.id}`, { waitUntil: "networkidle" });
+const guestBtns = page.getByRole("button", { name: "Vote", exact: true });
+check("guests are offered a vote", (await guestBtns.count()) === 2);
+const guestVotesBefore = await prisma.vote.count({ where: { guest: true } });
+if ((await guestBtns.count()) === 2) {
+  await guestBtns.first().click();
+  await page.getByText("Your vote").first().waitFor({ timeout: 10000 }).catch(() => {});
+}
+const guestVotesAfter = await prisma.vote.count({ where: { guest: true } });
+check("a guest vote is recorded and flagged as a guest vote", guestVotesAfter > guestVotesBefore,
+  `${guestVotesBefore} → ${guestVotesAfter}`);
 
 // ---------- Password reset (via mailer log fallback) ----------
 await page.goto(`${BASE}/forgot-password`, { waitUntil: "networkidle" });

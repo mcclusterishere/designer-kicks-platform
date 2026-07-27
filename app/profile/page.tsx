@@ -1,3 +1,11 @@
+import Money from "@/components/Money";
+import PushToggle from "@/components/PushToggle";
+import PlayLimits from "@/components/PlayLimits";
+import CreditStatement from "@/components/CreditStatement";
+import DeskRank from "@/components/DeskRank";
+import DeskPartner, { partnerUrl } from "@/components/DeskPartner";
+import { unreadCount } from "@/lib/messages";
+import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -8,11 +16,12 @@ import { getTasteProfile } from "@/lib/taste";
 import { formatUsd } from "@/lib/market";
 import { categoryLabel } from "@/lib/categories";
 import ProfileForm from "./ProfileForm";
+import DeleteAccount from "@/components/DeleteAccount";
 import ClaimSaleButton from "@/components/ClaimSaleButton";
 import FitBuilder from "@/components/FitBuilder";
 import IQPanel from "@/components/IQPanel";
 import Walkthrough from "@/components/Walkthrough";
-import { cultureIQ } from "@/lib/iq";
+import { cultureIQ, marketIQ, rankFor } from "@/lib/iq";
 import { respondOffer, withdrawOffer } from "@/app/actions";
 
 export const metadata = { title: "Your Profile — The Heat Chart" };
@@ -87,6 +96,18 @@ export default async function ProfilePage() {
     }),
     prisma.user.findUnique({ where: { id: user.id }, select: { credits: true } }),
   ]);
+  const unread = await unreadCount(user.id);
+  const { stakedToday, statement } = await import("@/lib/ledger");
+  const mkt = await marketIQ(user.id);
+  const deskRank = rankFor(mkt.correct);
+  const [limits, todayStaked, ledgerEntries] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { dailyStakeLimit: true, selfExcludedUntil: true },
+    }),
+    stakedToday(user.id),
+    statement(user.id, 25),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -102,6 +123,101 @@ export default async function ProfilePage() {
           <button className="tag text-smoke hover:text-white">Sign out</button>
         </form>
       </div>
+
+      {/* Inbox + alerts: the two things that bring somebody back. */}
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link
+          href="/messages"
+          className={`rounded-xl border p-4 transition hover:border-volt ${
+            unread > 0 ? "border-volt/60 bg-volt/5" : "border-edge bg-surface"
+          }`}
+        >
+          <p className="tag text-heat">Messages</p>
+          <p className="mt-0.5 text-sm text-white">
+            {unread > 0
+              ? `${unread} unread message${unread === 1 ? "" : "s"}`
+              : "Your commission conversations"}
+          </p>
+          <p className="mt-1 text-xs text-smoke">
+            Sizes, base pairs and budgets — on the record, on your account.
+          </p>
+        </Link>
+        {/* Both halves or nothing. The public key alone is enough to let a
+            browser subscribe, but sending needs the private one — offering the
+            switch in that state would take someone's permission and then never
+            deliver. Only the public key is ever passed to the client. */}
+        <PushToggle
+          vapidKey={pushConfigured() ? process.env.VAPID_PUBLIC_KEY! : null}
+        />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3">
+        <PlayLimits
+          dailyStakeLimit={limits?.dailyStakeLimit ?? null}
+          excludedUntil={limits?.selfExcludedUntil?.toISOString() ?? null}
+          stakedToday={todayStaked}
+        />
+        <DeskRank iq={mkt} rank={deskRank} />
+        {/* Credit for the instrument rungs, and the door to the full library. */}
+        <DeskPartner href={partnerUrl()} compact />
+        <CreditStatement entries={ledgerEntries} balance={creditUser?.credits ?? 0} />
+      </div>
+
+      {/* Artist account comes first — this is the maker's home base. */}
+      {user.artistProfile?.status === "APPROVED" && (
+        <div className="glow-volt mt-6 rounded-2xl border border-volt bg-volt/10 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="tag text-volt">✓ Artist account</p>
+              <p className="display mt-0.5 text-2xl text-white">
+                {user.artistProfile.displayName}
+              </p>
+              <p className="mt-0.5 text-sm text-smoke">
+                Your work, your rates, your drops — all controlled from the Studio.
+              </p>
+            </div>
+            {/* Post first, Studio second. This ordering is Dakota's, not
+                ours: asked what would make the site better, the one
+                concrete thing he named was that posting belongs on your
+                own profile rather than the home page. He's right, and
+                it's how every tool a maker already uses works — your
+                work lives on your page, so you post from your page. */}
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Link href="/submit" className="rounded-lg btn-hard px-5 py-2.5 tag font-bold">
+                ＋ Post a piece
+              </Link>
+              <Link
+                href="/studio"
+                className="rounded-lg border border-volt/50 px-5 py-2.5 tag font-bold text-white transition hover:border-volt"
+              >
+                Open Studio →
+              </Link>
+            </div>
+          </div>
+
+          {/* Straight into the controls, no hunting */}
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {[
+              { href: "/submit", label: "Post a piece", icon: "＋" },
+              { href: "/studio/contacts", label: "Your customers", icon: "☎" },
+              { href: "/studio#commission-desk", label: "Rates & turnaround", icon: "＄" },
+              { href: "/studio#drops", label: "Announce a drop", icon: "◎" },
+              { href: "/studio/portfolio", label: "Portfolio", icon: "▦" },
+              { href: "/studio#shops", label: "Your shops", icon: "⇗" },
+              { href: `/artists/${user.artistProfile.slug}`, label: "Public page", icon: "◉" },
+            ].map((a) => (
+              <Link
+                key={a.href}
+                href={a.href}
+                className="rounded-lg border border-edge bg-ink/40 px-3 py-2.5 transition hover:border-volt/60"
+              >
+                <span className="block text-lg leading-none text-volt">{a.icon}</span>
+                <span className="mt-1 block text-xs font-bold text-white">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {user.role === "EDITOR" && (
         <Link
@@ -160,18 +276,7 @@ export default async function ProfilePage() {
 
       {/* Account type */}
       <div className="mt-4 rounded-xl border border-edge bg-surface p-4 text-sm">
-        {user.artistProfile?.status === "APPROVED" ? (
-          <p className="text-smoke">
-            <span className="tag text-volt">✓ Artist account</span> — posting as{" "}
-            <Link href={`/artists/${user.artistProfile.slug}`} className="font-bold text-volt">
-              {user.artistProfile.displayName}
-            </Link>
-            {" · "}
-            <Link href="/studio" className="text-volt underline">
-              Studio →
-            </Link>
-          </p>
-        ) : user.artistProfile?.status === "PENDING" ? (
+        {user.artistProfile?.status === "APPROVED" ? null : user.artistProfile?.status === "PENDING" ? (
           <p className="text-smoke">
             <span className="tag text-heat">Artist application under review</span> —
             you&apos;ll be able to submit customs once approved.
@@ -365,7 +470,7 @@ export default async function ProfilePage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-white">{o.submission.title}</p>
                   <p className="text-sm text-smoke">
-                    <span className="display text-lg text-volt">{formatUsd(o.amountCents)}</span>{" "}
+                    <span className="display text-lg text-volt"><Money cents={o.amountCents} /></span>{" "}
                     from {o.buyer.name ?? "a collector"}
                   </p>
                 </div>
@@ -400,7 +505,7 @@ export default async function ProfilePage() {
                 className="flex items-center justify-between rounded-lg border border-edge bg-surface px-4 py-3 text-sm"
               >
                 <p className="text-smoke">
-                  <span className="text-white">{formatUsd(o.amountCents)}</span> on{" "}
+                  <span className="text-white"><Money cents={o.amountCents} /></span> on{" "}
                   <span className="text-white">{o.submission.title}</span> — waiting on the seller
                 </p>
                 <form action={withdrawOffer.bind(null, o.id)}>
@@ -501,6 +606,7 @@ export default async function ProfilePage() {
           }}
         />
       </div>
+      <DeleteAccount />
     </div>
   );
 }

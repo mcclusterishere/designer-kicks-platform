@@ -4,15 +4,30 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getStudioData } from "@/lib/analytics";
 import { getHeatList } from "@/lib/battles";
+import { isPro, daysLeft, needsAttention } from "@/lib/plans";
+import { pendingHandoffs, handoffMessage, handoffStats } from "@/lib/handoff";
+import HandoffDesk from "@/components/HandoffDesk";
+import OwnershipQueue from "@/components/OwnershipQueue";
+import StaffActivity from "@/components/StaffActivity";
+import { unansweredPieces } from "@/lib/ownership";
 import { formatUsd } from "@/lib/market";
 
 import MiniBars from "@/components/MiniBars";
 import AnnounceDropForm from "./AnnounceDropForm";
 import AddShopForm from "./AddShopForm";
-import { removeArtistShop, markSellsNowhere, respondCommissionRequest } from "@/app/actions";
+import ProfileMusicForm from "./ProfileMusicForm";
+import CommissionDeskForm from "./CommissionDeskForm";
+import ProfileEditForm from "./ProfileEditForm";
+import PieceManager from "./PieceManager";
+import ClosetLookForm from "./ClosetLookForm";
+import ProfileMusic from "@/components/ProfileMusic";
+import { removeArtistShop, markSellsNowhere, respondCommissionRequest, commissionQueueAction } from "@/app/actions";
 import { platformLabel } from "@/lib/sellPlatforms";
 import ShareMyPage from "@/components/ShareMyPage";
+import StudioAssistant from "./StudioAssistant";
 import { siteUrl } from "@/lib/articles";
+import { FOUNDING_SEATS, FOUNDING_MONTHS } from "@/lib/founding";
+import { acknowledgeFounding } from "@/app/billing-actions";
 
 export const metadata = { title: "Artist Studio — The Heat Chart" };
 export const dynamic = "force-dynamic";
@@ -21,26 +36,72 @@ export default async function StudioPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/signin");
 
+  // Note that nothing reads `?founding=` any more. The redirect still
+  // carries it — it's a useful marker in analytics for "arrived by
+  // claiming" — but whether the thank-you renders is decided by the
+  // record, not the URL, so a granted seat gets thanked too.
   const profile = await prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true, sellsOnline: true },
+    select: {
+      id: true, status: true, sellsOnline: true, spotifyUrl: true,
+      commissionOpen: true, commissionMinCents: true, commissionMaxCents: true,
+      commissionDays: true, commissionSlots: true,
+      bio: true, city: true, instagram: true, portfolioUrl: true, avatarUrl: true,
+      closetHeadline: true, featuredSubmissionId: true, accentColor: true, closetLayout: true,
+      plan: true, planStatus: true, paidThrough: true,
+      foundingNumber: true, foundingThankedAt: true,
+    },
   });
   if (!profile || profile.status !== "APPROVED") redirect("/submit");
 
-  const [data, heat, myDrops, myShops, commissions] = await Promise.all([
+  const onPro = isPro(profile);
+  const proDaysLeft = daysLeft(profile);
+  const billingTrouble = needsAttention(profile);
+
+  const [data, heat, myDrops, myShops, commissions, myPieces] = await Promise.all([
     getStudioData(profile.id),
     getHeatList(),
     prisma.artistDrop.findMany({ where: { artistId: profile.id }, orderBy: { dropAt: "asc" } }),
     prisma.artistShop.findMany({ where: { artistId: profile.id }, orderBy: { createdAt: "asc" } }),
     prisma.commissionRequest.findMany({
-      where: { artistId: profile.id, status: "PENDING" },
-      orderBy: { createdAt: "asc" },
+      where: { artistId: profile.id, status: { in: ["PENDING", "WAITLIST"] } },
+      orderBy: [{ status: "asc" }, { queuePosition: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
       include: { user: { select: { name: true } } },
+    }),
+    // Ordered exactly the way the public page will hang them, so the
+    // arrows in the manager move things in the direction people expect.
+    prisma.submission.findMany({
+      where: { artistId: profile.id },
+      orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+      select: {
+        id: true, title: true, imageUrl: true, size: true, description: true,
+        askingPriceCents: true, category: true,
+        closetHidden: true, closetSection: true,
+        sales: { where: { status: "CONFIRMED" }, select: { id: true }, take: 1 },
+      },
     }),
   ]);
   if (!data) redirect("/submit");
+  const waitlist = commissions.filter((c) => c.status === "WAITLIST");
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
   const { artist, stats, votesSeries, followsLast14, soldSales } = data;
+
+  // The unfinished transactions. Money already moved in real life; the
+  // piece just isn't officially anybody's yet, which keeps it off the
+  // artist's record and out of the resale market entirely.
+  const { siteUrl: siteBase } = await import("@/lib/articles");
+  const handoffs = (await pendingHandoffs(profile.id, siteBase())).map((h) => ({
+    ...h,
+    message: handoffMessage({
+      title: h.title,
+      artistName: artist.displayName,
+      claimUrl: h.claimUrl,
+    }),
+  }));
+  const handoff = await handoffStats(profile.id);
+  // The grandfathering backlog: pieces that went up before we asked.
+  const unanswered = await unansweredPieces(profile.id, 40);
+
 
   const bestRank = Math.min(
     ...artist.submissions.map((s) => heatRank.get(s.id) ?? Infinity)
@@ -68,6 +129,52 @@ export default async function StudioPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
+      {/* The thank-you. Shown until they've read it, NOT only on the
+          redirect — a seat can arrive two ways and only one of them
+          involves a click. The charter members were handed theirs by a
+          deploy, so a note that rendered only on `?founding=` would never
+          reach the two people it was most owed to. Once dismissed it's
+          gone for good; the seat number lives in the plan line forever. */}
+      {profile.foundingNumber && !profile.foundingThankedAt && (
+        <section className="mb-8 rounded-2xl border-2 border-volt bg-volt/[0.07] p-6">
+          <p className="tag text-volt">Founding Artist #{profile.foundingNumber}</p>
+          <h2 className="display mt-1 text-3xl text-white">Thank you.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
+            {/* The space after the count is written explicitly. JSX ate it
+                once already and shipped "the first 100artists" into the one
+                paragraph on the site whose entire job is to sound like a
+                person wrote it. */}
+            You&apos;re one of the first {FOUNDING_SEATS}{" "}
+            artists on The Heat Chart. Backing this before it was obvious is the hard version,
+            and the people who do it first are the reason there&apos;s anything here for anyone
+            else to join.
+          </p>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-smoke">
+            Artist Pro is yours free for {FOUNDING_MONTHS} months
+            {profile.paidThrough ? (
+              <>
+                {" "}
+                — through{" "}
+                <span className="text-white">
+                  {profile.paidThrough.toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </span>
+              </>
+            ) : null}
+            . There&apos;s no card on file and nothing to cancel — we never took a payment
+            method, so we can&apos;t charge you. Everything below is open now.
+          </p>
+          <form action={acknowledgeFounding} className="mt-4">
+            <button className="rounded-lg btn-hard px-5 py-2.5 tag font-bold">
+              Got it — thank you
+            </button>
+          </form>
+        </section>
+      )}
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="tag text-volt">Artist Studio</p>
@@ -75,8 +182,45 @@ export default async function StudioPage() {
             {artist.displayName}
           </h1>
           <p className="mt-1 text-sm text-smoke">
-            Plan: <span className="text-volt">{artist.plan === "PRO" ? "Pro" : "Free — founding artist"}</span>
+            Plan:{" "}
+            <span className="text-volt">
+              {profile.foundingNumber
+                ? `Pro — Founding Artist #${profile.foundingNumber}`
+                : onPro
+                  ? "Pro"
+                  : "Free"}
+            </span>
+            {/* A founding seat doesn't renew, so it must never say
+                "renews" — that reads as a charge coming, which is the one
+                thing this offer promises isn't. */}
+            {onPro && proDaysLeft !== null && (
+              <span className="text-smoke">
+                {profile.foundingNumber
+                  ? ` · free for another ${proDaysLeft} days`
+                  : ` · renews in ${proDaysLeft} days`}
+              </span>
+            )}
           </p>
+          {/* A failed card is a banner, never a lockout. Stripe retries for
+              days, and taking someone's tools away mid-retry turns a
+              billing hiccup into a cancellation. */}
+          {billingTrouble && (
+            <p className="mt-2 rounded-lg border border-heat/50 bg-heat/10 px-3 py-2 text-sm text-heat">
+              Your last payment didn&apos;t go through. Nothing&apos;s locked — update your card
+              when you get a minute.{" "}
+              <Link href="/studio/billing" className="underline">
+                Fix it
+              </Link>
+            </p>
+          )}
+          {!onPro && (
+            <p className="mt-2 text-sm text-smoke">
+              <Link href="/pricing" className="font-bold text-volt underline">
+                Artist Pro
+              </Link>{" "}
+              adds your customer list, real margins on every pair, and your own site.
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           <Link
@@ -94,6 +238,28 @@ export default async function StudioPage() {
         </div>
       </div>
 
+      {/* Unfinished handoffs sit above the vanity stats on purpose. An
+          unclaimed sale is real money that moved with nothing on the
+          record to show for it — worth more attention than a vote count. */}
+      <HandoffDesk items={handoffs} />
+
+      {/* Above the stats too: an unanswered piece has no provenance and
+          no resale value, which costs more than a low vote count. */}
+      <OwnershipQueue pieces={unanswered} />
+
+      {/* What we did to their work. Renders nothing when we've done
+          nothing, which is almost always — and that's the point: when it
+          DOES appear, it means something happened they should know about. */}
+      <StaffActivity userId={session.user.id} />
+
+      {handoff.claimed > 0 && (
+        <p className="mt-4 text-xs text-smoke">
+          {handoff.claimed} of your sales {handoff.claimed === 1 ? "has been" : "have been"}
+          {" "}claimed ({handoff.claimRatePct}%) — each one is a collector who now owns a piece
+          with your name on it.
+        </p>
+      )}
+
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {tiles.map((t) => (
           <div key={t.label} className="rounded-xl border border-edge bg-surface p-4 text-center">
@@ -101,6 +267,70 @@ export default async function StudioPage() {
             <p className="tag mt-1 text-smoke">{t.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Your page — editable without going through the office */}
+      <div id="your-page" className="mt-8 scroll-mt-24">
+        <p className="display text-xl text-white">Your page</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Your story, your city, your links, your photo. Name and page URL stay put so your
+          record and every link people already have keep working.
+        </p>
+        <div className="mt-3 rounded-xl border border-edge bg-surface p-5">
+          <ProfileEditForm current={profile} />
+        </div>
+      </div>
+
+      {/* Closet control — repricing without resubmitting */}
+      <div id="your-closet" className="mt-10 scroll-mt-24">
+        <p className="display text-xl text-white">
+          Your closet <span className="text-smoke">({myPieces.length})</span>
+        </p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Reprice, resize, rewrite or remove any piece — no resubmitting. Clear the price to
+          take something off the market and keep it on your page.
+        </p>
+
+        {/* How the room is hung, before the pieces in it. */}
+        <div className="mt-4 rounded-xl border border-edge bg-panel p-4">
+          <p className="tag text-heat">Your look</p>
+          <p className="mt-0.5 mb-3 max-w-2xl text-sm text-smoke">
+            Your page shouldn&apos;t look like everyone else&apos;s. Pick what you lead with,
+            say it in your words, and give the page your colour.
+          </p>
+          <ClosetLookForm
+            current={{
+              closetHeadline: profile.closetHeadline,
+              featuredSubmissionId: profile.featuredSubmissionId,
+              accentColor: profile.accentColor,
+              closetLayout: profile.closetLayout,
+            }}
+            pieces={myPieces.map((p) => ({ id: p.id, title: p.title }))}
+          />
+        </div>
+
+        <div className="mt-3">
+          <PieceManager
+            pieces={myPieces.map((p) => ({
+              id: p.id,
+              title: p.title,
+              imageUrl: p.imageUrl,
+              size: p.size,
+              description: p.description,
+              askingPriceCents: p.askingPriceCents,
+              category: p.category,
+              sold: p.sales.length > 0,
+              closetHidden: p.closetHidden,
+              closetSection: p.closetSection,
+              featured: profile.featuredSubmissionId === p.id,
+            }))}
+          />
+        </div>
+      </div>
+
+      {/* The artist's private AI corner — knows their standing */}
+      <div className="mt-8">
+        <StudioAssistant />
       </div>
 
       {/* Commission inbox — fans proposing builds. Accepting emails the
@@ -111,7 +341,7 @@ export default async function StudioPage() {
             Commission requests <span className="text-volt">({commissions.length})</span>
           </h2>
           <div className="mt-3 space-y-2">
-            {commissions.map((c) => (
+            {commissions.filter((c) => c.status === "PENDING").map((c) => (
               <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-edge bg-panel px-4 py-2.5 text-sm">
                 <div className="min-w-0">
                   <p className="font-bold text-white">
@@ -131,8 +361,75 @@ export default async function StudioPage() {
                       Accept
                     </button>
                   </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "waitlist")}>
+                    <button className="rounded border border-heat px-3 py-1.5 tag text-heat transition hover:bg-heat/10">
+                      Waitlist
+                    </button>
+                  </form>
                   <form action={respondCommissionRequest.bind(null, c.id, false)}>
                     <button className="rounded border border-edge px-3 py-1.5 tag text-smoke">Pass</button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* The queue. A slot count tells somebody there's no room; a position
+          tells them how long the wait is, and that's the difference between
+          leaving and staying. */}
+      {waitlist.length > 0 && (
+        <div className="mt-8">
+          <p className="display text-xl text-white">
+            Waitlist <span className="text-heat">({waitlist.length})</span>
+          </p>
+          <p className="mt-1 max-w-2xl text-sm text-smoke">
+            Everyone here can see their own position. Move people up as slots open,
+            then accept when you&apos;re ready to start.
+          </p>
+          <div className="mt-3 space-y-2">
+            {waitlist.map((c, i) => (
+              <div key={c.id} className="flex items-center gap-3 rounded-lg border border-edge bg-panel p-2.5">
+                <span className="display w-8 shrink-0 text-center text-lg text-heat">
+                  #{c.queuePosition ?? i + 1}
+                </span>
+                <div className="flex shrink-0 flex-col gap-0.5">
+                  <form action={commissionQueueAction.bind(null, c.id, "up")}>
+                    <button
+                      disabled={i === 0}
+                      aria-label="Move up the queue"
+                      className="flex h-5 w-6 items-center justify-center rounded border border-edge text-[10px] text-smoke hover:text-white disabled:opacity-30"
+                    >
+                      ▲
+                    </button>
+                  </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "down")}>
+                    <button
+                      disabled={i === waitlist.length - 1}
+                      aria-label="Move down the queue"
+                      className="flex h-5 w-6 items-center justify-center rounded border border-edge text-[10px] text-smoke hover:text-white disabled:opacity-30"
+                    >
+                      ▼
+                    </button>
+                  </form>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-bold text-white">{c.baseName}</p>
+                  <p className="truncate text-xs text-smoke">
+                    {c.user.name ?? "a fan"}
+                    {c.budgetCents ? ` · ${formatUsd(c.budgetCents)} budget` : ""}
+                    {c.note ? ` — "${c.note}"` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <form action={commissionQueueAction.bind(null, c.id, "accept")}>
+                    <button className="rounded border border-volt px-3 py-1.5 tag font-bold text-volt transition hover:bg-volt/10">
+                      Start
+                    </button>
+                  </form>
+                  <form action={commissionQueueAction.bind(null, c.id, "decline")}>
+                    <button className="rounded border border-edge px-3 py-1.5 tag text-smoke">Drop</button>
                   </form>
                 </div>
               </div>
@@ -284,6 +581,7 @@ export default async function StudioPage() {
           live once the league office approves it.
         </p>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <span id="drops" className="block scroll-mt-24" />
           <AnnounceDropForm />
         </div>
         {myDrops.length > 0 && (
@@ -323,6 +621,7 @@ export default async function StudioPage() {
           your page so voters can buy straight from you.
         </p>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <span id="shops" className="block scroll-mt-24" />
           <AddShopForm />
           {myShops.length > 0 && (
             <div className="mt-4 space-y-2 border-t border-edge pt-4">
@@ -355,6 +654,37 @@ export default async function StudioPage() {
                   </button>
                 </form>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Commission desk — price + turnaround, stated upfront */}
+      <div id="commission-desk" className="mt-12 scroll-mt-24">
+        <p className="display text-xl text-white">Your commission desk</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          What stops most buyers isn&apos;t your price — it&apos;s not knowing it. Post your
+          starting price and turnaround once and every visitor sees it upfront, so the people
+          who reach out already know what they&apos;re signing up for.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <CommissionDeskForm current={profile} />
+        </div>
+      </div>
+
+      {/* Your music — plays on your league page */}
+      <div className="mt-12">
+        <p className="display text-xl text-white">Your music</p>
+        <p className="mt-1 max-w-2xl text-sm text-smoke">
+          Make music too? Tie your Spotify (or DistroKid / Apple Music) and it
+          plays right on your league page — the culture hears you while they
+          look at your work.
+        </p>
+        <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
+          <ProfileMusicForm current={profile.spotifyUrl} />
+          {profile.spotifyUrl && (
+            <div className="mt-4 border-t border-edge pt-4">
+              <ProfileMusic url={profile.spotifyUrl} />
             </div>
           )}
         </div>

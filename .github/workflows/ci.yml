@@ -1,0 +1,181 @@
+# The gate.
+#
+# This exists because six CVEs — two of them critical, both in the auth
+# stack — accumulated quietly in production dependencies and were only
+# found because somebody asked an unrelated question about compliance.
+# One of them let existence-based auth checks fail open, and this app has
+# thirty-five of those in a single file. Nothing failed, nothing warned,
+# and the site kept serving.
+#
+# A dependency audit that only runs when a human remembers to run it is
+# not a control. This one runs on every push.
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  # Dependencies rot on their own schedule, not on ours: a CVE published
+  # tomorrow makes today's green build wrong without anyone touching the
+  # code. The weekly run catches that.
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` runs the postinstall (prisma generate), which is fine and
+      # needed by the typecheck below.
+      - run: npm ci
+
+      # Production dependencies only. A dev-only advisory in a build tool
+      # is worth knowing about but is not a reason to block a deploy, and
+      # a gate that cries wolf gets switched off.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      # Reported but never blocking, so a low-severity finding in a build
+      # tool is visible without holding up a fix to the live site.
+      - name: Audit everything (advisory only)
+        if: always()
+        run: npm audit || true
+
+  check:
+    name: Types, lint, and the maths
+    runs-on: ubuntu-latest
+    # The verify suites talk to a real database, because the bugs worth
+    # catching (overdrafts, double payouts, duplicate imports) only exist
+    # at the database boundary. A mock would pass all of them.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heatchart_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heatchart_ci
+      AUTH_SECRET: ci-only-not-a-real-secret
+      NEXTAUTH_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Lint is held at its known baseline rather than required to be
+      # clean. The repo carries 47 pre-existing errors; failing the build
+      # on them would mean every commit is red and nobody reads it again.
+      # What this catches is a commit that makes it WORSE.
+      - name: Lint (no new errors)
+        run: |
+          npx eslint --format json -o /tmp/lint.json || true
+          node -e "
+            const r = require('/tmp/lint.json');
+            const errors = r.reduce((t, f) => t + f.errorCount, 0);
+            const BASELINE = 47;
+            console.log('eslint errors:', errors, '(baseline', BASELINE + ')');
+            if (errors > BASELINE) {
+              console.error('New lint errors introduced. Fix them, or lower the baseline in ci.yml if you cleaned some up.');
+              process.exit(1);
+            }
+          "
+
+      - name: Prepare the database
+        run: npx prisma db push --skip-generate --accept-data-loss
+
+      # Cheapest and most consequential: no database, no network, and it
+      # is the one failure you want to hear about before the commit is
+      # public rather than after.
+      - name: No committed secrets
+        run: npm run verify:secrets
+
+      # Question arithmetic needs no database, so it runs next and fails
+      # fast.
+      - name: Question bank arithmetic
+        run: npm run verify:questions
+
+      - name: Rate limits and upload types
+        run: npm run verify:limits
+
+      - name: Credit ledger
+        run: npm run verify:ledger
+
+      - name: League payouts
+        run: npm run verify:league
+
+      - name: Reseller P&L
+        run: npm run verify:reseller
+
+      - name: Contact import
+        run: npm run verify:contacts
+
+      - name: Buyer handoff
+        run: npm run verify:handoff
+
+      - name: CRM import and intelligence
+        run: npm run verify:crm
+
+      - name: Ownership and provenance
+        run: npm run verify:ownership
+
+      # The two that answer "can somebody touch work that isn't theirs?"
+      # — one proves they can't, the other proves that when staff legally
+      # can, it's on the record.
+      - name: Access control
+        run: npm run verify:authz
+
+      - name: Staff action log
+        run: npm run verify:audit
+
+      - name: Subscription metrics
+        run: npm run verify:saas
+
+      # The cap is a promise with a number in it. A 101st founding member
+      # makes the offer a lie and every earlier seat worth less.
+      - name: The Founding 100
+        run: npm run verify:founding
+
+      # Merging touches artists' catalogues and must never delete history.
+      - name: Duplicate piece merge
+        run: npm run verify:dupes
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    env:
+      # Prisma's client generation needs a URL present at build time; it
+      # is never connected to here.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/unused
+      AUTH_SECRET: ci-only-not-a-real-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build

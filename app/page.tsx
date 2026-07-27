@@ -1,21 +1,35 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
+import MemberGreeting from "@/components/MemberGreeting";
+import MemberNudges from "@/components/MemberNudges";
+import { getMemberNudges } from "@/lib/nudges";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { getPublishedArticles } from "@/lib/articles";
 import { getActiveGiveaway } from "@/lib/quiz";
 import BattleCard from "@/components/BattleCard";
-import ProductCard from "@/components/ProductCard";
 import ArticleCard from "@/components/ArticleCard";
 import FeedScroller from "@/components/FeedScroller";
 import AdReel from "@/components/AdReel";
-import { SHOP_LIVE } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   await finalizeExpiredBattles();
 
-  const [battles, heat, products, articles] = await Promise.all([
+  const session = await auth();
+  const member = session?.user?.id
+    ? await prisma.user
+        .findUnique({ where: { id: session.user.id }, select: { name: true } })
+        .catch(() => null)
+    : null;
+  const firstName = member?.name?.trim().split(/\s+/)[0] ?? null;
+  // Open loops to pick back up — only for signed-in members.
+  const nudges = session?.user?.id
+    ? await getMemberNudges(session.user.id).catch(() => [])
+    : [];
+
+  const [battles, heat, articles] = await Promise.all([
     prisma.battle.findMany({
       where: { status: "ACTIVE" },
       orderBy: { endsAt: "asc" },
@@ -23,11 +37,6 @@ export default async function HomePage() {
       include: { subA: true, subB: true, ogShoe: true, votes: { select: { side: true } } },
     }),
     getHeatList(),
-    prisma.product.findMany({
-      where: { featured: true },
-      orderBy: { sortOrder: "asc" },
-      take: 4,
-    }),
     getPublishedArticles(3),
   ]);
   const giveaway = await getActiveGiveaway();
@@ -45,9 +54,13 @@ export default async function HomePage() {
       {/* Masthead: who we are + the live giveaway, one calm bar at the top */}
       <div className="border-b border-edge bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2.5 px-4 py-3.5">
-          <p className="text-sm font-medium tracking-wide text-smoke">
-            Custom sneaker culture · An <span className="text-volt">Equity Uprise</span> project
-          </p>
+          {firstName ? (
+            <MemberGreeting firstName={firstName} />
+          ) : (
+            <p className="text-sm font-medium tracking-wide text-smoke">
+              Custom sneaker culture · An <span className="text-volt">Equity Uprise</span> project
+            </p>
+          )}
           {giveaway && (
             <Link href="/quiz" className="group flex flex-wrap items-center gap-3 text-sm">
               <span className="text-smoke">
@@ -60,6 +73,9 @@ export default async function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Unfinished business — pick up where you left off */}
+      <MemberNudges nudges={nudges} />
 
       {/* Hero */}
       <section className="relative overflow-hidden border-b border-edge">
@@ -82,11 +98,21 @@ export default async function HomePage() {
             <h1 className="display mt-2 max-w-3xl text-7xl sm:text-8xl">
               <span className="text-gradient-volt">The Heat Chart.</span>
             </h1>
+            {/* Four short sentences instead of one long one.
+                The old version was a single run-on carrying five separate
+                products — release dates, resale, games, the draft, and
+                the custom work — so a first-time reader got a list before
+                they got an idea, and had to hold all five to understand
+                any. Say the one thing that's actually different first;
+                the features can wait for the sections below. */}
             <p className="mt-6 max-w-xl text-lg text-smoke">
-              The proving ground for custom sneaker culture. Artists put their
-              hardest pairs up; the culture votes them into rank. Watch the
-              battles, back your favorite maker — or step in and defend your
-              own name.
+              Artists paint one-of-a-kind sneakers. You vote on which ones are best,
+              and buy the ones you want.
+            </p>
+            <p className="mt-3 max-w-xl text-lg text-smoke">
+              There&apos;s only ever one of each pair, and the person who made it
+              signed it. Release dates, resale prices and the games are all here
+              too — free.
             </p>
             <div className="mt-9 flex flex-wrap gap-5">
               <Link
@@ -96,13 +122,31 @@ export default async function HomePage() {
                 Vote In Battles
               </Link>
               <Link
-                href="/submit"
+                href="/drops"
                 className="btn-hard-volt rounded-lg border-2 border-white/90 bg-ink px-7 py-3.5 tag font-bold text-white"
               >
-                Submit Your Customs
+                See What&apos;s Dropping
               </Link>
             </div>
-            <p className="tag mt-8 text-smoke">
+
+            {/* Every door in, on one line — the site is wider than one lane. */}
+            <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+              {[
+                ["/drops", "Drop calendar"],
+                ["/market", "Live resale"],
+                ["/league", "The Draft"],
+                ["/predict", "The Call"],
+                ["/games", "Free games"],
+                ["/available", "Shop 1-of-1s"],
+                ["/news", "Newsroom"],
+              ].map(([href, label]) => (
+                <Link key={href} href={href} className="font-medium text-smoke underline-offset-4 hover:text-volt hover:underline">
+                  {label}
+                </Link>
+              ))}
+            </div>
+
+            <p className="tag mt-7 text-smoke">
               Free to vote · Free to play · 1% seller fee when checkout opens
             </p>
           </div>
@@ -205,6 +249,19 @@ export default async function HomePage() {
             ))}
           </div>
         )}
+
+        {/* The empty state above offers a way in; a busy arena has to
+            offer one too. This line used to exist only when there were
+            no battles at all, so the invitation to enter disappeared
+            exactly when there was something worth entering. */}
+        {battles.length > 0 && (
+          <p className="mt-8 text-center text-sm text-smoke">
+            Your work belongs on this wall.{" "}
+            <Link href="/submit" className="font-bold text-volt underline">
+              Enter your customs
+            </Link>
+          </p>
+        )}
       </section>
 
       {/* Heat list preview */}
@@ -216,6 +273,11 @@ export default async function HomePage() {
               <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
                 The <span className="text-volt">Heat List</span>
               </h2>
+              <p className="mt-2 max-w-lg text-sm text-smoke">
+                Hand-finished, one-of-one artwork on a sneaker — signed by the
+                maker, owned by one person, ranked by the culture. Not a
+                colorway you missed. A piece nobody else on earth has.
+              </p>
             </div>
             <Link
               href="/heat-list"
@@ -322,31 +384,6 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
-
-      {/* Shop preview — stashed behind SHOP_LIVE until it's fully curated */}
-      {SHOP_LIVE && (
-        <section className="mx-auto max-w-6xl px-4 py-12">
-          <div className="flex items-end justify-between">
-            <div>
-              <div className="rule w-16" />
-              <h2 className="display mt-2 text-3xl text-white sm:text-4xl">
-                Gear <span className="text-heat">&amp; Heat</span>
-              </h2>
-            </div>
-            <Link
-              href="/shop"
-              className="tag rounded-full border border-edge px-4 py-2 text-smoke transition hover:border-heat hover:text-white"
-            >
-              Full shop →
-            </Link>
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* The Feed — the infinite scroll machine */}
       <section className="border-t border-edge">

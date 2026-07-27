@@ -149,8 +149,14 @@ export async function syncEbayPrices(limit = 40): Promise<{
           ebayNewCents: prices.newCents,
           ebayUsedCents: prices.usedCents,
           ebayCheckedAt: new Date(),
+          // Affiliate-tagged when EPN is configured — this is the link the
+          // exchange sends buyers to, so the click is credited to us.
+          ...(prices.sampleUrl ? { ebayItemUrl: prices.sampleUrl } : {}),
         },
       });
+      // Record today's observation so the pair builds a real price chart.
+      const { recordPrices } = await import("./priceHistory");
+      await recordPrices(shoe.id, { ebay_new: prices.newCents, ebay_used: prices.usedCents }).catch(() => {});
       if (prices.newCents || prices.usedCents) matched++;
     } catch {
       // One bad match never stops the rotation.

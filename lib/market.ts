@@ -164,11 +164,17 @@ export type OgStats = {
  * the pair — the number StockX built a business on.
  */
 export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; brands: string[] }> {
+  // Any shoe with a price earns a seat — a live resale number if we have
+  // one, otherwise retail as the floor. Requiring BOTH a market price AND
+  // an image was silently emptying the whole board whenever an import
+  // skipped either field. Imaged shoes still lead (the card falls back to
+  // a 👟 tile for the rest).
   const shoes = await prisma.catalogShoe.findMany({
-    // No photo, no board seat — a blank tile costs more credibility
-    // than the listing is worth.
-    where: { marketPriceCents: { not: null, gt: 0 }, imageUrl: { not: null } },
-    orderBy: { marketPriceCents: "desc" },
+    where: {
+      OR: [{ marketPriceCents: { gt: 0 } }, { retailPriceCents: { gt: 0 } }],
+    },
+    orderBy: { marketPriceCents: { sort: "desc", nulls: "last" } },
+    take: 1000,
     select: {
       sku: true, name: true, brand: true, imageUrl: true,
       retailPriceCents: true, marketPriceCents: true, releaseDate: true,
@@ -176,21 +182,34 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
     },
   });
 
-  const items: OgItem[] = shoes.map((s) => ({
-    sku: s.sku,
-    name: s.name,
-    brand: s.brand,
-    imageUrl: s.imageUrl,
-    retailCents: s.retailPriceCents,
-    marketCents: s.marketPriceCents!,
-    premiumPct:
-      s.retailPriceCents && s.retailPriceCents > 0
-        ? Math.round(((s.marketPriceCents! - s.retailPriceCents) / s.retailPriceCents) * 100)
-        : null,
-    ebayNewCents: s.ebayNewCents,
-    ebayUsedCents: s.ebayUsedCents,
-    releaseDate: s.releaseDate,
-  }));
+  const items: OgItem[] = shoes
+    .map((s) => {
+      const hasMarket = Boolean(s.marketPriceCents && s.marketPriceCents > 0);
+      // Headline value: live resale if we have it, else retail floor.
+      const marketCents = hasMarket ? s.marketPriceCents! : (s.retailPriceCents ?? 0);
+      return {
+        sku: s.sku,
+        name: s.name,
+        brand: s.brand,
+        imageUrl: s.imageUrl,
+        retailCents: s.retailPriceCents,
+        marketCents,
+        // Premium only reads true when we have a real resale number AND a
+        // retail to measure it against — never a fabricated 0% off a floor.
+        premiumPct:
+          hasMarket && s.retailPriceCents && s.retailPriceCents > 0
+            ? Math.round(((s.marketPriceCents! - s.retailPriceCents) / s.retailPriceCents) * 100)
+            : null,
+        ebayNewCents: s.ebayNewCents,
+        ebayUsedCents: s.ebayUsedCents,
+        releaseDate: s.releaseDate,
+      };
+    })
+    // Imaged, higher-value pairs float to the top of the board.
+    .sort((a, b) => {
+      const img = Number(Boolean(b.imageUrl)) - Number(Boolean(a.imageUrl));
+      return img !== 0 ? img : b.marketCents - a.marketCents;
+    });
 
   const withPremium = items.filter((i) => i.premiumPct !== null);
   const stats: OgStats = {
@@ -205,6 +224,50 @@ export async function getOgBoard(): Promise<{ items: OgItem[]; stats: OgStats; b
 
   const brands = [...new Set(items.map((i) => i.brand).filter((b): b is string => Boolean(b)))].sort();
   return { items, stats, brands };
+}
+
+export type ReadyPiece = {
+  id: string;
+  title: string;
+  artistName: string;
+  artistSlug: string | null;
+  imageUrl: string;
+  askCents: number;
+  size: string | null;
+  category: string;
+};
+
+/**
+ * Available now — finished one-of-ones with an open ask and no confirmed
+ * sale. These ship without a commission wait, which is the honest answer
+ * to "custom work takes weeks": some of it is already made. Newest first
+ * so the lane always looks alive.
+ */
+export async function getAvailableNow(limit = 24): Promise<ReadyPiece[]> {
+  const pieces = await prisma.submission.findMany({
+    where: {
+      status: "APPROVED",
+      askingPriceCents: { not: null, gt: 0 },
+      sales: { none: { status: "CONFIRMED" } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true, title: true, artistName: true, imageUrl: true,
+      askingPriceCents: true, size: true, category: true,
+      artist: { select: { slug: true, status: true } },
+    },
+  });
+  return pieces.map((p) => ({
+    id: p.id,
+    title: p.title,
+    artistName: p.artistName,
+    artistSlug: p.artist?.status === "APPROVED" ? p.artist.slug : null,
+    imageUrl: p.imageUrl,
+    askCents: p.askingPriceCents ?? 0,
+    size: p.size,
+    category: p.category,
+  }));
 }
 
 export type HotBase = {
@@ -224,7 +287,7 @@ export type HotBase = {
 export async function getHotBases(limit = 8): Promise<HotBase[]> {
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const pieces = await prisma.submission.findMany({
-    where: { status: "APPROVED", silhouette: { not: null }, category: "sneakers" },
+    where: { status: "APPROVED", artistId: { not: null }, silhouette: { not: null }, category: "sneakers" },
     select: { silhouette: true, createdAt: true, askingPriceCents: true },
   });
 

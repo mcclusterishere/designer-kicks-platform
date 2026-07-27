@@ -28,12 +28,21 @@ export default function PmaGate() {
         <h2 id="pma-title" className="display mt-1 text-2xl text-white">
           One more thing — membership
         </h2>
+        {/* This sheet blocks the entire site until it's answered, which
+            makes it the least forgiving place on the platform to be vague.
+            The old version said "private member association" twice and
+            never said what that means for the person reading it — so the
+            only way to find out was to agree to it. */}
         <p className="mt-3 text-sm leading-relaxed text-smoke">
-          The Heat Chart operates as a program of{" "}
-          <span className="text-white">Equity Uprise</span>, a private member
-          association. Every account holder is a private member — that&apos;s
-          what keeps this space ours. Give the agreement a read, then confirm
-          to keep rolling.
+          The Heat Chart is run by{" "}
+          <span className="text-white">Equity Uprise</span>, a member association —
+          meaning it&apos;s a members&apos; space rather than one open to the general
+          public, and everyone with an account joins as a member.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-smoke">
+          Nothing changes about how you use the site and it doesn&apos;t cost
+          anything. The agreement is the rulebook: what we owe you, what you agree to,
+          and how either of us walks away. Worth a read.
         </p>
         <a
           href="/equity-uprise"

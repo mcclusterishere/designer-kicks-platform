@@ -1,15 +1,26 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+import { fitsMember } from "@/lib/shoeSize";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
-import { getMarketBoard, getOgBoard, getHotBases, formatUsd, type MarketItem, type OgItem, type HotBase } from "@/lib/market";
+import { getMarketBoard, getHotBases, formatUsd, type MarketItem, type HotBase } from "@/lib/market";
+import { getExchangeBoard, getIndexStats, getMovers, getIndexHistory, type SortKey } from "@/lib/exchange";
+import ExchangeTable from "@/components/ExchangeTable";
+import HouseStock from "@/components/HouseStock";
+import TickerTape from "@/components/TickerTape";
+import IndexHero from "@/components/IndexHero";
+import CatalogBoard from "@/components/CatalogBoard";
+import PairChart from "@/components/PairChart";
+import TradePanel from "@/components/TradePanel";
 import OfferForm from "@/components/OfferForm";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
 
 export const metadata = {
-  title: "Market — Custom Heat & OG Drops, Priced Live | The Heat Chart",
+  title: "The Market — Live Sneaker Exchange, Bid/Ask & Resale Index | The Heat Chart",
   description:
-    "The two sides of the sneaker market on one board: one-of-one customs priced by their artists, and OG retail drops tracked against live resale. Last sales, asks, offers, premiums.",
+    "The sneaker exchange: every tracked pair as a live symbol with last price, premium over retail, and a real two-sided bid/ask from the used and new market. Plus one-of-one customs priced by the artists who built them.",
 };
 export const dynamic = "force-dynamic";
 
@@ -115,10 +126,12 @@ function CustomTile({
   item,
   rank,
   signedIn,
+  fitsYou,
 }: {
   item: MarketItem;
   rank: number | undefined;
   signedIn: boolean;
+  fitsYou: boolean;
 }) {
   const salePct =
     item.lastSaleCents && item.prevSaleCents
@@ -145,16 +158,31 @@ function CustomTile({
             Collab
           </span>
         )}
+        {/* "We know you": this one-of-one was made in the member's size */}
+        {fitsYou && (
+          <span className="glow-heat absolute right-2 bottom-2 flex items-center gap-1 rounded bg-heat px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            👟 Your size
+          </span>
+        )}
         {item.consignment && (
           <span className="absolute bottom-2 left-2 rounded bg-heat px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
             Consigned
           </span>
         )}
-        {item.ownerName && item.askCents && (
+        {item.ownerName && item.askCents ? (
           <span className="absolute bottom-2 right-2 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
             Resale
           </span>
-        )}
+        ) : item.askCents ? (
+          // The other half of the same fact, and it was missing. A piece
+          // with an ask and no owner is the maker selling their own work
+          // for the first time. Unlabelled, it reads identically to a
+          // collector resale — which made the board look like a
+          // secondary market when every listing on it was a first sale.
+          <span className="absolute bottom-2 right-2 rounded bg-volt px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink">
+            From the maker
+          </span>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col p-3">
         <p className="truncate text-sm font-semibold text-white" title={item.title}>
@@ -190,11 +218,15 @@ function CustomTile({
             · proceeds split with a private collector
           </p>
         )}
-        {item.ownerName && item.askCents && (
+        {item.ownerName && item.askCents ? (
           <p className="mt-1 text-[11px] leading-relaxed text-smoke">
             Collector resale — {RESALE_ARTIST_ROYALTY_PCT}% royalty goes back to the artist
           </p>
-        )}
+        ) : item.askCents ? (
+          <p className="mt-1 text-[11px] leading-relaxed text-smoke">
+            First sale, direct from {item.artistName} — never owned by anyone else
+          </p>
+        ) : null}
 
         {/* The proprietary number: Heat Index, its 8-week tape, its 7-day move */}
         <div className="mt-2 flex items-center justify-between gap-2 rounded bg-ink/60 px-2 py-1">
@@ -221,7 +253,7 @@ function CustomTile({
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">{headlineLabel}</p>
           <div className="flex items-baseline justify-between">
             <p className="text-xl font-bold tabular-nums text-white">
-              {headline ? formatUsd(headline) : "—"}
+              <Money cents={headline} />
             </p>
             {salePct !== null && <Delta pct={salePct} />}
           </div>
@@ -229,7 +261,7 @@ function CustomTile({
         <div className="mt-1.5 flex items-center justify-between text-[11px] tabular-nums text-smoke">
           <span>
             Last sale:{" "}
-            <span className="text-white">{item.lastSaleCents ? formatUsd(item.lastSaleCents) : "—"}</span>
+            <span className="text-white"><Money cents={item.lastSaleCents} /></span>
             {item.lastSaleCents !== null && item.lastSaleVerified && (
               <span className="ml-1 text-emerald-400" title="Substantiated with evidence or admin-verified">✓</span>
             )}
@@ -238,16 +270,23 @@ function CustomTile({
             {item.bidCount > 0 ? (
               <>
                 {item.bidCount} bid{item.bidCount === 1 ? "" : "s"} · high{" "}
-                <span className="font-bold text-emerald-400">{formatUsd(item.topOfferCents!)}</span>
+                <span className="font-bold text-emerald-400"><Money cents={item.topOfferCents!} /></span>
               </>
             ) : item.consignment ? (
-              <>Bids from <span className="font-bold text-white">{formatUsd(item.consignment.floorCents)}</span></>
+              <>Bids from <span className="font-bold text-white"><Money cents={item.consignment.floorCents} /></span></>
             ) : (
               "No bids yet"
             )}
           </span>
         </div>
-        <div className="mt-auto">
+        {/* Speculate on a one-of-one the same way as a retail pair. */}
+        <Link
+          href={`/market?board=customs&sym=${item.id}`}
+          className="mt-2 block rounded-lg border border-heat/60 py-2 text-center tag font-bold text-heat transition hover:bg-heat/10"
+        >
+          ◈ Chart &amp; call
+        </Link>
+        <div className="mt-2">
           <OfferForm
             submissionId={item.id}
             signedIn={signedIn}
@@ -260,81 +299,76 @@ function CustomTile({
   );
 }
 
-/* ---------- OG tile ---------- */
-
-function OgTile({ item }: { item: OgItem }) {
-  return (
-    <Link
-      href={`/catalog/${encodeURIComponent(item.sku)}`}
-      className="group flex flex-col rounded-lg border border-edge bg-surface transition hover:border-smoke/60"
-    >
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-t-lg bg-white p-3">
-        {item.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.04]"
-          />
-        ) : (
-          <span className="text-4xl">👟</span>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-3">
-        <p className="line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-tight text-white" title={item.name}>
-          {item.name}
-        </p>
-        <div className="mt-2.5 border-t border-edge pt-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">Market Value</p>
-          <div className="flex items-baseline justify-between">
-            <p className="text-xl font-bold tabular-nums text-white">{formatUsd(item.marketCents)}</p>
-            {item.premiumPct !== null && <Delta pct={item.premiumPct} />}
-          </div>
-        </div>
-        {/* The spread: retail → eBay new → eBay used. Live medians from
-            the auto-matcher; dashes until the eBay keys connect. */}
-        <div className="mt-1.5 space-y-0.5 text-[11px] tabular-nums text-smoke">
-          <p className="flex justify-between">
-            <span>Retail</span>
-            <span className="text-white">{item.retailCents ? formatUsd(item.retailCents) : "—"}</span>
-          </p>
-          <p className="flex justify-between">
-            <span>eBay new</span>
-            <span className="text-white">{item.ebayNewCents ? formatUsd(item.ebayNewCents) : "—"}</span>
-          </p>
-          <p className="flex justify-between">
-            <span>eBay used</span>
-            <span className="text-white">{item.ebayUsedCents ? formatUsd(item.ebayUsedCents) : "—"}</span>
-          </p>
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 /* ---------- page ---------- */
 
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string }>;
+  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string; sym?: string }>;
 }) {
   await finalizeExpiredBattles();
-  const { board = "customs", category = "all", q = "", sort = "hot", brand = "all" } = await searchParams;
-  const og = board === "og";
+  const sp = await searchParams;
+  const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "" } = sp;
+  const sym = (sp.sym ?? "").trim();
+
+  // One tab, four views. The exchange leads because the chart is the thing
+  // people came to look at; "og" is kept as an alias so every link already
+  // in the wild still lands on the book.
+  const raw = sp.board ?? "exchange";
+  const board: "exchange" | "catalog" | "customs" | "instock" = raw === "customs"
+    ? "customs"
+    : raw === "catalog"
+      ? "catalog"
+      : raw === "instock"
+        ? "instock"
+        : "exchange";
+  const og = board === "exchange";
   const needle = q.trim().toLowerCase();
 
   const [session, customsBoard, ogBoard, heat, hotBases] = await Promise.all([
     auth(),
-    og ? null : getMarketBoard(),
-    og ? getOgBoard() : null,
-    og ? Promise.resolve([]) : getHeatList(),
+    board === "customs" ? getMarketBoard() : null,
+    og ? getExchangeBoard({ q, brand: brand === "all" ? undefined : brand, sort: (["last","change","spread","volume","name","recent"].includes(sort) ? sort : "last") as SortKey, page: Number(page) || 1 }) : null,
+    board === "customs" ? getHeatList() : Promise.resolve([]),
     og ? getHotBases() : Promise.resolve([]),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
 
+  // The trade panel. Driven by a URL param so the chart is server-rendered
+  // with real data and a specific pair is a shareable link, not a modal
+  // that vanishes on reload.
+  const { getTradeTarget } = await import("@/lib/tradePanel");
+  const panelSide = board === "customs" ? "CUSTOM" : "OG";
+  const [tradeTarget, wallet] = await Promise.all([
+    sym ? getTradeTarget(panelSide, sym, session?.user?.id ?? null) : Promise.resolve(null),
+    session?.user?.id
+      ? prisma.user.findUnique({ where: { id: session.user.id }, select: { credits: true } })
+      : Promise.resolve(null),
+  ]);
+  const keep = new URLSearchParams({
+    ...(board !== "exchange" ? { board } : {}),
+    ...(q ? { q } : {}),
+    ...(brand !== "all" ? { brand } : {}),
+    ...(sort !== "hot" ? { sort } : {}),
+  }).toString();
+  const closeHref = keep ? `/market?${keep}` : "/market";
+  // The member's passport size powers the "your size" badge on customs.
+  const memberSize = session?.user?.id
+    ? (await prisma.user
+        .findUnique({ where: { id: session.user.id }, select: { shoeSize: true } })
+        .catch(() => null))?.shoeSize ?? null
+    : null;
+
+  // Four tabs, and on a 390px phone their labels simply do not fit across
+  // one row: `flex-1` cannot shrink a flex item below its content, so the
+  // last pill pushed 24px past the viewport and made the WHOLE market page
+  // scroll sideways — the one page where that matters most, because it is
+  // the page people are meant to shop on. Below sm the row scrolls
+  // horizontally on its own instead, which keeps every tab reachable and
+  // the document still. From sm up nothing changes: they share the width.
   const switchBase =
-    "flex-1 rounded-full px-5 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] transition";
+    "shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-center text-xs font-bold uppercase tracking-[0.14em] transition sm:flex-1 sm:shrink sm:px-5";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -344,39 +378,76 @@ export default async function MarketPage({
           <p className="tag text-volt">Live board</p>
           <h1 className="display mt-1 text-4xl text-white">The Market</h1>
           <p className="mt-1 text-sm text-smoke">
-            {og
-              ? "OG retail drops tracked against live resale value."
-              : "One-of-one customs priced by the artists who built them."}
+            {board === "exchange"
+              ? "Retail drops tracked against live resale — chart, book and spread."
+              : board === "catalog"
+                ? "The same pairs, laid out to browse."
+                : board === "instock"
+                  ? "Pairs we own outright and sell direct — our stock, our shipping."
+                  : "One-of-one customs priced by the artists who built them."}
           </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link
+              href="/available"
+              className="inline-block rounded-full border border-volt px-3 py-1 tag font-bold text-volt transition hover:bg-volt/10"
+            >
+              ⚡ Available now — ships without a wait
+            </Link>
+            <Link
+              href="/predict"
+              className="inline-block rounded-full border border-heat px-3 py-1 tag font-bold text-heat transition hover:bg-heat/10"
+            >
+              🎯 Think you can call it? — The Call
+            </Link>
+          </div>
         </div>
 
-        {/* The switch: customs by night, OG drops by day */}
+        {/* One market, three ways to read it. The catalog used to be its own
+            top-level tab, which asked people to know that two words meant one
+            set of shoes — it's a view here now. */}
         <div
-          className="flex w-full max-w-xs items-center rounded-full border border-edge bg-surface p-1 sm:w-auto"
+          className="flex w-full max-w-full items-center overflow-x-auto rounded-full border border-edge bg-surface p-1 sm:w-auto sm:overflow-x-visible"
           role="tablist"
-          aria-label="Which market"
+          aria-label="How to view the market"
         >
-          <Link
-            href="/market"
-            role="tab"
-            aria-selected={!og}
-            className={`${switchBase} ${!og ? "bg-volt text-ink" : "text-smoke hover:text-white"}`}
-          >
-            Customs
-          </Link>
-          <Link
-            href="/market?board=og"
-            role="tab"
-            aria-selected={og}
-            className={`${switchBase} ${og ? "bg-heat text-ink" : "text-smoke hover:text-white"}`}
-          >
-            OG Drops
-          </Link>
+          {(
+            [
+              { key: "exchange", label: "📈 Chart", tone: "bg-heat text-ink" },
+              { key: "catalog", label: "▦ Browse", tone: "bg-volt text-ink" },
+              { key: "customs", label: "✦ Customs", tone: "bg-volt text-ink" },
+              // Ours, kept visibly separate from the boards that list
+              // other people's inventory.
+              { key: "instock", label: "🏷 In Stock", tone: "bg-volt text-ink" },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.key}
+              href={t.key === "exchange" ? "/market" : `/market?board=${t.key}`}
+              role="tab"
+              aria-selected={board === t.key}
+              className={`${switchBase} ${board === t.key ? t.tone : "text-smoke hover:text-white"}`}
+            >
+              {t.label}
+            </Link>
+          ))}
         </div>
       </div>
 
-      {og && ogBoard ? (
-        <OgBoardView board={ogBoard} hotBases={hotBases} q={q} needle={needle} sort={sort} brand={brand} />
+      {tradeTarget && (
+        <TradePanel
+          target={tradeTarget}
+          credits={wallet?.credits ?? 0}
+          signedIn={Boolean(session?.user)}
+          closeHref={closeHref}
+        />
+      )}
+
+      {board === "instock" ? (
+        <HouseStock />
+      ) : board === "catalog" ? (
+        <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
+      ) : og && ogBoard ? (
+        <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />
       ) : customsBoard ? (
         <CustomsBoardView
           board={customsBoard}
@@ -386,11 +457,12 @@ export default async function MarketPage({
           q={q}
           needle={needle}
           sort={sort}
+          memberSize={memberSize}
         />
       ) : null}
 
       <p className="mt-10 rounded-lg border border-edge bg-surface px-4 py-3 text-xs leading-relaxed text-smoke">
-        {og
+        {board !== "customs"
           ? "Market values are live resale figures (average / lowest ask) captured from our pricing providers and refreshed on re-import. Premium is resale vs retail. Figures are informational, not quotes."
           : "HX is the Heat Index — our proprietary score per piece. Votes, battle wins, standing bids, and sales push it up; cold ratings pull it down. The arrow is the last 7 days of movement. Bids are standing orders: the seller can execute at the high bid any time (Sell Now), which records the sale for the buyer to confirm — payment settles directly between members. ✓ means a sale was substantiated with evidence. Seller fee is 1% when on-platform checkout opens; the book is free forever."}
       </p>
@@ -408,6 +480,7 @@ function CustomsBoardView({
   q,
   needle,
   sort,
+  memberSize,
 }: {
   board: Awaited<ReturnType<typeof getMarketBoard>>;
   heatRank: Map<string, number>;
@@ -416,6 +489,7 @@ function CustomsBoardView({
   q: string;
   needle: string;
   sort: string;
+  memberSize: string | null;
 }) {
   const { items, stats } = board;
   const price = (i: MarketItem) => i.askCents ?? i.lastSaleCents ?? i.topOfferCents ?? 0;
@@ -456,12 +530,12 @@ function CustomsBoardView({
               Confirmed volume · all-time
             </p>
             <p className="mt-1 text-4xl font-bold tabular-nums text-white sm:text-5xl">
-              {formatUsd(stats.volumeCents)}
+              <Money cents={stats.volumeCents} showUsd={false} />
             </p>
             <p className="mt-1 text-xs tabular-nums text-smoke">
               {stats.salesCount} sale{stats.salesCount === 1 ? "" : "s"} ·{" "}
               {stats.verifiedCount} verified · avg{" "}
-              {stats.salesCount ? formatUsd(stats.avgCents) : "—"}
+              <Money cents={stats.salesCount ? stats.avgCents : null} showUsd={false} />
             </p>
           </div>
           {indexSeries.length > 1 && (
@@ -550,7 +624,13 @@ function CustomsBoardView({
       ) : (
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {filtered.map((item) => (
-            <CustomTile key={item.id} item={item} rank={heatRank.get(item.id)} signedIn={signedIn} />
+            <CustomTile
+              key={item.id}
+              item={item}
+              rank={heatRank.get(item.id)}
+              signedIn={signedIn}
+              fitsYou={fitsMember(item.size, memberSize)}
+            />
           ))}
         </div>
       )}
@@ -560,58 +640,104 @@ function CustomsBoardView({
 
 /* ---------- OG board ---------- */
 
-function OgBoardView({
-  board,
+/**
+ * Pick the pair worth putting a chart on: the one that has moved furthest
+ * from retail among pairs we can actually draw. The index needs days of
+ * history before it has a shape, but a single pair's track is drawable the
+ * moment it has a release date and a retail price, so the floor always has
+ * a real graph on it rather than an empty frame.
+ */
+async function getSpotlightTrack() {
+  const candidates = await prisma.catalogShoe.findMany({
+    where: {
+      releaseDate: { not: null },
+      retailPriceCents: { gt: 0 },
+      OR: [{ marketPriceCents: { gt: 0 } }, { ebayNewCents: { gt: 0 } }],
+    },
+    orderBy: { marketPriceCents: "desc" },
+    take: 60,
+    select: {
+      id: true, sku: true, name: true, releaseDate: true,
+      retailPriceCents: true, marketPriceCents: true, ebayNewCents: true,
+    },
+  });
+  if (candidates.length === 0) return null;
+
+  const best = candidates
+    .map((s) => ({
+      s,
+      gap: Math.abs(((s.marketPriceCents ?? s.ebayNewCents ?? 0) - s.retailPriceCents!) / s.retailPriceCents!),
+    }))
+    .sort((a, b) => b.gap - a.gap)[0].s;
+
+  const { getPriceTrack } = await import("@/lib/priceHistory");
+  const points = await getPriceTrack(best);
+  return points.length >= 2 ? { points, name: best.name, sku: best.sku } : null;
+}
+
+async function ExchangeFloor({
+  exchange,
   hotBases,
   q,
-  needle,
   sort,
   brand,
 }: {
-  board: Awaited<ReturnType<typeof getOgBoard>>;
+  exchange: Awaited<ReturnType<typeof getExchangeBoard>>;
   hotBases: HotBase[];
   q: string;
-  needle: string;
   sort: string;
   brand: string;
 }) {
-  const { items, stats, brands } = board;
-  const filtered = items
-    .filter((i) => brand === "all" || i.brand === brand)
-    .filter((i) => !needle || i.name.toLowerCase().includes(needle) || i.sku.toLowerCase().includes(needle))
-    .sort((a, b) =>
-      sort === "price-low"
-        ? a.marketCents - b.marketCents
-        : sort === "premium"
-          ? (b.premiumPct ?? -Infinity) - (a.premiumPct ?? -Infinity)
-          : b.marketCents - a.marketCents
-    );
-  const page = filtered.slice(0, OG_PAGE_SIZE);
+  const { rows, total, page, pages, brands } = exchange;
+  const [index, movers, history, spotlight] = await Promise.all([
+    getIndexStats(),
+    getMovers(),
+    getIndexHistory(30),
+    getSpotlightTrack(),
+  ]);
 
   return (
     <>
-      {/* Hot Bases — what the culture is actually building on. Price
-          feeds say what a pair costs; this says what pairs get CHOSEN,
-          and what the work turns them into. */}
+      {/* The tape */}
+      <div className="mt-5 -mx-4">
+        <TickerTape movers={movers} />
+      </div>
+
+      <IndexHero
+        value={index.indexValue}
+        history={history.map((h) => ({ at: h.at.toISOString(), value: h.value }))}
+        listed={index.listed}
+        quoted={index.quoted}
+        advancers={index.advancers}
+        decliners={index.decliners}
+      />
+
+      {/* The pair chart. The index needs days before it has a shape; this
+          is drawable today, so the floor is never a chartless "market". */}
+      {spotlight && (
+        <PairChart
+          points={spotlight.points}
+          name={spotlight.name}
+          sku={spotlight.sku}
+          className="mt-5"
+        />
+      )}
+
+      {/* Hot bases — what the culture actually builds on */}
       {hotBases.length > 0 && (
         <div className="mt-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-smoke">
-            Hot bases — most customized in the league
-          </p>
+          <p className="tag text-smoke">Hot bases — most customized in the league</p>
           <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
             {hotBases.map((hb) => (
               <Link
                 key={hb.silhouette}
-                href={`/market?board=og&q=${encodeURIComponent(hb.silhouette)}`}
+                href={`/market?q=${encodeURIComponent(hb.silhouette)}`}
                 className="shrink-0 rounded-lg border border-edge bg-surface px-3 py-2 transition hover:border-volt/50"
               >
                 <p className="text-xs font-bold text-white">{hb.silhouette}</p>
                 <p className="mt-0.5 text-[11px] tabular-nums text-smoke">
                   {hb.customsBuilt} custom{hb.customsBuilt === 1 ? "" : "s"}
                   {hb.recentBuilds > 0 && <span className="text-volt"> · {hb.recentBuilds} this month</span>}
-                  {hb.avgCustomAskCents && (
-                    <span> · avg ask {formatUsd(hb.avgCustomAskCents)}</span>
-                  )}
                 </p>
               </Link>
             ))}
@@ -619,80 +745,41 @@ function OgBoardView({
         </div>
       )}
 
-      <StatStrip
-        stats={[
-          { label: "Pairs Tracked", value: stats.tracked.toLocaleString("en-US") },
-          { label: "Avg Premium", value: stats.avgPremiumPct !== null ? `${stats.avgPremiumPct > 0 ? "+" : ""}${stats.avgPremiumPct}%` : "—" },
-          {
-            label: "Top Gainer",
-            value: stats.topGainer ? `+${stats.topGainer.premiumPct}%` : "—",
-          },
-          { label: "Source", value: "Live resale" },
-        ]}
+      {/* Search / filter the floor */}
+      <form method="GET" action="/market" className="mt-5 flex flex-wrap gap-2">
+        <input type="hidden" name="board" value="og" />
+        <input type="hidden" name="sort" value={sort} />
+        <input
+          name="q"
+          defaultValue={q}
+          placeholder="Search ticker or pair…"
+          aria-label="Search symbols"
+          className="min-w-0 flex-1 rounded-md border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50"
+        />
+        <select
+          name="brand"
+          defaultValue={brand}
+          aria-label="Filter by brand"
+          className="rounded-md border border-edge bg-surface px-2 py-2 text-sm text-white"
+        >
+          <option value="all">All brands</option>
+          {brands.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+        </select>
+        <button className="rounded-md btn-hard px-4 py-2 tag font-bold">Go</button>
+      </form>
+
+      <ExchangeTable
+        rows={rows}
+        sort={(sort as SortKey) ?? "last"}
+        query={q || undefined}
+        brand={brand === "all" ? undefined : brand}
+        page={page}
+        pages={pages}
+        total={total}
       />
-
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <form method="GET" action="/market" className="flex min-w-0 flex-1 flex-wrap gap-2">
-          <input type="hidden" name="board" value="og" />
-          <select
-            name="brand"
-            defaultValue={brand}
-            aria-label="Filter by brand"
-            className="rounded-md border border-edge bg-surface px-2 py-1.5 text-xs text-white"
-          >
-            <option value="all">All brands</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            aria-label="Search name or SKU"
-            placeholder="Search name or SKU…"
-            className="min-w-0 flex-1 rounded-md border border-edge bg-surface px-3 py-1.5 text-sm text-white placeholder:text-smoke/60 focus:border-volt focus:outline-none"
-          />
-          <select
-            name="sort"
-            defaultValue={sort === "hot" ? "price-high" : sort}
-            aria-label="Sort the board"
-            className="rounded-md border border-edge bg-surface px-2 py-1.5 text-xs text-white"
-          >
-            {SORTS.filter((s) => s.key !== "hot").map((s) => (
-              <option key={s.key} value={s.key}>{s.label}</option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="rounded-md border border-edge px-3 py-1.5 text-xs font-semibold text-white transition hover:border-volt"
-          >
-            Go
-          </button>
-        </form>
-      </div>
-
-      {page.length === 0 ? (
-        <div className="mt-8 rounded-lg border border-dashed border-edge bg-surface p-10 text-center">
-          <p className="display text-2xl text-white">No pairs match</p>
-          <p className="mt-2 text-sm text-smoke">Loosen the search or switch brands.</p>
-        </div>
-      ) : (
-        <>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {page.map((item) => (
-              <OgTile key={item.sku} item={item} />
-            ))}
-          </div>
-          {filtered.length > page.length && (
-            <p className="mt-4 text-center text-xs text-smoke">
-              Showing {page.length} of {filtered.length.toLocaleString("en-US")} — search or filter to narrow it, or
-              browse the full{" "}
-              <Link href="/catalog" className="text-volt underline">catalog</Link>.
-            </p>
-          )}
-        </>
-      )}
     </>
   );
 }
+

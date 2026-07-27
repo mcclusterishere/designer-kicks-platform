@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { iqFromCounts } from "./iq";
+import { postCreditsIn } from "./ledger";
 
 // Game economy — tune these to taste.
 export const FREE_STRIKES_PER_DAY = 3; // free wrong answers per day
@@ -45,16 +46,12 @@ export async function consumeStrike(userId: string): Promise<"free" | "paid" | n
       });
       return "free" as const;
     }
-    if (user.credits > 0) {
-      await tx.user.update({
-        where: { id: userId },
-        data: { credits: { decrement: 1 } },
-      });
-      await tx.creditTransaction.create({
-        data: { userId, delta: -1, reason: "strike" },
-      });
-      return "paid" as const;
-    }
+    // Through the ledger, joining this transaction. The read above is only
+    // a hint — two wrong answers landing together would both see credits=1
+    // and both decrement, so the guard that actually holds is the
+    // conditional update inside postCreditsIn.
+    const paid = await postCreditsIn(tx, { userId, delta: -1, reason: "strike" });
+    if (paid.ok) return "paid" as const;
     return null;
   });
 }
@@ -147,21 +144,30 @@ export async function getQuizLeaderboard(limit = 10): Promise<LeaderboardEntry[]
     .slice(0, limit);
 }
 
+/**
+ * Hand credits to somebody.
+ *
+ * A Stripe session id doubles as the idempotency key, which is what makes a
+ * retried webhook safe. Stripe redelivers on any non-2xx and the return page
+ * also settles the purchase, so the two can land at once; keyed, the loser
+ * gets told the grant already happened instead of colliding with a unique
+ * constraint and 500ing into a retry loop that never resolves.
+ */
 export async function grantCredits(
   userId: string,
   amount: number,
   reason: string,
   stripeSessionId?: string
 ): Promise<void> {
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: { credits: { increment: amount } },
-    }),
-    prisma.creditTransaction.create({
-      data: { userId, delta: amount, reason, stripeSessionId },
-    }),
-  ]);
+  const { postCredits } = await import("./ledger");
+  const res = await postCredits({
+    userId,
+    delta: amount,
+    reason,
+    stripeSessionId,
+    idempotencyKey: stripeSessionId ? `stripe:${stripeSessionId}` : undefined,
+  });
+  if (!res.ok) throw new Error(`grantCredits failed: ${res.detail}`);
 }
 
 export async function getActiveGiveaway() {

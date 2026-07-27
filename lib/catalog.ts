@@ -286,6 +286,49 @@ export async function refreshCatalogPricing(brandsPerRun = 3, pages = 2): Promis
   return { ok: true, brands };
 }
 
+/**
+ * Every brand in one run, not the day's three.
+ *
+ * The scheduled refresher above rotates brands by day so it never hammers
+ * the provider. That rotation is keyed on the calendar, which means running
+ * it twice in an afternoon re-fetches the exact same three brands — correct
+ * for a nightly job, useless as a "refresh the database" button. This walks
+ * the whole brand list instead.
+ *
+ * It stops on a provider error rather than grinding through a rate limit,
+ * and it reports exactly how far it got: a sweep that covered 9 of 30 brands
+ * says so, because a partial sweep reported as a full one is worse than no
+ * sweep at all.
+ */
+export async function sweepAllBrands(
+  pages = 2,
+  budgetMs = 210_000
+): Promise<RefreshSummary & { covered: number; ofBrands: number; stoppedEarly: string | null }> {
+  if (!catalogConfigured()) {
+    return { ok: false, brands: [], covered: 0, ofBrands: 0, stoppedEarly: null, error: "Dormant — no KICKSDB_KEY." };
+  }
+  const groups = await prisma.catalogShoe.groupBy({ by: ["brand"], where: { brand: { not: null } } });
+  const all = groups.map((g) => g.brand!).sort();
+
+  const started = Date.now();
+  const brands: RefreshSummary["brands"] = [];
+  let stoppedEarly: string | null = null;
+
+  for (const brand of all) {
+    if (Date.now() - started > budgetMs) {
+      stoppedEarly = "ran out of time budget";
+      break;
+    }
+    const r = await importFromKicksDB(brand, pages);
+    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, error: r.error });
+    if (!r.ok) {
+      stoppedEarly = r.error ?? "provider error";
+      break;
+    }
+  }
+  return { ok: true, brands, covered: brands.length, ofBrands: all.length, stoppedEarly };
+}
+
 /** Panel numbers: how big the base is and how well customs resolve to it. */
 export async function catalogStats() {
   const [total, brands, sampled] = await Promise.all([

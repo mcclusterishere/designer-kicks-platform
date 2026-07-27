@@ -88,7 +88,8 @@ export default function RulesPage() {
           <p className="mt-2">
             This promotion is in no way sponsored, endorsed, administered
             by, or associated with Meta Platforms, Inc. (Facebook or
-            Instagram) or any other social platform. By entering, you
+            Instagram), Apple Inc., Google LLC, or any other platform on
+            which The Heat Chart is distributed. By entering, you
             understand that you are providing your information to the
             Sponsor and not to Meta, and you release Meta from any and all
             liability related to this promotion. Entry happens only on

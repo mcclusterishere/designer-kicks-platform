@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cronAuth";
 import { refreshCatalogPricing } from "@/lib/catalog";
 import { syncEbayPrices } from "@/lib/ebay";
+import { generateDropDrafts } from "@/lib/dropRadar";
 
 /**
  * Scheduled catalog refresher. Re-imports a rotating handful of brands
@@ -12,8 +14,7 @@ import { syncEbayPrices } from "@/lib/ebay";
  *   curl -H "Authorization: Bearer $CRON_SECRET" https://theheatchart.com/api/cron/refresh-catalog
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,5 +23,9 @@ export async function GET(req: NextRequest) {
   // batch per run covers the whole catalog across days. Dormant
   // without eBay keys.
   const ebay = await syncEbayPrices().catch(() => ({ configured: true, checked: 0, matched: 0 }));
-  return NextResponse.json({ ...summary, ebay });
+  // Turn fresh dated releases into DRAFT drop posts for editor review — the
+  // newsroom + drop calendar stay current with no manual writing. Never
+  // publishes on its own; drafts wait in the admin Drop Radar queue.
+  const radar = await generateDropDrafts(3).catch(() => ({ configured: false, scanned: 0, drafted: 0, skipped: 0 }));
+  return NextResponse.json({ ...summary, ebay, radar });
 }

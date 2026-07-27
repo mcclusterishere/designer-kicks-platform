@@ -7,10 +7,12 @@ import GoogleAnalytics from "@/components/GoogleAnalytics";
 import HeaderNav from "@/components/HeaderNav";
 import { auth } from "@/auth";
 import { siteUrl } from "@/lib/articles";
-import { SHOP_LIVE } from "@/lib/flags";
 import MobileTabBar from "@/components/MobileTabBar";
+import MoneyProvider from "@/components/MoneyProvider";
+import CurrencyPicker from "@/components/CurrencyPicker";
 import AddToHomeScreen from "@/components/AddToHomeScreen";
 import PmaGate from "@/components/PmaGate";
+import ThemeToggle from "@/components/ThemeToggle";
 import { prisma } from "@/lib/db";
 import "./globals.css";
 
@@ -32,16 +34,16 @@ const bodoni = Bodoni_Moda({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: "The Heat Chart — Custom Sneaker Culture, Battles & Culture IQ",
+  title: "The Heat Chart — Sneaker Drops, Live Resale & One-of-One Artwork",
   description:
-    "Showcase your custom kicks, battle other artists in community vote-offs, climb the Heat List, and build your Culture IQ. A home for custom-sneaker culture — a project of McCluster Corp's Equity Uprise program.",
+    "Sneaker culture, all of it: release dates and drop coverage, live resale prices on the pairs everyone's chasing, free games and a weekly fantasy draft — plus the one thing no other platform has, wearable one-of-one artwork from the independent makers who build it. Free to play, free to vote.",
   manifest: "/manifest.webmanifest",
   // Branded link unfurls everywhere a URL gets dropped — FB, IG DMs,
   // WhatsApp, iMessage. Pages with their own image (articles) override.
   openGraph: {
     type: "website",
     siteName: "The Heat Chart",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The Heat Chart — Custom Sneaker Battles" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "The Heat Chart — sneaker drops, live resale, and one-of-one artwork" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -71,6 +73,16 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+  // Inside the iOS shell: no third-party analytics at all — the app's
+  // privacy story stays exactly what the nutrition label says.
+  const { headers, cookies: nextCookies } = await import("next/headers");
+  const inAppShell = ((await headers()).get("user-agent") ?? "").includes("HeatChartApp");
+  // The reader's money, resolved here so every price below renders in it on
+  // the first paint rather than flashing dollars and correcting itself.
+  const { resolveMoney } = await import("@/lib/currencyServer");
+  const { TZ_COOKIE } = await import("@/lib/currency");
+  const money = await resolveMoney();
+  const knownTz = (await nextCookies()).get(TZ_COOKIE)?.value ?? null;
   // Equity Uprise PMA: members who joined through a door with no
   // checkbox (OAuth, pre-association accounts) accept via the gate.
   let needsPma = false;
@@ -80,25 +92,38 @@ export default async function RootLayout({
       .catch(() => null);
     needsPma = Boolean(member && !member.pmaAcceptedAt);
   }
+  const { unreadCount } = await import("@/lib/messages");
+  const unread = session?.user?.id ? await unreadCount(session.user.id).catch(() => 0) : 0;
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} h-full antialiased`}
     >
-      {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
-        <head>
+      <head>
+        {/* Theme before paint. Default is AUTO: the user's own clock
+            decides — light 7am–7pm local, dark at night (device time
+            already carries their timezone). A stored light/dark choice
+            overrides; runs pre-hydration so there's never a flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('thc-theme2');if(t!=='light'&&t!=='dark'){var h=new Date().getHours();t=h>=7&&h<19?'light':'dark'}if(t==='light')document.documentElement.dataset.theme='light'}catch(e){}",
+          }}
+        />
+        {!inAppShell && process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
           <script
             defer
             data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
             src="https://plausible.io/js/script.js"
           />
-        </head>
-      )}
+        )}
+      </head>
       <body className="min-h-full flex flex-col">
+        <MoneyProvider money={money} knownTz={knownTz}>
         <Suspense fallback={null}>
           <TrackPageview />
         </Suspense>
-        <GoogleAnalytics />
+        {!inAppShell && <GoogleAnalytics />}
         <a
           href="#main"
           className="sr-only z-[100] rounded btn-hard px-4 py-2 tag font-bold focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
@@ -106,8 +131,8 @@ export default async function RootLayout({
           Skip to content
         </a>
         <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-            <Link href="/" className="display text-xl text-white">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+            <Link href="/" className="display shrink-0 text-xl text-white">
               The<span className="text-volt">Heat</span>
               Chart
             </Link>
@@ -118,14 +143,56 @@ export default async function RootLayout({
                   ? session.user.name?.split(" ")[0] ?? "Account"
                   : "Sign In",
               }}
+              unread={unread}
             />
-            {/* Mobile: tab bar handles navigation; header keeps just the account chip */}
-            <Link
-              href={session?.user ? "/profile" : "/signin"}
-              className="tag rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
-            >
-              {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
-            </Link>
+            {/* Mobile: tab bar handles navigation; header keeps Post,
+                the account chip + the day/night switch.
+                Post is here because it went missing. Submit lives in
+                HeaderNav, which is `md:flex` — so when the four-door nav
+                shipped, phones lost every unconditional route to it. The
+                tab bar has five doors and Post isn't one, and both
+                fallback links (home, and the end of the vote deck) only
+                render when there are no live battles. The healthier the
+                arena got, the harder it became to enter it: an artist on
+                a phone had to vote through every open battle before a
+                submit button appeared. Artists are the supply side of
+                this market — their way in cannot be conditional. */}
+            <div className="flex min-w-0 items-center gap-2">
+              <Link
+                href="/submit"
+                className="btn-hard tag shrink-0 rounded-full px-3 py-2 font-bold md:hidden"
+              >
+                ＋ Post
+              </Link>
+              <ThemeToggle />
+              {/* An unread badge has to open the inbox. It pointed at
+                  /profile, so the one control that says "you have
+                  messages" was the one control that didn't show them. */}
+              <Link
+                href={
+                  !session?.user ? "/signin" : unread > 0 ? "/messages" : "/profile"
+                }
+                className="relative tag min-w-0 rounded-full border border-volt/40 px-3 py-2 text-white md:hidden"
+              >
+                {/* Truncated, because this is somebody's name and names are
+                    not a length we control. At "Justin" the header was
+                    already 1px wider than a 390px phone — enough to make
+                    every signed-in page drift sideways under the thumb.
+                    A longer first name pushes proportionally further, so
+                    the bug would have arrived one signup at a time. */}
+                <span className="block max-w-[5.5rem] truncate">
+                  {session?.user ? session.user.name?.split(" ")[0] ?? "Account" : "Sign In"}
+                </span>
+                {unread > 0 && (
+                  <span
+                    aria-label={`${unread} unread messages`}
+                    className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-volt px-1 text-[10px] font-bold text-ink"
+                  >
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </Link>
+            </div>
           </div>
         </header>
 
@@ -157,11 +224,8 @@ export default async function RootLayout({
                 <Link href="/drops" className="hover:text-white">Drops</Link>
                 <Link href="/market" className="hover:text-white">Market</Link>
                 <Link href="/giveaway" className="hover:text-white">Giveaway</Link>
-                {SHOP_LIVE && (
-                  <Link href="/shop" className="hover:text-white">Shop</Link>
-                )}
+                
                 <Link href="/story" className="hover:text-white">Our Story</Link>
-                <Link href="/film" className="hover:text-white">The Film</Link>
                 <Link href="/sell" className="hover:text-white">Sell Your Customs</Link>
                 <Link href="/careers" className="hover:text-white">Careers</Link>
               </div>
@@ -192,6 +256,7 @@ export default async function RootLayout({
             <div className="mt-4 flex flex-wrap gap-4 text-xs">
               <Link href="/terms" className="hover:text-white">Terms</Link>
               <Link href="/privacy" className="hover:text-white">Privacy</Link>
+              <Link href="/security" className="hover:text-white">Security</Link>
               <Link href="/rules" className="hover:text-white">Giveaway Rules</Link>
             </div>
             <p className="mt-6 border-t border-edge pt-4 text-xs">
@@ -201,6 +266,13 @@ export default async function RootLayout({
               their respective owners; customs featured here are independent
               artist work and not affiliated with the brands.
             </p>
+            {/* Detection is right most of the time and wrong some of the
+                time — travellers, VPNs, phones set to another country. The
+                picker is the only thing that's always right, so it's here on
+                every page rather than buried in settings. */}
+            <div className="mt-4 border-t border-edge/60 pt-4">
+              <CurrencyPicker />
+            </div>
             <p className="mt-3 text-xs">
               © 2026 McCluster Corp · The Heat Chart is a McCluster Corp /
               Equity Uprise project supporting creative opportunity and
@@ -215,6 +287,7 @@ export default async function RootLayout({
         </footer>
         <MobileTabBar />
         <AddToHomeScreen />
+        </MoneyProvider>
       </body>
     </html>
   );

@@ -28,17 +28,17 @@ jobs:
           fetch public/ad-videos/notforcheap.mp4 "$base/hf_20260721_212251_f8cce72e-9835-4d90-85c0-f7e45d36c142.mp4"
           fetch public/ad-videos/verdict.mp4     "$base/hf_20260721_212303_029a824a-6511-42f8-a7c7-8197801bf215.mp4"
           fetch public/ad-videos/gallery.mp4     "$base/hf_20260721_212314_83268fbf-3352-4111-9dbb-a9fc2e006500.mp4"
-          fetch public/ad-videos/unboxing.mp4    "$base/hf_20260721_212325_fb58961e-63b2-4ecf-91f4-7eac2d98d906.mp4"
           # The night-campaign verticals — the rest of the brand's asset library
-          fetch public/ad-videos/doomscroll.mp4  "$base/hf_20260717_021353_2e7a9ac3-5318-4772-844e-86d83e7478e7.mp4"
-          fetch public/ad-videos/citywalk.mp4    "$base/hf_20260717_021359_97e6a428-efea-49c3-b506-58c0297d4374.mp4"
-          fetch public/ad-videos/vault.mp4       "$base/hf_20260717_023823_146d3861-2d07-40ab-8251-a875907e7540.mp4"
+          # Real-shoe arena recut (v2)
+          fetch public/ad-videos/arena2.mp4      "$base/hf_20260722_063533_28dac7f1-fc7a-4ae0-92cf-2a2c7be6b35c.mp4"
           ls -la public/ad-videos
       - name: Download the app typeface (Urbanist)
         run: |
           mkdir -p public/fonts
           fetch() { [ -f "$1" ] && echo "skip $1" || curl -fSLo "$1" "$2"; }
           fetch "public/fonts/Urbanist.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/urbanist/Urbanist%5Bwght%5D.ttf"
+          fetch "public/fonts/Anton.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf"
+          fetch "public/fonts/Archivo.ttf" "https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf"
           ls -la public/fonts
       - name: Commit the videos
         run: |

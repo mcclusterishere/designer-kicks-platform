@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -11,6 +12,8 @@ import {
 } from "@/lib/articles";
 import ArticleCard from "@/components/ArticleCard";
 import { buyLinks } from "@/lib/affiliates";
+import { prisma } from "@/lib/db";
+import { formatUsd } from "@/lib/market";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,28 @@ export default async function ArticlePage({ params }: Props) {
 
   const tags = articleTags(article);
   const more = (await getPublishedArticles(4)).filter((a) => a.slug !== slug).slice(0, 3);
+
+  // If this story carries a style code, pull the shoe straight from the
+  // catalog — its photo (as a cover fallback) and its live prices.
+  const shoe = article.sku
+    ? await prisma.catalogShoe
+        .findUnique({
+          where: { sku: article.sku },
+          select: {
+            sku: true, imageUrl: true, retailPriceCents: true,
+            marketPriceCents: true, ebayNewCents: true, ebayUsedCents: true,
+          },
+        })
+        .catch(() => null)
+    : null;
+  const cover = article.coverImage || shoe?.imageUrl || null;
+  const premiumPct =
+    shoe?.marketPriceCents && shoe.retailPriceCents
+      ? Math.round(((shoe.marketPriceCents - shoe.retailPriceCents) / shoe.retailPriceCents) * 100)
+      : null;
+  const hasPrices = Boolean(
+    shoe && (shoe.retailPriceCents || shoe.marketPriceCents || shoe.ebayNewCents || shoe.ebayUsedCents)
+  );
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -105,23 +130,70 @@ export default async function ArticlePage({ params }: Props) {
       <h1 className="display mt-3 text-4xl text-white sm:text-5xl">{article.title}</h1>
       <p className="mt-4 text-lg text-smoke">{article.excerpt}</p>
 
-      {article.coverImage && (
+      {cover && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={article.coverImage}
+          src={cover}
           alt={article.title}
           className="mt-6 w-full rounded-xl border border-edge object-cover"
         />
       )}
 
+      {/* Live prices straight from the catalog — resolved by this story's
+          style code. */}
+      {hasPrices && shoe && (
+        <Link
+          href={`/catalog/${encodeURIComponent(shoe.sku)}`}
+          className="mt-6 block rounded-xl border border-edge bg-surface p-5 transition hover:border-volt/50"
+        >
+          <div className="flex items-center justify-between">
+            <p className="tag text-volt">Market snapshot</p>
+            <p className="tag text-smoke">{shoe.sku}</p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <p className="tag text-smoke">Retail</p>
+              <p className="text-lg font-bold tabular-nums text-white">
+                <Money cents={shoe.retailPriceCents} />
+              </p>
+            </div>
+            <div>
+              <p className="tag text-smoke">Resale</p>
+              <p className="text-lg font-bold tabular-nums text-white">
+                <Money cents={shoe.marketPriceCents} />
+                {premiumPct !== null && (
+                  <span className={`ml-1.5 text-xs font-semibold ${premiumPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {premiumPct >= 0 ? "▲" : "▼"} {Math.abs(premiumPct)}%
+                  </span>
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="tag text-smoke">eBay new</p>
+              <p className="text-lg font-bold tabular-nums text-white">
+                <Money cents={shoe.ebayNewCents} />
+              </p>
+            </div>
+            <div>
+              <p className="tag text-smoke">eBay used</p>
+              <p className="text-lg font-bold tabular-nums text-white">
+                <Money cents={shoe.ebayUsedCents} />
+              </p>
+            </div>
+          </div>
+          <p className="mt-3 tag text-volt">Full market data →</p>
+        </Link>
+      )}
+
       <article
-        className="prose-invert mt-8 max-w-none space-y-4 leading-relaxed text-neutral-200
+        className="article-body mt-8 max-w-none space-y-4 leading-relaxed
           [&_h2]:display [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:text-white
           [&_h3]:mt-6 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-white
           [&_a]:text-volt [&_a]:underline
           [&_strong]:text-white
           [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6
           [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6
+          [&_img]:my-6 [&_img]:w-full [&_img]:rounded-xl [&_img]:border [&_img]:border-edge
           [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm
           [&_th]:border [&_th]:border-edge [&_th]:bg-panel [&_th]:p-2 [&_th]:text-left
           [&_td]:border [&_td]:border-edge [&_td]:p-2

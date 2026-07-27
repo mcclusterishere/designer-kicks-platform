@@ -1,5 +1,7 @@
+import Money from "@/components/Money";
+import { Fragment } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
@@ -20,7 +22,9 @@ import SellNowButton from "@/components/SellNowButton";
 import ShippingQuote from "@/components/ShippingQuote";
 import ConsignForm from "@/components/ConsignForm";
 import CommissionForm from "@/components/CommissionForm";
+import CommissionDesk from "@/components/CommissionDesk";
 import ClaimLinkShare from "@/components/ClaimLinkShare";
+import ProfileMusic from "@/components/ProfileMusic";
 import { siteUrl } from "@/lib/articles";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +41,27 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
+// Retired page addresses that were shared in emails/DMs before a
+// rename — old links land on the artist, never a 404.
+const SLUG_ALIASES: Record<string, string> = {
+  "justin-dekota-2": "justin-dekota",
+};
+
+/** How densely the maker chose to hang the wall. */
+function closetGridClass(layout: string): string {
+  if (layout === "list") return "grid-cols-1";
+  if (layout === "gallery") return "grid-cols-1 sm:grid-cols-2";
+  return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+}
+
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
   await finalizeExpiredBattles();
 
-  const artist = await getArtistBySlug(slug);
+  let artist = await getArtistBySlug(slug);
+  if (!artist && SLUG_ALIASES[slug]) {
+    redirect(`/artists/${SLUG_ALIASES[slug]}`);
+  }
   if (!artist) notFound();
 
   const session = await auth();
@@ -73,7 +93,7 @@ export default async function ArtistPage({ params }: Props) {
   const viewerCanChallenge =
     viewerProfile?.status === "APPROVED" && viewerProfile.id !== artist.id;
   // Pre-loaded pages stay claimable until the artist sets a login.
-  const claimable = !artist.user.passwordHash && artist.user._count.accounts === 0;
+  const claimable = !artist.hasPassword && artist.user._count.accounts === 0;
 
   // Raw page-view counting for the Studio dashboard — own visits excluded.
   if (!isOwnPage) {
@@ -94,6 +114,22 @@ export default async function ArtistPage({ params }: Props) {
   }
   const winRate = battles > 0 ? Math.round((wins / battles) * 100) : null;
 
+  // The maker's lead piece goes first. Done here rather than in the query
+  // because "featured, then everything else in the arranged order" isn't
+  // something a single ORDER BY can express — and a featured piece that
+  // was since deleted or hidden simply doesn't match, so the closet falls
+  // back to their arrangement instead of breaking.
+  const closetOrdered = (() => {
+    const id = artist.featuredSubmissionId;
+    if (!id) return artist.submissions;
+    const lead = artist.submissions.find((s) => s.id === id);
+    return lead ? [lead, ...artist.submissions.filter((s) => s.id !== id)] : artist.submissions;
+  })();
+
+  // Section labels get printed above the first piece that carries them, so
+  // a maker who files their work in chapters gets chapters.
+  const seenSections = new Set<string>();
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
       <Link href="/artists" className="tag text-smoke hover:text-white">
@@ -102,8 +138,14 @@ export default async function ArtistPage({ params }: Props) {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="tag text-volt">Artist</p>
-          <h1 className="display mt-1 text-4xl text-white sm:text-5xl">
+          {artist.editorsPick ? (
+            <span className="inline-block rounded-full bg-heat px-3 py-1 tag font-bold text-ink">
+              ★ Editor's Pick
+            </span>
+          ) : (
+            <p className="tag text-volt">Artist</p>
+          )}
+          <h1 className="display mt-2 text-4xl text-white sm:text-5xl">
             {artist.displayName}
           </h1>
           {artist.userId && (
@@ -126,8 +168,26 @@ export default async function ArtistPage({ params }: Props) {
             {artist.city}
           </p>
           {artist.bio && <p className="mt-3 max-w-xl text-smoke">{artist.bio}</p>}
+          {artist.editorsPick && artist.editorialNote && (
+            <blockquote className="mt-4 max-w-xl border-l-2 border-heat pl-4 text-base font-medium italic leading-relaxed text-smoke">
+              {artist.editorialNote}
+              <cite className="mt-1 block text-sm font-bold not-italic text-heat">
+                — The Heat Chart editors
+              </cite>
+            </blockquote>
+          )}
           {!isOwnPage && session?.user && (
-            <CommissionForm artistId={artist.id} artistName={artist.displayName} />
+            <>
+              <CommissionForm artistId={artist.id} artistName={artist.displayName} />
+              {/* A direct line, so the negotiation that follows a commission
+                  request doesn't have to leave for Instagram. */}
+              <Link
+                href={`/messages/${artist.userId}`}
+                className="mt-2 inline-block rounded-lg border border-edge px-4 py-2 tag font-bold text-white transition hover:border-volt hover:text-volt"
+              >
+                ✉ Message {artist.displayName.split(" ")[0]}
+              </Link>
+            </>
           )}
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -157,6 +217,24 @@ export default async function ArtistPage({ params }: Props) {
         </div>
       </div>
 
+      {/* What it costs and how long it takes — answered before anyone asks. */}
+      <div className="mt-6">
+        {/* A LITERAL, never the entity. Handing a Prisma record to a
+            client component is what published the artist's password hash:
+            the prop type is narrower, TypeScript accepts the wider object
+            structurally, and types erase — so React serialises whatever
+            was actually passed. Five fields in, five fields out. */}
+        <CommissionDesk
+          desk={{
+            commissionOpen: artist.commissionOpen,
+            commissionMinCents: artist.commissionMinCents,
+            commissionMaxCents: artist.commissionMaxCents,
+            commissionDays: artist.commissionDays,
+            commissionSlots: artist.commissionSlots,
+          }}
+        />
+      </div>
+
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: "Record", value: `${wins}W–${battles - wins}L` },
@@ -170,6 +248,8 @@ export default async function ArtistPage({ params }: Props) {
           </div>
         ))}
       </div>
+
+      <ProfileMusic url={artist.spotifyUrl} />
 
       {claimable && (
         <ClaimProfileForm artistId={artist.id} displayName={artist.displayName} />
@@ -225,9 +305,15 @@ export default async function ArtistPage({ params }: Props) {
         </div>
       )}
 
-      {/* The Closet — every one-of-one, with its live heat rank */}
-      <h2 className="display mt-10 text-2xl text-white">
-        The Closet
+      {/* The Closet — hung the way the maker arranged it. The heading, the
+          lead piece, the density and the accent are all theirs; the heat
+          rank on each piece stays ours, because that one isn't a matter of
+          taste. */}
+      <h2
+        className="display mt-10 text-2xl text-white"
+        style={artist.accentColor ? { color: artist.accentColor } : undefined}
+      >
+        {artist.closetHeadline?.trim() || "The Closet"}
       </h2>
       <p className="mt-1 text-sm text-smoke">
         Every one-of-one in the collection, ranked live on the{" "}
@@ -236,16 +322,37 @@ export default async function ArtistPage({ params }: Props) {
       {artist.submissions.length === 0 ? (
         <p className="mt-4 text-smoke">No approved customs yet.</p>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {artist.submissions.map((s) => {
+        <div className={`mt-4 grid gap-6 ${closetGridClass(artist.closetLayout)}`}>
+          {closetOrdered.map((s) => {
             const shoeBattles =
               s.battlesAsA.filter((b) => b.status === "COMPLETED").length +
               s.battlesAsB.filter((b) => b.status === "COMPLETED").length;
             const rank = heatRank.get(s.id);
             const pendingSale = s.sales.find((sale) => sale.status === "PENDING");
             const lastSale = s.sales.find((sale) => sale.status === "CONFIRMED");
+            const section = s.closetSection?.trim();
+            const openSection = section && !seenSections.has(section) ? section : null;
+            if (openSection) seenSections.add(openSection);
+            const isLead = s.id === artist.featuredSubmissionId;
             return (
-              <div key={s.id} className="group overflow-hidden rounded-xl border border-edge bg-surface transition hover:border-volt/50">
+              <Fragment key={s.id}>
+                {/* A chapter heading is a row of its own, not a hat on the
+                    first card in it — otherwise the card it rides stretches
+                    across the grid and the wall goes crooked. */}
+                {openSection && (
+                  <h3
+                    className="col-span-full mt-2 border-b border-edge pb-1.5 tag text-smoke"
+                    style={artist.accentColor ? { color: artist.accentColor } : undefined}
+                  >
+                    {openSection}
+                  </h3>
+                )}
+              <div
+                className={`group overflow-hidden rounded-xl border bg-surface transition hover:border-volt/50 ${
+                  isLead ? "border-volt/70" : "border-edge"
+                }`}
+                style={isLead && artist.accentColor ? { borderColor: artist.accentColor } : undefined}
+              >
                 <div className="relative overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -323,7 +430,7 @@ export default async function ArtistPage({ params }: Props) {
                   {viewerCanChallenge && <ChallengeButton targetSubmissionId={s.id} />}
                   {lastSale && (
                     <p className="mt-1 text-sm">
-                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      <span className="font-bold text-white"><Money cents={lastSale.priceCents} /></span>{" "}
                       {lastSale.verified ? (
                         <span className="tag text-volt" title="Sale substantiated with evidence or admin-verified">✓ verified sale</span>
                       ) : (
@@ -349,7 +456,7 @@ export default async function ArtistPage({ params }: Props) {
                   {s.offers.length > 0 && (
                     <p className="mt-1.5 text-sm tabular-nums text-smoke">
                       {s.offers.length} standing bid{s.offers.length === 1 ? "" : "s"} · high{" "}
-                      <span className="font-bold text-emerald-400">{formatUsd(s.offers[0].amountCents)}</span>
+                      <span className="font-bold text-emerald-400"><Money cents={s.offers[0].amountCents} /></span>
                     </p>
                   )}
                   {s.consignment?.status === "OPEN" && (
@@ -359,7 +466,7 @@ export default async function ArtistPage({ params }: Props) {
                         ? ` — previously sold at ${formatUsd(s.consignment.priorSaleCents)}`
                         : ""}
                       {" · bids from "}
-                      {formatUsd(s.consignment.floorCents)} · proceeds split with a private collector
+                      <Money cents={s.consignment.floorCents} /> · proceeds split with a private collector
                     </p>
                   )}
                   {(isOwnPage || admin) && (
@@ -384,6 +491,7 @@ export default async function ArtistPage({ params }: Props) {
                   )}
                 </div>
               </div>
+              </Fragment>
             );
           })}
         </div>

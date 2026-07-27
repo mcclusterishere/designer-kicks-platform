@@ -27,6 +27,21 @@ export default function LeadFinder() {
     }
   }
 
+  // One tap carries the lead straight into the staging form — no
+  // retyping what the scout already knows.
+  function stage(lead: { name: string; instagram: string | null; city: string | null }) {
+    const fill = (id: string, value: string | null) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el && value) el.value = value;
+    };
+    fill("pl-name", lead.name);
+    fill("pl-ig", lead.instagram ? `@${lead.instagram}` : null);
+    fill("pl-city", lead.city);
+    const name = document.getElementById("pl-name");
+    name?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (document.getElementById("pl-title") as HTMLInputElement | null)?.focus({ preventScroll: true });
+  }
+
   return (
     <div className="space-y-4">
       <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -75,6 +90,10 @@ export default function LeadFinder() {
                   <button type="button" onClick={() => research(l)}
                     className="shrink-0 rounded-lg border border-volt/60 bg-volt/10 px-3 py-1.5 text-xs font-bold text-volt">
                     Research →
+                  </button>
+                  <button type="button" onClick={() => stage(l)}
+                    className="shrink-0 rounded-lg bg-volt px-3 py-1.5 text-xs font-bold text-ink">
+                    Stage →
                   </button>
                 </div>
               ))}

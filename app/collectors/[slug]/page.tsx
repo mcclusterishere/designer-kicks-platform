@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
@@ -133,7 +134,7 @@ export default async function CollectorPage({ params }: Props) {
                   )}
                   {s.askingPriceCents && (
                     <span className="tag absolute bottom-2 left-2 rounded bg-heat px-2 py-1 font-bold text-white">
-                      Ask {formatUsd(s.askingPriceCents)}
+                      Ask <Money cents={s.askingPriceCents} />
                     </span>
                   )}
                   {pendingSale && (
@@ -158,7 +159,7 @@ export default async function CollectorPage({ params }: Props) {
                   </p>
                   {lastSale && (
                     <p className="mt-1 text-sm">
-                      <span className="font-bold text-white">{formatUsd(lastSale.priceCents)}</span>{" "}
+                      <span className="font-bold text-white"><Money cents={lastSale.priceCents} /></span>{" "}
                       {lastSale.verified ? (
                         <span className="tag text-volt">✓ verified sale</span>
                       ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   startQuizRun,
   answerQuestion,
@@ -26,15 +27,18 @@ type Props = {
   stripeConfigured: boolean;
   purchasesEnabled: boolean;
   questionCount: number;
+  cultureCount: number;
+  marketsCount: number;
 };
 
-export default function QuizGame({ initialState, purchaseResult, stripeConfigured, purchasesEnabled, questionCount }: Props) {
+export default function QuizGame({ initialState, purchaseResult, stripeConfigured, purchasesEnabled, questionCount, cultureCount, marketsCount }: Props) {
   const [state, setState] = useState<QuizState | null>(initialState);
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | null>(null);
   const [pending, startTransition] = useTransition();
   const forfeitedRef = useRef<Set<string>>(new Set());
+  const router = useRouter();
 
   // Anti-cheat: LEAVING the screen mid-question burns that question —
   // recorded as a miss so it never returns, auto-advanced, no reveal,
@@ -75,7 +79,16 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
     };
   }, [state?.runId, state?.status, state?.question?.id]);
 
-  function run(action: () => Promise<{ ok: boolean } & Record<string, unknown>>) {
+  function run(
+    action: () => Promise<{ ok: boolean } & Record<string, unknown>>,
+    /**
+     * Starting a run changes what the page is. The heading above this
+     * component is server-rendered and was drawn before the run existed, so
+     * without a refresh a markets run sits under a "Culture IQ" title.
+     * Only on start — refreshing after every answer would be pure waste.
+     */
+    refreshShell = false
+  ) {
     setError(null);
     startTransition(async () => {
       const res = (await action()) as
@@ -89,6 +102,7 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
         setState(res.state);
         setFeedback(res.feedback ?? null);
         setPicked(null);
+        if (refreshShell) router.refresh();
       }
     });
   }
@@ -104,18 +118,42 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             Payment received — your strikes are loaded.
           </p>
         )}
-        <p className="display text-2xl text-white">How high is your Culture IQ?</p>
+        <p className="display text-2xl text-white">Pick your game</p>
         <p className="mt-2 text-sm text-smoke">
-          {questionCount} culture questions in the bank. Every one you nail lifts
-          your Culture IQ and climbs you up the board — no repeats, ever.
+          Same rules either way: a wrong answer costs a strike, no question ever
+          repeats, and every one you nail lifts your IQ.
         </p>
-        <button
-          onClick={() => run(startQuizRun)}
-          disabled={pending}
-          className="mt-5 rounded-lg bg-heat px-8 py-3.5 tag font-bold text-white glow-heat disabled:opacity-50"
-        >
-          {pending ? "Loading…" : "Start The Heat Check"}
-        </button>
+
+        {/* Two doors, stated plainly. The markets track isn't a harder
+            version of the trivia — it's a different thing to know, and
+            pretending otherwise would bury it. */}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <button
+            onClick={() => run(() => startQuizRun("culture"), true)}
+            disabled={pending}
+            className="group rounded-xl border border-edge bg-panel p-4 text-left transition hover:border-heat disabled:opacity-50"
+          >
+            <p className="tag text-heat">The Heat Check</p>
+            <p className="display mt-1 text-xl text-white">Culture IQ</p>
+            <p className="mt-1 text-xs leading-relaxed text-smoke">
+              Who made it, what year, which collab. {cultureCount} questions on the
+              history you either know or you don&apos;t.
+            </p>
+          </button>
+          <button
+            onClick={() => run(() => startQuizRun("markets"), true)}
+            disabled={pending}
+            className="group rounded-xl border border-volt/50 bg-volt/5 p-4 text-left transition hover:border-volt disabled:opacity-50"
+          >
+            <p className="tag text-volt">The Desk</p>
+            <p className="display mt-1 text-xl text-white">Market IQ</p>
+            <p className="mt-1 text-xs leading-relaxed text-smoke">
+              How markets actually work, taught through resale. {marketsCount} lessons
+              from what a bid is up to why the crowd is usually already priced in.
+            </p>
+          </button>
+        </div>
+        {pending && <p className="mt-3 tag text-smoke">Loading…</p>}
         {error && <p className="mt-3 text-sm text-heat">{error}</p>}
       </div>
     );
@@ -127,12 +165,15 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
       <div className="rounded-xl border border-volt bg-surface p-8 text-center glow-volt">
         <p className="display text-4xl text-volt">Run complete</p>
         <p className="mt-3 text-white">
-          {state.correctCount} correct this run · your Culture IQ is{" "}
+          {state.correctCount} correct this run · your{" "}
+          {state.track === "markets" ? "Market IQ" : "Culture IQ"} is{" "}
           <span className="text-volt">{state.iq}</span>
         </p>
         <p className="mt-1 text-sm text-smoke">
-          {state.answered} answered all-time. The highest Culture IQ tops the
-          leaderboard — keep climbing.
+          {state.answered} answered all-time.{" "}
+          {state.track === "markets"
+            ? "Keep going and you climb the desk — Retail Buyer up to Desk Head."
+            : "The highest Culture IQ tops the leaderboard — keep climbing."}
         </p>
         {state.entryEarned ? (
           <p className="mx-auto mt-3 max-w-md rounded border border-volt/40 bg-volt/10 p-3 text-sm text-volt">
@@ -182,7 +223,10 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
           entries only come from free-strike runs — purchases never affect your
           odds of winning.
         </p>
-        {purchasesEnabled ? (
+        {/* App Store 3.1.1: no external purchase of digital credits
+            inside the iOS shell — the app shows only the free path. */}
+        {purchasesEnabled &&
+        !(typeof navigator !== "undefined" && navigator.userAgent.includes("HeatChartApp")) ? (
           <>
             <BuyPanel
               pending={pending}
@@ -239,7 +283,9 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             <span className="mr-2 rounded bg-heat/20 px-1.5 py-0.5 text-heat">Leaderboard run</span>
           )}
           <span className="text-white">{state.correctCount}</span> correct ·{" "}
-          <span className="text-volt">IQ {state.iq}</span>
+          <span className="text-volt">
+            {state.track === "markets" ? "MKT" : "IQ"} {state.iq}
+          </span>
         </p>
         <p className="tag text-smoke">
           <span className={strikesLeft <= 1 ? "text-heat" : "text-white"}>
@@ -285,6 +331,21 @@ export default function QuizGame({ initialState, purchaseResult, stripeConfigure
             <p className="font-bold">
               {feedback.correct ? "Correct." : `Wrong — it was: ${feedback.correctAnswer}`}
             </p>
+            {/* The takeaway, shown whether they got it right or wrong. The
+                one you most need to read is the one you just missed, which
+                is exactly the moment a quiz normally tells you nothing but
+                the score. Sits above the explanation because the idea
+                outlives this particular question. */}
+            {feedback.lesson && (
+              <div className="mt-2 rounded-lg border border-white/15 bg-ink/20 p-3">
+                {feedback.concept && (
+                  <p className="tag mb-1 opacity-80">
+                    {feedback.concept.replace(/-/g, " ")}
+                  </p>
+                )}
+                <p className="leading-relaxed opacity-95">{feedback.lesson}</p>
+              </div>
+            )}
             {feedback.explanation && (
               <p className="mt-1 text-smoke">{feedback.explanation}</p>
             )}

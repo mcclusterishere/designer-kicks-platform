@@ -16,6 +16,20 @@ export const dynamic = "force-dynamic";
 
 const GAMES = [
   {
+    href: "/league",
+    emoji: "🏆",
+    title: "The Draft",
+    blurb: "Draft customs + OG drops. Score on real heat and resale. New board every week.",
+    tone: "volt" as const,
+  },
+  {
+    href: "/predict",
+    emoji: "🎯",
+    title: "The Call",
+    blurb: "Say where a pair lands in 7 or 30 days. Settled on real recorded prices — build a track record.",
+    tone: "heat" as const,
+  },
+  {
     href: "/games/guess-the-resale",
     emoji: "💸",
     title: "Guess The Resale",
@@ -80,7 +94,7 @@ export default async function ArcadePage() {
 
       <p className="mt-10 text-center text-sm text-smoke">
         New pairs cycle in as the catalog updates.{" "}
-        <Link href="/catalog" className="text-volt underline">Browse the whole shoe database →</Link>
+        <Link href="/market?board=catalog" className="text-volt underline">Browse the whole shoe database →</Link>
       </p>
     </div>
   );

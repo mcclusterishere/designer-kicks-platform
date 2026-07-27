@@ -49,7 +49,9 @@ export async function getStudioData(artistId: string) {
         where: { status: "APPROVED" },
         orderBy: { createdAt: "desc" },
         include: {
-          _count: { select: { votes: true, battlesWon: true } },
+          // The Studio shows the artist their own standing, so it counts
+          // the same votes the league does.
+          _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
           offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" } },

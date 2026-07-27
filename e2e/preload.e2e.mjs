@@ -2,7 +2,7 @@
 // claim link and outreach DM; the artist claims the account via the
 // link and lands as an approved artist.
 import { PrismaClient } from "@prisma/client";
-import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, SHOTS, PNG_1x1, ADMIN_PASSWORD, makeChecker, launchBrowser, registerAccount } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -157,22 +157,14 @@ check("state normalized to uppercase", rivalClaim?.state === "CO");
 const regCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const reg = await regCtx.newPage();
 await reg.goto(`${BASE}/register`, { waitUntil: "networkidle" });
-await reg.fill("#name", "Preload Test Artist");
-await reg.fill("#email", EMAIL);
-await reg.fill("#password", "registerpass1");
-await reg.check("#age13");
-await reg.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(reg, { name: "Preload Test Artist", email: EMAIL, password: "registerpass1" });
 // React 19 resets the form when the action resolves — wait for the
 // refusal to land before typing the next registration into it.
 await reg.getByText(/hasn't been claimed yet/).waitFor({ timeout: 15000 });
 check("unverified email can't grab the page via register", true);
 // ...but registering with a PENDING claim from a fresh email works and
 // says the claim will hook up on approval.
-await reg.fill("#name", "Second Claimer");
-await reg.fill("#email", EMAIL2);
-await reg.fill("#password", "registerpass2");
-await reg.check("#age13");
-await reg.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(reg, { name: "Second Claimer", email: EMAIL2, password: "registerpass2" });
 await reg.locator("[data-testid=register-note]").waitFor({ timeout: 15000 });
 check("pending claim surfaced at signup", await reg.getByText(/still in review/).isVisible());
 await regCtx.close();
@@ -205,11 +197,7 @@ check(
 const adoptCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const adopt = await adoptCtx.newPage();
 await adopt.goto(`${BASE}/register`, { waitUntil: "networkidle" });
-await adopt.fill("#name", "Preload Test Artist");
-await adopt.fill("#email", EMAIL);
-await adopt.fill("#password", "adoptedpass1");
-await adopt.check("#age13");
-await adopt.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(adopt, { name: "Preload Test Artist", email: EMAIL, password: "adoptedpass1" });
 await adopt.locator("[data-testid=register-note]").waitFor({ timeout: 15000 });
 check("verified register adopts the artist page", await adopt.getByText(/it's yours now/).isVisible());
 await adoptCtx.close();

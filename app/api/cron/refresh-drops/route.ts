@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cronAuth";
 import { refreshDropDates } from "@/lib/dropRefresh";
 
 /**
@@ -14,8 +15,7 @@ import { refreshDropDates } from "@/lib/dropRefresh";
  *   curl -H "Authorization: Bearer $CRON_SECRET" https://theheatchart.com/api/cron/refresh-drops
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,0 +1,5 @@
+# Railway build customization. ffmpeg is added so uploaded clips (iPhone
+# .mov / HEVC) transcode server-side to a universal H.264 MP4 that plays
+# on every device. Everything else is nixpacks' auto-detected Node build.
+[phases.setup]
+aptPkgs = ["ffmpeg"]

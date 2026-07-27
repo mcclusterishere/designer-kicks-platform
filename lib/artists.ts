@@ -58,7 +58,8 @@ export async function getArtistRankings(): Promise<ArtistRanking[]> {
       submissions: {
         where: { status: "APPROVED" },
         include: {
-          _count: { select: { votes: true, battlesWon: true } },
+          // Account votes only: this total is the artist's public record.
+          _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
         },
@@ -111,24 +112,62 @@ export async function getArtistBySlug(slug: string) {
     where: { slug },
     include: {
       _count: { select: { followers: true } },
-      // Just enough to know whether the page is still unclaimed —
-      // booleans derived from this must never leak the hash itself.
-      user: { select: { passwordHash: true, _count: { select: { accounts: true } } } },
+      // NEVER select passwordHash here.
+      //
+      // This used to fetch the hash so the page could derive "is this
+      // profile still unclaimed", with a comment saying the hash itself
+      // must not leak. It leaked anyway, and the reason is worth
+      // remembering: the page passed this whole artist object into a
+      // client component. TypeScript accepted it because the component's
+      // prop type is narrower and structural typing allows a wider object
+      // — but types are erased at runtime, so React serialised the actual
+      // object into the payload. Every public artist page was shipping the
+      // artist's bcrypt hash in its HTML, harvestable by anyone with curl
+      // and crackable offline at leisure.
+      //
+      // The lesson is that a comment cannot enforce this. So the hash is
+      // no longer fetched at all: `accounts` covers OAuth sign-ups, and
+      // the password case is answered by a separate count below that
+      // returns a number, never the secret.
+      user: { select: { _count: { select: { accounts: true } } } },
       submissions: {
-        where: { status: "APPROVED" },
-        orderBy: { createdAt: "desc" },
+        // Hidden pieces keep their votes, battles and league standing —
+        // they just don't hang in the maker's own room. The order is the
+        // maker's if they've arranged one, newest-first if they haven't.
+        where: { status: "APPROVED", closetHidden: false },
+        orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+        // The submitter's contact details are not public. An `include`
+        // with no omit returns every scalar on Submission, so these two
+        // rode along into the page payload.
+        omit: { email: true, socialHandle: true },
         include: {
-          _count: { select: { votes: true, battlesWon: true } },
+          _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
           battlesAsA: { select: { status: true } },
           battlesAsB: { select: { status: true } },
           tournamentsWon: { select: { id: true, name: true } },
           owner: { select: { name: true, collectorSlug: true } },
-          sales: { orderBy: { soldAt: "desc" } },
+          // Explicit select: an unselected include returns every scalar,
+          // and Sale carries buyerEmail. A public page must never carry a
+          // buyer's address into the payload.
+          sales: {
+            orderBy: { soldAt: "desc" },
+            select: { id: true, priceCents: true, soldAt: true, status: true, verified: true },
+          },
           ratings: { select: { stars: true } },
           collaborators: { where: { status: "APPROVED" }, select: { slug: true, displayName: true } },
-          // The open bid book, high bid first — powers Sell Now.
-          offers: { where: { status: "OPEN" }, orderBy: { amountCents: "desc" } },
-          consignment: true,
+          // The open bid book, high bid first — powers Sell Now. Amounts
+          // only: who bid is nobody else's business.
+          offers: {
+            where: { status: "OPEN" },
+            orderBy: { amountCents: "desc" },
+            select: { id: true, amountCents: true, createdAt: true },
+          },
+          // Consignment carries consignorName, which the schema itself
+          // says is "kept private — shown publicly as 'a private
+          // collector'". Selecting the whole row contradicted that.
+          consignment: {
+            select: { id: true, status: true, floorCents: true, splitPct: true, priorSaleCents: true },
+          },
         },
       },
       // Pieces this artist co-built on someone else's page — the
@@ -140,8 +179,15 @@ export async function getArtistBySlug(slug: string) {
       },
     },
   });
-  // Pending/rejected artist accounts aren't public.
-  return artist?.status === "APPROVED" ? artist : null;
+  if (artist?.status !== "APPROVED") return null; // pending/rejected aren't public
+
+  // Whether a password exists, as a boolean, computed without ever pulling
+  // the hash into a value that could be handed to a component.
+  const withPassword = await prisma.user.count({
+    where: { id: artist.userId, passwordHash: { not: null } },
+  });
+
+  return { ...artist, hasPassword: withPassword > 0 };
 }
 
 /** Championship titles won by any of the artist's shoes. */

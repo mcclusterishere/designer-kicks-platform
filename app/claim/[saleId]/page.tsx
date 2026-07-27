@@ -1,3 +1,4 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -68,7 +69,7 @@ export default async function ClaimPiecePage({
               artistName
             )}
             {" · "}
-            <span className="tabular-nums text-white">{formatUsd(sale.priceCents)}</span>
+            <span className="tabular-nums text-white"><Money cents={sale.priceCents} /></span>
           </p>
         </div>
       </div>

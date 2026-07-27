@@ -30,6 +30,8 @@ import {
   postToInstagram,
 } from "@/lib/social";
 import { uniqueArtistSlug, ensureCollectorSlug } from "@/lib/artists";
+import { stillHeldBy, holderOf, PIECE_HAS_MOVED_ON } from "@/lib/ownership";
+import { provesEmail } from "@/lib/authz";
 import { createTournament } from "@/lib/tournaments";
 import { heatScore } from "@/lib/analytics";
 import { isPieceCategory, categoryLabel, PIECE_CATEGORY_KEYS } from "@/lib/categories";
@@ -39,11 +41,13 @@ import { redirect } from "next/navigation";
 import { randomUUID, randomInt, randomBytes } from "crypto";
 import { saveUpload } from "@/lib/storage";
 import { resaleSplitLabel } from "@/lib/resale";
+import { estimateFeeCents } from "@/lib/reseller";
 import { sendMail } from "@/lib/mailer";
-import { allowAttempt } from "@/lib/ratelimit";
+import { allowAttempt, checkAttempt, spendAttempt, retryLabel } from "@/lib/ratelimit";
 import { searchPlaces, zipFromAddress, STORE_STATUSES } from "@/lib/stores";
 import { refreshDropDates } from "@/lib/dropRefresh";
 import { findSku, sneakerApiLive } from "@/lib/sneakerApi";
+import { isMusicLink } from "@/lib/spotify";
 import { isEditor, currentUserRole, ensureRefCode, editorRefLink } from "@/lib/editor";
 import { SELL_PLATFORMS } from "@/lib/sellPlatforms";
 import { researchProfile, onboardAgentConfigured, type ProfileDraft } from "@/lib/onboardAgent";
@@ -61,9 +65,41 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  // Accept iPhone/Safari HEIC too — saveUpload re-encodes every image to a
+  // clean JPEG, so it lands as a universally-viewable file regardless.
+  "image/heic": "heic",
+  "image/heif": "heif",
+  "image/heic-sequence": "heic",
+  "image/heif-sequence": "heif",
 };
 // 15-second clips: duration is gated in the browser (no ffprobe on the
 // server) — the 40MB cap is the hard backstop, sized for ~15s of 1080p.
+/**
+ * The MIME type a browser puts on a picked file, resolved defensively.
+ *
+ * Facebook's and Instagram's in-app browsers — which is where most of
+ * this roster actually opens the site — routinely hand over a File with
+ * an empty `type`, or "application/octet-stream". A straight lookup then
+ * rejects a perfectly good iPhone photo with "must be a JPG, PNG, or
+ * WebP", which reads as the site being broken, because from the artist's
+ * side it is. Falling back to the filename extension recovers those.
+ *
+ * saveUpload re-encodes every image to a clean JPEG anyway, so a wrong
+ * guess costs nothing: an undecodable file is caught downstream and kept
+ * as-is rather than lost.
+ */
+function imageExt(file: File): string | null {
+  const byMime = ALLOWED_TYPES[file.type];
+  if (byMime) return byMime;
+  const dot = file.name.lastIndexOf(".");
+  if (dot < 0) return null;
+  const byName: Record<string, string> = {
+    jpg: "jpg", jpeg: "jpg", png: "png", webp: "webp",
+    heic: "heic", heif: "heif",
+  };
+  return byName[file.name.slice(dot + 1).toLowerCase()] ?? null;
+}
+
 const MAX_VIDEO_BYTES = 40 * 1024 * 1024;
 const VIDEO_TYPES: Record<string, string> = {
   "video/mp4": "mp4",
@@ -103,11 +139,29 @@ export async function createSubmission(
 
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of your custom." };
   if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-  const ext = ALLOWED_TYPES[image.type];
-  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
+  const ext = imageExt(image);
+  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, HEIC, or WebP." };
 
-  if (!allowAttempt("submit", user.id, 10, 60 * 60 * 1000)) {
-    return { ok: false, error: "That's a lot of submissions — try again in an hour." };
+  // Counted on SUCCESS, not on attempt, and checked without spending.
+  //
+  // This used to charge a slot the moment it was reached — before the
+  // artist-status check, before the video cap, before the upload itself.
+  // So every failed upload, every "one video a day" rejection, every
+  // storage hiccup burned budget. An artist fighting a broken upload
+  // spent all ten retries and got locked out for an hour without a
+  // single piece landing, which is precisely backwards: the limit exists
+  // to stop a flood of posts, and it was punishing the absence of one.
+  //
+  // The ceiling is also higher now. Onboarding a back catalogue in one
+  // sitting is the behaviour we're actively asking artists for.
+  const SUBMIT_MAX = 40;
+  const SUBMIT_WINDOW = 60 * 60 * 1000;
+  const gate = checkAttempt("submit", user.id, SUBMIT_MAX, SUBMIT_WINDOW);
+  if (!gate.ok) {
+    return {
+      ok: false,
+      error: `That's ${SUBMIT_MAX} pieces in an hour — the rest can go up ${retryLabel(gate.retryAfterMs)}.`,
+    };
   }
 
   // Submitting requires an APPROVED artist account (fan accounts apply
@@ -204,8 +258,21 @@ export async function createSubmission(
   const extra = await saveImageList(formData.getAll("morePhotos"), 4);
   if (!Array.isArray(extra)) return { ok: false, error: extra.error };
 
-  await prisma.submission.create({
+  // Who has it — asked once, here, because asked later it never gets
+  // asked at all. WITH_ARTIST is the default and costs the uploader
+  // nothing; the owner fields only matter when there is an owner.
+  const { validateOwnership } = await import("@/lib/ownership");
+  const ownership = validateOwnership(String(formData.get("ownershipStatus") ?? "WITH_ARTIST"), {
+    name: String(formData.get("ownerName") ?? ""),
+    email: String(formData.get("ownerEmail") ?? ""),
+    phone: String(formData.get("ownerPhone") ?? ""),
+    address: String(formData.get("ownerAddress") ?? ""),
+  });
+  if (!ownership.ok) return { ok: false, error: ownership.error };
+
+  const created = await prisma.submission.create({
     data: {
+      ...ownership.data,
       title,
       artistName: artist.displayName,
       socialHandle: artist.instagram ?? (socialHandle || null),
@@ -225,7 +292,33 @@ export async function createSubmission(
         ? { collaborators: { connect: collaboratorIds.map((id) => ({ id })) } }
         : {}),
     },
+    select: { id: true },
   });
+
+  // Budget is spent here and nowhere earlier: the row exists, so a piece
+  // genuinely landed. A throw anywhere above costs the artist nothing.
+  spendAttempt("submit", user.id, SUBMIT_WINDOW);
+
+  // If an owner was named, reach them straight away. The artist saying
+  // "Marcus owns this" is a claim; the owner confirming makes it a fact,
+  // and nothing downstream treats it as proof until they do.
+  const namedOwner = ownership.data.ownerEmail as string | null;
+  if (namedOwner) {
+    const { ownerVerifyEmail } = await import("@/lib/ownership");
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+    sendMail({
+      to: namedOwner,
+      ...ownerVerifyEmail({
+        title,
+        artistName: artist.displayName,
+        verifyUrl: `${site}/own/${created.id}`,
+      }),
+    }).catch(() => {});
+    notifyAdmin(
+      "Owner named — needs verifying",
+      `${artist.displayName} listed ${namedOwner} as the owner of "${title}". Verify queue: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin?tab=roster`
+    );
+  }
 
   notifyAdmin(
     "New submission in the review queue",
@@ -265,8 +358,8 @@ async function saveImageList(
     if (!(f instanceof File) || f.size === 0) continue;
     if (urls.length >= max) break;
     if (f.size > MAX_UPLOAD_BYTES) return { error: "Each photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[f.type];
-    if (!ext) return { error: "Photos must be JPG, PNG, or WebP." };
+    const ext = imageExt(f);
+    if (!ext) return { error: "Photos must be JPG, PNG, HEIC, or WebP." };
     urls.push(
       await saveUpload(Buffer.from(await f.arrayBuffer()), `${randomUUID()}.${ext}`, f.type)
     );
@@ -309,6 +402,33 @@ export async function applyForArtist(
   });
   if (existing?.status === "PENDING") return { ok: false, error: "Your application is already under review." };
   if (existing?.status === "APPROVED") return { ok: false, error: "You already have an approved artist account." };
+
+  // One artist, one page: if a page already carries this name or IG
+  // handle (usually a pre-staged roster page), send them to claim it
+  // instead of minting a twin. Duplicate pages split records,
+  // followers, and search — never again.
+  const igNorm = instagram.replace(/^@/, "").trim();
+  const twin = await prisma.artistProfile.findFirst({
+    where: {
+      userId: { not: session.user.id },
+      status: { in: ["APPROVED", "PENDING"] },
+      OR: [
+        ...(igNorm
+          ? [
+              { instagram: { equals: igNorm, mode: "insensitive" as const } },
+              { instagram: { equals: `@${igNorm}`, mode: "insensitive" as const } },
+            ]
+          : []),
+        { displayName: { equals: displayName, mode: "insensitive" as const } },
+      ],
+    },
+  });
+  if (twin) {
+    return {
+      ok: false,
+      error: `${twin.displayName} already has a page on the league — if that's you, don't start over: open theheatchart.com/artists/${twin.slug} and hit "Claim this page" to take it over with its record and followers. Not you? Tweak your artist name slightly (or email hello@theheatchart.com) and re-apply.`,
+    };
+  }
 
   const data = {
     displayName,
@@ -378,8 +498,8 @@ export async function preloadArtist(
   if (!shoeTitle || !baseShoe) return { ok: false, error: "Shoe title and base shoe are required." };
   if (!(image instanceof File) || image.size === 0) return { ok: false, error: "Upload a photo of the custom." };
   if (image.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-  const ext = ALLOWED_TYPES[image.type];
-  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, or WebP." };
+  const ext = imageExt(image);
+  if (!ext) return { ok: false, error: "Photo must be a JPG, PNG, HEIC, or WebP." };
 
   // Claimable account: no password until the artist sets one via the link.
   const user = await prisma.user.upsert({
@@ -546,22 +666,43 @@ export async function recordSale(
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { artist: true, sales: { where: { status: "PENDING" } } },
+    include: {
+      artist: true,
+      sales: { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { status: true } },
+    },
   });
   if (!submission) return { ok: false, error: "Piece not found." };
-  if (submission.sales.length > 0) {
+  if (submission.sales.some((s) => s.status === "PENDING")) {
     return { ok: false, error: "This piece already has a sale pending the buyer's claim." };
   }
 
-  const isArtist = session?.user?.id && submission.artist?.userId === session.user.id;
-  const isCurrentOwner = session?.user?.id && submission.ownerId === session.user.id;
+  // Who is actually holding this pair right now.
+  //
+  // The right to sell a one-of-one belongs to whoever has it, and it
+  // transfers with the piece — it is not a permanent property of having
+  // made it. This used to be an OR that never expired: the maker's branch
+  // stayed true forever, so an artist could record a "sale" of a pair
+  // already sitting in a collector's closet, and the buyer's claim would
+  // then rewrite `ownerId` and take it. A CONFIRMED sale with no owner
+  // (the buyer deleted their account, SetNulling the column) doesn't hand
+  // authority back either — it goes to nobody, and an admin sorts it out.
+  const holderId = holderOf(submission);
+
   const admin = await isAdmin();
-  if (!isArtist && !isCurrentOwner && !admin) {
-    return { ok: false, error: "Only the piece's artist or current owner can record its sale." };
+  if (!admin && (!holderId || session?.user?.id !== holderId)) {
+    return {
+      ok: false,
+      error: submission.ownerId
+        ? "This piece is in a collector's closet — only its current owner can record its sale."
+        : "Only the piece's artist or current owner can record its sale.",
+    };
   }
 
-  const sellerId =
-    session?.user?.id ?? submission.ownerId ?? submission.artist?.userId;
+  // The seller of record is the holder, NOT whoever filled in the form.
+  // An admin recording a sale on someone's behalf must not end up as the
+  // seller on the receipt — that was silently rewriting provenance every
+  // time the office helped an artist out.
+  const sellerId = holderId;
   if (!sellerId) return { ok: false, error: "Couldn't determine the seller account." };
 
   const sellerUser = await prisma.user.findUnique({ where: { id: sellerId } });
@@ -572,8 +713,8 @@ export async function recordSale(
   let evidenceUrl: string | null = null;
   if (evidence instanceof File && evidence.size > 0) {
     if (evidence.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Evidence file must be under 6MB." };
-    const ext = ALLOWED_TYPES[evidence.type];
-    if (!ext) return { ok: false, error: "Evidence must be a JPG, PNG, or WebP (screenshot the receipt)." };
+    const ext = imageExt(evidence);
+    if (!ext) return { ok: false, error: "Evidence must be a JPG, PNG, HEIC, or WebP (screenshot the receipt)." };
     evidenceUrl = await saveUpload(
       Buffer.from(await evidence.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -581,7 +722,7 @@ export async function recordSale(
     );
   }
 
-  await prisma.sale.create({
+  const sale = await prisma.sale.create({
     data: {
       submissionId: submission.id,
       sellerId,
@@ -591,11 +732,38 @@ export async function recordSale(
       note: note || null,
       evidenceUrl,
     },
+    select: { id: true },
   });
+
+  // Tell the BUYER. This is the whole handoff and it was missing.
+  //
+  // Recording a sale collected the buyer's address and then emailed
+  // nobody but us. The claim link existed, but only on the artist's own
+  // public page, which meant the maker had to go find it and send it by
+  // hand — so in practice nothing ever got claimed. Every sale sat
+  // PENDING forever, no ownership moved, no collector account was
+  // created, and the resale side of the market stayed empty because
+  // nobody ever came to own anything they could resell.
+  //
+  // Fire-and-forget: a mail outage must never fail a sale that already
+  // happened in real life. The artist still gets a copyable link either
+  // way, because for this roster the real channel is an Instagram DM.
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const sellerName = submission.artist?.displayName ?? sellerUser?.name ?? "The seller";
+  const { buyerClaimEmail, claimUrl } = await import("@/lib/handoff");
+  sendMail({
+    to: buyerEmail,
+    ...buyerClaimEmail({
+      title: submission.title,
+      sellerName,
+      priceCents: Math.round(price * 100),
+      claimUrl: claimUrl(sale.id, base),
+    }),
+  }).catch(() => {});
 
   notifyAdmin(
     "Sale recorded — pending buyer claim",
-    `"${submission.title}" recorded sold for $${price}${evidenceUrl ? " (evidence attached)" : " (no evidence)"}. It confirms when the buyer claims it; ledger: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
+    `"${submission.title}" recorded sold for $${price}${evidenceUrl ? " (evidence attached)" : " (no evidence)"}. Buyer emailed a claim link. It confirms when they claim it; ledger: ${process.env.NEXT_PUBLIC_SITE_URL || ""}/admin`
   );
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
@@ -620,6 +788,21 @@ export async function claimSale(saleId: string): Promise<ActionResult> {
     return { ok: false, error: "This sale is waiting on a different buyer account." };
   }
   if (sale.sellerId === user.id) return { ok: false, error: "You can't claim your own sale." };
+
+  // The piece must still be where the sale said it was.
+  //
+  // Claiming is the write that moves `ownerId`, so a PENDING sale is a
+  // loaded gun pointed at whoever holds the piece when it finally goes
+  // off. If the pair changed hands after this sale was recorded, the
+  // record is stale and firing it now would take the pair off the person
+  // who legitimately owns it today.
+  if (sale.submission.ownerId && sale.submission.ownerId !== sale.sellerId) {
+    return {
+      ok: false,
+      error:
+        "This piece has changed hands since that sale was recorded, so the record is out of date. Message us with your receipt and we'll straighten it out.",
+    };
+  }
 
   await prisma.$transaction([
     prisma.sale.update({
@@ -1001,9 +1184,25 @@ export async function outreachInvite(
     // let them claim via the banner instead of a password link.
     return { ok: false, error: "That email already has an account — have them use Claim This Page on their artist page instead." };
   }
-  if (profile.userId !== target.id) {
+  const reassigned = profile.userId !== target.id;
+  if (reassigned) {
     await prisma.artistProfile.update({ where: { id: profile.id }, data: { userId: target.id } });
     await prisma.submission.updateMany({ where: { artistId: profile.id }, data: { email } });
+
+    // Reassigning a page moves a whole body of work — every piece on it —
+    // to a different account, and hands the claim URL back to whoever
+    // ran the action. It is only ever used on unclaimed pre-loaded pages,
+    // which is why it's allowed, and it is the single widest-reaching
+    // thing an editor can do, which is why it's written down.
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "editor"),
+      action: "artist.page.reassign",
+      targetType: "artistProfile",
+      targetId: profile.id,
+      targetOwnerId: target.id,
+      summary: `Attached the ${profile.displayName} page to ${email} and sent a claim link`,
+    });
   }
 
   let token = (
@@ -1114,16 +1313,45 @@ export async function submitArtistClaim(
     zip,
   };
 
-  // Duplicate info merges, never dead-ends: a re-file from the same
-  // email refreshes the pending claim with the newest answers.
-  const existing = await prisma.artistClaim.findFirst({
-    where: { artistId, email, status: "PENDING" },
-  });
+  // Duplicate info merges, never dead-ends: a re-file refreshes the
+  // pending claim with the newest answers instead of filing a duplicate.
+  //
+  // But only for the person who filed it. This form is unauthenticated by
+  // design — the whole point is that the artist hasn't got an account yet
+  // — so "same email" is an assertion, not a fact, and anyone who knows a
+  // maker's address could overwrite their pending claim: replace the
+  // social proof that verifies them, and overwrite the phone number and
+  // street address sitting in the review queue. Typing an email is not
+  // proving one.
+  //
+  // So the merge needs a session on that address. Everyone else still
+  // gets through — their answers land as their own row, both show up in
+  // the queue, and a human decides. Nobody's filing gets destroyed by
+  // somebody else's.
+  const session = await auth();
+  const provenEmail = provesEmail(session?.user?.email, email);
+
+  const existing = provenEmail
+    ? await prisma.artistClaim.findFirst({ where: { artistId, email, status: "PENDING" } })
+    : null;
   if (existing) {
     await prisma.artistClaim.update({ where: { id: existing.id }, data: claimData });
     return {
       ok: true,
       note: "You already had a claim pending on this page — we merged in your newest answers instead of filing a duplicate. Still in the review queue.",
+    };
+  }
+
+  // Unproven re-files stack instead of overwriting, so cap the stack —
+  // otherwise "file a second row" is just a slower way to bury the review
+  // queue. Three is enough for a real person fixing a typo twice.
+  const alreadyPending = await prisma.artistClaim.count({
+    where: { artistId, email, status: "PENDING" },
+  });
+  if (alreadyPending >= 3) {
+    return {
+      ok: true,
+      note: "You've already got a claim in the queue on this page — we're on it. A human reviews every one by hand, so hang tight rather than re-filing.",
     };
   }
 
@@ -1162,6 +1390,22 @@ export async function respondArtistClaim(claimId: string, approve: boolean): Pro
     update: { name: claim.name },
     create: { name: claim.name, email: claim.email },
   });
+
+  // Approving hands a page — and every piece on it — to an account, and
+  // rejects everyone else's claim on the same page in the same breath.
+  // Whoever loses out deserves the decision to exist somewhere other
+  // than in the head of the person who made it.
+  {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "artist.claim.approve",
+      targetType: "artistProfile",
+      targetId: claim.artistId,
+      targetOwnerId: user.id,
+      summary: `Approved ${claim.email}'s claim on the ${claim.artist.displayName} page`,
+    });
+  }
   await prisma.$transaction([
     prisma.artistProfile.update({ where: { id: claim.artistId }, data: { userId: user.id } }),
     prisma.submission.updateMany({ where: { artistId: claim.artistId }, data: { email: claim.email } }),
@@ -1248,6 +1492,20 @@ export async function addSubmissionPhotos(
     where: { id: submissionId },
     data: { extraImages: { push: added } },
   });
+
+  // Staff editing somebody else's piece gets written down and the artist
+  // gets told. The permission is intended; doing it invisibly is not.
+  if (admin && !isArtistOwner && submission.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.photos.add",
+      targetType: "submission",
+      targetId: submission.id,
+      targetOwnerId: submission.artist.userId,
+      summary: `Added ${added.length} photo${added.length === 1 ? "" : "s"} to "${submission.title}"`,
+    });
+  }
 
   if (submission.artist) revalidatePath(`/artists/${submission.artist.slug}`);
   return { ok: true };
@@ -1372,8 +1630,25 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
   const admin = await isAdmin();
   if (!admin && (!session?.user?.id || session.user.id !== sellerUserId)) return;
 
+  // Staff answering an offer on somebody else's piece is a money
+  // decision made on their behalf. It gets recorded either way.
+  const actedForSomeoneElse = admin && session?.user?.id !== sellerUserId;
+  const logStaff = async (verb: string) => {
+    if (!actedForSomeoneElse) return;
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: `offer.${verb}`,
+      targetType: "offer",
+      targetId: offerId,
+      targetOwnerId: sellerUserId,
+      summary: `${verb === "accept" ? "Accepted" : "Declined"} an offer on "${offer.submission.title}" on the seller's behalf`,
+    });
+  };
+
   if (!accept) {
     await prisma.offer.update({ where: { id: offerId }, data: { status: "DECLINED" } });
+    await logStaff("decline");
     revalidatePath("/profile");
     return;
   }
@@ -1426,6 +1701,7 @@ export async function respondOffer(offerId: string, accept: boolean): Promise<vo
 
   if (offer.submission.artist) revalidatePath(`/artists/${offer.submission.artist.slug}`);
   revalidatePath("/market");
+  await logStaff("accept");
   revalidatePath("/profile");
 }
 
@@ -1468,7 +1744,7 @@ export async function createConsignment(
     include: {
       artist: { select: { id: true, userId: true, slug: true } },
       consignment: { select: { id: true, status: true } },
-      sales: { where: { status: "PENDING" }, select: { id: true } },
+      sales: { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { status: true } },
       owner: { select: { id: true } },
     },
   });
@@ -1476,14 +1752,19 @@ export async function createConsignment(
   if (piece.artist?.userId !== session.user.id) {
     return { ok: false, error: "Only the artist can open a consignment on their piece." };
   }
-  if (piece.owner) {
+  // Sold is sold, whether the buyer's account still exists or not. The
+  // owner check alone missed the case where a collector deletes their
+  // account and SetNulls `ownerId` — the pair doesn't come back.
+  if (piece.owner || piece.sales.some((s) => s.status === "CONFIRMED")) {
     return {
       ok: false,
       error:
         "This piece is in a collector's closet on-platform — they sell it from their side. Consignment relists are for pieces that came back to you from off-platform sales.",
     };
   }
-  if (piece.sales.length > 0) return { ok: false, error: "This piece has a sale pending." };
+  if (piece.sales.some((s) => s.status === "PENDING")) {
+    return { ok: false, error: "This piece has a sale pending." };
+  }
   if (piece.consignment && piece.consignment.status === "OPEN") {
     return { ok: false, error: "This piece already has an open consignment." };
   }
@@ -1559,13 +1840,40 @@ export async function toggleFollowArtist(artistId: string): Promise<ActionResult
 
 // ---------- Voting ----------
 
+/**
+ * Cast a vote. Signed in or not.
+ *
+ * The account requirement was the single biggest thing between a link on
+ * Instagram and a vote, so it's gone. Anonymous votes are recorded and shown
+ * in the live split, but they don't feed the Heat List or decide a battle,
+ * because a device key can be rotated and an artist's standing has to hold up
+ * when they ask why they lost. Both numbers exist, and the page says which is
+ * which rather than blending them.
+ *
+ * Guests are rate-limited harder than accounts — an account is a thing
+ * somebody had to create, a device key isn't.
+ */
 export async function castVote(battleId: string, submissionId: string): Promise<ActionResult> {
   const session = await auth();
-  if (!session?.user?.id) {
-    return { ok: false, error: "Sign in to vote — it takes 10 seconds and your vote counts." };
-  }
-  if (!allowAttempt("vote", session.user.id, 30, 60 * 1000)) {
-    return { ok: false, error: "Slow down — try again in a minute." };
+  const { guestKey } = await import("@/lib/guest");
+
+  let voterKey: string;
+  let userId: string | null = null;
+  let guest = false;
+
+  if (session?.user?.id) {
+    voterKey = session.user.id;
+    userId = session.user.id;
+    if (!allowAttempt("vote", voterKey, 30, 60 * 1000)) {
+      return { ok: false, error: "Slow down — try again in a minute." };
+    }
+  } else {
+    const g = await guestKey();
+    voterKey = g.key;
+    guest = true;
+    if (!allowAttempt("guestvote", voterKey, 10, 60 * 1000)) {
+      return { ok: false, error: "Slow down — try again in a minute." };
+    }
   }
 
   await finalizeExpiredBattles();
@@ -1596,10 +1904,9 @@ export async function castVote(battleId: string, submissionId: string): Promise<
     return { ok: false, error: "That shoe isn't in this battle." };
   }
 
-  const voterKey = session.user.id;
   try {
     await prisma.vote.create({
-      data: { battleId, side, submissionId: votedSubmissionId, voterKey, userId: session.user.id },
+      data: { battleId, side, submissionId: votedSubmissionId, voterKey, userId, guest },
     });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -1611,7 +1918,12 @@ export async function castVote(battleId: string, submissionId: string): Promise<
   revalidatePath(`/battles/${battleId}`);
   revalidatePath("/battles");
   revalidatePath("/");
-  return { ok: true };
+  return {
+    ok: true,
+    note: guest
+      ? "Counted. Sign in and your votes start counting toward the Heat List too."
+      : undefined,
+  };
 }
 
 // ---------- Admin ----------
@@ -1731,6 +2043,103 @@ export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJE
 }
 
 /**
+ * Permanently remove a piece and everything hanging off it. Votes, ratings,
+ * offers, sales, outfit items and the consignment cascade on the submission
+ * delete — but Battle and Tournament references do NOT cascade in the schema,
+ * so a piece that's in a battle would otherwise refuse to delete. Those are
+ * cleared first (battles it fought are removed, taking their votes with them;
+ * bracket slots and champion/winner pointers are nulled). The piece's stored
+ * image/video bytes are freed too. Admin-only — for clearing junk or
+ * broken-image entries.
+ */
+export async function deleteSubmissionCascade(id: string) {
+  await requireAdmin();
+
+  // Read it first. This is the single most destructive thing staff can
+  // do to somebody's work — it takes the piece, its photos, its votes,
+  // its battle history and any sale record with it, and there is no
+  // undo. Afterwards there is nothing left to write a log entry about,
+  // which is exactly why the entry has to be assembled beforehand.
+  const doomed = await prisma.submission.findUnique({
+    where: { id },
+    select: {
+      title: true,
+      ownerId: true,
+      artist: { select: { userId: true, displayName: true } },
+    },
+  });
+
+  await deleteSubmissionCascadeInternal(id);
+
+  const affected = doomed?.ownerId ?? doomed?.artist?.userId;
+  if (doomed && affected) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.delete",
+      targetType: "submission",
+      targetId: id,
+      targetOwnerId: affected,
+      summary: `Deleted the piece "${doomed.title}" and everything attached to it`,
+    });
+  }
+}
+
+/**
+ * The cascade itself, with no auth of its own — every caller must have
+ * already established the right to delete this piece (admin, or the artist
+ * who made it). Kept in one place so both paths clear the same non-cascading
+ * Battle/Tournament references and free the same stored media.
+ */
+async function deleteSubmissionCascadeInternal(id: string) {
+  const sub = await prisma.submission.findUnique({
+    where: { id },
+    select: { imageUrl: true, extraImages: true, videoUrl: true },
+  });
+  if (!sub) return; // already gone
+
+  const battles = await prisma.battle.findMany({
+    where: { OR: [{ subAId: id }, { subBId: id }] },
+    select: { id: true },
+  });
+  const battleIds = battles.map((b) => b.id);
+
+  await prisma.$transaction([
+    // Detach from any tournament bracket slots / champion pointers.
+    prisma.tournamentMatch.updateMany({ where: { subAId: id }, data: { subAId: null } }),
+    prisma.tournamentMatch.updateMany({ where: { subBId: id }, data: { subBId: null } }),
+    prisma.tournamentMatch.updateMany({ where: { winnerId: id }, data: { winnerId: null } }),
+    prisma.tournament.updateMany({ where: { championId: id }, data: { championId: null } }),
+    // A tournament match may point at a battle we're about to delete.
+    ...(battleIds.length
+      ? [prisma.tournamentMatch.updateMany({ where: { battleId: { in: battleIds } }, data: { battleId: null } })]
+      : []),
+    // Clear winner refs at this piece, then drop the battles it fought
+    // (their votes cascade on battle delete).
+    prisma.battle.updateMany({ where: { winnerId: id }, data: { winnerId: null } }),
+    ...(battleIds.length ? [prisma.battle.deleteMany({ where: { id: { in: battleIds } } })] : []),
+    // The piece itself — remaining child rows cascade on submissionId.
+    prisma.submission.delete({ where: { id } }),
+  ]);
+
+  // Reclaim the stored bytes for this piece's media.
+  const localName = (u?: string | null) =>
+    u && u.startsWith("/api/uploads/") ? u.slice("/api/uploads/".length) : null;
+  const names = [sub.imageUrl, sub.videoUrl, ...(sub.extraImages || [])]
+    .map(localName)
+    .filter((n): n is string => !!n);
+  if (names.length) {
+    const { deleteBlob } = await import("@/lib/blobStore");
+    for (const n of names) await deleteBlob(n);
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/heat-list");
+  revalidatePath("/");
+  revalidatePath("/market");
+}
+
+/**
  * A customizer announces their own upcoming drop onto the calendar.
  * Approved artists only; it lands PENDING and shows on /drops once an
  * admin approves it (same vetting as submissions).
@@ -1815,27 +2224,30 @@ export async function createBattle(
     return { ok: false, error: "Unknown battle format." };
   }
   if (!subAId) return { ok: false, error: "Pick the custom in the A corner." };
-  if (!Number.isFinite(days) || days < 1 || days > 30) return { ok: false, error: "Battle length must be 1–30 days." };
-
-  const a = await prisma.submission.findUnique({ where: { id: subAId } });
-  if (!a || a.status !== "APPROVED") {
-    return { ok: false, error: "The A corner must be an approved custom." };
+  if (type === "CUSTOM_VS_CUSTOM" && !subBId) return { ok: false, error: "Pick two shoes." };
+  if (type === "CUSTOM_VS_CUSTOM" && subAId === subBId) {
+    return { ok: false, error: "A shoe can't battle itself." };
   }
+  if (!Number.isFinite(days) || days < 1 || days > 30) return { ok: false, error: "Battle length must be 1–30 days." };
 
   // ---- custom culture vs OG culture ----
   if (type === "CUSTOM_VS_OG") {
+    const custom = await prisma.submission.findUnique({ where: { id: subAId } });
+    if (!custom || custom.status !== "APPROVED") {
+      return { ok: false, error: "The A corner must be an approved custom." };
+    }
     if (!ogShoeId) return { ok: false, error: "Pick the OG standing in the B corner." };
     const og = await prisma.catalogShoe.findUnique({ where: { id: ogShoeId } });
     if (!og) return { ok: false, error: "That OG isn't in the catalog." };
     // The category wall still holds: only sneakers have a retail original
     // in the catalog, so a hat can never be matched against one.
-    if (a.category !== "sneakers") {
+    if (custom.category !== "sneakers") {
       return {
         ok: false,
-        error: `Custom vs OG is a sneaker format — "${a.title}" is ${categoryLabel(a.category)}.`,
+        error: `Custom vs OG is a sneaker format — "${custom.title}" is ${categoryLabel(custom.category)}.`,
       };
     }
-    const battle = await prisma.battle.create({
+    const ogBattle = await prisma.battle.create({
       data: {
         type,
         subAId,
@@ -1845,12 +2257,12 @@ export async function createBattle(
       },
     });
     notifyBattleStart({
-      battleId: battle.id,
-      aTitle: a.title,
-      aArtist: a.artistName,
+      battleId: ogBattle.id,
+      aTitle: custom.title,
+      aArtist: custom.artistName,
       bTitle: og.name,
       bArtist: og.brand ?? "OG",
-      endsAt: battle.endsAt,
+      endsAt: ogBattle.endsAt,
     }).catch(() => {});
     revalidatePath("/battles");
     revalidatePath("/admin");
@@ -1859,11 +2271,11 @@ export async function createBattle(
   }
 
   // ---- customizer vs customizer ----
-  if (!subBId) return { ok: false, error: "Pick two shoes." };
-  if (subAId === subBId) return { ok: false, error: "A shoe can't battle itself." };
-
-  const b = await prisma.submission.findUnique({ where: { id: subBId } });
-  if (!b || b.status !== "APPROVED") {
+  const [a, b] = await Promise.all([
+    prisma.submission.findUnique({ where: { id: subAId } }),
+    prisma.submission.findUnique({ where: { id: subBId } }),
+  ]);
+  if (!a || !b || a.status !== "APPROVED" || b.status !== "APPROVED") {
     return { ok: false, error: "Both shoes must be approved submissions." };
   }
   // Category wall: hats never face shoes, vests never face hats.
@@ -1996,8 +2408,8 @@ export async function saveArticle(
   // it from our own domain.
   if (coverFile instanceof File && coverFile.size > 0) {
     if (coverFile.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Cover photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[coverFile.type];
-    if (!ext) return { ok: false, error: "Cover photo must be a JPG, PNG, or WebP." };
+    const ext = imageExt(coverFile);
+    if (!ext) return { ok: false, error: "Cover photo must be a JPG, PNG, HEIC, or WebP." };
     coverImage = await saveUpload(
       Buffer.from(await coverFile.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -2091,6 +2503,72 @@ export async function deleteArticle(id: string) {
   revalidatePath("/admin");
 }
 
+export type DropRadarScan = { ok: boolean; error?: string; scanned?: number; drafted?: number; skipped?: number };
+
+/**
+ * Drop Radar: generate a fresh batch of DRAFT drop posts from real catalog
+ * releases. Facts come from the DB; Gemini writes only prose + a culture
+ * question. Nothing publishes — the drafts wait for one-tap review.
+ */
+export async function scanDropRadar(): Promise<DropRadarScan> {
+  await requireAdmin();
+  const { generateDropDrafts } = await import("@/lib/dropRadar");
+  const r = await generateDropDrafts(5);
+  if (!r.configured) {
+    return { ok: false, error: "Drop Radar is off — add GEMINI_API_KEY in Railway to switch it on." };
+  }
+  revalidatePath("/admin");
+  revalidatePath("/news");
+  revalidatePath("/drops");
+  return { ok: true, scanned: r.scanned, drafted: r.drafted, skipped: r.skipped };
+}
+
+/** Publish a draft article (Drop Radar or otherwise) and activate its culture question. */
+export async function publishArticle(id: string) {
+  await requireAdmin();
+  const a = await prisma.article.findUnique({ where: { id }, select: { slug: true, publishedAt: true } });
+  if (!a) return;
+  await prisma.article.update({
+    where: { id },
+    data: { status: "PUBLISHED", publishedAt: a.publishedAt ?? new Date() },
+  });
+  await prisma.quizQuestion.updateMany({ where: { articleId: id }, data: { active: true } });
+  revalidatePath("/news");
+  revalidatePath(`/news/${a.slug}`);
+  revalidatePath("/drops");
+  revalidatePath("/");
+  revalidatePath("/admin");
+}
+
+// ---------- The Draft (weekly fantasy league) ----------
+
+/** Lock in a weekly roster of customs + drops. One entry per user per week. */
+export async function draftLeagueRoster(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Sign in to draft your roster." };
+  let picks: unknown;
+  try {
+    picks = JSON.parse(String(formData.get("picks") ?? "[]"));
+  } catch {
+    return { ok: false, error: "Couldn't read your picks — try again." };
+  }
+  if (!Array.isArray(picks)) return { ok: false, error: "Couldn't read your picks — try again." };
+  const clean = picks
+    .filter((p): p is { assetType: "CUSTOM" | "DROP"; refId: string } =>
+      !!p && (p.assetType === "CUSTOM" || p.assetType === "DROP") && typeof p.refId === "string")
+    .slice(0, 12);
+  const { draftRoster } = await import("@/lib/league");
+  const r = await draftRoster(userId, clean);
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/league");
+  revalidatePath("/");
+  return { ok: true, note: "Roster locked — good luck this week." };
+}
+
 // ---------- Drop-date sync (SKU → release date waterfall) ----------
 
 /**
@@ -2130,16 +2608,161 @@ export async function lookupSkuForArticle(id: string): Promise<ActionResult> {
   }
   const article = await prisma.article.findUnique({
     where: { id },
-    select: { title: true },
+    select: { title: true, coverImage: true },
   });
   if (!article) return { ok: false, error: "Article not found." };
   const hit = await findSku(article.title).catch(() => null);
   if (!hit?.sku) {
     return { ok: false, error: "No style code matched that headline. Add it by hand." };
   }
-  await prisma.article.update({ where: { id }, data: { sku: hit.sku.toUpperCase() } });
+  const sku = hit.sku.toUpperCase();
+
+  // Apply the code AND the shoe's photo (only if the story has no cover
+  // yet — never clobber a hand-picked one).
+  const articleData: { sku: string; coverImage?: string } = { sku };
+  const appliedPhoto = Boolean(hit.image && !article.coverImage);
+  if (appliedPhoto) articleData.coverImage = hit.image!;
+  await prisma.article.update({ where: { id }, data: articleData });
+
+  // Fold the shoe into the catalog so the SKU resolves to a priced entry
+  // (photo + retail) that the story and the market board can read. Fills
+  // blanks only — never overwrites data an import already captured.
+  const existing = await prisma.catalogShoe.findUnique({ where: { sku } });
+  if (!existing) {
+    await prisma.catalogShoe.create({
+      data: {
+        sku,
+        name: hit.name ?? article.title.split(/[—:|(]/)[0].trim(),
+        imageUrl: hit.image ?? null,
+        retailPriceCents: hit.retailPriceCents ?? null,
+        releaseDate: hit.releaseDate ?? null,
+        source: "article",
+      },
+    });
+  } else {
+    const fill: { imageUrl?: string; retailPriceCents?: number; releaseDate?: Date } = {};
+    if (!existing.imageUrl && hit.image) fill.imageUrl = hit.image;
+    if (!existing.retailPriceCents && hit.retailPriceCents) fill.retailPriceCents = hit.retailPriceCents;
+    if (!existing.releaseDate && hit.releaseDate) fill.releaseDate = hit.releaseDate;
+    if (Object.keys(fill).length > 0) {
+      await prisma.catalogShoe.update({ where: { sku }, data: fill });
+    }
+  }
+
   revalidatePath("/admin");
-  return { ok: true, note: `Found style code ${hit.sku}${hit.name ? ` (${hit.name})` : ""}.` };
+  revalidatePath("/market");
+  const bits = [`Found style code ${sku}`];
+  if (hit.name) bits.push(`(${hit.name})`);
+  if (appliedPhoto) bits.push("— photo applied");
+  if (hit.retailPriceCents) bits.push(`— retail ${(hit.retailPriceCents / 100).toFixed(0)} saved to catalog`);
+  return { ok: true, note: `${bits.join(" ")}.` };
+}
+
+/** Normalize a shoe name for fuzzy article-title ↔ catalog matching. */
+function normShoeName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/['’"]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Give every cover-less article the shoe's photo. Matches to the catalog
+ * by style code first, then by normalized name; anything still uncovered
+ * (and not in the catalog) gets a bounded live lookup that also grows the
+ * catalog. One button, run it after any import.
+ */
+export async function matchArticlePhotos(): Promise<ActionResult> {
+  await requireAdmin();
+  const articles = await prisma.article.findMany({
+    where: { OR: [{ coverImage: null }, { coverImage: "" }] },
+    select: { id: true, title: true, sku: true },
+  });
+  if (articles.length === 0) return { ok: true, note: "Every article already has a cover." };
+
+  const shoes = await prisma.catalogShoe.findMany({
+    where: { imageUrl: { not: null } },
+    select: { sku: true, name: true, imageUrl: true },
+  });
+  const bySku = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const s of shoes) {
+    if (!s.imageUrl) continue;
+    bySku.set(s.sku.toUpperCase(), s.imageUrl);
+    const k = normShoeName(s.name);
+    if (k && !byName.has(k)) byName.set(k, s.imageUrl);
+  }
+
+  let fromCatalog = 0;
+  let fromApi = 0;
+  let stillMissing = 0;
+  const apiLive = sneakerApiLive();
+  let apiBudget = 40; // don't hammer the provider on a big backlog
+
+  for (const a of articles) {
+    let img: string | undefined = a.sku ? bySku.get(a.sku.toUpperCase()) : undefined;
+    if (!img) img = byName.get(normShoeName(a.title.split(/[—:|(]/)[0]));
+    if (img) {
+      await prisma.article.update({ where: { id: a.id }, data: { coverImage: img } });
+      fromCatalog++;
+      continue;
+    }
+    // Not in the catalog yet — pull it live (bounded) and fold it in.
+    if (apiLive && apiBudget > 0) {
+      apiBudget--;
+      const hit = await findSku(a.title).catch(() => null);
+      if (hit?.image) {
+        await prisma.article.update({
+          where: { id: a.id },
+          data: { coverImage: hit.image, ...(hit.sku && !a.sku ? { sku: hit.sku.toUpperCase() } : {}) },
+        });
+        if (hit.sku) {
+          const sku = hit.sku.toUpperCase();
+          const existing = await prisma.catalogShoe.findUnique({ where: { sku } });
+          if (!existing) {
+            await prisma.catalogShoe.create({
+              data: {
+                sku,
+                name: hit.name ?? a.title.split(/[—:|(]/)[0].trim(),
+                imageUrl: hit.image,
+                retailPriceCents: hit.retailPriceCents ?? null,
+                releaseDate: hit.releaseDate ?? null,
+                source: "article",
+              },
+            });
+          } else if (!existing.imageUrl) {
+            await prisma.catalogShoe.update({ where: { sku }, data: { imageUrl: hit.image } });
+          }
+        }
+        fromApi++;
+        continue;
+      }
+    }
+    stillMissing++;
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/news");
+  const parts = [`${fromCatalog} matched from the catalog`];
+  if (fromApi) parts.push(`${fromApi} pulled live`);
+  if (stillMissing) parts.push(`${stillMissing} still need one`);
+  return { ok: true, note: `Article photos: ${parts.join(" · ")}.` };
+}
+
+// Re-encode already-stored HEIC photos (invisible in Chrome) to JPEG in
+// place. One button; run it once to rescue everything uploaded before the
+// normalize-on-upload fix.
+export async function fixUploadedPhotos(): Promise<ActionResult> {
+  await requireAdmin();
+  const { repairBrokenUploads } = await import("@/lib/uploadRepair");
+  const r = await repairBrokenUploads();
+  revalidatePath("/");
+  const note =
+    `Scanned ${r.scanned} photo${r.scanned === 1 ? "" : "s"} · ` +
+    `converted ${r.fixed} HEIC to JPEG · ${r.skipped} already fine` +
+    (r.failed ? ` · ${r.failed} couldn't be read` : "");
+  return { ok: true, note };
 }
 
 // ---------- Editor Desk ----------
@@ -2167,8 +2790,8 @@ export async function stageProspect(
   const file = formData.get("file");
   if (file instanceof File && file.size > 0) {
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, error: "File must be under 6MB." };
-    const ext = ALLOWED_TYPES[file.type];
-    if (!ext) return { ok: false, error: "Upload a JPG, PNG, or WebP." };
+    const ext = imageExt(file);
+    if (!ext) return { ok: false, error: "Upload a JPG, PNG, HEIC, or WebP." };
     fileUrl = await saveUpload(Buffer.from(await file.arrayBuffer()), `${randomUUID()}.${ext}`, file.type);
   }
 
@@ -2356,12 +2979,295 @@ export async function saveJob(
 
 // ---------- Artist shops (where they already sell) ----------
 
+/**
+ * Edit your own page: bio, city, socials, and a profile photo. Everything
+ * here is the maker's to change without going through the office — the one
+ * thing they can't touch is displayName/slug, since the Heat List record,
+ * claim links and existing URLs all hang off those.
+ */
+export async function updateArtistProfile(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+
+  const clean = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
+  const bio = clean("bio", 1000);
+  const city = clean("city", 80);
+  const instagram = clean("instagram", 60).replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/$/, "");
+  let portfolioUrl = clean("portfolioUrl", 300);
+  if (portfolioUrl && !/^https?:\/\//i.test(portfolioUrl)) portfolioUrl = `https://${portfolioUrl}`;
+  if (portfolioUrl) {
+    try {
+      new URL(portfolioUrl);
+    } catch {
+      return { ok: false, error: "That portfolio link doesn't look like a valid URL." };
+    }
+  }
+
+  // Optional new profile photo — same pipeline as every other upload, so
+  // it's normalised to a web-safe JPEG and stored where uploads persist.
+  let avatarUrl: string | undefined;
+  const photo = formData.get("avatar");
+  if (photo instanceof File && photo.size > 0) {
+    if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Profile photo must be under 6MB." };
+    const ext = imageExt(photo);
+    if (!ext) return { ok: false, error: "Profile photo must be a JPEG, PNG, WebP or HEIC." };
+    avatarUrl = await saveUpload(
+      Buffer.from(await photo.arrayBuffer()),
+      `${randomUUID()}.${ext}`,
+      photo.type
+    );
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      bio: bio || null,
+      city: city || null,
+      instagram: instagram || null,
+      portfolioUrl: portfolioUrl || null,
+      ...(avatarUrl ? { avatarUrl } : {}),
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  revalidatePath("/artists");
+  return { ok: true, note: "Page updated." };
+}
+
+/**
+ * Change a piece you made: what it's asking, its size, its description.
+ * Scoped by artistId in the WHERE clause, so a crafted id can only ever
+ * match your own work — the price on someone else's piece is unreachable
+ * from here.
+ */
+/**
+ * How the maker's own room is hung: headline, lead piece, accent, layout.
+ *
+ * The accent is the only field here that reaches a style attribute, so it's
+ * the only one that gets strict validation — a strict hex or nothing. The
+ * rest are text, capped and stored as written.
+ */
+export async function updateClosetLook(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+
+  const headline = String(formData.get("closetHeadline") ?? "").trim().slice(0, 120);
+  const layoutRaw = String(formData.get("closetLayout") ?? "grid");
+  const layout = ["grid", "gallery", "list"].includes(layoutRaw) ? layoutRaw : "grid";
+
+  // Anything that isn't a plain 6-digit hex is dropped rather than escaped.
+  const accentRaw = String(formData.get("accentColor") ?? "").trim();
+  const accentColor = /^#[0-9a-fA-F]{6}$/.test(accentRaw) ? accentRaw.toLowerCase() : null;
+  if (accentRaw && !accentColor) {
+    return { ok: false, error: "Use a colour like #ff5a3c, or leave it blank for the house look." };
+  }
+
+  // Feature must be a piece they actually own — scoped in the WHERE, so a
+  // forged id can't graft someone else's work onto this page.
+  const featureRaw = String(formData.get("featuredSubmissionId") ?? "").trim();
+  let featuredSubmissionId: string | null = null;
+  if (featureRaw) {
+    const owned = await prisma.submission.findFirst({
+      where: { id: featureRaw, artistId: profile.id, status: "APPROVED" },
+      select: { id: true },
+    });
+    if (!owned) return { ok: false, error: "You can only feature one of your own approved pieces." };
+    featuredSubmissionId = owned.id;
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      closetHeadline: headline || null,
+      closetLayout: layout,
+      accentColor,
+      featuredSubmissionId,
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Closet updated." };
+}
+
+/**
+ * Move a piece up or down the wall, hide it, or file it under a section.
+ *
+ * Hiding is deliberately not deleting: the piece keeps its votes, its
+ * battle record and its place in the league, it just isn't hanging in the
+ * maker's own room. Somebody tidying their portfolio shouldn't have to
+ * destroy history to do it.
+ */
+export async function updatePieceInCloset(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const id = String(formData.get("pieceId") ?? "");
+  const move = String(formData.get("move") ?? "");
+
+  // Ownership is enforced in the WHERE of every read below, never after.
+  const pieces = await prisma.submission.findMany({
+    where: { artistId: profile.id, status: "APPROVED" },
+    orderBy: [{ closetOrder: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    select: { id: true, closetHidden: true },
+  });
+  const at = pieces.findIndex((p) => p.id === id);
+  if (at === -1) return { ok: false, error: "That piece isn't yours." };
+
+  if (move === "up" || move === "down") {
+    const to = move === "up" ? at - 1 : at + 1;
+    if (to < 0 || to >= pieces.length) return { ok: true, note: "Already at the end." };
+    const reordered = [...pieces];
+    [reordered[at], reordered[to]] = [reordered[to], reordered[at]];
+    // Renumber the whole wall so the order is total rather than relative —
+    // partial ordering is what makes these lists drift over time.
+    await prisma.$transaction(
+      reordered.map((p, i) =>
+        prisma.submission.update({ where: { id: p.id }, data: { closetOrder: i } })
+      )
+    );
+  } else if (move === "hide") {
+    await prisma.submission.update({
+      where: { id },
+      data: { closetHidden: !pieces[at].closetHidden },
+    });
+  } else if (move === "section") {
+    const section = String(formData.get("section") ?? "").trim().slice(0, 40);
+    await prisma.submission.update({ where: { id }, data: { closetSection: section || null } });
+  } else {
+    return { ok: false, error: "Unknown change." };
+  }
+
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Closet updated." };
+}
+
+/**
+ * Why a piece didn't match — did they make it and sell it, or was it
+ * never theirs? Only ever asked about a row already scoped to their own
+ * artistId, so it tells them nothing about anybody else's work.
+ */
+async function notYoursReason(artistId: string, pieceId: string): Promise<string> {
+  const made = await prisma.submission.count({ where: { id: pieceId, artistId } });
+  return made > 0 ? PIECE_HAS_MOVED_ON : "That piece isn't yours to edit.";
+}
+
+export async function updateMyPiece(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const id = String(formData.get("pieceId") ?? "");
+  if (!id) return { ok: false, error: "Which piece?" };
+
+  const mine = await prisma.submission.findFirst({
+    where: stillHeldBy(profile.id, id),
+    select: { id: true },
+  });
+  if (!mine) return { ok: false, error: await notYoursReason(profile.id, id) };
+
+  const rawAsk = String(formData.get("askingPrice") ?? "").replace(/[^0-9.]/g, "").trim();
+  let askingPriceCents: number | null = null;
+  if (rawAsk) {
+    const n = Math.round(Number(rawAsk) * 100);
+    if (!Number.isFinite(n) || n <= 0) return { ok: false, error: "That asking price doesn't look right." };
+    askingPriceCents = Math.min(n, 1_000_000_00);
+  }
+  const size = String(formData.get("size") ?? "").trim().slice(0, 24);
+  const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
+
+  await prisma.submission.update({
+    where: { id: mine.id },
+    data: {
+      askingPriceCents,
+      size: size || null,
+      description: description || null,
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath("/market");
+  revalidatePath("/available");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: askingPriceCents ? "Piece updated — it's listed." : "Piece updated — taken off the market." };
+}
+
+/**
+ * Remove your own piece. Same cascade-safe path the admin delete uses.
+ *
+ * The cascade is exactly why this one is scoped to pieces the artist
+ * still holds. Deleting a sold piece doesn't just remove a photo — it
+ * destroys the collector's CONFIRMED sale, their offers, the consignment
+ * and every rating, and there is no undo. The Studio hides the button on
+ * sold pieces, but that lock lived only in the browser.
+ */
+export async function deleteMyPiece(pieceId: string) {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") return;
+  const mine = await prisma.submission.findFirst({
+    where: stillHeldBy(profile.id, pieceId),
+    select: { id: true },
+  });
+  if (!mine) return; // not yours, or no longer yours — nothing happens
+  await deleteSubmissionCascadeInternal(mine.id);
+  revalidatePath("/studio");
+  revalidatePath("/market");
+  revalidatePath("/available");
+  revalidatePath(`/artists/${profile.slug}`);
+}
+
+// ---------- The Call (prediction market) ----------
+
+/** Lock in a read on where a pair's resale lands. */
+export async function makePredictionCall(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Sign in to make a call." };
+
+  const shoeId = String(formData.get("shoeId") ?? "") || undefined;
+  const submissionId = String(formData.get("submissionId") ?? "") || undefined;
+  const kind = String(formData.get("kind") ?? "DIRECTION") === "PRICE" ? "PRICE" : "DIRECTION";
+  const horizonDays = Number(formData.get("horizonDays")) || 7;
+  const direction = String(formData.get("direction") ?? "") === "DOWN" ? "DOWN" : "UP";
+  const rawPrice = String(formData.get("predictedPrice") ?? "").replace(/[^0-9.]/g, "").trim();
+  const predictedCents = rawPrice ? Math.round(Number(rawPrice) * 100) : undefined;
+  const stakeCredits = Number(formData.get("stakeCredits")) || 0;
+
+  const { makeCall } = await import("@/lib/predictions");
+  const r = await makeCall({
+    userId, shoeId, submissionId, kind, horizonDays, direction, predictedCents, stakeCredits,
+  });
+  if (!r.ok) return { ok: false, error: r.error };
+  revalidatePath("/market");
+  revalidatePath("/predict");
+  return { ok: true, note: r.note ?? "Call locked. It settles itself when the window closes." };
+}
+
 async function myApprovedArtist() {
   const session = await auth();
   if (!session?.user?.id) return null;
   return prisma.artistProfile.findUnique({
     where: { userId: session.user.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, slug: true },
   });
 }
 
@@ -2403,6 +3309,85 @@ export async function removeArtistShop(id: string) {
     await prisma.artistProfile.update({ where: { id: profile.id }, data: { sellsOnline: null } });
   }
   revalidatePath("/studio");
+}
+
+// A maker ties their Spotify (or DistroKid/hyperfollow/Apple Music) link so
+// their music plays on their profile. Blank clears it.
+/**
+ * The commission desk: price floor, turnaround, and whether you're taking
+ * work — stated upfront so a buyer never has to DM to find out. Blank a
+ * field to clear it; the public page then says "ask" instead of guessing.
+ */
+export async function setCommissionDesk(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  const money = (k: string): number | null => {
+    const raw = String(formData.get(k) ?? "").replace(/[^0-9.]/g, "").trim();
+    if (!raw) return null;
+    const n = Math.round(Number(raw) * 100);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, 100_000_00) : null;
+  };
+  const whole = (k: string, max: number): number | null => {
+    const raw = String(formData.get(k) ?? "").replace(/[^0-9]/g, "").trim();
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.min(n, max) : null;
+  };
+
+  const min = money("commissionMinCents");
+  const max = money("commissionMaxCents");
+  if (min && max && max < min) {
+    return { ok: false, error: "Top of range can't be lower than the starting price." };
+  }
+
+  await prisma.artistProfile.update({
+    where: { id: profile.id },
+    data: {
+      commissionOpen: formData.get("commissionOpen") === "on",
+      commissionMinCents: min,
+      commissionMaxCents: max,
+      commissionDays: whole("commissionDays", 365),
+      commissionSlots: whole("commissionSlots", 99),
+    },
+  });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  revalidatePath("/artists");
+  return { ok: true, note: "Commission desk updated — buyers see it on your page." };
+}
+
+export async function setArtistMusic(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const profile = await myApprovedArtist();
+  if (!profile || profile.status !== "APPROVED") {
+    return { ok: false, error: "Approved artists only." };
+  }
+  let url = String(formData.get("spotifyUrl") ?? "").trim();
+  if (!url) {
+    await prisma.artistProfile.update({ where: { id: profile.id }, data: { spotifyUrl: null } });
+    revalidatePath("/studio");
+    revalidatePath(`/artists/${profile.slug}`);
+    return { ok: true, note: "Music removed from your page." };
+  }
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  if (url.length > 400) return { ok: false, error: "That link is too long." };
+  if (!isMusicLink(url)) {
+    return {
+      ok: false,
+      error: "Paste a Spotify link (or a DistroKid / hyperfollow / Apple Music link).",
+    };
+  }
+  await prisma.artistProfile.update({ where: { id: profile.id }, data: { spotifyUrl: url } });
+  revalidatePath("/studio");
+  revalidatePath(`/artists/${profile.slug}`);
+  return { ok: true, note: "Your music is live on your profile." };
 }
 
 // ---------- Onboarding Agent (research → preloaded profile) ----------
@@ -2546,6 +3531,383 @@ export async function importCatalog(
   };
 }
 
+export type CatalogRefreshResult = {
+  ok: boolean;
+  error?: string;
+  brands?: { brand: string; imported: number; updated: number; priced: number }[];
+  ebay?: { configured: boolean; checked: number; matched: number };
+};
+
+/**
+ * Run the daily catalog refresh on demand (admin) — exactly what the
+ * refresh-catalog cron does: re-import a rotating batch of brands from
+ * KicksDB (photos + live prices), then pull fresh eBay new/used medians.
+ * Lets an admin fill the OG board and verify the eBay keys without
+ * waiting for the cron. The eBay line reports matched/checked so a live
+ * count confirms the credentials are working.
+ */
+export async function refreshCatalogNow(): Promise<CatalogRefreshResult> {
+  await requireAdmin();
+  const { refreshCatalogPricing } = await import("@/lib/catalog");
+  const { syncEbayPrices } = await import("@/lib/ebay");
+  const summary = await refreshCatalogPricing();
+  const ebay = await syncEbayPrices(40).catch(() => ({ configured: true, checked: 0, matched: 0 }));
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  return {
+    ok: summary.ok,
+    error: summary.error,
+    brands: summary.brands?.map((b) => ({
+      brand: b.brand, imported: b.imported, updated: b.updated, priced: b.priced,
+    })),
+    ebay,
+  };
+}
+
+/**
+ * Refresh the whole database, not a slice of it.
+ *
+ * The button above rotates a few brands, which is the right behaviour for a
+ * nightly job and the wrong behaviour for someone sitting there clicking it.
+ * This runs the deep pass: every catalog brand, a much deeper eBay sweep,
+ * release dates, drop drafts, orphan repair, price history, call settlement,
+ * league rollover and a fresh index reading — the same pipeline the cron
+ * calls, turned all the way up.
+ *
+ * It reports per step, including steps that failed or ran dormant, so a
+ * half-finished run is never mistaken for a clean one.
+ */
+export async function refreshEverythingNow(): Promise<import("@/lib/refreshAll").RefreshReport> {
+  await requireAdmin();
+  const { refreshEverything } = await import("@/lib/refreshAll");
+  const report = await refreshEverything("deep");
+  for (const p of ["/admin", "/market", "/catalog", "/drops", "/news", "/predict", "/league", "/heat-list"]) {
+    revalidatePath(p);
+  }
+  return report;
+}
+
+
+// ---------- Direct messages ----------
+
+/**
+ * Send a message. Blocks are honoured in both directions, self-messaging is
+ * refused, and the recipient gets a push if they've allowed one — the reply
+ * still saves if the notification fails, because a message is the thing that
+ * matters and the ping is a courtesy.
+ */
+export async function sendMessage(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to send a message." };
+  const me = session.user.id;
+
+  const toUserId = String(formData.get("toUserId") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim().slice(0, 2000);
+  if (!toUserId) return { ok: false, error: "Who's it for?" };
+  if (toUserId === me) return { ok: false, error: "That's your own inbox." };
+  if (!body) return { ok: false, error: "Write something first." };
+  if (!allowAttempt("dm", me, 40, 60 * 60 * 1000)) {
+    return { ok: false, error: "That's a lot of messages this hour — try again later." };
+  }
+
+  const { blockedBetween } = await import("@/lib/messages");
+  if (await blockedBetween(me, toUserId)) {
+    return { ok: false, error: "You can't message this member." };
+  }
+  const recipient = await prisma.user.findUnique({ where: { id: toUserId }, select: { id: true, name: true } });
+  if (!recipient) return { ok: false, error: "That member doesn't exist." };
+
+  await prisma.directMessage.create({ data: { fromUserId: me, toUserId, body } });
+
+  const { pushTo } = await import("@/lib/push");
+  pushTo(toUserId, {
+    title: `${session.user.name?.split(" ")[0] ?? "Someone"} messaged you`,
+    body: body.slice(0, 120),
+    url: `/messages/${me}`,
+    tag: `dm-${me}`,
+  }).catch(() => {});
+
+  revalidatePath("/messages");
+  revalidatePath(`/messages/${toUserId}`);
+  return { ok: true, note: "Sent." };
+}
+
+// ---------- Push notifications ----------
+
+/** Register a browser or installed app to be notified. */
+export async function savePushSub(
+  endpoint: string,
+  p256dh: string,
+  auth_: string,
+  userAgent?: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  if (!endpoint || !p256dh || !auth_) return { ok: false, error: "Incomplete subscription." };
+
+  // Refuse to bank a subscription we can't send to. Storing one while the
+  // signing key is missing means holding a permission we can't honour, and
+  // the member would sit waiting for alerts that never come.
+  const { pushConfigured } = await import("@/lib/push");
+  if (!pushConfigured()) {
+    return { ok: false, error: "Alerts aren't switched on yet on our side — nothing to subscribe to." };
+  }
+
+  // Endpoint is unique, so the same device re-subscribing updates rather
+  // than duplicating — otherwise reinstalling would double every alert.
+  await prisma.pushSub.upsert({
+    where: { endpoint },
+    create: { userId: session.user.id, endpoint, p256dh, auth: auth_, userAgent: userAgent?.slice(0, 200) },
+    update: { userId: session.user.id, p256dh, auth: auth_, failures: 0 },
+  });
+  return { ok: true, note: "You'll get the alerts that matter." };
+}
+
+export async function removePushSub(endpoint: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  // Scoped to the caller so an endpoint string can't unsubscribe someone else.
+  await prisma.pushSub.deleteMany({ where: { endpoint, userId: session.user.id } });
+  return { ok: true, note: "Alerts off." };
+}
+
+// ---------- Commission waitlist ----------
+
+/**
+ * Put a request in the queue, or move it.
+ *
+ * A slot count tells somebody there's no room. A queue position tells them
+ * how long the wait is, which is the difference between leaving and staying.
+ * Positions are renumbered across the whole queue on every change so the list
+ * stays a total order rather than drifting into ties.
+ */
+export async function setCommissionQueue(
+  requestId: string,
+  action: "waitlist" | "up" | "down" | "accept" | "decline" | "done"
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+
+  const profile = await prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, displayName: true },
+  });
+  if (!profile) return { ok: false, error: "Artists only." };
+
+  // Ownership enforced in the WHERE, never checked after the fact.
+  const req = await prisma.commissionRequest.findFirst({
+    where: { id: requestId, artistId: profile.id },
+    select: { id: true, userId: true, baseName: true, status: true },
+  });
+  if (!req) return { ok: false, error: "That request isn't on your desk." };
+
+  if (action === "accept" || action === "decline" || action === "done") {
+    const status = action === "accept" ? "ACCEPTED" : action === "decline" ? "DECLINED" : "DONE";
+    await prisma.commissionRequest.update({
+      where: { id: req.id },
+      data: { status, queuePosition: null },
+    });
+    const { pushTo } = await import("@/lib/push");
+    if (action !== "done") {
+      pushTo(req.userId, {
+        title: action === "accept" ? "Your commission was accepted" : "Commission update",
+        body: `${profile.displayName} ${action === "accept" ? "took on" : "passed on"} your ${req.baseName}.`,
+        url: "/profile",
+        tag: `commission-${req.id}`,
+      }).catch(() => {});
+    }
+    revalidatePath("/studio");
+    return { ok: true, note: "Updated." };
+  }
+
+  const queue = await prisma.commissionRequest.findMany({
+    where: { artistId: profile.id, status: "WAITLIST" },
+    orderBy: [{ queuePosition: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+
+  let order = queue.map((q) => q.id);
+  if (action === "waitlist") {
+    if (!order.includes(req.id)) order.push(req.id);
+    await prisma.commissionRequest.update({ where: { id: req.id }, data: { status: "WAITLIST" } });
+  } else {
+    const at = order.indexOf(req.id);
+    if (at === -1) return { ok: false, error: "That request isn't on the waitlist." };
+    const to = action === "up" ? at - 1 : at + 1;
+    if (to < 0 || to >= order.length) return { ok: true, note: "Already at the end." };
+    [order[at], order[to]] = [order[to], order[at]];
+  }
+
+  await prisma.$transaction(
+    order.map((id, i) =>
+      prisma.commissionRequest.update({ where: { id }, data: { queuePosition: i + 1 } })
+    )
+  );
+
+  if (action === "waitlist") {
+    const position = order.indexOf(req.id) + 1;
+    const { pushTo } = await import("@/lib/push");
+    pushTo(req.userId, {
+      title: "You're on the waitlist",
+      body: `${profile.displayName} put your ${req.baseName} at #${position} in the queue.`,
+      url: "/profile",
+      tag: `commission-${req.id}`,
+    }).catch(() => {});
+  }
+
+  revalidatePath("/studio");
+  return { ok: true, note: "Queue updated." };
+}
+
+/**
+ * Form-friendly wrapper. A plain <form action> must resolve to void, so the
+ * Studio's queue buttons go through here while anything that wants the
+ * result (a client component with useActionState) calls the action directly.
+ */
+export async function commissionQueueAction(
+  requestId: string,
+  action: "waitlist" | "up" | "down" | "accept" | "decline" | "done"
+): Promise<void> {
+  await setCommissionQueue(requestId, action);
+}
+
+
+// ---------- The drip feed ----------
+
+/**
+ * Create or update a destination and the rules it actually enforces.
+ *
+ * The rule toggles are the point. r/Customsneakers bans self-promo in
+ * titles, affiliate links and bulk posting; recording that here is what
+ * lets the queue refuse a post before a moderator has to.
+ */
+export async function saveSocialTarget(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const platform = String(formData.get("platform") ?? "").toUpperCase();
+  if (!["REDDIT", "X", "BLUESKY", "TELEGRAM", "DISCORD", "YOUTUBE"].includes(platform)) {
+    return { ok: false, error: "Pick a platform." };
+  }
+  const name = String(formData.get("name") ?? "").trim().replace(/^r\//, "").slice(0, 80) || null;
+  const label = String(formData.get("label") ?? "").trim().slice(0, 80) || (name ? `r/${name}` : platform);
+
+  const data = {
+    platform,
+    name,
+    label,
+    active: formData.get("active") === "on",
+    allowLinks: formData.get("allowLinks") === "on",
+    allowSelfPromo: formData.get("allowSelfPromo") === "on",
+    allowAffiliate: formData.get("allowAffiliate") === "on",
+    requireFlair: formData.get("requireFlair") === "on",
+    minHoursBetween: Math.max(1, Math.min(720, Number(formData.get("minHoursBetween")) || 24)),
+    maxPerWeek: Math.max(1, Math.min(50, Number(formData.get("maxPerWeek")) || 3)),
+    rulesNote: String(formData.get("rulesNote") ?? "").trim().slice(0, 1000) || null,
+  };
+
+  // A compound unique with a nullable column can't be addressed by upsert,
+  // so find-then-write. Nulls are how the default account for a platform is
+  // represented — an X target has no "name" the way a subreddit does.
+  const existing = await prisma.socialTarget.findFirst({ where: { platform, name } });
+  if (existing) {
+    await prisma.socialTarget.update({ where: { id: existing.id }, data });
+  } else {
+    await prisma.socialTarget.create({ data });
+  }
+  revalidatePath("/admin");
+  return { ok: true, note: `${label} saved.` };
+}
+
+export type FillResult =
+  | { ok: true; queued: number; blocked: number; details: { source: string; status: string; note: string; when?: string }[] }
+  | { ok: false; error: string };
+
+/** Queue a batch of existing content for one destination. */
+export async function fillDripQueue(targetId: string, kind: string, count: number): Promise<FillResult> {
+  await requireAdmin();
+  if (!["ARTICLE", "PIECE"].includes(kind)) return { ok: false, error: "Unknown content type." };
+  const { fillQueue } = await import("@/lib/dripFeed");
+  try {
+    const out = await fillQueue(targetId, kind as "ARTICLE" | "PIECE", Math.max(1, Math.min(50, count)));
+    revalidatePath("/admin");
+    return { ok: true, queued: out.queued, blocked: out.blocked, details: out.details };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Couldn't build the queue." };
+  }
+}
+
+/** Drop one queued post — a human overriding the machine. */
+export async function cancelDripPost(id: string): Promise<void> {
+  await requireAdmin();
+  await prisma.socialPost.deleteMany({ where: { id, status: { in: ["QUEUED", "BLOCKED", "FAILED"] } } });
+  revalidatePath("/admin");
+}
+
+/** Send what's due right now, without waiting for the schedule. */
+export async function drainDripNow(): Promise<{ sent: number; failed: number; skipped: number }> {
+  await requireAdmin();
+  const { drainQueue } = await import("@/lib/dripFeed");
+  const out = await drainQueue();
+  revalidatePath("/admin");
+  return out;
+}
+
+
+// ---------- Play limits ----------
+
+/**
+ * A member binding their own future behaviour.
+ *
+ * The daily limit can be raised or removed freely — it's a budgeting tool.
+ * Self-exclusion cannot be shortened, only set or extended, and that
+ * asymmetry is the entire point: a break somebody can cancel at the moment
+ * they most want to cancel it isn't a break. Under every regime that allows
+ * staking, an operator that lets people undo their own exclusion on a whim
+ * is the operator that gets made an example of.
+ */
+export async function setPlayLimits(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const userId = session.user.id;
+
+  const rawLimit = String(formData.get("dailyStakeLimit") ?? "").trim();
+  const dailyStakeLimit = rawLimit === "" ? null : Math.max(0, Math.min(100000, Number(rawLimit) || 0));
+
+  const days = Number(formData.get("excludeDays")) || 0;
+  const current = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { selfExcludedUntil: true },
+  });
+
+  let selfExcludedUntil = current?.selfExcludedUntil ?? null;
+  if (days > 0) {
+    const requested = new Date(Date.now() + days * 86400000);
+    // Only ever extends. An existing exclusion further out always wins.
+    if (!selfExcludedUntil || requested > selfExcludedUntil) selfExcludedUntil = requested;
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { dailyStakeLimit, selfExcludedUntil },
+  });
+  revalidatePath("/profile");
+  revalidatePath("/market");
+  return {
+    ok: true,
+    note: selfExcludedUntil && selfExcludedUntil.getTime() > Date.now()
+      ? `Saved. You're taking a break until ${selfExcludedUntil.toDateString()} — this can be extended but not shortened.`
+      : "Saved.",
+  };
+}
+
 // ---------- Gemini assists (all dormant until GEMINI_API_KEY) ----------
 
 const AI_RATE = { max: 60, windowMs: 60 * 60 * 1000 }; // per-user, per hour
@@ -2638,17 +4000,47 @@ export async function findLeads(
   if (gate) return { ok: false, error: gate };
   const focus = String(formData.get("focus") ?? "").trim().slice(0, 200);
 
-  const out = await geminiJson<{ candidates?: unknown[] }>({
+  const SCHEMA =
+    'Return ONLY JSON: {"candidates":[{"name":string,"instagram":string|null,"link":string|null,"city":string|null,"why":string}]} with up to 10 candidates. ' +
+    "instagram is the bare handle. link is their most useful public URL. why is one short line on what makes their work stand out.";
+  const SLANG =
+    "Briefs are casual — interpret shorthand generously: ATL=Atlanta, NYC=New York, LA=Los Angeles, HTX=Houston, CHI=Chicago, IG=Instagram, AF1=Air Force 1, AJ1=Jordan 1. " +
+    '"custom sneaker ATL" means: custom sneaker artists in or near Atlanta. Never ask for a better brief — work with what you have.';
+
+  // Pass 1 — search-grounded, strict: only artists actually found.
+  let out = await geminiJson<{ candidates?: unknown[] }>({
     system:
       "You scout custom-sneaker artists (customizers who hand-paint/rework sneakers) who could join The Heat Chart, a battle-league platform. " +
-      "Use search to find REAL, currently-active artists with public Instagram or portfolio pages. Prefer independent artists over big brands. " +
-      'Return ONLY JSON: {"candidates":[{"name":string,"instagram":string|null,"link":string|null,"city":string|null,"why":string}]} with up to 10 candidates. ' +
-      "instagram is the bare handle. link is their most useful public URL. why is one short line on what makes their work stand out. Only list artists you actually found — never invent.",
+      SLANG + " Use search to find REAL, currently-active artists with public Instagram or portfolio pages. Prefer independent artists over big brands. " +
+      SCHEMA + " Only list artists you actually found — never invent.",
     parts: [{ text: focus ? `Scout brief from the editor: ${focus}` : "Scout brief: notable independent custom-sneaker artists active right now." }],
     search: true,
     temperature: 0.4,
   });
-  if (!out?.candidates?.length) return { ok: false, error: "The scout came back empty — try a more specific brief." };
+
+  // Pass 2 — the scout NEVER shrugs at the editor: broaden on our
+  // side and allow well-known artists from model knowledge, flagged
+  // for a handle check before staging.
+  let secondPass = false;
+  if (!out?.candidates?.length) {
+    secondPass = true;
+    out = await geminiJson<{ candidates?: unknown[] }>({
+      system:
+        "You scout custom-sneaker artists (customizers who hand-paint/rework sneakers) for The Heat Chart, a battle-league platform. " +
+        SLANG + " " + SCHEMA +
+        " List real, widely-known independent customizers you are CONFIDENT actually exist that best match the brief; if the brief names a city, include artists from that city or region first, then great fits from anywhere. Never fabricate a person.",
+      parts: [{ text: focus ? `Scout brief from the editor: ${focus}` : "Scout brief: notable independent custom-sneaker artists active right now." }],
+      search: true,
+      temperature: 0.6,
+    });
+  }
+  if (!out?.candidates?.length) {
+    console.error("[findLeads] both passes empty", { focus });
+    return {
+      ok: false,
+      error: "The scout struck out — that's on us, not your brief. Give it another run in a minute; if it keeps happening, tell the office.",
+    };
+  }
 
   const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
   const raw: LeadCandidate[] = out.candidates
@@ -2673,10 +4065,14 @@ export async function findLeads(
     (c) => !(c.instagram && handles.has(c.instagram.toLowerCase())) && !names.has(c.name.toLowerCase())
   );
   const dropped = raw.length - leads.length;
+  const notes = [
+    dropped > 0 ? `${dropped} already on the chart — filtered out.` : null,
+    secondPass ? "Ranged wider than live search — double-check handles before staging." : null,
+  ].filter(Boolean);
   return {
     ok: true,
     leads,
-    note: dropped > 0 ? `${dropped} already on the chart — filtered out.` : undefined,
+    note: notes.length ? notes.join(" ") : undefined,
   };
 }
 
@@ -3185,6 +4581,37 @@ export async function setArtistStage(artistId: string, stage: string): Promise<v
 }
 
 /** Save the admin's working notes on a lead ("DM'd 7/18, replied 🔥"). */
+/**
+ * Log a touch on a recruiting lead: stamps the time, counts it, and moves
+ * the stage forward. That timestamp is what the Roster Run uses to decide
+ * who's due next, so logging a touch is the whole tracking system.
+ */
+export async function logOutreachTouch(artistId: string, nextStage?: string) {
+  await requireEditor();
+  const lead = await prisma.artistProfile.findUnique({
+    where: { id: artistId },
+    select: { outreachStage: true, touchCount: true },
+  });
+  if (!lead) return;
+  // First touch on an untouched lead advances NEW → CONTACTED on its own.
+  const stage =
+    nextStage && ["NEW", "CONTACTED", "IN_TALKS", "INVITED", "ARCHIVED"].includes(nextStage)
+      ? nextStage
+      : lead.outreachStage === "NEW"
+        ? "CONTACTED"
+        : lead.outreachStage;
+  await prisma.artistProfile.update({
+    where: { id: artistId },
+    data: {
+      lastTouchAt: new Date(),
+      touchCount: { increment: 1 },
+      outreachStage: stage,
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/editor");
+}
+
 export async function saveArtistNotes(
   _prev: ActionResult | null,
   formData: FormData
@@ -3240,8 +4667,8 @@ async function runBroadcast(formData: FormData): Promise<BroadcastResult> {
   const photo = formData.get("photo");
   if (photo instanceof File && photo.size > 0) {
     if (photo.size > MAX_UPLOAD_BYTES) return { ok: false, error: "Photo must be under 6MB." };
-    const ext = ALLOWED_TYPES[photo.type];
-    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
+    const ext = imageExt(photo);
+    if (!ext) return { ok: false, error: "Photo must be JPG, PNG, HEIC, or WebP." };
     imageUrl = await saveUpload(
       Buffer.from(await photo.arrayBuffer()),
       `${randomUUID()}.${ext}`,
@@ -3296,16 +4723,40 @@ export async function editorBroadcast(
 export async function deleteFeedPost(id: string) {
   // The admin (password cookie, no NextAuth session) can delete
   // anything; an artist can delete their own post.
-  if (!(await isAdmin())) {
+  const admin = await isAdmin();
+  // Read the post BEFORE deleting it: after the delete there is nothing
+  // left to describe, and a log entry saying "deleted a post" without
+  // saying whose or which is not a log, it's a tally.
+  const post = await prisma.feedPost.findUnique({
+    where: { id },
+    include: { artist: { select: { userId: true, displayName: true } } },
+  });
+  if (!post) return;
+
+  let deletingOwnPost = false;
+  if (!admin) {
     const session = await auth();
     if (!session?.user?.id) return;
-    const post = await prisma.feedPost.findUnique({
-      where: { id },
-      include: { artist: { select: { userId: true } } },
-    });
-    if (!post || post.artist?.userId !== session.user.id) return;
+    if (post.artist?.userId !== session.user.id) return;
+    deletingOwnPost = true;
   }
+
   await prisma.feedPost.delete({ where: { id } }).catch(() => {});
+
+  // Removing somebody else's post is the most consequential thing on
+  // this list — it is the one action whose evidence destroys itself.
+  if (admin && !deletingOwnPost && post.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "post.delete",
+      targetType: "feedPost",
+      targetId: id,
+      targetOwnerId: post.artist.userId,
+      summary: `Removed a feed post by ${post.artist.displayName}`,
+    });
+  }
+
   revalidatePath("/");
   revalidatePath("/admin");
 }
@@ -3337,13 +4788,21 @@ export async function toggleFeedReaction(
 }
 
 export type FeedCommentResult =
-  | { ok: true; comment: { id: string; name: string; body: string } }
+  | { ok: true; comment: { id: string; name: string; body: string; userId: string; parentId: string | null } }
   | { ok: false; error: string };
 
-/** Anyone signed in can talk under a post. */
+/**
+ * Comment, or reply to one.
+ *
+ * Replies go one level deep and no further: a reply to a reply attaches to
+ * the same parent. Deeper nesting reads badly on a phone and produces the
+ * kind of thread nobody finishes, and flattening it there is far better than
+ * indenting a conversation off the right edge of the screen.
+ */
 export async function addFeedComment(
   postId: string,
-  bodyRaw: string
+  bodyRaw: string,
+  parentIdRaw?: string | null
 ): Promise<FeedCommentResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Sign in to comment." };
@@ -3354,13 +4813,49 @@ export async function addFeedComment(
   }
   const post = await prisma.feedPost.findUnique({ where: { id: postId } });
   if (!post) return { ok: false, error: "Post is gone." };
+
+  let parentId: string | null = null;
+  if (parentIdRaw) {
+    // Scoped to this post, so a comment id from elsewhere can't graft a
+    // thread across posts. Replying to a reply collapses to its parent.
+    const parent = await prisma.feedComment.findFirst({
+      where: { id: parentIdRaw, postId },
+      select: { id: true, parentId: true },
+    });
+    if (parent) parentId = parent.parentId ?? parent.id;
+  }
+
   const comment = await prisma.feedComment.create({
-    data: { postId, userId: session.user.id, body },
-    include: { user: { select: { name: true } } },
+    data: { postId, userId: session.user.id, body, parentId },
+    include: { user: { select: { id: true, name: true } } },
   });
+
+  // Tell the person being replied to, if it isn't their own thread.
+  if (parentId) {
+    const parent = await prisma.feedComment.findUnique({
+      where: { id: parentId },
+      select: { userId: true },
+    });
+    if (parent && parent.userId !== session.user.id) {
+      const { pushTo } = await import("@/lib/push");
+      pushTo(parent.userId, {
+        title: `${session.user.name?.split(" ")[0] ?? "Someone"} replied`,
+        body: body.slice(0, 120),
+        url: "/battles",
+        tag: `reply-${parentId}`,
+      }).catch(() => {});
+    }
+  }
+
   return {
     ok: true,
-    comment: { id: comment.id, name: comment.user.name ?? "A fan", body: comment.body },
+    comment: {
+      id: comment.id,
+      name: comment.user.name ?? "A fan",
+      body: comment.body,
+      userId: comment.user.id,
+      parentId,
+    },
   };
 }
 
@@ -3464,12 +4959,9 @@ export async function clearQuizMiss(answerId: string): Promise<ClearMissResult> 
       data: { cleared: true },
     });
     if (flip.count === 0) return "already"; // a concurrent clear got it first
-    const dec = await tx.user.updateMany({
-      where: { id: userId, credits: { gte: 1 } },
-      data: { credits: { decrement: 1 } },
-    });
-    if (dec.count === 0) throw new Error("no-credit"); // rolls back the flip
-    await tx.creditTransaction.create({ data: { userId, delta: -1, reason: "iq-clear" } });
+    const { postCreditsIn } = await import("@/lib/ledger");
+    const spend = await postCreditsIn(tx, { userId, delta: -1, reason: "iq-clear" });
+    if (!spend.ok) throw new Error("no-credit"); // rolls back the flip
     return "ok";
   }).catch((e) => (e instanceof Error && e.message === "no-credit" ? "no-credit" : Promise.reject(e)));
   if (result === "no-credit") {
@@ -3970,4 +5462,971 @@ export async function setAmbassadorStatus(id: string, status: string): Promise<v
   if (!["NEW", "AMBASSADOR", "CURATOR", "PASSED"].includes(status)) return;
   await prisma.ambassadorApplication.update({ where: { id }, data: { status } });
   revalidatePath("/admin");
+}
+
+// ---------- App-store safety rails (Apple 1.2 + 5.1.1) ----------
+
+/**
+ * Flag a piece of member content for the moderation queue. One flag
+ * per member per target; every flag emails the admin so the 24-hour
+ * response promise in the terms is real.
+ */
+export async function reportContent(
+  kind: "feed_post" | "feed_comment" | "submission" | "artist",
+  targetId: string,
+  reason?: string
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to report content." };
+  if (!allowAttempt("report", session.user.id, 10, 60 * 1000)) {
+    return { ok: false, error: "Slow down — try again in a minute." };
+  }
+  const cleanReason = (reason ?? "").slice(0, 500) || null;
+  await prisma.contentFlag.upsert({
+    where: { kind_targetId_reporterId: { kind, targetId, reporterId: session.user.id } },
+    create: { kind, targetId, reporterId: session.user.id, reason: cleanReason },
+    update: { reason: cleanReason, status: "OPEN" },
+  });
+  notifyAdmin(
+    `Content reported: ${kind} ${targetId}`,
+    `A member flagged ${kind} ${targetId}.\nReason: ${cleanReason ?? "(none given)"}\nReporter: ${session.user.id}\n\nReview it in the admin panel and resolve within 24 hours.`
+  );
+  return { ok: true };
+}
+
+/** Block a member: their posts and comments disappear from your feed. */
+export async function blockMember(blockedUserId: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to block members." };
+  if (blockedUserId === session.user.id) return { ok: false, error: "That's you." };
+  const exists = await prisma.user.findUnique({ where: { id: blockedUserId }, select: { id: true } });
+  if (!exists) return { ok: false, error: "Member not found." };
+  await prisma.userBlock.upsert({
+    where: { blockerId_blockedId: { blockerId: session.user.id, blockedId: blockedUserId } },
+    create: { blockerId: session.user.id, blockedId: blockedUserId },
+    update: {},
+  });
+  revalidatePath("/feed");
+  return { ok: true };
+}
+
+/**
+ * Self-serve account deletion (App Store 5.1.1(v)). Wipes the
+ * member's personal data and kills every way into the account:
+ * password, OAuth links, sessions. Votes and battle results stay as
+ * anonymous league records; comments show "Deleted Member".
+ */
+export async function deleteMyAccount(confirm: string): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  if (confirm !== "DELETE") {
+    return { ok: false, error: 'Type DELETE (all caps) to confirm.' };
+  }
+  const userId = session.user.id;
+  await prisma.$transaction([
+    prisma.account.deleteMany({ where: { userId } }),
+    prisma.session.deleteMany({ where: { userId } }),
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: "Deleted Member",
+        email: `deleted-${userId}@deleted.theheatchart.com`,
+        emailVerified: null,
+        image: null,
+        passwordHash: null,
+        phone: null,
+        city: null,
+        shoeSize: null,
+        favoriteSilhouette: null,
+        favoriteBrands: null,
+        styleInterests: null,
+        instagram: null,
+        marketingOptIn: false,
+        battleAlerts: false,
+        shopFor: null,
+        signupSource: null,
+      },
+    }),
+  ]);
+  notifyAdmin(
+    "Member deleted their account",
+    `User ${userId} self-deleted from the profile page. PII wiped, sign-in disabled.`
+  );
+  return { ok: true };
+}
+
+// ---------- Rate: the endless deck ----------
+
+import { buildRateDeck } from "@/lib/rateDeck";
+import type { RateCard } from "@/components/RateDeck";
+
+export type MoreCardsResult = { ok: true; cards: RateCard[] } | { ok: false; error: string };
+
+/** Deals the next hand — rated pieces are excluded at the query level,
+ *  passed ones ride in via excludeIds. Rate all day if you want. */
+export async function moreRateCards(excludeIds: string[]): Promise<MoreCardsResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to rate." };
+  if (!allowAttempt("rate-deal", session.user.id, 30, 60 * 1000)) {
+    return { ok: false, error: "Slow down — the deck deals again in a minute." };
+  }
+  const cards = await buildRateDeck(
+    session.user.id,
+    12,
+    Array.isArray(excludeIds) ? excludeIds.filter((x) => typeof x === "string") : []
+  );
+  return { ok: true, cards };
+}
+
+// ---------- Admin: artist account repair ----------
+
+export type RepairResult = { ok: true; note: string } | { ok: false; error: string };
+
+/**
+ * Move an artist page onto the account its owner actually logs in with.
+ * The "profile is gone" bug is an account-linkage mismatch: a merge can
+ * leave the page owned by one User while the artist signs in as another
+ * (a claimable staged account they set a password on). This relinks the
+ * page's userId to the account matching `email`, so Studio finds it
+ * again. Optionally corrects the handle/slug in the same pass.
+ */
+export async function repairArtistAccount(formData: FormData): Promise<RepairResult> {
+  await requireAdmin();
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+  if (!slug) return { ok: false, error: "Artist page slug is required." };
+
+  const artist = await prisma.artistProfile.findUnique({
+    where: { slug },
+    select: { id: true, userId: true, displayName: true },
+  });
+  if (!artist) return { ok: false, error: `No artist page at "${slug}".` };
+
+  const notes: string[] = [];
+
+  if (email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: "That target email isn't valid." };
+    }
+    let target = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true },
+    });
+    if (!target) {
+      // No account with that email yet — mint a claimable one and hand
+      // the page to it. The artist then does "forgot password" on this
+      // address to set a login and walk into their Studio. This is what
+      // makes the repair one click even when the right email was never
+      // registered (e.g. the on-file address had a typo).
+      target = await prisma.user.create({
+        data: { email, name: artist.displayName },
+        select: { id: true, name: true },
+      });
+      notes.push(`Created a login for ${email} — the artist sets a password via "Forgot password".`);
+    }
+    if (target.id !== artist.userId) {
+      // The target account can't already own a different artist page
+      // (userId is unique on ArtistProfile).
+      const clash = await prisma.artistProfile.findUnique({
+        where: { userId: target.id },
+        select: { slug: true },
+      });
+      if (clash) {
+        return {
+          ok: false,
+          error: `${email} already owns the page "${clash.slug}". Merge those first.`,
+        };
+      }
+      await prisma.artistProfile.update({
+        where: { id: artist.id },
+        data: { userId: target.id },
+      });
+      notes.push(`Page reassigned to ${email} — they'll see it in their Studio now.`);
+
+      // A repair is still a page changing hands. It's nearly always the
+      // right call — the artist is locked out and asking for it — but
+      // "nearly always right" is precisely the kind of action that should
+      // leave a trail, because the rare wrong one looks identical while
+      // it's happening.
+      const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+      await recordStaffAction({
+        actor: actorFrom(await auth().catch(() => null), "admin"),
+        action: "artist.page.repair",
+        targetType: "artistProfile",
+        targetId: artist.id,
+        targetOwnerId: target.id,
+        summary: `Relinked the ${artist.displayName} page to ${email} (account repair)`,
+      });
+    } else {
+      notes.push(`${email} already owns this page.`);
+    }
+  }
+
+  if (instagram) {
+    await prisma.artistProfile.update({
+      where: { id: artist.id },
+      data: { instagram },
+    });
+    notes.push(`Instagram set to @${instagram}.`);
+  }
+
+  revalidatePath(`/artists/${slug}`);
+  revalidatePath("/admin");
+  return { ok: true, note: notes.join(" ") || "No changes — fill the target email or a new handle." };
+}
+
+// ---------- Gallery Run (admin-only): outreach to the rooms that
+// decide what counts as art ----------
+
+export type GalleryScoutResult = ActionResult & { added?: number; scanned?: number };
+
+/**
+ * Sweep a city or zip for galleries worth showing this work to.
+ *
+ * Runs every search angle rather than one, because "contemporary gallery"
+ * and "gallery accepting submissions" surface almost disjoint sets and the
+ * second one is where the yes lives. placeId dedupes the overlap.
+ */
+export async function scoutGalleries(
+  _prev: GalleryScoutResult | null,
+  formData: FormData
+): Promise<GalleryScoutResult> {
+  await requireAdmin();
+  const where = String(formData.get("where") ?? "").trim();
+  if (where.length < 2) return { ok: false, error: "Enter a city or zip to scan." };
+
+  try {
+    const { scanGalleries } = await import("@/lib/galleryOutreach");
+    const results = await scanGalleries(where);
+    const added = results.reduce((n, r) => n + r.saved, 0);
+    const scanned = results.reduce((n, r) => n + r.found, 0);
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      added,
+      scanned,
+      note: added
+        ? `Found ${scanned} places across ${results.length} searches, ${added} new galleries staged.`
+        : `Found ${scanned} places — all of them already on the board.`,
+    };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Gallery scan failed." };
+  }
+}
+
+/**
+ * Record that a gallery was actually contacted.
+ *
+ * The queue is computed from the follow-up clock, so a send that isn't
+ * recorded means the same gallery resurfaces tomorrow and gets pitched
+ * twice — which is worse than not pitching at all.
+ */
+export async function galleryTouchAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "") || undefined;
+  if (!id) return;
+  const { markGalleryTouched } = await import("@/lib/galleryOutreach");
+  await markGalleryTouched(id, status);
+  revalidatePath("/admin");
+}
+
+/**
+ * Plain-form wrapper for the gallery scan.
+ *
+ * A <form action> handler must return void; scoutGalleries returns a
+ * result object for useActionState callers. Same split the commission
+ * queue needed — one action, two call shapes.
+ */
+export async function scoutGalleriesAction(formData: FormData): Promise<void> {
+  await scoutGalleries(null, formData);
+}
+
+// ---- Reseller desk: house inventory ------------------------------------
+//
+// These rows are our own capital, so the write path is stricter than the
+// rest of the admin panel. Cost basis is required and must be positive:
+// an item with no cost silently reports infinite margin everywhere
+// downstream, and a P&L that flatters itself is worse than none.
+
+/**
+ * Dollars in a text field to integer cents. Returns null for blank so a
+ * missing optional price stays missing, rather than becoming a very
+ * confident $0.00 — the distinction matters on every money field here.
+ */
+function dollarsToCents(raw: FormDataEntryValue | null): number | null {
+  const s = String(raw ?? "").trim().replace(/[$,]/g, "");
+  if (!s) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100);
+}
+
+/** Add or edit a pair on the shelf. */
+export async function saveInventoryItem(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  const size = String(formData.get("size") ?? "").trim();
+  const sku = String(formData.get("sku") ?? "").trim();
+  const brand = String(formData.get("brand") ?? "").trim();
+  const condition = String(formData.get("condition") ?? "DS");
+  const acquiredFrom = String(formData.get("acquiredFrom") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const imageUrl = String(formData.get("imageUrl") ?? "").trim();
+
+  if (!name || !size) return { ok: false, error: "Name and size are required." };
+  if (!["DS", "VNDS", "USED"].includes(condition)) return { ok: false, error: "Unknown condition." };
+
+  const costCents = dollarsToCents(formData.get("cost"));
+  if (costCents === null || costCents <= 0) {
+    return { ok: false, error: "Cost basis is required — every margin on the desk is computed from it." };
+  }
+  const listCents = dollarsToCents(formData.get("listPrice"));
+
+  const acquiredRaw = String(formData.get("acquiredAt") ?? "").trim();
+  const acquiredAt = acquiredRaw ? new Date(`${acquiredRaw}T12:00:00Z`) : undefined;
+  if (acquiredAt && Number.isNaN(acquiredAt.getTime())) {
+    return { ok: false, error: "Acquired date isn't a real date." };
+  }
+
+  // Link to the catalog when the SKU matches — that link is what makes
+  // live comps and lower-of-cost-or-market valuation possible.
+  const catalogShoeId = sku
+    ? (await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } }))?.id ?? null
+    : null;
+
+  const publicListed = formData.get("publicListed") === "on";
+  const data = {
+    name,
+    size,
+    sku: sku || null,
+    brand: brand || null,
+    condition,
+    costCents,
+    listPriceCents: listCents,
+    acquiredFrom: acquiredFrom || null,
+    notes: notes || null,
+    imageUrl: imageUrl || null,
+    catalogShoeId,
+    publicListed,
+    // Listing a pair starts its days-on-market clock. Only stamp it the
+    // first time, so re-saving an already-listed pair doesn't reset the
+    // clock and make aging stock look fresh.
+    ...(listCents !== null ? { status: "LISTED" } : {}),
+    ...(acquiredAt ? { acquiredAt } : {}),
+  };
+
+  if (id) {
+    const existing = await prisma.inventoryItem.findUnique({ where: { id }, select: { listedAt: true } });
+    await prisma.inventoryItem.update({
+      where: { id },
+      data: { ...data, ...(listCents !== null && !existing?.listedAt ? { listedAt: new Date() } : {}) },
+    });
+  } else {
+    await prisma.inventoryItem.create({
+      data: { ...data, ...(listCents !== null ? { listedAt: new Date() } : {}) },
+    });
+  }
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Record a sale. This is the write that turns a guess into a number. */
+export async function sellInventoryItem(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, error: "Which pair?" };
+
+  const soldPriceCents = dollarsToCents(formData.get("soldPrice"));
+  if (soldPriceCents === null || soldPriceCents <= 0) {
+    return { ok: false, error: "What did it actually sell for?" };
+  }
+  const channel = String(formData.get("soldChannel") ?? "other");
+  // The fee is pre-filled from the channel's published rate, but what
+  // the operator types wins. An estimate that silently overwrites the
+  // real number is how a ledger stops being usable as evidence.
+  const typedFee = dollarsToCents(formData.get("fee"));
+  const feeCents = typedFee ?? estimateFeeCents(soldPriceCents, channel);
+  const shipCents = dollarsToCents(formData.get("ship")) ?? 0;
+
+  const soldRaw = String(formData.get("soldAt") ?? "").trim();
+  const soldAt = soldRaw ? new Date(`${soldRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(soldAt.getTime())) return { ok: false, error: "Sold date isn't a real date." };
+
+  await prisma.inventoryItem.update({
+    where: { id },
+    data: {
+      status: "SOLD",
+      soldPriceCents,
+      soldChannel: channel,
+      feeCents,
+      shipCents,
+      soldAt,
+      // A sold pair leaves the storefront immediately. Nothing worse
+      // than taking money for a pair that's already gone.
+      publicListed: false,
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/available");
+  return { ok: true };
+}
+
+/** Pull a pair off the shelf entirely (returned, kept, written off). */
+export async function removeInventoryItem(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  await prisma.inventoryItem.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/admin");
+}
+
+/** Show or hide a pair on our own storefront, without touching anything else. */
+export async function toggleInventoryListing(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const item = await prisma.inventoryItem.findUnique({
+    where: { id },
+    select: { publicListed: true, listPriceCents: true, listedAt: true },
+  });
+  if (!item) return;
+  // A pair with no price can't go on the storefront — it would render as
+  // a buyable item with nothing to charge.
+  if (!item.publicListed && item.listPriceCents === null) return;
+  await prisma.inventoryItem.update({
+    where: { id },
+    data: {
+      publicListed: !item.publicListed,
+      ...(!item.publicListed && !item.listedAt ? { listedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/available");
+}
+
+// ---- Contacts: an artist's own customer list ---------------------------
+
+/** The signed-in artist, or null. Contacts are per-artist, always. */
+async function currentArtist() {
+  const session = await auth();
+  if (!session?.user?.id) return null;
+  return prisma.artistProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { id: true, status: true },
+  });
+}
+
+/**
+ * Import a contacts CSV.
+ *
+ * Re-importing the same file updates rather than duplicates, and every
+ * row that couldn't be used comes back with a reason and its real line
+ * number — a silent import that drops a quarter of someone's list is
+ * how a maker loses customers without ever knowing it happened.
+ */
+export async function importContactsAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") {
+    return { ok: false, error: "Artist accounts only." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose a CSV exported from your phone, Gmail, or Shopify." };
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    return { ok: false, error: "That file is over 5MB — split it in half and import twice." };
+  }
+
+  const { parseContacts, importContacts } = await import("@/lib/contacts");
+  const report = parseContacts(await file.text());
+  if (report.contacts.length === 0) {
+    return {
+      ok: false,
+      error: report.skipped[0]?.reason ?? "No contacts found in that file.",
+    };
+  }
+
+  const result = await importContacts(artist.id, report);
+  revalidatePath("/studio/contacts");
+
+  const parts = [
+    `${result.created} added`,
+    result.updated > 0 ? `${result.updated} updated` : null,
+    result.skipped.length > 0 ? `${result.skipped.length} skipped` : null,
+  ].filter(Boolean);
+  return { ok: true, note: parts.join(", ") };
+}
+
+/** Pull the artist's confirmed sales into the contact list as real customers. */
+export async function syncContactsAction(): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return;
+  const { syncContactsFromSales } = await import("@/lib/contacts");
+  await syncContactsFromSales(artist.id);
+  revalidatePath("/studio/contacts");
+}
+
+/** Add or edit one contact by hand. */
+export async function saveContactAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") {
+    return { ok: false, error: "Artist accounts only." };
+  }
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { ok: false, error: "A contact needs a name." };
+
+  const { looksLikeEmail, normalizePhone, normalizeHandle } = await import("@/lib/contacts");
+  const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (rawEmail && !looksLikeEmail(rawEmail)) {
+    return { ok: false, error: "That email doesn't look right." };
+  }
+
+  const data = {
+    name: name.slice(0, 120),
+    email: rawEmail || null,
+    phone: normalizePhone(String(formData.get("phone") ?? "")),
+    social: normalizeHandle(String(formData.get("social") ?? "")),
+    city: String(formData.get("city") ?? "").trim().slice(0, 80) || null,
+    notes: String(formData.get("notes") ?? "").trim().slice(0, 2000) || null,
+    // Consent is a checkbox the artist ticks knowingly, never a default
+    // and never inherited from a file.
+    emailOptIn: formData.get("emailOptIn") === "on",
+  };
+
+  if (id) {
+    // Scoped to this artist: without the artistId in the where clause,
+    // any artist could edit any other artist's contact by guessing an id.
+    const owned = await prisma.contact.findFirst({
+      where: { id, artistId: artist.id },
+      select: { id: true },
+    });
+    if (!owned) return { ok: false, error: "Not your contact." };
+    await prisma.contact.update({ where: { id }, data });
+  } else {
+    const clash = data.email
+      ? await prisma.contact.findUnique({
+          where: { artistId_email: { artistId: artist.id, email: data.email } },
+          select: { id: true },
+        })
+      : null;
+    if (clash) return { ok: false, error: "You already have a contact with that email." };
+    await prisma.contact.create({ data: { ...data, artistId: artist.id, source: "manual" } });
+  }
+
+  revalidatePath("/studio/contacts");
+  return { ok: true };
+}
+
+/** Mark that you spoke to someone today — the follow-up clock resets. */
+export async function touchContactAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("id") ?? "");
+  await prisma.contact.updateMany({
+    where: { id, artistId: artist.id },
+    data: { lastContactAt: new Date() },
+  });
+  revalidatePath("/studio/contacts");
+}
+
+/** Delete a contact. Scoped, so it can only ever be one of yours. */
+export async function deleteContactAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("id") ?? "");
+  await prisma.contact.deleteMany({ where: { id, artistId: artist.id } });
+  revalidatePath("/studio/contacts");
+}
+
+// ---- Handoff: chasing an unclaimed sale --------------------------------
+
+/**
+ * Re-send a buyer their claim link.
+ *
+ * Rate-limited per sale rather than per artist, so chasing three
+ * different buyers on the same day is fine but hammering one of them
+ * isn't. Uses the check/spend split: a mail that fails to send costs no
+ * budget, because the artist got nothing for it.
+ */
+export async function resendClaimLink(formData: FormData): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const saleId = String(formData.get("saleId") ?? "");
+  if (!saleId) return;
+
+  const sale = await prisma.sale.findFirst({
+    where: {
+      id: saleId,
+      status: "PENDING",
+      // Only the seller — the artist who recorded it, or whoever owned
+      // the piece at the time. Without this, any signed-in account could
+      // spray claim links for sales that aren't theirs.
+      OR: [{ sellerId: session.user.id }, { submission: { artist: { userId: session.user.id } } }],
+    },
+    select: {
+      id: true,
+      buyerEmail: true,
+      priceCents: true,
+      submission: { select: { title: true, artist: { select: { displayName: true } } } },
+    },
+  });
+  if (!sale) return;
+
+  const WINDOW = 24 * 60 * 60 * 1000;
+  if (!checkAttempt("claim-resend", saleId, 2, WINDOW).ok) return;
+
+  const base = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const seller = sale.submission.artist?.displayName ?? "The seller";
+  const { buyerClaimEmail, claimUrl } = await import("@/lib/handoff");
+  const { delivered } = await sendMail({
+    to: sale.buyerEmail,
+    ...buyerClaimEmail({
+      title: sale.submission.title,
+      sellerName: seller,
+      priceCents: sale.priceCents,
+      claimUrl: claimUrl(sale.id, base),
+      reminder: true,
+    }),
+  });
+
+  if (delivered) spendAttempt("claim-resend", saleId, WINDOW);
+  revalidatePath("/studio");
+}
+
+// ---- CRM: timeline, tasks, and the contact record ----------------------
+
+/** Assert the signed-in artist owns this contact. Never trust an id. */
+async function ownedContact(contactId: string) {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return null;
+  const c = await prisma.contact.findFirst({
+    where: { id: contactId, artistId: artist.id },
+    select: { id: true, artistId: true },
+  });
+  return c;
+}
+
+/** Log a call, a DM, a note — whatever just happened. */
+export async function logActivityAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const contactId = String(formData.get("contactId") ?? "");
+  const owned = await ownedContact(contactId);
+  if (!owned) return { ok: false, error: "Not your contact." };
+
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return { ok: false, error: "Write what happened." };
+
+  const kind = String(formData.get("kind") ?? "NOTE");
+  const { ACTIVITY_KINDS, logActivity } = await import("@/lib/crm");
+  if (!(ACTIVITY_KINDS as readonly string[]).includes(kind)) {
+    return { ok: false, error: "Unknown activity type." };
+  }
+
+  // Backdating is allowed on purpose: somebody writing up yesterday's
+  // call needs yesterday's date, or the timeline quietly lies.
+  const whenRaw = String(formData.get("occurredAt") ?? "").trim();
+  const occurredAt = whenRaw ? new Date(`${whenRaw}T12:00:00Z`) : new Date();
+  if (Number.isNaN(occurredAt.getTime())) return { ok: false, error: "That date isn't real." };
+
+  await logActivity({
+    contactId,
+    kind: kind as Parameters<typeof logActivity>[0]["kind"],
+    body,
+    occurredAt,
+  });
+  revalidatePath(`/studio/contacts/${contactId}`);
+  return { ok: true };
+}
+
+/** Set a follow-up with a date on it. */
+export async function addTaskAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const contactId = String(formData.get("contactId") ?? "");
+  const owned = await ownedContact(contactId);
+  if (!owned) return { ok: false, error: "Not your contact." };
+
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return { ok: false, error: "What's the follow-up?" };
+  const dueRaw = String(formData.get("dueAt") ?? "").trim();
+  const dueAt = dueRaw ? new Date(`${dueRaw}T12:00:00Z`) : new Date(Date.now() + 7 * 86400000);
+  if (Number.isNaN(dueAt.getTime())) return { ok: false, error: "That date isn't real." };
+
+  await prisma.contactTask.create({
+    data: { contactId, title: title.slice(0, 200), dueAt },
+  });
+  revalidatePath(`/studio/contacts/${contactId}`);
+  revalidatePath("/studio/contacts");
+  return { ok: true };
+}
+
+/** Tick a follow-up off. Scoped through the contact, never by task id alone. */
+export async function completeTaskAction(formData: FormData): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist) return;
+  const id = String(formData.get("taskId") ?? "");
+  await prisma.contactTask.updateMany({
+    where: { id, contact: { artistId: artist.id } },
+    data: { doneAt: new Date() },
+  });
+  revalidatePath("/studio/contacts");
+}
+
+/** Pull sales, claims and offers onto every contact's timeline. */
+export async function syncTimelineAction(): Promise<void> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return;
+  const { syncTimelineFromPlatform } = await import("@/lib/crm");
+  await syncTimelineFromPlatform(artist.id);
+  revalidatePath("/studio/contacts");
+}
+
+// ---- Ownership: answering the question, and verifying the answer -------
+
+/**
+ * Answer "who has this?" for a piece already uploaded.
+ *
+ * Powers the grandfathering backfill — every piece that existed before
+ * the question did is UNKNOWN, and this is how that backlog gets cleared
+ * two seconds at a time.
+ */
+export async function setOwnershipAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const artist = await currentArtist();
+  if (!artist || artist.status !== "APPROVED") return { ok: false, error: "Artist accounts only." };
+
+  const id = String(formData.get("submissionId") ?? "");
+  // Scoped in the query. A submission id in a form is attacker input.
+  //
+  // The scope is "made it AND still holds it", and that matters more here
+  // than anywhere else, because naming an owner is one step from becoming
+  // one: /own/[id] lets the named address confirm, and confirming writes
+  // `ownerId`. On a piece already transferred on-platform but not yet
+  // email-verified, re-pointing ownerEmail was a way for the maker to
+  // hand a collector's pair to an address of their choosing. An
+  // already-verified record is frozen too — correcting one is a support
+  // conversation, not a form post.
+  const piece = await prisma.submission.findFirst({
+    where: { ...stillHeldBy(artist.id, id), ownerVerifiedAt: null },
+    select: { id: true, title: true, ownerEmail: true },
+  });
+  if (!piece) {
+    const known = await prisma.submission.findFirst({
+      where: { id, artistId: artist.id },
+      select: { ownerVerifiedAt: true },
+    });
+    if (!known) return { ok: false, error: "Not your piece." };
+    return {
+      ok: false,
+      error: known.ownerVerifiedAt
+        ? "This piece's owner has already confirmed, so the record is locked. Message us if it needs correcting."
+        : PIECE_HAS_MOVED_ON,
+    };
+  }
+
+  const { validateOwnership, ownerVerifyEmail } = await import("@/lib/ownership");
+  const res = validateOwnership(String(formData.get("ownershipStatus") ?? ""), {
+    name: String(formData.get("ownerName") ?? ""),
+    email: String(formData.get("ownerEmail") ?? ""),
+    phone: String(formData.get("ownerPhone") ?? ""),
+    address: String(formData.get("ownerAddress") ?? ""),
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  await prisma.submission.update({ where: { id: piece.id }, data: res.data });
+
+  // Only mail a newly-named owner. Re-saving the same answer shouldn't
+  // re-badger somebody who already got the letter.
+  const email = res.data.ownerEmail as string | null;
+  if (email && email !== piece.ownerEmail) {
+    const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+    const me = await prisma.artistProfile.findUnique({
+      where: { id: artist.id }, select: { displayName: true },
+    });
+    sendMail({
+      to: email,
+      ...ownerVerifyEmail({
+        title: piece.title,
+        artistName: me?.displayName ?? "The artist",
+        verifyUrl: `${site}/own/${piece.id}`,
+      }),
+    }).catch(() => {});
+  }
+
+  revalidatePath("/studio");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/**
+ * Fold duplicate listings of one shoe into a single piece.
+ *
+ * Staff acting on an artist's work, so it goes in the log and shows up in
+ * their Studio — consolidating somebody's catalogue is exactly the kind of
+ * helpful edit that should never happen silently.
+ */
+export async function mergePiecesAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const survivorId = String(formData.get("survivorId") ?? "");
+  const duplicateIds = formData.getAll("duplicateId").map(String).filter(Boolean);
+
+  const before = await prisma.submission.findUnique({
+    where: { id: survivorId },
+    select: { title: true, artist: { select: { userId: true, displayName: true } } },
+  });
+
+  const { mergePieces } = await import("@/lib/dupes");
+  const res = await mergePieces(survivorId, duplicateIds);
+  if (!res.ok) return { ok: false, error: res.error };
+
+  if (before?.artist?.userId) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "piece.merge",
+      targetType: "submission",
+      targetId: survivorId,
+      targetOwnerId: before.artist.userId,
+      summary:
+        `Merged ${res.retired} duplicate listing${res.retired === 1 ? "" : "s"} into ` +
+        `"${before.title}"${res.photosAdded > 0 ? `, keeping ${res.photosAdded} more photo${res.photosAdded === 1 ? "" : "s"}` : ""}`,
+    });
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  revalidatePath("/studio");
+  return {
+    ok: true,
+    note:
+      `Merged. ${res.retired} duplicate${res.retired === 1 ? "" : "s"} retired (not deleted — ` +
+      `their votes and history are intact), ${res.photosAdded} extra photo${res.photosAdded === 1 ? "" : "s"} kept.`,
+  };
+}
+
+/** Admin confirms ownership by hand — after a call, a DM, a receipt. */
+export async function verifyOwnerAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("submissionId") ?? "");
+  if (!id) return;
+  await prisma.submission.updateMany({
+    where: { id, ownerVerifiedAt: null },
+    data: { ownerVerifiedAt: new Date(), ownerVerifiedBy: "admin" },
+  });
+  revalidatePath("/admin");
+}
+
+/** Re-send the owner their confirmation link. Capped per piece per day. */
+export async function resendOwnerVerifyAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = String(formData.get("submissionId") ?? "");
+  const piece = await prisma.submission.findUnique({
+    where: { id },
+    select: { id: true, title: true, ownerEmail: true, ownerVerifiedAt: true, artist: { select: { displayName: true } } },
+  });
+  if (!piece?.ownerEmail || piece.ownerVerifiedAt) return;
+
+  const WINDOW = 24 * 60 * 60 * 1000;
+  if (!checkAttempt("owner-verify", id, 2, WINDOW).ok) return;
+
+  const { ownerVerifyEmail } = await import("@/lib/ownership");
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
+  const { delivered } = await sendMail({
+    to: piece.ownerEmail,
+    ...ownerVerifyEmail({
+      title: piece.title,
+      artistName: piece.artist?.displayName ?? "The artist",
+      verifyUrl: `${site}/own/${piece.id}`,
+    }),
+  });
+  if (delivered) spendAttempt("owner-verify", id, WINDOW);
+  revalidatePath("/admin");
+}
+
+/** The owner confirms. This is the write that turns a claim into a fact. */
+export async function confirmOwnershipAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in to confirm." };
+
+  const id = String(formData.get("submissionId") ?? "");
+  const piece = await prisma.submission.findUnique({
+    where: { id },
+    select: {
+      id: true, ownershipStatus: true, ownerVerifiedAt: true, artistId: true, title: true,
+      ownerEmail: true,
+    },
+  });
+  if (!piece || piece.ownershipStatus !== "SOLD") return { ok: false, error: "Nothing to confirm." };
+  if (piece.ownerVerifiedAt) return { ok: true };
+
+  // The confirmation must come from the person the artist actually named.
+  //
+  // Without this the /own/[id] URL was a bearer token for a one-of-one:
+  // anyone signed in who received a forwarded link took ownership, got a
+  // public collector page, and rewrote the provenance of somebody else's
+  // piece — while the page above it promised "Not yours? Close this and
+  // nothing happens." It did not do nothing.
+  //
+  // lib/ownership.ts lowercases ownerEmail on write, so this compares
+  // like for like.
+  const signedInEmail = (session.user.email ?? "").trim().toLowerCase();
+  if (!piece.ownerEmail || piece.ownerEmail !== signedInEmail) {
+    return {
+      ok: false,
+      error:
+        "This confirmation is waiting on a different email address. Sign in with the address the seller sent it to, or ask them to re-send it to this one.",
+    };
+  }
+
+  const { ensureCollectorSlug } = await import("@/lib/artists");
+
+  // Ownership moving and verification landing are one write. A half-done
+  // handover — verified but with no owner, or owned but unverified — is
+  // worse than neither, because the public page would then disagree with
+  // the record.
+  await prisma.$transaction([
+    prisma.submission.update({
+      where: { id: piece.id },
+      data: {
+        ownerId: session.user.id,
+        ownerVerifiedAt: new Date(),
+        ownerVerifiedBy: "email",
+      },
+    }),
+  ]);
+  await ensureCollectorSlug(session.user.id).catch(() => {});
+
+  revalidatePath(`/own/${piece.id}`);
+  revalidatePath("/profile");
+  revalidatePath("/market");
+  return { ok: true };
 }

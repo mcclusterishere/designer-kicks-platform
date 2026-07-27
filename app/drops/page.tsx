@@ -63,6 +63,11 @@ export default async function DropsPage({
     }),
   ]);
 
+  // Every month that actually holds a drop, so the switcher can point at
+  // the archive instead of leaving it behind blind arrows.
+  const { monthsWithDrops } = await import("@/lib/dropHistory");
+  const loaded = await monthsWithDrops();
+
   // The radar: confirmed-coming drops whose dates aren't locked yet
   // (dropAt null). They graduate onto the calendar automatically the
   // moment a verified date lands (manual or the nightly SKU sync).
@@ -161,6 +166,38 @@ export default async function DropsPage({
           ›
         </Link>
       </div>
+
+      {/* Which months actually hold something.
+          The arrows alone made browsing a guess — step back far enough and
+          you hit empty month after empty month with no way to know whether
+          anything is further back. This says where the drops are, so the
+          archive is one tap instead of ten. */}
+      {loaded.length > 1 && (
+        <nav aria-label="Months with drops" className="mt-3 overflow-x-auto">
+          <ul className="flex gap-1.5 pb-1">
+            {loaded.map((mo) => {
+              const here = mo.month === `${year}-${String(month + 1).padStart(2, "0")}`;
+              const [y, mm] = mo.month.split("-");
+              return (
+                <li key={mo.month}>
+                  <Link
+                    href={`/drops?m=${mo.month}`}
+                    aria-current={here ? "page" : undefined}
+                    className={`block whitespace-nowrap rounded-full border px-3 py-1.5 tag transition ${
+                      here
+                        ? "border-volt bg-volt/10 text-volt"
+                        : "border-edge text-smoke hover:border-volt hover:text-white"
+                    }`}
+                  >
+                    {monthLabel(Number(y), Number(mm) - 1).replace(" ", " ’").slice(0, 9)}
+                    <span className="ml-1 opacity-60">{mo.count}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
 
       {/* The calendar — tap any marked day for that date's drop sheet */}
       <DropCalendar
@@ -277,7 +314,7 @@ export default async function DropsPage({
 
       <p className="mt-8 text-center text-sm text-smoke">
         Hunting a specific pair?{" "}
-        <Link href="/catalog" className="text-volt underline">Browse the full shoe catalog →</Link>
+        <Link href="/market?board=catalog" className="text-volt underline">Browse the full shoe catalog →</Link>
       </p>
 
       <div className="mt-8 rounded-2xl border border-edge bg-surface p-4 text-center">

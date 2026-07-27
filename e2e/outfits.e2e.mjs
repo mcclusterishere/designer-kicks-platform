@@ -3,7 +3,7 @@
 // renders and takes votes, and the admin outreach module invites a
 // cold lead with a claim link.
 import { PrismaClient } from "@prisma/client";
-import { BASE, SHOTS, ADMIN_PASSWORD, makeChecker, launchBrowser } from "./helpers.mjs";
+import { BASE, SHOTS, ADMIN_PASSWORD, makeChecker, launchBrowser, registerAccount } from "./helpers.mjs";
 
 try { process.loadEnvFile(); } catch {}
 const prisma = new PrismaClient();
@@ -32,11 +32,7 @@ const page = await ctx.newPage();
 
 // ---------- Fan registers and gets a closet ----------
 await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
-await page.fill("#name", "Outfit Fan");
-await page.fill("#email", FAN_EMAIL);
-await page.fill("#password", "fitcheck99");
-await page.check("#age13");
-await page.getByRole("button", { name: "Create Account" }).click();
+await registerAccount(page, { name: "Outfit Fan", email: FAN_EMAIL, password: "fitcheck99" });
 await page.waitForURL("**/profile", { timeout: 15000 });
 const fan = await prisma.user.findUnique({ where: { email: FAN_EMAIL } });
 check("fan account created", Boolean(fan));

@@ -28,16 +28,19 @@ export async function finalizeExpiredBattles(force = false) {
   });
 
   for (const battle of expired) {
+    // Account votes only. A win is worth 1000 points of Heat Score, so
+    // deciding one on device keys would hand the league to whoever clears
+    // cookies fastest. Guest votes still show in the public split.
     // Counted by corner, not by submission: in a custom-vs-OG battle the
     // B corner is a retail shoe with no submission row to tally against.
     const [aVotes, bVotes] = await Promise.all([
-      prisma.vote.count({ where: { battleId: battle.id, side: "A" } }),
-      prisma.vote.count({ where: { battleId: battle.id, side: "B" } }),
+      prisma.vote.count({ where: { battleId: battle.id, side: "A", guest: false } }),
+      prisma.vote.count({ where: { battleId: battle.id, side: "B", guest: false } }),
     ]);
     const winnerSide = aVotes === bVotes ? null : aVotes > bVotes ? "A" : "B";
-    // winnerId stays the submission-level answer, so the heat chart and
-    // the tournament brackets keep reading it unchanged. It is null when
-    // the OG takes it — OG culture doesn't collect a customizer's trophy.
+    // winnerId stays the submission-level answer so the Heat List and the
+    // tournament brackets read it unchanged. Null when the OG takes it —
+    // OG culture doesn't collect a customizer's trophy.
     const winnerId =
       winnerSide === "A" ? battle.subAId : winnerSide === "B" ? battle.subBId : null;
     await prisma.battle.update({
@@ -70,9 +73,14 @@ export type HeatEntry = {
  */
 export async function getHeatList(): Promise<HeatEntry[]> {
   const submissions = await prisma.submission.findMany({
-    where: { status: "APPROVED" },
+    // Attributable artist work only. artistId is SetNull on delete, so a
+    // removed artist leaves orphaned pieces behind — those aren't customs
+    // anyone can be credited for and don't belong on the league table.
+    where: { status: "APPROVED", artistId: { not: null } },
     include: {
-      _count: { select: { votes: true, battlesWon: true } },
+      // Ranked on account votes only — see castVote. The `votes` relation
+      // filter keeps guests out of the score without a second query.
+      _count: { select: { votes: { where: { guest: false } }, battlesWon: true } },
       battlesAsA: { select: { status: true } },
       battlesAsB: { select: { status: true } },
       artist: { select: { slug: true } },
@@ -115,17 +123,20 @@ export async function getBattleWithVotes(battleId: string) {
   });
   if (!battle) return null;
 
-  const [aVotes, bVotes] = await Promise.all([
-    prisma.vote.count({ where: { battleId: battle.id, side: "A" } }),
-    prisma.vote.count({ where: { battleId: battle.id, side: "B" } }),
+  // By corner, so the OG's votes count in a custom-vs-OG battle.
+  const [aVotes, bVotes, aGuest, bGuest] = await Promise.all([
+    prisma.vote.count({ where: { battleId: battle.id, side: "A", guest: false } }),
+    prisma.vote.count({ where: { battleId: battle.id, side: "B", guest: false } }),
+    prisma.vote.count({ where: { battleId: battle.id, side: "A", guest: true } }),
+    prisma.vote.count({ where: { battleId: battle.id, side: "B", guest: true } }),
   ]);
-  return { battle, aVotes, bVotes };
+  return { battle, aVotes, bVotes, aGuest, bGuest };
 }
 
 /**
- * The B corner, whichever culture is standing in it — so pages and the
- * API render one shape instead of branching on battle type everywhere.
- * Customs carry an artist; an OG carries the brand that made it.
+ * The B corner, whichever culture is standing in it — so pages render one
+ * shape instead of branching on battle type everywhere. Customs carry an
+ * artist; an OG carries the brand that made it.
  */
 export type BattleSide = {
   kind: "custom" | "og";
@@ -152,25 +163,16 @@ export function sideB(battle: {
   if (battle.type === "CUSTOM_VS_OG" && battle.ogShoe) {
     const og = battle.ogShoe;
     return {
-      kind: "og",
-      id: og.id,
-      title: og.name,
-      byline: og.brand ?? "OG",
-      artistSlug: null,
-      imageUrl: og.imageUrl,
+      kind: "og", id: og.id, title: og.name, byline: og.brand ?? "OG",
+      artistSlug: null, imageUrl: og.imageUrl,
       shoe: og.silhouette ?? og.colorway ?? null,
     };
   }
   if (battle.subB) {
     const s = battle.subB;
     return {
-      kind: "custom",
-      id: s.id,
-      title: s.title,
-      byline: s.artistName,
-      artistSlug: s.artist?.slug ?? null,
-      imageUrl: s.imageUrl,
-      shoe: s.baseShoe,
+      kind: "custom", id: s.id, title: s.title, byline: s.artistName,
+      artistSlug: s.artist?.slug ?? null, imageUrl: s.imageUrl, shoe: s.baseShoe,
     };
   }
   return null;

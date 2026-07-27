@@ -10,6 +10,8 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { AuthError } from "next-auth";
 import type { ActionResult } from "./actions";
+import { checkEmailDomain } from "@/lib/emailDomains";
+import { mayAdoptExistingAccount } from "@/lib/authz";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -21,6 +23,29 @@ async function clientIp(): Promise<string> {
 function validPassword(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters.";
   if (password.length > 100) return "Password is too long.";
+  return null;
+}
+
+/**
+ * The two boxes have to agree — checked here as well as in the browser.
+ *
+ * The form wires the mismatch through setCustomValidity so the browser
+ * refuses to submit, which is the right experience. It is not a
+ * guarantee: anything a client enforces, a client can skip, and a form
+ * post is a form post. Getting this wrong doesn't leak anything, it just
+ * silently sets a password to something the person didn't mean — which on
+ * this platform means an artist locked out of their own catalogue with no
+ * idea why.
+ *
+ * Deliberately tolerant of a MISSING second field rather than requiring
+ * it. Not every caller sets a password through a two-box form, and a
+ * check that hard-fails on absence would break the next one that doesn't.
+ * An empty confirm means "not asked"; a present-and-different one is the
+ * only failure.
+ */
+function passwordsAgree(password: string, confirm: string): string | null {
+  if (confirm === "") return null;
+  if (confirm !== password) return "Those two passwords don't match — check the second box.";
   return null;
 }
 
@@ -36,8 +61,19 @@ export async function registerUser(
 
   if (!name || name.length > 60) return { ok: false, error: "Name is required." };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  // Server-side backstop for the signup typo guard: a domain one
+  // keystroke off gmail/yahoo/etc. is never anyone's real email.
+  const domainCheck = checkEmailDomain(email);
+  if (domainCheck.verdict === "typo") {
+    return {
+      ok: false,
+      error: `That email service doesn't exist — did you mean @${domainCheck.suggestion}?`,
+    };
+  }
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+  const matchErr = passwordsAgree(password, String(formData.get("confirmPassword") ?? ""));
+  if (matchErr) return { ok: false, error: matchErr };
   // COPPA: the service is 13+. The affirmation is required at signup.
   if (!age13) return { ok: false, error: "You must confirm you're at least 13 to create an account." };
   // Membership is the door: every account is an Equity Uprise PMA
@@ -66,6 +102,27 @@ export async function registerUser(
   }
 
   if (existing) {
+    // A staff seat is never adopted by registering.
+    //
+    // `grantEditor` creates a passwordless row with role EDITOR and mails
+    // its holder a set-password link — that link is the door. This form
+    // was a second one: register with a known staff address and the
+    // adoption branch attached a password to the row without touching
+    // `role`, so the account came out of signup already an editor. From
+    // there `outreachInvite` reassigns unclaimed artist pages and hands
+    // back the claim URL, which turns one guessed work address into a
+    // roster takeover.
+    //
+    // Refuse and point at the real door. An editor who genuinely lost
+    // their link uses password recovery, which proves the mailbox.
+    if (!mayAdoptExistingAccount(existing)) {
+      return {
+        ok: false,
+        error:
+          "That email belongs to a Heat Chart staff account. Use the set-password link we sent you, or reset it from the sign-in page — staff accounts can't be created through signup.",
+      };
+    }
+
     // Duplicate info merges, never dead-ends — but only through the
     // verified door. A passwordless shell account exists for every
     // pre-loaded artist page; registering with its email ADOPTS it
@@ -94,12 +151,23 @@ export async function registerUser(
         name,
         passwordHash: await hash(password, 10),
         pmaAcceptedAt: new Date(),
+        // Written, not inherited. The guard above already refused any
+        // non-MEMBER row; stating it here means no future column default
+        // or half-provisioned record can turn signup into a promotion.
+        role: "MEMBER",
         ...(existing.signupSource ? {} : { signupSource }),
       },
     });
   } else {
     await prisma.user.create({
-      data: { name, email, passwordHash: await hash(password, 10), signupSource, pmaAcceptedAt: new Date() },
+      data: {
+        name,
+        email,
+        passwordHash: await hash(password, 10),
+        role: "MEMBER",
+        signupSource,
+        pmaAcceptedAt: new Date(),
+      },
     });
   }
 
@@ -161,6 +229,15 @@ export async function requestPasswordReset(
 ): Promise<ActionResult & { devResetLink?: string }> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  // Server-side backstop for the signup typo guard: a domain one
+  // keystroke off gmail/yahoo/etc. is never anyone's real email.
+  const domainCheck = checkEmailDomain(email);
+  if (domainCheck.verdict === "typo") {
+    return {
+      ok: false,
+      error: `That email service doesn't exist — did you mean @${domainCheck.suggestion}?`,
+    };
+  }
 
   if (!allowAttempt("pwreset", await clientIp(), 5, 15 * 60 * 1000)) {
     return { ok: false, error: "Too many reset requests — try again in 15 minutes." };
@@ -200,6 +277,8 @@ export async function resetPassword(
   const password = String(formData.get("password") ?? "");
   const pwErr = validPassword(password);
   if (pwErr) return { ok: false, error: pwErr };
+  const matchErr = passwordsAgree(password, String(formData.get("confirmPassword") ?? ""));
+  if (matchErr) return { ok: false, error: matchErr };
 
   const row = await prisma.passwordResetToken.findUnique({ where: { token } });
   if (!row || row.expires < new Date()) {

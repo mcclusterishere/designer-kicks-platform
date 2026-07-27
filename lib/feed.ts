@@ -34,22 +34,30 @@ export type FeedItem =
       reactions: number;
       mine: boolean;
       commentCount: number;
-      comments: { id: string; name: string; body: string }[];
+      // Author of the post when it's a claimed artist — lets the
+      // client offer Block; null for house posts.
+      authorUserId: string | null;
+      comments: { id: string; name: string; body: string; userId: string; parentId: string | null }[];
     }
   | {
       type: "battle";
       id: string;
       title: string | null;
       endsAt: string;
-      votes: number;
-      a: { title: string; imageUrl: string; artistName: string };
-      b: { title: string; imageUrl: string; artistName: string };
+      // Per-side submission id (to cast a vote inline) + live vote count
+      // (to reveal the split the moment you pick). myPick = the side this
+      // viewer already voted for, so a revisit shows the result, not the
+      // buttons.
+      a: { id: string; title: string; imageUrl: string; videoUrl: string | null; artistName: string; votes: number };
+      b: { id: string; title: string; imageUrl: string; videoUrl: string | null; artistName: string; votes: number };
+      myPick: string | null;
     }
   | {
       type: "piece";
       id: string;
       title: string;
       imageUrl: string;
+      videoUrl: string | null;
       artistName: string;
       artistSlug: string | null;
       brand: string | null;
@@ -59,6 +67,10 @@ export type FeedItem =
       // The viewer's own Rate-game score on this piece (null = hasn't
       // rated — the feed card shows the flames to vote right there).
       myStars: number | null;
+      // Why this landed in your feed — "Because you follow …" / "Your
+      // brand: …" — the algorithm saying itself out loud. null = no
+      // personal reason (it's here on merit).
+      why: string | null;
     }
   | {
       type: "question";
@@ -104,19 +116,27 @@ export async function getFeed(
   const now = Date.now();
   const since = new Date(now - 90 * 24 * 3_600_000);
 
-  const [posts, battles, pieces, questions, articles, follows, viewer, polls] = await Promise.all([
+  const [posts, battles, pieces, questions, articles, follows, viewer, polls, blocks] = await Promise.all([
     prisma.feedPost.findMany({
       where: { OR: [{ pinned: true }, { createdAt: { gte: since } }] },
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
-        artist: { select: { displayName: true, slug: true } },
+        artist: { select: { displayName: true, slug: true, userId: true } },
         _count: { select: { reactions: true, comments: true } },
         reactions: userId ? { where: { userId }, select: { id: true } } : false,
         comments: {
           orderBy: { createdAt: "desc" },
-          take: 2,
-          include: { user: { select: { name: true } } },
+          take: 4,
+          include: {
+            user: { select: { id: true, name: true } },
+            // One level of replies, oldest first so a thread reads in order.
+            replies: {
+              orderBy: { createdAt: "asc" },
+              take: 3,
+              include: { user: { select: { id: true, name: true } } },
+            },
+          },
         },
       },
     }),
@@ -125,8 +145,11 @@ export async function getFeed(
       include: {
         subA: { include: { artist: { select: { displayName: true } } } },
         subB: { include: { artist: { select: { displayName: true } } } },
-        ogShoe: { select: { name: true, brand: true, imageUrl: true } },
-        _count: { select: { votes: true } },
+        ogShoe: { select: { id: true, name: true, brand: true, imageUrl: true } },
+        // Vote rows (light: two ids each) let us split the tally per side
+        // and spot whether THIS viewer already voted — the inline card
+        // reveals the result instead of the buttons for them.
+        votes: { select: { side: true, submissionId: true, userId: true } },
       },
       take: 25,
     }),
@@ -172,7 +195,13 @@ export async function getFeed(
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
+    // Members this viewer has blocked — their posts and comments are
+    // filtered out below (App Store UGC requirement).
+    userId
+      ? prisma.userBlock.findMany({ where: { blockerId: userId }, select: { blockedId: true } })
+      : Promise.resolve([]),
   ]);
+  const blocked = new Set(blocks.map((b) => b.blockedId));
 
   const followed = new Set(follows.map((f) => f.artistId));
   const favBrands = new Set(
@@ -185,6 +214,8 @@ export async function getFeed(
   const scored: { score: number; item: FeedItem }[] = [];
 
   for (const p of posts) {
+    // A blocked member's posts never reach the blocker's feed.
+    if (p.artist?.userId && blocked.has(p.artist.userId)) continue;
     scored.push({
       score:
         (p.pinned ? 1000 : 60) +
@@ -205,34 +236,69 @@ export async function getFeed(
         reactions: p._count.reactions,
         mine: Array.isArray(p.reactions) && p.reactions.length > 0,
         commentCount: p._count.comments,
+        authorUserId: p.artist?.userId ?? null,
+        // Parents in chronological order, each followed by its replies, so
+        // the flat list the client renders still reads as a thread.
         comments: p.comments
           .slice()
           .reverse()
-          .map((c) => ({ id: c.id, name: c.user.name ?? "A fan", body: c.body })),
+          .filter((c) => !blocked.has(c.user.id))
+          .flatMap((c) => [
+            { id: c.id, name: c.user.name ?? "A fan", body: c.body, userId: c.user.id, parentId: null },
+            ...c.replies
+              .filter((r) => !blocked.has(r.user.id))
+              .map((r) => ({
+                id: r.id,
+                name: r.user.name ?? "A fan",
+                body: r.body,
+                userId: r.user.id,
+                parentId: c.id,
+              })),
+          ]),
       },
     });
   }
 
   for (const b of battles) {
+    // By corner: a custom-vs-OG battle has no submission in the B slot.
+    const aVotes = b.votes.filter((v) => v.side === "A").length;
+    const bVotes = b.votes.filter((v) => v.side === "B").length;
+    // Whichever culture stands in the B corner, flattened to one shape.
+    const bKey = b.ogShoeId ? "og" : b.subBId ?? "";
+    const bTitle = b.ogShoe?.name ?? b.subB?.title ?? "";
+    const bImage = b.ogShoe?.imageUrl ?? b.subB?.imageUrl ?? "";
+    const bBy = b.ogShoe?.brand ?? b.subB?.artist?.displayName ?? b.subB?.artistName ?? "OG";
+    const mine = userId ? b.votes.find((v) => v.userId === userId) : undefined;
+    const myPick = mine ? (mine.side === "A" ? b.subAId : bKey) : null;
     scored.push({
-      score: 50 + recency(b.createdAt, now) + 6 * Math.log1p(b._count.votes),
+      // A battle you haven't voted on floats up — the feed always keeps a
+      // live matchup in front of you to tap.
+      score:
+        50 +
+        recency(b.createdAt, now) +
+        6 * Math.log1p(aVotes + bVotes) +
+        (userId && !myPick ? 14 : 0),
       item: {
         type: "battle",
         id: b.id,
         title: b.title,
         endsAt: b.endsAt.toISOString(),
-        votes: b._count.votes,
+        myPick,
         a: {
+          id: b.subAId,
           title: b.subA.title,
           imageUrl: b.subA.imageUrl,
+          videoUrl: b.subA.videoUrl,
           artistName: b.subA.artist?.displayName ?? b.subA.artistName,
+          votes: aVotes,
         },
         b: {
-          // custom, or the OG standing in for OG culture
-          title: b.ogShoe?.name ?? b.subB?.title ?? "",
-          imageUrl: b.ogShoe?.imageUrl ?? b.subB?.imageUrl ?? "",
-          artistName:
-            b.ogShoe?.brand ?? b.subB?.artist?.displayName ?? b.subB?.artistName ?? "OG",
+          id: bKey,
+          title: bTitle,
+          imageUrl: bImage,
+          videoUrl: b.ogShoe ? null : b.subB?.videoUrl ?? null,
+          artistName: bBy,
+          votes: bVotes,
         },
       },
     });
@@ -245,8 +311,15 @@ export async function getFeed(
       ? (s.ratings.find((r) => r.userId === userId)?.stars ?? null)
       : null;
     let personal = 0;
-    if (s.artistId && followed.has(s.artistId)) personal += 12;
-    if (brand && favBrands.has(brand.toLowerCase())) personal += 10;
+    let why: string | null = null;
+    if (s.artistId && followed.has(s.artistId)) {
+      personal += 12;
+      why = `Because you follow ${s.artist?.displayName ?? s.artistName}`;
+    }
+    if (brand && favBrands.has(brand.toLowerCase())) {
+      personal += 10;
+      why ??= `Your brand · ${brand}`;
+    }
     // Unrated pieces surface first for this viewer — the feed IS the
     // Rate game now, so it deals you what you haven't scored.
     if (userId && myStars === null) personal += 8;
@@ -262,6 +335,7 @@ export async function getFeed(
         id: s.id,
         title: s.title,
         imageUrl: s.imageUrl,
+        videoUrl: s.videoUrl,
         artistName: s.artist?.displayName ?? s.artistName,
         artistSlug: s.artist?.slug ?? null,
         brand,
@@ -269,6 +343,7 @@ export async function getFeed(
         votes: s._count.votes,
         heat: hs ? { score: hs.score, count: hs.count } : null,
         myStars,
+        why,
       },
     });
   }

@@ -1,26 +1,57 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerUser } from "@/app/account-actions";
 import type { ActionResult } from "@/app/actions";
+import { checkEmailDomain } from "@/lib/emailDomains";
+import PasswordField from "@/components/PasswordField";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
 
-export default function RegisterForm() {
+export default function RegisterForm({ next = "/profile" }: { next?: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     registerUser,
     null
   );
+  const formRef = useRef<HTMLFormElement>(null);
+  // Email-domain guard: typos hard-block with the fix offered; unknown
+  // (self-hosted) domains go through the confirm-it interstitial.
+  const [typo, setTypo] = useState<string | null>(null);
+  const [unknownDomain, setUnknownDomain] = useState<string | null>(null);
+  const [armed, setArmed] = useState(false); // click 1 of 2 inside the card
+  const approved = useRef(false); // set after click 2 — lets submit pass
+
+  function guardSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (approved.current) return; // confirmed custom domain — go
+    const email = String(new FormData(e.currentTarget).get("email") ?? "");
+    const check = checkEmailDomain(email);
+    if (check.verdict === "ok") return;
+    e.preventDefault();
+    if (check.verdict === "typo") {
+      setTypo(check.suggestion);
+    } else {
+      setArmed(false);
+      setUnknownDomain(check.domain);
+    }
+  }
+
+  function applySuggestion() {
+    const input = formRef.current?.elements.namedItem("email") as HTMLInputElement | null;
+    if (input && typo) {
+      input.value = input.value.replace(/@[^@]*$/, `@${typo}`);
+    }
+    setTypo(null);
+  }
 
   // A note means something merged (a pre-loaded page attached, or a
   // claim is pending) — let them read it before moving on. Silent
   // success goes straight through.
   useEffect(() => {
     if (state?.ok && !state.note) {
-      router.push("/profile");
+      router.push(next);
       router.refresh();
     }
   }, [state?.ok, state?.note, router]);
@@ -34,7 +65,7 @@ export default function RegisterForm() {
         <button
           type="button"
           onClick={() => {
-            router.push("/profile");
+            router.push(next);
             router.refresh();
           }}
           className="w-full rounded-lg btn-hard py-3 tag font-bold"
@@ -46,19 +77,77 @@ export default function RegisterForm() {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form ref={formRef} action={formAction} onSubmit={guardSubmit} className="space-y-4">
       <div>
         <label htmlFor="name" className="tag text-smoke">Name</label>
         <input id="name" name="name" required maxLength={60} autoComplete="name" className={inputClass} />
       </div>
       <div>
         <label htmlFor="email" className="tag text-smoke">Email</label>
-        <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          className={inputClass}
+          aria-describedby="email-privacy"
+          onChange={() => {
+            setTypo(null);
+            approved.current = false;
+          }}
+        />
+        {typo && (
+          <div role="alert" className="mt-2 rounded-lg border-2 border-heat bg-heat/10 p-3">
+            <p className="text-sm font-bold text-white">
+              That email service doesn&apos;t exist — looks like a typo.
+            </p>
+            <button
+              type="button"
+              onClick={applySuggestion}
+              className="mt-2 w-full rounded-lg bg-heat py-2.5 tag font-bold text-ink"
+            >
+              Fix it → @{typo}
+            </button>
+          </div>
+        )}
+        {/*
+          Said here, at the field people actually hesitate over, rather than
+          buried in a policy nobody opens mid-signup.
+
+          Deliberately specific instead of a warm blanket like "we respect
+          your privacy". A vague reassurance is worth nothing to somebody
+          deciding whether to hand over the address their whole life runs
+          through — and worse, it's the exact phrasing every company that
+          did sell your data also used. Naming what stays hidden AND what
+          shows is the only version that earns anything.
+
+          Every clause is checked before being written here: no public page
+          renders a member's email (e2e/leaks.e2e.mjs greps the real bytes
+          of every artist page, every collector closet and the claim page
+          for any address); "never sold, never to advertisers" restates
+          /privacy verbatim rather than inventing a new promise; and the
+          name really is public in exactly the places listed — comments,
+          the leaderboards, and a collector closet page.
+        */}
+        <p id="email-privacy" className="mt-2 text-xs leading-relaxed text-smoke">
+          <span aria-hidden="true">🔒</span> Your email is <span className="text-white">never
+          shown to other members</span>, never sold, and never handed to advertisers. It signs
+          you in and lets us reach you about your own pieces — nothing else. The only thing
+          other people see is the name above, and only if you comment, land on a leaderboard,
+          or open a collector closet.{" "}
+          <a href="/privacy" target="_blank" className="text-volt underline">
+            Privacy
+          </a>
+        </p>
       </div>
-      <div>
-        <label htmlFor="password" className="tag text-smoke">Password (8+ characters)</label>
-        <input id="password" name="password" type="password" required minLength={8} autoComplete="new-password" className={inputClass} />
-      </div>
+      <PasswordField
+        label="Password (8+ characters)"
+        autoComplete="new-password"
+        minLength={8}
+        confirm
+        confirmLabel="Type it again"
+      />
       <label htmlFor="age13" className="flex items-start gap-2 text-sm text-smoke">
         <input id="age13" name="age13" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
         <span>
@@ -66,6 +155,11 @@ export default function RegisterForm() {
           children under 13.
         </span>
       </label>
+      {/* The consent sentence itself is left exactly as written — it is a
+          legal agreement and softening the words someone is agreeing TO
+          would be the wrong kind of clarity. What was missing is the
+          plain-English answer to "what am I actually signing?", which is
+          a fair question to have and a bad one to have to guess at. */}
       <label htmlFor="pma" className="flex items-start gap-2 text-sm text-smoke">
         <input id="pma" name="pma" type="checkbox" required className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
         <span>
@@ -76,7 +170,68 @@ export default function RegisterForm() {
           and I&apos;m joining as a private member.
         </span>
       </label>
+      <p className="-mt-1 pl-6 text-xs leading-relaxed text-smoke/70">
+        In plain terms: The Heat Chart is run by a member association rather than being
+        open to the public, so every account holder joins as a member. The agreement is
+        the rulebook — what we owe you, what you agree to, and how either of us leaves.
+        It costs nothing and you can read it before you tick the box.
+      </p>
       {state?.error && <p role="alert" className="text-sm text-heat">{state.error}</p>}
+
+      {unknownDomain && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/95 p-5"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="domain-check-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border-2 border-heat bg-surface p-6 shadow-[0_0_60px_rgba(217,185,106,0.25)]">
+            <p className="tag text-heat">Hold up — check this</p>
+            <h2 id="domain-check-title" className="display mt-2 text-2xl text-white">
+              Is <span className="text-volt">@{unknownDomain}</span> really your email?
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-smoke">
+              That&apos;s not a mail service we recognize. If it&apos;s your own
+              domain — a work or personal address — you&apos;re good, confirm
+              below. But if you meant Gmail, Yahoo, Outlook or another
+              everyday address, <strong className="text-white">fix it now</strong>:
+              one wrong letter here and you can never reset your password,
+              and battle alerts, approvals, and giveaway wins will never
+              reach you.
+            </p>
+            <div className="mt-5 space-y-2.5">
+              <button
+                type="button"
+                onClick={() => setUnknownDomain(null)}
+                className="w-full rounded-lg btn-hard py-3 tag font-bold"
+              >
+                Let me fix my email
+              </button>
+              {!armed ? (
+                <button
+                  type="button"
+                  onClick={() => setArmed(true)}
+                  className="w-full rounded-lg border border-edge py-3 tag font-bold text-smoke transition hover:border-heat hover:text-white"
+                >
+                  It&apos;s right — this is my own domain
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    approved.current = true;
+                    setUnknownDomain(null);
+                    formRef.current?.requestSubmit();
+                  }}
+                  className="w-full rounded-lg border-2 border-heat bg-heat/15 py-3 tag font-bold text-heat"
+                >
+                  Confirm: sign me up with @{unknownDomain}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <button
         type="submit"
         disabled={pending}

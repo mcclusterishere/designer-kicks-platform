@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { adminLogin, type ActionResult } from "@/app/actions";
+import PasswordField from "@/components/PasswordField";
 
 export default function LoginForm({ twoFactor = false }: { twoFactor?: boolean }) {
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -11,17 +12,7 @@ export default function LoginForm({ twoFactor = false }: { twoFactor?: boolean }
 
   return (
     <form action={formAction} className="mx-auto mt-10 max-w-sm space-y-4">
-      <label htmlFor="password" className="tag text-smoke">
-        Admin password
-      </label>
-      <input
-        id="password"
-        name="password"
-        type="password"
-        required
-        autoFocus
-        className="w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white focus:border-volt focus:outline-none"
-      />
+      <PasswordField label="Admin password" autoComplete="current-password" autoFocus />
       {twoFactor && (
         <div>
           <label htmlFor="code" className="tag text-smoke">

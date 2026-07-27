@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Submission {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   title        String
   artistName   String // denormalized from the artist profile at submit time
   socialHandle String?
@@ -22,15 +22,27 @@ model Submission {
   baseColorway String?
   description  String?
   imageUrl     String
-  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
   // When this piece was auto-posted to the site feed + connected socials
   // (fires once, on first approval). Null = not yet / created before
   // autopost existed / staged in bulk.
   autopostedAt DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   // Gallery beyond the cover shot — voters swipe through these inline.
   extraImages String[] @default([])
+
+  // How this piece hangs in its maker's closet. closetOrder is a manual
+  // rank (lower first); null falls back to newest-first, so a maker who
+  // never touches the ordering still gets a sensible closet. closetHidden
+  // takes a piece off the artist's own page WITHOUT deleting it or
+  // withdrawing it from the league — the record and the votes stand,
+  // it just isn't in the room. closetSection is a free-text group label
+  // ("2026 work", "Commissions") for makers who want their closet in
+  // chapters instead of one wall.
+  closetOrder   Int?
+  closetHidden  Boolean @default(false)
+  closetSection String?
 
   // Optional 15-second clip of the piece. Duration is gated client-side
   // (no ffprobe on the server); the hard backstop is the 40MB size cap.
@@ -46,7 +58,7 @@ model Submission {
 
   // Market: what kind of piece, and the owner's open ask (display-only
   // until on-platform checkout exists).
-  category         String @default("sneakers") // sneakers | apparel | accessories
+  category         String  @default("sneakers") // sneakers | apparel | accessories
   size             String? // e.g. "US 10.5", "L", "7 3/8" — buyers need this
   askingPriceCents Int?
 
@@ -69,14 +81,45 @@ model Submission {
   outfitItems OutfitItem[]
   ratings     DesignRating[]
 
-  battlesAsA Battle[] @relation("battleSubA")
-  battlesAsB Battle[] @relation("battleSubB")
-  battlesWon Battle[] @relation("battleWinner")
-  votes      Vote[]
+  battlesAsA  Battle[]     @relation("battleSubA")
+  battlesAsB  Battle[]     @relation("battleSubB")
+  battlesWon  Battle[]     @relation("battleWinner")
+  votes       Vote[]
+  predictions Prediction[]
 
   tournamentsWon Tournament[]      @relation("tournamentChampion")
   matchesAsA     TournamentMatch[] @relation("matchSubA")
   matchesAsB     TournamentMatch[] @relation("matchSubB")
+
+  /// Who physically has this piece — asked once, at upload.
+  ///
+  /// WITH_ARTIST is the common case and costs the uploader nothing: they
+  /// made it, they still have it, there is no owner to contact. SOLD
+  /// means somebody else has it and their details were captured. UNKNOWN
+  /// is only ever set by the grandfathering backfill, for the pieces that
+  /// existed before this question did — it is a question outstanding, not
+  /// a state anyone can choose.
+  ownershipStatus String @default("WITH_ARTIST") // WITH_ARTIST | SOLD | UNKNOWN
+
+  /// The owner's details, captured at upload when the piece is already
+  /// sold. Deliberately NOT a user account: most buyers never make one,
+  /// and the whole point is to reach them before they do.
+  ///
+  /// Address is optional on purpose. It is the highest-risk field on this
+  /// table, it triggers breach-notification duties in every US state, and
+  /// it is not what verifies ownership — the email is. Nothing ships from
+  /// this platform, so an address is collected only when someone has a
+  /// reason to give one.
+  ownerEmail   String?
+  ownerPhone   String?
+  ownerAddress String?
+  ownerName    String?
+
+  /// Set when the owner confirmed by email, or an admin confirmed by
+  /// hand. Until then the details are a claim by the artist, not a fact,
+  /// and anything downstream that treats them as proof should check this.
+  ownerVerifiedAt DateTime?
+  ownerVerifiedBy String? // "email" | "admin"
 
   // Hot paths: the Heat List / feed / analytics all filter APPROVED;
   // artist pages, call-outs, and the roster seed filter by artistId;
@@ -87,29 +130,75 @@ model Submission {
 }
 
 model ArtistProfile {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  slug        String   @unique
-  displayName String
-  bio         String?
-  instagram   String?
-  city        String?
-  portfolioUrl String?
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  slug          String    @unique
+  displayName   String
+  bio           String?
+  instagram     String?
+  city          String?
+  portfolioUrl  String?
+  // Maker's own photo/logo for their page. Uploaded through the Studio and
+  // stored like any other upload, so it rides the same normalisation and
+  // persistence as piece photos.
+  avatarUrl     String?
   // Fan accounts are instant; artist accounts are reviewed (payout
   // rails later require vetted identities). Existing/seed artists
   // default APPROVED; applications are created PENDING.
-  status      String   @default("APPROVED") // PENDING | APPROVED | REJECTED
+  status        String    @default("APPROVED") // PENDING | APPROVED | REJECTED
   // Subscription groundwork: everyone rides FREE until billing opens.
-  plan      String @default("FREE") // FREE | PRO
-  viewCount Int    @default(0) // raw public page views (own visits excluded)
-  invitedAt DateTime? // last outreach email sent from the admin panel
+  plan          String    @default("FREE") // FREE | PRO
+  viewCount     Int       @default(0) // raw public page views (own visits excluded)
+  invitedAt     DateTime? // last outreach email sent from the admin panel
   // Recruiting pipeline for pre-loaded pages: NEW (never touched) →
   // CONTACTED (comment/DM sent) → IN_TALKS (they replied) → INVITED
   // (claim link sent). Claimed pages leave the board entirely.
-  outreachStage String  @default("NEW")
+  outreachStage String    @default("NEW")
   outreachNotes String?
-  createdAt   DateTime @default(now())
+  // Follow-up engine: when we last actually reached out, and how many
+  // times. Pipelines don't die from bad leads, they die from nobody
+  // circling back — these two fields let the Roster Run compute exactly
+  // who is due today instead of relying on someone's memory.
+  lastTouchAt   DateTime?
+  touchCount    Int       @default(0)
+  // Editorial anointment — a quietly hand-picked feature, independent of
+  // the Heat List. Exactly one artist wears this at a time. editorialNote
+  // is the editors' short blurb on the work.
+  editorsPick   Boolean   @default(false)
+  editorialNote String?
+  // Music: a Spotify (or DistroKid/hyperfollow/Apple Music) link the maker
+  // ties to their page so their tracks play right on the profile. Many of
+  // these customizers are musicians too.
+  spotifyUrl    String?
+
+  // Commission desk — the honest answer to "what does it cost and how long
+  // does it take", stated upfront instead of discovered after a DM. The
+  // #1 friction on custom work is uncertainty, not price. Null = not
+  // stated yet; the page then says so plainly rather than guessing.
+  commissionOpen       Boolean @default(true) // taking work vs booked out
+  commissionMinCents   Int? // "from $X"
+  commissionMaxCents   Int? // typical top end, optional
+  commissionDays       Int? // typical turnaround in days
+  commissionSlots      Int? // open slots right now, optional scarcity
+  // Closet customization — the maker's own hang of their own room. A
+  // portfolio where everyone's work is dealt in upload order flattens the
+  // difference between makers, and the difference is the whole point.
+  //
+  // closetHeadline is the line over the work, in their words rather than
+  // ours. featuredSubmissionId is the one piece they lead with — a
+  // deliberate loose reference, not a relation, so deleting the piece just
+  // clears the feature instead of cascading into the profile. accentColor
+  // is a single hex the page borrows for rules and highlights; it's
+  // validated on write and ignored if it isn't a hex, because a stray
+  // value here would leak straight into a style attribute. closetLayout
+  // picks how the grid hangs.
+  closetHeadline       String?
+  featuredSubmissionId String?
+  accentColor          String?
+  closetLayout         String  @default("grid") // grid | gallery | list
+
+  createdAt DateTime @default(now())
 
   // Where they already sell — captured at onboarding, shown on their page.
   // null = never asked; false = "I don't sell anywhere yet" (→ portal);
@@ -122,15 +211,64 @@ model ArtistProfile {
   onboardedById String?
   onboardedBy   User?   @relation("onboardedArtists", fields: [onboardedById], references: [id], onDelete: SetNull)
 
-  submissions Submission[]
-  collabs      Submission[]  @relation("collabPieces")
-  consignments Consignment[]
+  submissions        Submission[]
+  collabs            Submission[]        @relation("collabPieces")
+  consignments       Consignment[]
   commissionRequests CommissionRequest[]
-  followers   ArtistFollow[]
-  claims      ArtistClaim[]
-  feedPosts   FeedPost[]
-  drops       ArtistDrop[]
-  shops       ArtistShop[]
+  followers          ArtistFollow[]
+  claims             ArtistClaim[]
+  feedPosts          FeedPost[]
+  drops              ArtistDrop[]
+  shops              ArtistShop[]
+
+  contacts Contact[]
+
+  /// Subscription. `plan` is the entitlement the app reads on every
+  /// request; everything else is Stripe's state mirrored locally so a
+  /// page render never has to call Stripe to answer "can they use this".
+  ///
+  /// planStatus tracks Stripe's own subscription status rather than a
+  /// boolean, because "past_due" is not "cancelled" — a card that failed
+  /// on Tuesday shouldn't lock a maker out of their customer list while
+  /// Stripe is still retrying. Access is granted through paidThrough,
+  /// which is the only field the gate actually trusts.
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  planStatus           String? // active | past_due | canceled | incomplete
+  planPriceCents       Int? // what THIS artist pays, so founding rates survive a price change
+  planInterval         String? // month | year
+  /// Access runs to this instant regardless of billing state. Set on
+  /// payment, extended on renewal, left alone on cancellation so a
+  /// cancelling artist keeps what they already paid for.
+  paidThrough          DateTime?
+  /// Set once, the first time they ever subscribe — the cohort date for
+  /// retention maths, which a churned-and-returned artist would otherwise
+  /// scramble.
+  firstSubscribedAt    DateTime?
+
+  /// The Founding 100.
+  ///
+  /// Their seat number, 1 through 100, in the order they claimed it. It
+  /// is @unique for a reason beyond tidiness: it is what actually
+  /// enforces the cap. Two artists tapping "Go Pro" in the same instant
+  /// both compute the same next number, the database refuses the second,
+  /// and it retries into the next free seat — so the hundredth seat can
+  /// be handed out exactly once no matter how the requests interleave.
+  /// A counter in application code cannot promise that.
+  ///
+  /// Kept separate from the billing columns because it is not billing:
+  /// it is a fact about who showed up first, and it stays true long after
+  /// the twelve months run out.
+  foundingNumber    Int?      @unique
+  foundingGrantedAt DateTime?
+  /// When they were actually thanked, i.e. when they closed the note.
+  ///
+  /// Needed because a seat can arrive two ways. Claiming it yourself ends
+  /// on a thank-you page; being GIVEN one — the charter members who were
+  /// already here before the offer existed — involves no click at all, so
+  /// without this they would be handed a year of Pro and never told. The
+  /// note waits in their Studio until they dismiss it.
+  foundingThankedAt DateTime?
 
   @@index([onboardedById])
 }
@@ -139,13 +277,13 @@ model ArtistProfile {
 // (works for every platform today); live inventory sync can bolt onto
 // this row later per platform (add tokens/externalId when built).
 model ArtistShop {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   artistId  String
   artist    ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   platform  String // ebay | shopify | etsy | depop | grailed | mercari | stockx | goat | website | instagram | other
   url       String
   label     String? // optional custom label ("My Depop", etc.)
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
 
   @@index([artistId])
 }
@@ -193,6 +331,13 @@ model GroupLead {
 model StoreLead {
   id          String  @id @default(cuid())
   placeId     String? @unique // Google Place id — dedupes rescans
+  /**
+   * What kind of room this is. A gallery and a sneaker store sit in the
+   * same pipeline because the mechanics are identical — find it, qualify
+   * it, pitch it, circle back — but they are pitched on completely
+   * different grounds, so the kind decides which letter gets written.
+   */
+  kind        String  @default("STORE") // STORE | GALLERY
   name        String
   address     String?
   zip         String?
@@ -203,17 +348,23 @@ model StoreLead {
   reviewCount Int?
 
   // Brand research, filled in by hand before the invite goes out
-  email      String?
-  instagram  String?
-  specialty  String? // e.g. "consignment + customs", "kids exclusives"
-  notes      String?
+  email     String?
+  instagram String?
+  specialty String? // e.g. "consignment + customs", "kids exclusives"
+  notes     String?
 
   status    String    @default("SCOUTED") // SCOUTED | QUALIFIED | INVITED | JOINED | PASSED
   invitedAt DateTime?
   createdAt DateTime  @default(now())
 
+  // Follow-up clock: the pipeline dies when nobody circles back, so the
+  // due-today queue sorts on these.
+  lastTouchAt DateTime?
+  touchCount  Int       @default(0)
+
   @@index([status, createdAt])
   @@index([zip])
+  @@index([kind, status])
 }
 
 // Every outbound purchase click, logged before the 302 — the receipts
@@ -301,9 +452,9 @@ model OutfitBattle {
   status String  @default("ACTIVE") // ACTIVE | COMPLETED
 
   outfitAId String
-  outfitA   Outfit @relation("obA", fields: [outfitAId], references: [id], onDelete: Cascade)
+  outfitA   Outfit  @relation("obA", fields: [outfitAId], references: [id], onDelete: Cascade)
   outfitBId String
-  outfitB   Outfit @relation("obB", fields: [outfitBId], references: [id], onDelete: Cascade)
+  outfitB   Outfit  @relation("obB", fields: [outfitBId], references: [id], onDelete: Cascade)
   winnerId  String?
   winner    Outfit? @relation("obWinner", fields: [winnerId], references: [id], onDelete: SetNull)
 
@@ -314,13 +465,13 @@ model OutfitBattle {
 }
 
 model OutfitVote {
-  id       String       @id @default(cuid())
-  battleId String
-  battle   OutfitBattle @relation(fields: [battleId], references: [id], onDelete: Cascade)
-  outfitId String
-  userId   String
-  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime    @default(now())
+  id        String       @id @default(cuid())
+  battleId  String
+  battle    OutfitBattle @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  outfitId  String
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
 
   @@unique([battleId, userId])
   @@index([battleId, outfitId])
@@ -334,10 +485,10 @@ model ArtistClaim {
   artistId String
   artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
-  name        String
-  email       String
-  socialProof String? // IG handle / shop link that proves it's them
-  message     String?
+  name         String
+  email        String
+  socialProof  String? // IG handle / shop link that proves it's them
+  message      String?
   // Seller verification — PRIVATE, admin eyes only, never rendered on
   // any public page. Street address required (no P.O. Boxes) so the
   // league knows its sellers are real.
@@ -347,7 +498,7 @@ model ArtistClaim {
   city         String?
   state        String?
   zip          String?
-  status      String  @default("PENDING") // PENDING | APPROVED | REJECTED
+  status       String  @default("PENDING") // PENDING | APPROVED | REJECTED
 
   createdAt DateTime @default(now())
 
@@ -355,12 +506,12 @@ model ArtistClaim {
 }
 
 model ArtistFollow {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   artistId  String
   artist    ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
 
   @@unique([artistId, userId])
 }
@@ -372,18 +523,18 @@ model ArtistFollow {
 //
 //   CUSTOM_VS_OG — custom culture against OG culture: a one-of-one
 //   against the untouched retail silhouette it was built from. Side B
-//   is a CatalogShoe, not a Submission, so an OG never has to be faked
-//   as a custom to get in the ring.
+//   is a CatalogShoe, not a Submission, so an OG never has to be filed
+//   as somebody's custom to get in the ring.
 //
 // Side A is always a custom. Exactly one of subBId / ogShoeId is set,
 // decided by type.
 model Battle {
-  id       String    @id @default(cuid())
-  title    String?
-  status   String    @default("ACTIVE") // ACTIVE | COMPLETED
-  type     String    @default("CUSTOM_VS_CUSTOM") // CUSTOM_VS_CUSTOM | CUSTOM_VS_OG
-  startsAt DateTime  @default(now())
-  endsAt   DateTime
+  id        String   @id @default(cuid())
+  title     String?
+  status    String   @default("ACTIVE") // ACTIVE | COMPLETED
+  type      String   @default("CUSTOM_VS_CUSTOM") // CUSTOM_VS_CUSTOM | CUSTOM_VS_OG
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
   createdAt DateTime @default(now())
 
   subAId String
@@ -395,15 +546,15 @@ model Battle {
   ogShoeId String?
   ogShoe   CatalogShoe? @relation("battleOG", fields: [ogShoeId], references: [id])
 
-  // Which corner took it: "A" | "B". This is the format-agnostic answer
-  // and the one finalization writes. winnerId stays the submission-level
-  // answer (null when the OG wins) so the heat chart and tournament
-  // brackets, which only ever count customs, keep working untouched.
+  // Which corner took it: "A" | "B". The format-agnostic answer, and what
+  // finalization writes. winnerId stays the submission-level answer (null
+  // when the OG wins) so the Heat List and tournament brackets, which only
+  // ever count customs, keep working untouched.
   winnerSide String?
   winnerId String?
   winner   Submission? @relation("battleWinner", fields: [winnerId], references: [id])
 
-  votes Vote[]
+  votes           Vote[]
   tournamentMatch TournamentMatch?
 
   // Hot path: lazy finalization scans (status ACTIVE, endsAt < now) and
@@ -416,15 +567,15 @@ model Battle {
 // (admin Broadcast); set = an approved artist posting from their
 // Studio. Fans react, comment, and share — they don't post.
 model FeedPost {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   body      String
   imageUrl  String?
   linkUrl   String?
   linkLabel String?
-  pinned    Boolean  @default(false)
+  pinned    Boolean        @default(false)
   artistId  String?
   artist    ArtistProfile? @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
 
   reactions FeedReaction[]
   comments  FeedComment[]
@@ -452,6 +603,81 @@ model FeedComment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   body      String
   createdAt DateTime @default(now())
+
+  // Replies, one level deep. Deeper nesting reads badly on a phone and
+  // invites the kind of thread nobody finishes, so a reply to a reply
+  // attaches to the same parent rather than indenting further.
+  parentId String?
+  parent   FeedComment?  @relation("commentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  FeedComment[] @relation("commentReplies")
+
+  @@index([postId, parentId])
+}
+
+// A direct line between a fan and an artist. Custom work is negotiated, and
+// negotiating it in public comments is how deals die — so this exists to keep
+// the conversation on the platform instead of pushing it to Instagram DMs
+// where nothing is recorded and nobody is protected.
+model DirectMessage {
+  id         String    @id @default(cuid())
+  fromUserId String
+  fromUser   User      @relation("sentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User      @relation("receivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([toUserId, readAt])
+  @@index([fromUserId, createdAt])
+  @@index([toUserId, fromUserId, createdAt])
+}
+
+// A browser or installed app that agreed to be notified. Endpoints go stale
+// constantly — people clear data, uninstall, revoke — so a 404/410 from the
+// push service is treated as a withdrawal and the row is deleted rather than
+// retried forever.
+model PushSub {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastSentAt DateTime?
+  failures   Int       @default(0)
+
+  @@index([userId])
+}
+
+// App-store UGC safety (Apple 1.2): members can flag content for the
+// moderation queue and block other members. A block hides the blocked
+// member's posts and comments from the blocker's feed.
+model ContentFlag {
+  id         String   @id @default(cuid())
+  kind       String // feed_post | feed_comment | submission | artist
+  targetId   String
+  reason     String?
+  reporterId String
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  status     String   @default("OPEN") // OPEN | RESOLVED
+  createdAt  DateTime @default(now())
+
+  @@unique([kind, targetId, reporterId])
+  @@index([status, createdAt])
+}
+
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String
+  blocker   User     @relation("blocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String
+  blocked   User     @relation("blocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
 }
 
 model Tournament {
@@ -503,24 +729,31 @@ model TournamentMatch {
 }
 
 model Vote {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   battleId     String
-  battle       Battle   @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  battle       Battle     @relation(fields: [battleId], references: [id], onDelete: Cascade)
   // Which corner the vote went to: "A" | "B". This is what counting reads,
-  // because in a CUSTOM_VS_OG battle side B is a retail shoe and has no
+  // because in a CUSTOM_VS_OG battle side B is a retail shoe with no
   // submission to point at. Backfilled for every pre-existing vote.
-  side         String   @default("A")
-  // Still recorded when the chosen side is a custom — the heat chart
-  // ranks submissions by votes collected. Null when the OG took the vote.
+  side         String     @default("A")
+  // Still written when a custom takes the vote — the Heat List ranks
+  // submissions by votes collected. Null when the OG took it.
   submissionId String?
   submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  voterKey     String // the voting user's id (or a seed key for demo votes)
+  voterKey     String // the voting user's id, a guest device key, or a seed key
   userId       String?
-  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt    DateTime @default(now())
+  // Anonymous votes count toward the visible split and nothing else. The
+  // Heat List and battle winners read account votes only, because a device
+  // key can be rotated and an artist's standing has to be defensible when
+  // they ask why they lost. Keeping both means the signup wall comes down
+  // without the league becoming spoofable.
+  guest        Boolean    @default(false)
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
 
   @@unique([battleId, voterKey])
   @@index([battleId, submissionId])
+  @@index([battleId, guest])
   @@index([battleId, side])
 }
 
@@ -547,7 +780,7 @@ model User {
   // "Who do you shop for?" — mens | womens | kids | all. Weights the
   // catalog and Rate deck toward their lane (~2/3 lane, ~1/3 wild card);
   // never a wall, always a toggle.
-  shopFor String?
+  shopFor    String?
   // "Only my lane" — kills the ~1/3 wild-card mix for people who
   // specifically don't want cross-lane discovery.
   laneStrict Boolean @default(false)
@@ -563,7 +796,7 @@ model User {
   // hasn't agreed yet.
   pmaAcceptedAt DateTime?
 
-  commissionRequests CommissionRequest[]
+  commissionRequests    CommissionRequest[]
   ambassadorApplication AmbassadorApplication?
 
   // Profile / contact info (the "Sneaker Passport")
@@ -587,35 +820,66 @@ model User {
 
   createdAt DateTime @default(now())
 
-  accounts       Account[]
-  sessions       Session[]
-  votes          Vote[]
-  quizRuns       QuizRun[]
-  creditTxns     CreditTransaction[]
-  quizAnswers    QuizAnswer[]
+  accounts        Account[]
+  sessions        Session[]
+  contentFlags    ContentFlag[]
+  blocksMade      UserBlock[]         @relation("blocksMade")
+  blocksReceived  UserBlock[]         @relation("blocksReceived")
+  votes           Vote[]
+  quizRuns        QuizRun[]
+  creditTxns      CreditTransaction[]
+  quizAnswers     QuizAnswer[]
   giveawayEntries GiveawayEntry[]
-  giveawaysWon   Giveaway[]          @relation("giveawayWinner")
-  artistProfile  ArtistProfile?
-  artistFollows  ArtistFollow[]
+  giveawaysWon    Giveaway[]          @relation("giveawayWinner")
+  artistProfile   ArtistProfile?
+  artistFollows   ArtistFollow[]
 
   // Fan collector identity — public closet URL, minted on first piece.
   collectorSlug String?      @unique
   ownedPieces   Submission[] @relation("ownedPieces")
 
-  salesSold   Sale[] @relation("salesSold")
-  salesBought Sale[] @relation("salesBought")
-  offers      Offer[]
-  outfits     Outfit[]
-  outfitVotes OutfitVote[]
-  designRatings DesignRating[]
-  feedReactions FeedReaction[]
-  feedComments  FeedComment[]
-  pollVotes     PollVote[]
+  salesSold        Sale[]          @relation("salesSold")
+  salesBought      Sale[]          @relation("salesBought")
+  offers           Offer[]
+  outfits          Outfit[]
+  outfitVotes      OutfitVote[]
+  designRatings    DesignRating[]
+  feedReactions    FeedReaction[]
+  feedComments     FeedComment[]
+  pollVotes        PollVote[]
+  // Direct messages in both directions, plus the devices that agreed to be
+  // notified. Both cascade on account deletion so "delete my account"
+  // actually removes the conversation and stops the notifications.
+  sentMessages     DirectMessage[] @relation("sentMessages")
+  receivedMessages DirectMessage[] @relation("receivedMessages")
+  pushSubs         PushSub[]
+
+  // Play limits. Every regime that lets people stake anything requires the
+  // account holder to be able to bind their own future behaviour, and
+  // requires the operator to honour it — so the fields exist now, enforced
+  // on the play they already have, rather than being retrofitted onto a
+  // live book later.
+  //
+  // selfExcludedUntil is deliberately one-way in the UI: a member can set it
+  // or extend it, and cannot shorten it. An exclusion somebody can undo in
+  // the moment they most want to undo it isn't an exclusion.
+  dailyStakeLimit   Int?
+  selfExcludedUntil DateTime?
+  /**
+   * Country/region as resolved at signup — the basis for any future gating.
+   */
+  jurisdiction      String?
+  /**
+   * Set when age has actually been checked, not when a box was ticked.
+   */
+  ageVerifiedAt     DateTime?
 
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
   catalogRatings   CatalogRating[]
+  leagueEntries    LeagueEntry[]
+  predictions      Prediction[]
 }
 
 // A private thread between an editor and the league office. Editors can
@@ -672,15 +936,15 @@ model JobPosting {
 }
 
 model JobApplication {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   jobId     String
   job       JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
   name      String
   email     String
   links     String? // portfolio / socials
   pitch     String? // why them
-  status    String   @default("NEW") // NEW | REVIEWED | HIRED | PASSED
-  createdAt DateTime @default(now())
+  status    String     @default("NEW") // NEW | REVIEWED | HIRED | PASSED
+  createdAt DateTime   @default(now())
 
   @@index([jobId, createdAt])
   @@index([status, createdAt])
@@ -759,15 +1023,15 @@ model AmbassadorApplication {
 // platform routes members to them and licenses them the data; their
 // independence is the product, so they are never platform employees.
 model AppraiserApplication {
-  id          String   @id @default(cuid())
-  name        String
-  email       String
-  org         String? // ISA / AAA / ASA + designation, e.g. "ISA AM"
-  specialty   String? // what they appraise today
-  links       String? // site / LinkedIn / sample report
-  note        String?
-  status      String   @default("NEW") // NEW | CONTACTED | ACTIVE | PASSED
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  org       String? // ISA / AAA / ASA + designation, e.g. "ISA AM"
+  specialty String? // what they appraise today
+  links     String? // site / LinkedIn / sample report
+  note      String?
+  status    String   @default("NEW") // NEW | CONTACTED | ACTIVE | PASSED
+  createdAt DateTime @default(now())
 
   @@index([status])
 }
@@ -778,9 +1042,9 @@ model AppraiserApplication {
 // (eBay affiliate link) and the two arrange delivery to the artist —
 // addresses move through email, never the public site.
 model CommissionRequest {
-  id       String @id @default(cuid())
+  id       String        @id @default(cuid())
   userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   artistId String
   artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
@@ -788,10 +1052,18 @@ model CommissionRequest {
   catalogSku  String? // set when the fan started from a catalog page
   budgetCents Int?
   note        String?
-  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  status      String   @default("PENDING") // PENDING | ACCEPTED | DECLINED | WAITLIST | DONE
   createdAt   DateTime @default(now())
 
+  // Where they sit in the queue when the artist is booked out. A slot count
+  // tells somebody there's no room; a position tells them how long the wait
+  // is, which is the difference between leaving and staying. Null until the
+  // artist actually waitlists them.
+  queuePosition Int?
+  artistNote    String?
+
   @@index([artistId, status])
+  @@index([artistId, status, queuePosition])
   @@index([userId])
 }
 
@@ -803,17 +1075,17 @@ model CommissionRequest {
 // party relists that HIDE the relationship are what gets people charged
 // with fraud; this model exists so nothing needs hiding.
 model Consignment {
-  id           String     @id @default(cuid())
-  submissionId String     @unique
-  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  submissionId String        @unique
+  submission   Submission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   artistId     String
   artist       ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   priorSaleCents Int? // what it sold for the first time (self-reported unless a Sale record backs it)
   consignorName  String? // kept private — shown publicly as "a private collector"
-  splitPct       Int     @default(75) // consignor's share of the resale
+  splitPct       Int      @default(75) // consignor's share of the resale
   floorCents     Int // bids below this bounce
-  status         String  @default("OPEN") // OPEN | SOLD | CLOSED
+  status         String   @default("OPEN") // OPEN | SOLD | CLOSED
   createdAt      DateTime @default(now())
 
   @@index([artistId, status])
@@ -870,17 +1142,53 @@ model QuizQuestion {
   category    String  @default("history")
   explanation String?
   active      Boolean @default(true)
+
+  /**
+   * Which game this belongs to: "culture" (the original trivia — who
+   * designed what, which year, which collab) or "markets" (the same
+   * culture used to teach how markets actually work).
+   * Defaulted to culture so the existing bank is correctly labelled
+   * without touching a row. The two tracks never mix inside a run: a
+   * markets run that kept serving Jordan trivia would teach nothing, and
+   * a culture run interrupted by a question about cost of carry would
+   * just feel broken.
+   */
+  track String @default("culture")
+
+  /**
+   * The named financial idea, e.g. "bid-ask-spread". Markets questions
+   * only. Shared with lib/marketLessons so the same concept can be taught
+   * on the market page and tested here under one name.
+   */
+  concept String?
+
+  /**
+   * The micro-lesson: what this concept IS, in two or three sentences,
+   * naming the term a trading desk would use.
+   * Deliberately a separate field from `explanation`. An explanation
+   * justifies one answer ("Jordan signed in 1984"); a lesson teaches
+   * something transferable that outlives the question. Culture trivia
+   * only ever needed the former.
+   */
+  lesson String?
+
+  /**
+   * 1–5, the progression ladder in lib/iq. Culture questions stay at 1.
+   */
+  level     Int      @default(1)
   // Culture questions born from articles — the feed links back to the
   // story so people can read up before (or after) they answer.
-  articleId   String?
-  article     Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
+  articleId String?
+  article   Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 
   answers QuizAnswer[]
 
   // Quiz pool + count filter on active; culture-question upsert on articleId.
   @@index([active])
   @@index([articleId])
+  // Every run builds its pool by track.
+  @@index([track, active])
 }
 
 // The Culture IQ ledger: one row per user per question, forever. A
@@ -902,34 +1210,68 @@ model QuizAnswer {
 }
 
 model QuizRun {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questionIds  String // JSON array, server-chosen order
-  currentIndex Int       @default(0)
-  correctCount Int       @default(0)
-  wrongCount   Int       @default(0)
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /**
+   * Which game this run is playing. Fixed for the life of the run.
+   */
+  track           String    @default("culture")
+  questionIds     String // JSON array, server-chosen order
+  currentIndex    Int       @default(0)
+  correctCount    Int       @default(0)
+  wrongCount      Int       @default(0)
   // True once any purchased strike is spent in this run. Paid runs
   // count for the leaderboard but NEVER earn giveaway entries — paying
   // must not affect prize odds (sweepstakes law).
-  usedPaidStrikes Boolean @default(false)
+  usedPaidStrikes Boolean   @default(false)
   // True once this run has minted its one free giveaway entry. Guards
   // against a run granting more than one entry across its terminal
   // transitions (finished the queue vs. struck out).
-  entryGranted Boolean   @default(false)
-  status       String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | OUT_OF_QUESTIONS | ABANDONED
-  startedAt    DateTime  @default(now())
-  completedAt  DateTime?
+  entryGranted    Boolean   @default(false)
+  status          String    @default("ACTIVE") // ACTIVE | NEEDS_CREDITS | OUT_OF_QUESTIONS | ABANDONED
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
 }
 
+/**
+ * The ledger. Every credit that moves, and why.
+ * Two fields here exist for a future in which this has to be defensible to
+ * somebody outside the company.
+ * balanceAfter is the running balance at the moment of the entry, written in
+ * the same transaction as the balance change. It means the balance at any
+ * point in the past can be read directly rather than reconstructed by
+ * replaying every entry since the account opened, and it means a mismatch
+ * between the stored balance and the ledger is detectable rather than
+ * theoretical.
+ * idempotencyKey is replay protection. A settlement job that retries after a
+ * timeout must not pay twice, and the only way to guarantee that is to make
+ * the second write fail at the database rather than rely on the job
+ * remembering what it already did.
+ */
 model CreditTransaction {
   id              String   @id @default(cuid())
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   delta           Int
-  reason          String // purchase | strike | admin
+  reason          String // purchase | strike | admin | call-stake | call-payout | ...
+  /**
+   * Balance immediately after this entry was applied.
+   */
+  balanceAfter    Int?
+  /**
+   * Stable key for an operation that must happen at most once.
+   */
+  idempotencyKey  String?  @unique
+  /**
+   * Free text for an admin adjustment — who and why.
+   */
+  note            String?
   stripeSessionId String?  @unique
   createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([reason, createdAt])
 }
 
 model Giveaway {
@@ -986,19 +1328,19 @@ model PollVote {
 }
 
 model Article {
-  id          String    @id @default(cuid())
-  slug        String    @unique
-  title       String
-  excerpt     String // doubles as the meta description — keep under ~160 chars
-  content     String // markdown
-  coverImage  String?
-  tags        String? // comma-separated
-  status      String    @default("DRAFT") // DRAFT | PUBLISHED
-  publishedAt DateTime?
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  title         String
+  excerpt       String // doubles as the meta description — keep under ~160 chars
+  content       String // markdown
+  coverImage    String?
+  tags          String? // comma-separated
+  status        String    @default("DRAFT") // DRAFT | PUBLISHED
+  publishedAt   DateTime?
   // Drop calendar (free, no paywall): when the release drops and where
   // to enter its raffle. Articles with dropAt appear on /drops.
-  dropAt      DateTime?
-  raffleUrl   String?
+  dropAt        DateTime?
+  raffleUrl     String?
   // Release-date sync: the style code (e.g. "DZ5485-612") keys the
   // sneaker-API waterfall, dropSource records who set the current date
   // (manual | SNKRS | RapidAPI_StockX | KicksDB | Apify), and
@@ -1007,8 +1349,8 @@ model Article {
   sku           String?
   dropSource    String?
   dropCheckedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   cultureQuestions QuizQuestion[]
 
@@ -1029,11 +1371,11 @@ model AppSetting {
 }
 
 model Product {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   // Stable key for the seed top-up: curated slate products upsert by
   // slug (create-only — admin edits are never overwritten on deploy).
   // Admin-created products have no slug and are never touched.
-  slug         String? @unique
+  slug         String?  @unique
   name         String
   merchant     String
   category     String // marketplace | retail | customization | cleaning | accessories
@@ -1041,8 +1383,8 @@ model Product {
   price        String?
   imageUrl     String?
   affiliateUrl String
-  featured     Boolean @default(false)
-  sortOrder    Int     @default(0)
+  featured     Boolean  @default(false)
+  sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
 }
 
@@ -1065,9 +1407,12 @@ model CatalogShoe {
   // The eBay legs of the spread: what the pair actually moves for new
   // and used on the open secondary market. Auto-matched by the eBay
   // Browse API sync (no manual uploads) — median of live listings.
-  ebayNewCents  Int?
-  ebayUsedCents Int?
-  ebayCheckedAt DateTime?
+  ebayNewCents     Int?
+  ebayUsedCents    Int?
+  ebayCheckedAt    DateTime?
+  // Affiliate-tagged eBay listing URL captured with the price sync, so a
+  // buy click off the exchange is credited to our EPN campaign.
+  ebayItemUrl      String?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.
@@ -1076,10 +1421,13 @@ model CatalogShoe {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  ratings CatalogRating[]
+  ratings      CatalogRating[]
   // OG culture's side of the arena — every custom-vs-OG battle this
   // silhouette has stood in.
-  battles Battle[] @relation("battleOG")
+  battles      Battle[]        @relation("battleOG")
+  priceHistory PriceSnapshot[]
+  inventory    InventoryItem[]
+  predictions  Prediction[]
 
   @@index([brand])
   @@index([silhouette])
@@ -1100,4 +1448,530 @@ model CatalogRating {
 
   @@unique([shoeId, userId])
   @@index([userId])
+}
+
+// Persistent binary store for user uploads (photos + short clips), kept
+// in Postgres so uploads survive every redeploy WITHOUT depending on a
+// mounted disk volume (Railway app-service volumes weren't mounting; the
+// Postgres volume is the one storage that reliably persists here). The
+// image bytes are already normalized to compact JPEG before they land
+// here, so rows stay small. Served through /api/uploads/[name], which
+// keeps the exact same public URL scheme — so switching to S3/R2 later is
+// just an env-var change with zero record migration. `name` is the
+// uuid.ext filename that appears in every saved imageUrl/videoUrl.
+model UploadBlob {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  contentType String
+  size        Int
+  data        Bytes
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ---------- The Draft: weekly fantasy league ----------
+// Draft a roster of customs (1-of-1 artist pieces) and drops (OG retail
+// releases) each week; earn Heat Points as your picks move on real
+// on-platform signals — votes, battle wins, verified sales, and resale
+// premium. A fantasy league nobody else can run, because the customs data
+// only lives here.
+
+model LeagueSeason {
+  id        String   @id @default(cuid())
+  // Human label, e.g. "Week of Jul 21".
+  label     String
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+  // OPEN = drafting + live scoring; SETTLED = week closed, ranks frozen.
+  status    String   @default("OPEN") // OPEN | SETTLED
+  createdAt DateTime @default(now())
+
+  entries LeagueEntry[]
+
+  @@index([status, endsAt])
+}
+
+model LeagueEntry {
+  id         String       @id @default(cuid())
+  seasonId   String
+  season     LeagueSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Frozen final score/rank once the season settles; live-computed while OPEN.
+  finalScore Float?
+  finalRank  Int?
+  // What this entry won when the week settled, e.g. "10 credits + 3 entries".
+  // Doubles as the payout record — set in the same pass that grants them.
+  prize      String?
+  createdAt  DateTime     @default(now())
+
+  picks LeaguePick[]
+
+  @@unique([seasonId, userId])
+  @@index([seasonId])
+}
+
+model LeaguePick {
+  id          String      @id @default(cuid())
+  entryId     String
+  entry       LeagueEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  // CUSTOM → refId is a Submission id; DROP → refId is a CatalogShoe id.
+  assetType   String // CUSTOM | DROP
+  refId       String
+  // Denormalized for display so the leaderboard needs no extra joins.
+  label       String
+  imageUrl    String?
+  // Composite metric snapshotted at draft time; live points = now − start.
+  startMetric Float       @default(0)
+  createdAt   DateTime    @default(now())
+
+  @@unique([entryId, refId])
+  @@index([entryId])
+  @@index([assetType, refId])
+}
+
+// A daily fingerprint of the whole market, so the index can be CHARTED
+// instead of just quoted. We only store current prices per shoe, which
+// means history has to be accumulated going forward — this table is that
+// record. Written once per day by the cron; the chart draws real points
+// only and says it's still building until there are enough of them.
+model IndexSnapshot {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  value     Int // median premium % across measurable pairs
+  listed    Int
+  quoted    Int
+  advancers Int
+  decliners Int
+
+  @@index([at])
+}
+
+// Daily price observation for one pair, per source. This is how the shoe
+// charts get built: nobody sells retroactive sneaker history for free, so
+// the only honest path is to record the market every day from now on. One
+// row per shoe per source per UTC day, written by the cron.
+//
+// source: ebay_new | ebay_used | market (KicksDB aggregate of StockX/GOAT)
+model PriceSnapshot {
+  id     String      @id @default(cuid())
+  shoeId String
+  shoe   CatalogShoe @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+  source String
+  cents  Int
+  at     DateTime    @default(now())
+
+  @@unique([shoeId, source, at])
+  @@index([shoeId, at])
+  @@index([at])
+}
+
+// The Call — predict where a pair's resale lands, get scored when reality
+// arrives. Every prediction stores the price it was made against (basis),
+// so settlement is a comparison of two recorded facts rather than a
+// judgement call. Resolved by the cron once resolveAt passes.
+model Prediction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A call is on a retail pair OR a one-of-one, never both. Two nullable
+  // sides rather than one polymorphic id, so the database still enforces
+  // that whatever is referenced actually exists.
+  shoeId       String?
+  shoe         CatalogShoe? @relation(fields: [shoeId], references: [id], onDelete: Cascade)
+  submissionId String?
+  submission   Submission?  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  /**
+   * OG | CUSTOM — which floor this call was made on.
+   */
+  side String @default("OG")
+
+  // Credits staked. This is the whole point of the panel: a call with
+  // nothing behind it is an opinion, and opinions don't make a market.
+  // Debited when the call is placed and returned with winnings on a hit,
+  // so the balance on screen is always what's actually left.
+  stakeCredits  Int  @default(0)
+  /**
+   * Credits returned at settlement — stake plus winnings, or zero.
+   */
+  payoutCredits Int?
+
+  kind           String // DIRECTION | PRICE
+  horizonDays    Int
+  // What the market read when the call was made — the line you're betting against.
+  basisCents     Int
+  // DIRECTION calls: UP | DOWN. PRICE calls: the number you're calling.
+  direction      String?
+  predictedCents Int?
+
+  resolveAt   DateTime
+  status      String    @default("OPEN") // OPEN | SETTLED | VOID
+  // Filled at settlement.
+  actualCents Int?
+  correct     Boolean?
+  points      Int?
+  settledAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  // One open call per pair per horizon per person — no hedging both ways.
+  // Separate constraints per side because a null in a compound unique
+  // doesn't collide, so one index can't cover both.
+  @@unique([userId, shoeId, horizonDays, status])
+  @@unique([userId, submissionId, horizonDays, status])
+  @@index([status, resolveAt])
+  @@index([userId, status])
+  @@index([shoeId])
+  @@index([submissionId])
+  @@index([side, status])
+}
+
+// ---------- Distribution: the drip feed ----------
+
+/**
+ * Somewhere we post, and the rules that place actually has.
+ * Every subreddit is its own publication with its own editorial policy, and
+ * the ones worth being in are precisely the ones that enforce it. r/Customsneakers
+ * bans self-promo in titles, affiliate links, and bulk posting — three rules
+ * that a naive "blast the same thing everywhere" loop breaks on every post.
+ * So the destination carries its rules, the queue checks against them before
+ * anything is scheduled, and a post that would break one never gets sent.
+ * A banned account distributes nothing, which makes compliance the
+ * highest-throughput strategy rather than the cautious one.
+ */
+model SocialTarget {
+  id       String  @id @default(cuid())
+  platform String // REDDIT | X | BLUESKY | TELEGRAM | DISCORD
+  /**
+   * Subreddit name without the r/, handle, or channel. Null = the default account.
+   */
+  name     String?
+  label    String
+
+  active Boolean @default(true)
+
+  // The house rules, as the destination states them.
+  allowLinks      Boolean @default(true) // false = text/image posts only
+  allowSelfPromo  Boolean @default(true) // false = brand name can't lead
+  allowAffiliate  Boolean @default(true)
+  requireFlair    Boolean @default(false)
+  /**
+   * Minimum gap between our posts here. The anti-bulk-posting rule, enforced.
+   */
+  minHoursBetween Int     @default(24)
+  maxPerWeek      Int     @default(3)
+  /**
+   * Whatever else the sidebar says, kept where whoever queues can read it.
+   */
+  rulesNote       String?
+
+  lastPostedAt DateTime?
+  posts        SocialPost[]
+
+  @@unique([platform, name])
+  @@index([platform, active])
+}
+
+/**
+ * One queued post.
+ * Content is rendered per platform rather than shared, because the same piece
+ * is a different post in each place: Reddit wants the maker's name and the
+ * work, X wants a hook and an image, Discord wants a card. Storing the
+ * rendered copy means a human can read exactly what will go out before it
+ * goes out, and edit it if it reads wrong.
+ * BLOCKED is a first-class status, not an error. A post that would break the
+ * destination's rules is kept with the reason attached so the pattern is
+ * visible, instead of being silently dropped or — worse — sent.
+ */
+model SocialPost {
+  id       String       @id @default(cuid())
+  targetId String
+  target   SocialTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  /**
+   * What this is about, so the same source is never queued twice per target.
+   */
+  sourceKind String // ARTICLE | PIECE | BATTLE | SHOE
+  sourceId   String
+
+  title    String
+  body     String?
+  link     String?
+  mediaUrl String?
+  flair    String?
+
+  scheduledFor  DateTime
+  status        String    @default("QUEUED") // QUEUED | POSTED | FAILED | BLOCKED | SKIPPED
+  blockedReason String?
+  result        String?
+  postedAt      DateTime?
+  attempts      Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  @@unique([targetId, sourceKind, sourceId])
+  @@index([status, scheduledFor])
+  @@index([targetId, status])
+}
+
+/// House inventory — pairs The Heat Chart owns outright and resells.
+///
+/// One row per physical pair, deliberately. A reseller's questions are
+/// all size- and pair-level ("what did THAT 10.5 cost me, how long did
+/// it sit, what did it clear"), and a quantity column answers none of
+/// them. Two of the same shoe in different sizes are two rows.
+///
+/// This is separate from Submission (artist one-of-ones, which we do not
+/// own) and from Product (affiliate links, where we never touch the
+/// goods). Inventory is the only table on the site that represents our
+/// own capital sitting on a shelf.
+model InventoryItem {
+  id String @id @default(cuid())
+
+  /// Linked to the catalog when the SKU is known, which is what makes
+  /// live comps possible — CatalogShoe already carries market and eBay
+  /// prices, so a linked pair can be valued without anyone typing a
+  /// number. Free-text name covers everything else.
+  catalogShoeId String?
+  catalogShoe   CatalogShoe? @relation(fields: [catalogShoeId], references: [id], onDelete: SetNull)
+
+  name      String
+  sku       String?
+  brand     String?
+  size      String
+  condition String  @default("DS") // DS | VNDS | USED
+
+  imageUrl    String?
+  extraImages String[] @default([])
+  notes       String?
+
+  /// Money in. Cost basis is landed cost — the price paid plus tax and
+  /// any inbound shipping — because every margin number downstream is
+  /// only as honest as this field. Understating it flatters the P&L and
+  /// makes the whole ledger useless as evidence.
+  costCents    Int
+  acquiredAt   DateTime @default(now())
+  acquiredFrom String?
+
+  /// On the shelf. listedAt starts the days-on-market clock, which is a
+  /// different question from days-held and worth keeping separate.
+  listPriceCents Int?
+  listedAt       DateTime?
+  /// Whether this pair shows on our own storefront. A pair can be listed
+  /// on eBay and not here, or here and nowhere else.
+  publicListed   Boolean   @default(false)
+
+  status String @default("IN_STOCK") // IN_STOCK | LISTED | SOLD | RETURNED
+
+  /// Money out. feeCents is everything the channel took, shipCents is
+  /// what we paid to get it to the buyer. Both are subtracted before
+  /// profit, because a gross sale price is not money you received.
+  soldPriceCents Int?
+  soldAt         DateTime?
+  soldChannel    String? // heatchart | ebay | goat | stockx | in-person | other
+  feeCents       Int       @default(0)
+  shipCents      Int       @default(0)
+  buyerEmail     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Hot paths: the shelf filters by status, the P&L rolls up by soldAt,
+  /// and comps join through the catalog.
+  @@index([status])
+  @@index([soldAt])
+  @@index([catalogShoeId])
+}
+
+/// An artist's own customer list — the CRM spine.
+///
+/// Sales, offers, consignments and messages already exist, but they're
+/// separate rows with no shared subject, so nobody can ask the question
+/// that actually runs a custom business: who bought from me, what have
+/// they spent, and when did I last speak to them. This is that subject.
+///
+/// Deliberately owned by an artist rather than by the platform. Two
+/// artists who both know the same collector each keep their own record
+/// of that relationship, with their own notes and their own history —
+/// merging them would leak one maker's client list into another's.
+model Contact {
+  id       String        @id @default(cuid())
+  artistId String
+  artist   ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  name   String
+  email  String?
+  phone  String?
+  /// Whatever handle they actually talk on — for most of this roster the
+  /// relationship lives in Instagram DMs, not an inbox.
+  social String?
+  city   String?
+
+  /// Where this contact came from: import | sale | offer | commission |
+  /// manual. Provenance matters because a bought list and a real buyer
+  /// are not the same asset, and only one of them can be emailed.
+  source String @default("manual")
+
+  /// Pipeline: LEAD (never bought) → CUSTOMER (has) → REPEAT (more than
+  /// once) → LAPSED (bought, gone quiet). Computed on write from real
+  /// sales rather than typed, so it can't drift into fiction.
+  stage String @default("LEAD")
+
+  notes String?
+  tags  String[] @default([])
+
+  /// Consent, tracked per contact because CAN-SPAM and the platform's own
+  /// privacy policy both turn on it. An imported phone contact has NOT
+  /// opted in to marketing, and the import says so rather than assuming.
+  emailOptIn Boolean @default(false)
+
+  /// Relationship clock. lastContactAt is the follow-up trigger; the
+  /// totals are denormalised from Sale so a list of 500 doesn't need 500
+  /// joins to sort by value.
+  lastContactAt   DateTime?
+  totalSpentCents Int       @default(0)
+  purchaseCount   Int       @default(0)
+
+  /// Links to the account, if this person ever made one. Optional: most
+  /// of a maker's customers never sign up, and the CRM has to hold them
+  /// anyway or it's not a CRM.
+  userId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Footwear is a sized business and no general CRM has a field for it.
+  /// Kept on the contact because most buyers never make an account, so
+  /// User.shoeSize isn't available for them.
+  shoeSize String?
+
+  /// Everything the importer recognised but has no column for. Other
+  /// CRMs carry lifecycle stages, lead sources, deal amounts, arbitrary
+  /// custom properties — most importers silently drop all of it, which
+  /// is how people lose ten years of notes moving between tools. Kept
+  /// verbatim, shown on the contact, searchable.
+  customFields Json?
+
+  /// Which tool this row came out of, when we could tell — "hubspot",
+  /// "shopify", "google". Provenance for the data itself.
+  importSource String?
+
+  /// Denormalised from the activity timeline so a list of 500 can sort
+  /// by "who have I not touched" without 500 subqueries.
+  lastActivityAt DateTime?
+
+  activities ContactActivity[]
+  tasks      ContactTask[]
+
+  /// One row per person per artist. Email is the natural key when it
+  /// exists, which is what makes re-importing the same CSV idempotent
+  /// instead of duplicating the whole list.
+  @@unique([artistId, email])
+  @@index([artistId, stage])
+  @@index([artistId, lastContactAt])
+}
+
+/// One thing that happened with a contact.
+///
+/// The timeline is what separates a CRM from a spreadsheet. A list of
+/// names tells you who exists; a timeline tells you what the
+/// relationship is, and it's the thing people actually open the software
+/// to read before they pick up the phone.
+///
+/// Some rows are typed by the artist and some are generated by the
+/// platform — a sale recorded, a piece claimed, an offer placed. Mixing
+/// them is the point: the software already knows most of what happened,
+/// and making a maker re-enter it by hand is why CRMs go stale.
+model ContactActivity {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  /// NOTE | CALL | EMAIL | DM | MEETING | SALE | OFFER | CLAIM | IMPORT
+  kind String
+  body String
+
+  /// When it actually happened, which is not always when it was logged —
+  /// somebody writing up yesterday's call needs yesterday's date or the
+  /// timeline lies.
+  occurredAt DateTime @default(now())
+
+  /// Set for platform-generated rows so they can be de-duplicated and
+  /// never double-posted: "sale:<id>", "claim:<id>", "offer:<id>".
+  sourceKey String? @unique
+
+  /// The piece this was about, when it was about a piece.
+  submissionId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([contactId, occurredAt])
+}
+
+/// A follow-up with a date on it.
+///
+/// Separate from an activity because the two answer opposite questions:
+/// an activity is what happened, a task is what hasn't yet. Collapsing
+/// them into one table is how "log a note" and "remind me Tuesday" end
+/// up as the same button and neither works.
+model ContactTask {
+  id        String  @id @default(cuid())
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  title  String
+  dueAt  DateTime
+  doneAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  /// The open-and-overdue query runs on every dashboard load.
+  @@index([contactId, doneAt])
+  @@index([doneAt, dueAt])
+}
+
+/// A record of staff acting on somebody else's content.
+///
+/// Admin power over user content is intended — a platform needs to be
+/// able to fix a broken photo, remove abuse, or correct a sale. What is
+/// NOT acceptable is that power being invisible. Before this table, an
+/// admin could add photos to an artist's piece, accept an offer on their
+/// behalf, or delete their post, and there was no record anywhere and no
+/// notification to the person whose work changed.
+///
+/// That is the difference between administration and interference, and
+/// the only thing that separates them is a log the operator cannot
+/// silently edit and the affected user can see.
+///
+/// Deliberately append-only in practice: nothing in the app updates or
+/// deletes these rows.
+model AuditLog {
+  id String @id @default(cuid())
+
+  /// Who did it. Null only for automated/system actions.
+  actorId    String?
+  actorEmail String?
+  /// admin | editor | system — what capability was exercised.
+  actorRole  String
+
+  /// A stable verb: "piece.photos.add", "offer.respond", "post.delete".
+  action String
+
+  /// What was acted on, and — crucially — WHOSE it was. The owner id is
+  /// what lets the affected person be shown their own entries without a
+  /// join through five tables.
+  targetType    String // submission | offer | feedPost | sale | artistProfile
+  targetId      String
+  targetOwnerId String?
+
+  /// One human sentence: "Added 2 photos to \"Afro Samurai\"".
+  summary String
+
+  createdAt DateTime @default(now())
+
+  /// The two reads this table has: the admin's full log, and one user's
+  /// "what was done to my stuff" view.
+  @@index([createdAt])
+  @@index([targetOwnerId, createdAt])
 }

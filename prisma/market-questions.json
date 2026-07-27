@@ -1,0 +1,606 @@
+[
+  {
+    "question": "A Dunk drops at $115 and sells out in 40 seconds. Ten minutes later it's listed at $290. Which market set the $290?",
+    "options": ["The primary market", "The secondary market", "The wholesale market", "The futures market"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "primary-vs-secondary",
+    "lesson": "The primary market is where something is sold for the first time, at a price the issuer sets. The secondary market is everyone trading it afterwards, at prices discovered by what buyers will actually pay. Same distinction as an IPO versus the stock exchange.",
+    "explanation": "Nike set $115 in the primary market. The $290 came from the secondary market, where price is discovered rather than announced."
+  },
+  {
+    "question": "Two identical pairs list at $400 and sit unsold for a month. A third lists at $260 and sells the same day. What just happened?",
+    "options": ["Price discovery", "Arbitrage", "A short squeeze", "Inflation"],
+    "answerIndex": 0,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "price-discovery",
+    "lesson": "Price discovery is a market finding the level where a buyer and a seller actually agree. Listings are opinions; trades are data. Until something transacts, nobody knows the price.",
+    "explanation": "The $400 listings were asking prices nobody accepted. The $260 sale is the first real information about what the pair is worth."
+  },
+  {
+    "question": "You want to sell your pair today — right now, no waiting. Which number do you actually get?",
+    "options": ["The ask", "The bid", "The last sale", "Retail"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "bid",
+    "lesson": "The bid is the highest price a buyer is currently committed to pay. Selling immediately means accepting the bid. On any quote screen — stocks, bonds, crypto — the bid is the sell-now price.",
+    "explanation": "The bid is the only price with a buyer already standing behind it, so it's the one available to a seller in a hurry."
+  },
+  {
+    "question": "You want the pair in your hands today, not next month. Which price do you pay?",
+    "options": ["The bid", "The ask", "The last sale", "Retail"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "ask",
+    "lesson": "The ask, or offer, is the lowest price a seller will currently accept. Buying immediately means paying the ask. Buy at the ask, sell at the bid — that gap is the cost of speed.",
+    "explanation": "The ask is the lowest price at which someone will part with the shoe right now."
+  },
+  {
+    "question": "Bid $180, ask $240. You buy at the ask and immediately resell at the bid. What's the damage?",
+    "options": ["$0", "$60 loss", "$60 profit", "$420"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "bid-ask-spread",
+    "lesson": "The gap between bid and ask is the spread, and it is the cost of immediacy. Round-tripping instantly always loses the spread — that loss is what pays the market makers who stand on both sides.",
+    "explanation": "You pay $240 and receive $180. The $60 difference is the spread, lost the moment you cross it in both directions."
+  },
+  {
+    "question": "Pair A: dozens of sales a week, bid and ask $10 apart. Pair B: two sales a year, bid and ask $300 apart. Which is more liquid?",
+    "options": ["Pair A", "Pair B", "Equally liquid", "Impossible to say"],
+    "answerIndex": 0,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "liquidity",
+    "lesson": "Liquidity is how easily you can turn something into cash near its quoted value. Frequent trades and tight spreads mean high liquidity. A wide spread is the market warning you that leaving may be expensive.",
+    "explanation": "Pair A trades constantly at a tight spread — you could exit near the quoted price. Pair B would cost you $300 of spread and a long wait."
+  },
+  {
+    "question": "A brand announces a surprise restock that triples the number in circulation. Demand is unchanged. What happens to the resale price?",
+    "options": ["It rises", "It falls", "It stays the same", "It doubles"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "supply-shock",
+    "lesson": "Price settles where supply meets demand. Increase supply while demand holds and the clearing price falls. An unexpected change in available quantity is a supply shock — the same mechanic as OPEC raising oil output.",
+    "explanation": "Three times the pairs chasing the same buyers means the market clears at a lower price."
+  },
+  {
+    "question": "A brand makes exactly 12 pairs of a colorway nobody wants. Which fact alone determines resale value?",
+    "options": ["Scarcity alone", "Demand alone", "Neither alone", "Production cost"],
+    "answerIndex": 2,
+    "difficulty": 2,
+    "level": 1,
+    "concept": "scarcity-needs-demand",
+    "lesson": "Scarcity only creates value where demand already exists. A limited run of something unwanted is just a small pile of unsold stock. Markets price the intersection of the two, never one on its own.",
+    "explanation": "Twelve pairs is extreme scarcity and worth nothing without buyers. 'Rare' is a claim about supply, never by itself a claim about worth."
+  },
+  {
+    "question": "The same deadstock pair, same size, is $220 on one platform and $310 on another after all fees. Buying low to sell high across the two is called:",
+    "options": ["Hedging", "Arbitrage", "Shorting", "Averaging down"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "arbitrage",
+    "lesson": "Arbitrage is profiting from one asset trading at two prices in two places. Arbitrageurs are why those gaps close: their buying lifts the cheap venue and their selling presses the expensive one until only costs remain.",
+    "explanation": "Same shoe, same size, two prices — the trade captures the difference and, in doing so, narrows it."
+  },
+  {
+    "question": "You buy at $200 and sell at $250. The platform takes 10% of the sale and shipping costs you $15. What did you actually make?",
+    "options": ["$50", "$35", "$10", "$25"],
+    "answerIndex": 2,
+    "difficulty": 2,
+    "level": 1,
+    "concept": "transaction-costs",
+    "lesson": "Gross profit is the price difference; net profit is what survives every cost of doing the trade. Commissions, fees and shipping are why a position that looks green on the screen can be red in your account.",
+    "explanation": "The $250 sale pays a $25 fee and $15 shipping, leaving $210. Against a $200 cost, that's $10 — not the $50 the prices suggest."
+  },
+  {
+    "question": "Shoe A trades at $2,000 with 300 pairs made. Shoe B trades at $400 with 50,000 pairs made. Which colorway represents more total market value?",
+    "options": ["Shoe A", "Shoe B", "They're equal", "Impossible to say"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 1,
+    "concept": "market-cap-vs-price",
+    "lesson": "Unit price says nothing about total size. Price multiplied by units outstanding gives market capitalisation. It's why a $3 stock can be a far bigger company than a $300 one — the price per share tells you nothing on its own.",
+    "explanation": "A is 300 × $2,000 = $600,000. B is 50,000 × $400 = $20,000,000 — over thirty times bigger despite the lower price."
+  },
+  {
+    "question": "A pair's last recorded sale was $500 — nine months ago, and nothing has traded since. What is that $500 today?",
+    "options": ["The exact current value", "A data point that may be stale", "A guaranteed floor", "A hard ceiling"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 1,
+    "concept": "last-traded-price",
+    "lesson": "The last traded price is history, not a promise — it tells you what one buyer paid once. In a thin market it can be badly out of date, which is why traders quote a live bid and ask instead of leaning on the last print.",
+    "explanation": "Nine months of nothing means no one has tested that level since. It's evidence, not a valuation."
+  },
+
+  {
+    "question": "You try to sell 20 pairs of the same shoe at once. The first goes at $300, the last at $215. Your own selling moved the price. That's:",
+    "options": ["Slippage", "Arbitrage", "Inflation", "A short squeeze"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "slippage",
+    "lesson": "Slippage is the difference between the price you expected and the average you actually got, and it grows with your order size relative to the market. Big orders eat through the available buyers, each one worse than the last.",
+    "explanation": "There weren't 20 buyers at $300. Working down the queue is what dragged your average price down."
+  },
+  {
+    "question": "You'll sell at $400 or better and you're happy to wait as long as it takes. Which instruction is that?",
+    "options": ["Market order", "Limit order", "Stop-loss", "Fill-or-kill"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 2,
+    "concept": "limit-vs-market-order",
+    "lesson": "A market order takes whatever price is available now: certain execution, uncertain price. A limit order names your price and waits: certain price, uncertain execution. Every order chooses between those two certainties.",
+    "explanation": "Naming your price and accepting that it might never fill is exactly a limit order."
+  },
+  {
+    "question": "You own a pair at $600 and decide in advance to sell if it ever falls to $450, to stop the bleeding. That standing instruction is a:",
+    "options": ["Limit order", "Stop-loss", "Call option", "Hedge"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "stop-loss",
+    "lesson": "A stop-loss triggers once the price falls to a level you set, capping your loss without you watching the screen. Its weakness is that a fast drop can fill you well below your trigger — a stop is not a guarantee.",
+    "explanation": "The order sits dormant and activates on the way down, which is what separates a stop from a limit."
+  },
+  {
+    "question": "You hold 40 pairs for a year in a $90-a-month storage unit. The shoes gain $1,200 in value over that year. How did you actually do?",
+    "options": ["Up $1,200", "Up $120", "Down $120", "Break-even"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 2,
+    "concept": "cost-of-carry",
+    "lesson": "Holding real assets costs money — storage, insurance, and the return your cash could have earned elsewhere. That total is the cost of carry, and it's why futures on physical goods usually price above spot.",
+    "explanation": "Storage ran $90 × 12 = $1,080. The $1,200 gain barely cleared it, leaving $120 before you count your time."
+  },
+  {
+    "question": "Comps say your collection is worth $40,000, up from the $25,000 you paid. You haven't sold anything. What's your realized gain?",
+    "options": ["$15,000", "$40,000", "$0", "$25,000"],
+    "answerIndex": 2,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "realized-vs-unrealized",
+    "lesson": "A gain is unrealized until you sell — on paper it's a mark, not money. Realized means the trade closed and the cash exists. Marks can evaporate overnight; realized gains cannot.",
+    "explanation": "Nothing has been sold, so nothing has been realized. The $15,000 is a mark that the market can take back."
+  },
+  {
+    "question": "A shoe ran from $300 to $900, fell to $500, and now sits at $700. What was its maximum drawdown?",
+    "options": ["22%", "44%", "33%", "66%"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 2,
+    "concept": "drawdown",
+    "lesson": "Drawdown is the peak-to-trough fall, measured from the highest point reached. It matters more than the final return, because it's the pain you have to sit through — and the level where most people sell.",
+    "explanation": "From the $900 peak down to $500 is a $400 fall on $900, or about 44%. The current $700 doesn't change what the worst stretch was."
+  },
+  {
+    "question": "Shoe A trades between $290 and $310 all year. Shoe B swings from $150 to $900 and back. Which word describes B?",
+    "options": ["Liquid", "Volatile", "Overbought", "Arbitraged"],
+    "answerIndex": 1,
+    "difficulty": 1,
+    "level": 2,
+    "concept": "volatility",
+    "lesson": "Volatility measures how violently a price moves, not which direction. High volatility means bigger gains and bigger losses are both live possibilities. It's the standard proxy for risk on every trading desk.",
+    "explanation": "B's range is enormous relative to its price. That's volatility — and it says nothing about whether B ends up higher."
+  },
+  {
+    "question": "A one-of-one has never sold and has no bid or ask. How do you put a number on it?",
+    "options": ["Retail of the donor pair", "Comparable sales of similar work", "The artist's follower count", "It has no value"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "comparables-valuation",
+    "lesson": "With no live market you value from comparables — recent sales of similar assets, adjusted for the differences. It's how private companies, houses and art are all priced, and it always carries more uncertainty than a traded price.",
+    "explanation": "Comparable sales are the only real evidence. The donor pair's retail ignores the work, and followers aren't buyers."
+  },
+  {
+    "question": "Deadstock pairs trade at $340; the same shoe worn twice trades at $190. That $150 gap is best described as:",
+    "options": ["The bid-ask spread", "A condition spread", "Slippage", "Arbitrage"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "quality-tiers",
+    "lesson": "The same underlying asset trades at different prices by grade. Bonds split by credit rating, oil by sulphur content, sneakers by condition. Never compare two prices without checking you're comparing the same grade.",
+    "explanation": "Both prices are real and neither is wrong — they're quotes on two different grades of the same shoe."
+  },
+  {
+    "question": "Two shoes both show a last sale of $250. One trades 300 times a month, the other twice a year. Which price should you trust more?",
+    "options": ["The one trading 300 times", "The one trading twice", "Trust them equally", "Neither"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "volume",
+    "lesson": "Volume is how much actually changes hands. A price backed by heavy volume reflects hundreds of independent opinions; a price from two trades reflects two. Thin volume makes any single print easy to distort.",
+    "explanation": "Three hundred trades a month is a price the market keeps re-confirming. Two trades a year could be two unusual buyers."
+  },
+  {
+    "question": "A platform charges 12% of the sale price. You buy at $300. Ignoring shipping, what must it sell for just to break even?",
+    "options": ["$336", "$341", "$312", "$360"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 2,
+    "concept": "breakeven-with-fees",
+    "lesson": "Your breakeven isn't your purchase price — it's your purchase price grossed up for the cost of getting out. The drag from fees and spread is what makes thin margins unprofitable no matter how often you trade.",
+    "explanation": "You keep 88% of the sale, so you need $300 ÷ 0.88 ≈ $341. Adding 12% to $300 gives $336, which still leaves you short."
+  },
+  {
+    "question": "You bought one pair at $600. It falls to $400 and you buy a second. What's your average cost per pair now?",
+    "options": ["$600", "$500", "$400", "$1,000"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 2,
+    "concept": "averaging-down",
+    "lesson": "Buying more as the price falls lowers your average entry — averaging down. It reduces the price at which you break even, but it also increases your exposure to something that is, so far, going the wrong way.",
+    "explanation": "$1,000 spent across two pairs is $500 each. You now break even at $500 instead of $600 — with twice as much at stake."
+  },
+
+  {
+    "question": "A dealer at a trade show says: 'I'll buy that pair off you at $400, or sell you one at $460. Your choice.' What is he doing?",
+    "options": ["Arbitraging", "Making a market", "Shorting", "Hedging"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 3,
+    "concept": "making-a-market",
+    "lesson": "A market maker quotes both a bid and an ask and will trade either side on demand, earning the spread for providing that service. Their job is to be the buyer when you must sell and the seller when you must buy.",
+    "explanation": "Quoting both sides at once and letting you pick is the definition of making a market."
+  },
+  {
+    "question": "That dealer now owns 30 pairs he bought at his bid, and the model falls out of favour. What risk is he carrying?",
+    "options": ["Counterparty risk", "Inventory risk", "Currency risk", "Slippage"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 3,
+    "concept": "inventory-risk",
+    "lesson": "A market maker who buys must hold the asset until someone buys it back — that's inventory risk, and it's what the spread compensates. The riskier the inventory, the wider they quote.",
+    "explanation": "He's long 30 pairs he didn't want to own. The spread he earned is small comfort against a falling market."
+  },
+  {
+    "question": "At $300 there are buyers for 2 pairs. At $280, buyers for 25. At $250, buyers for 400. This picture of size at each price is:",
+    "options": ["Market depth", "Volatility", "The spread", "Slippage"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 3,
+    "concept": "market-depth",
+    "lesson": "The order book lists resting orders at every price, and the quantity stacked at each level is market depth. Depth tells you how much you can trade before you move the price — the thing a single quoted price hides.",
+    "explanation": "The $300 quote is real but only two pairs deep. Depth is what tells you the tenth pair sells far lower."
+  },
+  {
+    "question": "A dealer notices the only people selling him a certain model lately are people who know a restock is coming. His problem is:",
+    "options": ["Adverse selection", "Arbitrage", "Slippage", "Contango"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "adverse-selection",
+    "lesson": "Adverse selection is the risk that whoever wants to trade with you knows something you don't. Market makers widen their spreads against informed flow — it's why quotes get worse right before news.",
+    "explanation": "He's only getting filled by people with better information, so every trade he wins is one he'd rather have lost."
+  },
+  {
+    "question": "You agree a $2,000 private sale and ship first. The buyer never pays. The risk you took was:",
+    "options": ["Market risk", "Counterparty risk", "Liquidity risk", "Inventory risk"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 3,
+    "concept": "counterparty-risk",
+    "lesson": "Counterparty risk is the chance the other side fails to deliver their half of the deal. Exchanges and escrow exist almost entirely to remove it — a clearing house steps between buyer and seller so neither has to trust the other.",
+    "explanation": "The shoe's value never changed. What failed was the person on the other side."
+  },
+  {
+    "question": "A marketplace holds the buyer's money and the seller's shoe until both are verified, then releases both. In market terms that's:",
+    "options": ["Underwriting", "Settlement through a clearing house", "Hedging", "Market making"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "settlement",
+    "lesson": "Settlement is the actual exchange of asset for cash. A clearing house guarantees it by standing in the middle of every trade — which is why you never think about who is on the other side of a stock purchase.",
+    "explanation": "Holding both legs until each is verified is exactly what a clearing house does, minus the shoes."
+  },
+  {
+    "question": "Fakes are hard to spot, so buyers assume any pair might be fake and bid lower. Honest sellers stop bothering. This spiral is:",
+    "options": ["A short squeeze", "A market for lemons", "Contango", "A bubble"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "information-asymmetry",
+    "lesson": "When buyers can't tell quality apart they price for the average, which drives the good sellers out and lowers the average further. Economists call it a market for lemons, and verification is the standard cure.",
+    "explanation": "Each round of discounting pushes out the best stock, which justifies more discounting. Authentication breaks the loop."
+  },
+  {
+    "question": "Bid $300, ask $340. Two people find each other and trade at $320. Compared with hitting the quotes, what happened?",
+    "options": ["Both got a worse price", "Both got price improvement", "The buyer lost $20", "Nothing changed"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "price-improvement",
+    "lesson": "Trading inside the quoted spread beats the public quote for both sides — that's price improvement. Matching buyer to seller directly splits the spread between them instead of paying it away to a middleman.",
+    "explanation": "The buyer saved $20 against the $340 ask and the seller gained $20 over the $300 bid. The dealer's spread went unpaid."
+  },
+  {
+    "question": "You sold 50 pairs over a month at many prices. To grade your selling you compare against VWAP. What does VWAP weight each sale by?",
+    "options": ["The date", "The number of pairs in it", "The buyer's rating", "The platform fee"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "vwap",
+    "lesson": "VWAP is the volume-weighted average price: each trade counts in proportion to its size, so a 30-pair sale counts thirty times a single. Desks are graded against it because it measures execution rather than luck on one trade.",
+    "explanation": "Weighting by quantity stops one lucky single-pair sale from flattering a month of mediocre bulk selling."
+  },
+  {
+    "question": "You need all 10 pairs at once or none at all — a partial fill is useless to you. Which instruction says that?",
+    "options": ["Fill-or-kill", "Stop-limit", "Market order", "Good-till-cancelled"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 3,
+    "concept": "fill-or-kill",
+    "lesson": "Fill-or-kill executes the entire order immediately or cancels it completely. Order types exist to encode your real constraint — a partial fill can leave you holding a position you never wanted.",
+    "explanation": "Any other order type risks filling you on 4 pairs and leaving you with a broken lot."
+  },
+  {
+    "question": "A seller holding 200 pairs displays only 5 at a time so the market can't see the size coming. That's:",
+    "options": ["An iceberg order", "A short squeeze", "A stop-loss", "Arbitrage"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "iceberg-order",
+    "lesson": "An iceberg order hides most of its size and reveals a small slice at a time. Showing a huge order moves the price against you before it fills, so large traders conceal size deliberately.",
+    "explanation": "Five visible, 195 hidden. Buyers price against what they can see."
+  },
+  {
+    "question": "Panic hits the market. Dealers who quoted $10 apart are suddenly quoting $120 apart. Why?",
+    "options": ["Pure greed", "Uncertainty raised their risk of being caught holding", "New regulation", "Platform fees rose"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 3,
+    "concept": "liquidity-withdrawal",
+    "lesson": "Spreads widen when the future gets less predictable, because a dealer holding inventory through a violent move can lose far more than any spread. Liquidity is not a constant — it withdraws exactly when you most need it.",
+    "explanation": "A wider spread is a dealer pricing the risk of buying from you and being unable to sell before the market moves again."
+  },
+
+  {
+    "question": "An artist takes $40 today for the right — not the obligation — to buy a piece at $500 next month. What did the buyer purchase?",
+    "options": ["A call option", "A put option", "A futures contract", "A short position"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 4,
+    "concept": "call-option",
+    "lesson": "A call option is the right to buy at a fixed price (the strike) before a deadline, bought for a non-refundable fee (the premium). Your loss is capped at the premium; your upside isn't capped at all.",
+    "explanation": "A right without an obligation, paid for upfront, at a set price, with an expiry — that's a call."
+  },
+  {
+    "question": "You paid $40 for the right to buy at $500. It's now worth $700 and you exercise. What's your net profit?",
+    "options": ["$200", "$160", "$700", "$260"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "option-payoff",
+    "lesson": "An option's profit is the gain from exercising minus the premium you paid. Break-even isn't the strike — it's the strike plus the premium, which is why a correct call can still lose money.",
+    "explanation": "Buying at $500 something worth $700 gains $200. Subtract the $40 premium you already spent: $160."
+  },
+  {
+    "question": "Same deal — $40 for the right to buy at $500. At the deadline it's only worth $430. What do you do?",
+    "options": ["Exercise and lose $70", "Let it expire and lose $40", "Exercise and lose $40", "Sell it short"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "option-expiry",
+    "lesson": "You never have to exercise. If the market sits below your strike, buying at the strike would be worse than buying outright, so you walk away and lose only the premium. That capped downside is the entire point of options.",
+    "explanation": "Exercising would mean paying $500 for a $430 shoe. Walking away costs you only the $40 you'd already spent."
+  },
+  {
+    "question": "You own a grail and pay $60 for the right to sell it at $900 any time this year, whatever happens to the market. You bought:",
+    "options": ["A call", "A put", "A future", "A swap"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 4,
+    "concept": "put-option",
+    "lesson": "A put is the right to sell at a fixed price — insurance against a fall. Portfolio managers buy puts for exactly this reason: a known cost today in exchange for a floor under a position they already hold.",
+    "explanation": "A guaranteed selling price you can use but don't have to is a put option, and the $60 is its premium."
+  },
+  {
+    "question": "A reseller takes $500 today for a pair he doesn't own yet, promising delivery next week. He is:",
+    "options": ["Long", "Short", "Hedged", "Arbitraging"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 4,
+    "concept": "short-selling",
+    "lesson": "Selling something you don't yet own is being short: you profit if the price falls, because you buy it back cheaper than you sold it. It's the only way to make money from a price going down.",
+    "explanation": "He's sold what he doesn't have and must buy it later. He wants the price to drop before he does."
+  },
+  {
+    "question": "He sold at $500. Before he can buy, a celebrity wears the pair and it runs to $2,400. What's his loss?",
+    "options": ["Capped at $500", "$1,900, and it could have gone higher", "Zero", "$2,400"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "unlimited-downside",
+    "lesson": "A long position can only fall to zero, so your loss is capped at what you paid. A short has no ceiling, because there is no limit to how high a price can go. That asymmetry is the defining danger of short selling.",
+    "explanation": "He collected $500 and must spend $2,400 to deliver — a $1,900 loss, with nothing that would have stopped it growing."
+  },
+  {
+    "question": "Dozens of resellers are short the same pair. It spikes, they all scramble to buy back at once, and that buying drives it higher still. This is:",
+    "options": ["A short squeeze", "A bubble", "Contango", "Arbitrage"],
+    "answerIndex": 0,
+    "difficulty": 2,
+    "level": 4,
+    "concept": "short-squeeze",
+    "lesson": "A short squeeze happens when rising prices force shorts to buy to close, and their buying pushes the price up further, forcing more of them out. The buying isn't belief — it's compulsion.",
+    "explanation": "Each forced buy-back is real demand that lifts the price and traps the next short. The move feeds itself."
+  },
+  {
+    "question": "A consignment platform fronted him inventory against a deposit. As the price runs against him they demand more money or they'll close him out. That demand is:",
+    "options": ["A margin call", "A dividend", "A coupon", "A stop-loss"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "margin-call",
+    "lesson": "Trading on borrowed money requires collateral, and when losses eat into it the lender demands more — a margin call. Fail to meet it and they liquidate your position at whatever price is available, not the one you'd have chosen.",
+    "explanation": "The lender is protecting itself, not you. Its right to force a sale is what makes leverage dangerous."
+  },
+  {
+    "question": "You control $10,000 of inventory with $2,000 of your own money and $8,000 borrowed. The inventory falls 20%. What happened to your money?",
+    "options": ["Down 20%", "Wiped out — down 100%", "Down 4%", "Unchanged"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "leverage",
+    "lesson": "Leverage multiplies both directions. Five-to-one leverage turns a 20% move against you into the total loss of your capital. This is how experienced traders reach zero on a move that barely dented the asset itself.",
+    "explanation": "A 20% fall on $10,000 is a $2,000 loss — exactly your stake. The lender still wants all $8,000 back."
+  },
+  {
+    "question": "A customizer holding 50 blank pairs takes short positions in the same model to protect against a fall. He is:",
+    "options": ["Speculating", "Hedging", "Arbitraging", "Averaging down"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 4,
+    "concept": "hedging",
+    "lesson": "A hedge is a position taken to offset risk you already carry, not to make money on its own. Airlines hedge fuel, farmers hedge crops — you give up some upside to remove some downside.",
+    "explanation": "He's already long 50 pairs by owning them. The short cancels part of that exposure rather than adding a new bet."
+  },
+  {
+    "question": "Pairs cost $500 today. A contract for delivery in a year prices at $560, mostly because of storage and financing. That $60 gap is:",
+    "options": ["The basis", "Slippage", "The spread", "Arbitrage"],
+    "answerIndex": 0,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "basis-and-contango",
+    "lesson": "Basis is the difference between the spot price and the futures price, and for physical goods it mostly reflects the cost of carry. When futures trade above spot the market is said to be in contango.",
+    "explanation": "Nobody expects the shoe to be worth $60 more — the gap pays whoever stores and finances it for a year."
+  },
+  {
+    "question": "One person buys a pair expecting to flip it in weeks. Another buys the brand's stock expecting profits over a decade. The clearest distinction is:",
+    "options": ["One of them is illegal", "Where the return is expected to come from", "One is riskier by definition", "There is no real difference"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 4,
+    "concept": "speculation-vs-investment",
+    "lesson": "Investment aims to earn from something productive over time; speculation aims to earn from a change in price. The line blurs, but the honest test is where you expect your return to come from — a business, or the next buyer.",
+    "explanation": "The shareholder is paid by the company's earnings. The flipper is paid by whoever buys the shoe next."
+  },
+
+  {
+    "question": "Every forum agrees a pair is going up. What does that tell you about today's price?",
+    "options": ["It's going up", "That expectation is probably already in the price", "It's too low", "Nothing at all"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "crowded-trade",
+    "lesson": "Prices reflect what participants already believe. When a view is universally held it has already been acted on, so the price has already moved. That's why consensus trades pay less and disappoint more often.",
+    "explanation": "Unanimity isn't a signal to buy — it's evidence the buying already happened."
+  },
+  {
+    "question": "A piece of news is on the front page of every sneaker site. To make money from it you'd need:",
+    "options": ["To act on it fast", "An insight the price hasn't captured", "More capital", "A better platform"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "market-efficiency",
+    "lesson": "In a reasonably efficient market, public information is already in the price by the time you read it. An edge means knowing something the price doesn't, or being willing to hold a risk that others won't.",
+    "explanation": "Everyone read the same headline. Speed alone rarely beats the people who were already positioned."
+  },
+  {
+    "question": "A shoe trades at prices nobody defends on the merits, purely because buyers expect someone to pay more tomorrow. That dynamic is:",
+    "options": ["Value investing", "The greater fool theory", "Hedging", "Arbitrage"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 5,
+    "concept": "greater-fool",
+    "lesson": "The greater fool theory describes buying at any price on the assumption someone else will pay more. It works until it doesn't — and it stops working for everybody at the same moment.",
+    "explanation": "The thesis isn't the shoe, it's the next buyer. That's a chain with a last link."
+  },
+  {
+    "question": "During a mania prices are high and everything sells instantly. When it turns, the worst problem is usually:",
+    "options": ["Prices dip a little", "The bids disappear entirely", "Fees rise", "Shipping slows down"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "liquidity-risk",
+    "lesson": "In a bust the quoted price isn't the problem — the absence of any buyer at all is. Liquidity is at its best when you don't need it and gone precisely when you do.",
+    "explanation": "A listing with no bid isn't a price, it's a hope. You can't exit a market that has no buyers at any level."
+  },
+  {
+    "question": "Your entire collection is one brand's hyped models. That brand loses cultural momentum. What happens?",
+    "options": ["A few pairs dip", "Nearly all of it falls together", "Nothing", "Prices rise"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 5,
+    "concept": "correlation",
+    "lesson": "Correlation measures how much things move together. Holdings that share a single driver aren't separate bets — they're one bet in several boxes, and they all go wrong on the same day.",
+    "explanation": "Twenty pairs from one brand is one position, not twenty. The brand is the risk."
+  },
+  {
+    "question": "Given that, the standard defence is to hold things whose prices are driven by different forces. That's:",
+    "options": ["Hedging", "Diversification", "Leverage", "Arbitrage"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 5,
+    "concept": "diversification",
+    "lesson": "Diversification reduces risk by combining assets that don't move together. It's the closest thing to a free improvement in finance — but only if what you hold is genuinely driven by different things.",
+    "explanation": "Owning more of the same driver isn't diversification. Owning different drivers is."
+  },
+  {
+    "question": "A flipper is right on 8 of 10 calls, but bets everything on each one. On the ninth he's wrong and loses it all. His mistake was:",
+    "options": ["Bad picks", "Position sizing", "Bad timing", "Too much diversification"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "position-sizing",
+    "lesson": "Being right often doesn't help if a single loss can end you. Position sizing decides how much of your capital one outcome can destroy — survival matters more than accuracy, because you can't compound from zero.",
+    "explanation": "An 80% hit rate is excellent. Staking everything on each call guarantees that the one miss is terminal."
+  },
+  {
+    "question": "Every resale success story you see comes from someone who made money. What's missing from that picture?",
+    "options": ["Nothing", "Everyone who lost and stopped posting", "Fees", "Taxes"],
+    "answerIndex": 1,
+    "difficulty": 2,
+    "level": 5,
+    "concept": "survivorship-bias",
+    "lesson": "Survivorship bias is judging results from the winners because the losers aren't visible. Any track record assembled from the people still talking overstates the odds — the quiet ones are part of the sample too.",
+    "explanation": "The people who lost money and quit don't post their numbers, so the visible average is far too flattering."
+  },
+  {
+    "question": "A drop prices at $115 and instantly trades at $290. Who captured that $175?",
+    "options": ["The brand", "Whoever got an allocation", "The resale platform", "Nobody"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "underpricing-and-allocation",
+    "lesson": "When an issuer prices below what the market will pay, the difference goes to whoever received an allocation, not to the issuer. IPO underpricing is the same transfer — which is why getting an allocation is the valuable part.",
+    "explanation": "The brand banked $115 and left $175 on the table. It went to whoever won the raffle."
+  },
+  {
+    "question": "A 'sneaker market index' is up 30%. Then you learn it only includes shoes currently trading above retail. That number is:",
+    "options": ["Accurate", "Biased upward by what it leaves out", "Too low", "Irrelevant"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "index-construction",
+    "lesson": "An index is only as honest as its inclusion rules. Screening out the losers guarantees a rising line that describes nothing real. Always read what an index counts before believing what it says.",
+    "explanation": "Every shoe that fell below retail was quietly excluded, so the index measures winners and calls it a market."
+  },
+  {
+    "question": "A 'free' marketplace makes its money by routing your order to a dealer who pays for the privilege. What should you check?",
+    "options": ["Nothing, it's free", "Whether your price was worse than the best available", "The app's rating", "Shipping speed"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "payment-for-order-flow",
+    "lesson": "Payment for order flow means the venue is paid by whoever ends up trading against you. It isn't automatically bad, but 'free' means the cost moved somewhere less visible — usually into the price you were given.",
+    "explanation": "Someone is paying for that order flow, and it's worth their money because of what they earn on the other side of your trade."
+  },
+  {
+    "question": "You value your 200-pair collection using the highest asking prices currently listed. What's wrong with that?",
+    "options": ["Nothing", "Asks aren't bids, and 200 can't all sell at the top", "It's too conservative", "Only that it ignores fees"],
+    "answerIndex": 1,
+    "difficulty": 3,
+    "level": 5,
+    "concept": "honest-marks",
+    "lesson": "Marking a book to the most flattering quote available overstates it twice: asks are not executable prices, and selling real size pushes down through the bids beneath. Honest marks use where you could actually exit.",
+    "explanation": "Nobody has agreed to pay those asks, and unloading 200 pairs would move the price against you the whole way down."
+  }
+]

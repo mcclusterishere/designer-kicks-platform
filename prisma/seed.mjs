@@ -145,6 +145,64 @@ const retiredStarterNames = [
 // promoting a post.
 const articles = [
   {
+    slug: "nike-air-max-1000-2-glacier-blue-release-date",
+    title: "Nike Air Max 1000.2 'Glacier Blue' Release Date: The 3D-Printed Slip-On Gets Iced Out",
+    excerpt:
+      "Nike and Zellerfeld's 3D-printed Air Max 1000.2 returns in 'Glacier Blue' — a stealth-black build with a frozen-blue Air unit. Drops July 30, 2026 on Nike SNKRS for $180 (JF3484-006).",
+    tags: "Nike, Zellerfeld, Air Max, 3D Printed, Release Dates",
+    coverImage: "/seed/air-max-1000-2-glacier-blue.jpeg",
+    sku: "JF3484-006",
+    dropAt: new Date("2026-07-30T12:00:00Z"),
+    raffleUrl: "https://www.nike.com/launch",
+    daysAgo: 0,
+    question: {
+      q: "Nike's fully 3D-printed Air Max 1000 is made in partnership with which startup?",
+      options: ["Carbon", "Zellerfeld", "HP", "Formlabs"],
+      answer: 1,
+      explain:
+        "Zellerfeld, the Hamburg-based 3D-printing company, prints the Air Max 1000 as a single-material, laceless shoe. The 1000.2 update sped up that print process so colorways can roll out faster.",
+    },
+    content: [
+      "## Cold tech, hot drop",
+      "",
+      "Nike and 3D-printing partner **Zellerfeld** keep their futuristic run going with the **Air Max 1000.2 \"Glacier Blue\"** — a stealth-black, fully printed slip-on with one icy detail that steals the show.",
+      "",
+      "Building on the original Air Max 1000, the **1000.2** refines the outsole geometry and — the real story — speeds up Zellerfeld's printing process, so Nike can push new colorways at a faster clip while keeping that soft, one-piece underfoot feel.",
+      "",
+      "## Design & aesthetic",
+      "",
+      "The \"Glacier Blue\" makeup runs a jet-black base and lets the shoe's fluid, printed architecture do the talking:",
+      "",
+      "- **3D-printed monolithic upper** — a seamless, laceless slip-on printed as a single piece with variable material densities for breathability and support, no stitching or overlays.",
+      "- **Sculpted ridges & debossed branding** — wave-like contours and subtle debossed Swooshes nod to Air Max heritage.",
+      "- **The focal point** — a vibrant **Glacier Blue Air unit** set into the black sculpted heel, a sharp frozen contrast against the blackout build.",
+      "",
+      "![Nike Air Max 1000.2 Glacier Blue heel detail](/seed/air-max-1000-2-glacier-blue-heel.jpeg)",
+      "",
+      "## The drop at a glance",
+      "",
+      "| | |",
+      "|---|---|",
+      "| **Model** | Nike Air Max 1000.2 |",
+      "| **Colorway** | Black / Glacier Blue |",
+      "| **Style code** | JF3484-006 |",
+      "| **Retail** | $180 |",
+      "| **Release** | July 30, 2026 — Nike SNKRS |",
+      "",
+      "The wider launch lands **Thursday, July 30, 2026 on Nike SNKRS** for **$180**. Zellerfeld's 1000.2 colorways have typically opened an **EQL raffle on Zellerfeld's own site a few days ahead** of the SNKRS release — expect the same cadence here, and we'll pin the exact raffle date on the calendar as it firms up.",
+      "",
+      "## How to cop",
+      "",
+      "1. **Nike SNKRS** — the main draw opens July 30; hit the launch link above and enter the minute it goes live.",
+      "2. **Zellerfeld (EQL)** — watch Zellerfeld's site for the pre-launch raffle on the 1000.2 line.",
+      "3. **Miss it?** The buy links below route to the marketplaces we trust for resale.",
+      "",
+      "*A fully 3D-printed Nike is exactly the kind of tech that rewrites what a custom can be — the future of the game, printed one shoe at a time.*",
+      "",
+      "*Images via Nike / Zellerfeld.*",
+    ].join("\n"),
+  },
+  {
     slug: "air-jordan-4-laser-pack-2027-release-date",
     title: "Air Jordan 4 'Laser' Pack Returns February 2027 — Both 2005 Grails, One $500 Box",
     excerpt:
@@ -914,12 +972,12 @@ const preloadArtists = [
     ],
   },
   {
-    // Atlanta concept artist — verified FB (4.8K), IG @dekota_customz,
-    // commissions open. FB DMs are closed; IG is the channel.
+    // Atlanta concept artist — active IG @the_gifted_7 (the old
+    // @dekota_customz page is locked/abandoned). IG is the channel.
     slug: "justin-dekota",
     email: null,
     displayName: "Justin Dekota",
-    instagram: "dekota_customz",
+    instagram: "the_gifted_7",
     city: "Atlanta, GA",
     bio: "Atlanta sneaker artist bringing concepts to life — story builds with a message under the paint. KAWS-style characters, hand-lettered narratives, heels that read like panels. Commissions open.",
     pieces: [
@@ -1141,9 +1199,9 @@ const preloadArtists = [
   },
 ];
 
-function loadQuestions() {
+function loadQuestions(file = "questions.json") {
   try {
-    const raw = readFileSync(path.join(here, "questions.json"), "utf8");
+    const raw = readFileSync(path.join(here, file), "utf8");
     const parsed = JSON.parse(raw);
     return parsed.filter(
       (q) =>
@@ -1430,6 +1488,535 @@ async function seedOgSeriesBattles() {
   console.log(`OG Series: ${entries.length} editorial entrants, ${created} new battle(s).`);
 }
 
+
+/**
+ * One real artist, one page. When a staged page and a member's own
+ * page exist for the same person, fold the staged page into theirs:
+ * every piece, collab credit, follower, claim, shop, drop, post,
+ * commission and consignment moves to the member's page; their own
+ * name, bio, handle and slug win; empty fields (city, portfolio)
+ * fill from the staged page; page views add up; then the staged page
+ * is deleted. Keyed by known duplicate pairs and idempotent, so it is
+ * safe on every deploy.
+ */
+async function mergeDuplicateArtists() {
+  // [staged-duplicate instagram, member-survivor instagram], no @.
+  const PAIRS = []; // duplicate-merge pairs; Dekota's already merged — repairs now go through the admin tool
+  const norm = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
+
+  for (const [dupIg, survIg] of PAIRS) {
+    const profiles = await prisma.artistProfile.findMany();
+    const dup = profiles.find((p) => norm(p.instagram) === dupIg);
+    const surv = profiles.find((p) => norm(p.instagram) === survIg);
+    if (!surv) continue;
+
+    if (dup && dup.id !== surv.id) {
+    const move = { where: { artistId: dup.id }, data: { artistId: surv.id } };
+    await prisma.submission.updateMany(move);
+    await prisma.artistShop.updateMany(move);
+    await prisma.artistDrop.updateMany(move);
+    await prisma.feedPost.updateMany(move);
+    await prisma.commissionRequest.updateMany(move);
+    await prisma.consignment.updateMany(move);
+    await prisma.artistClaim.updateMany(move);
+
+    // Followers are unique per (artist, user): move the ones the
+    // survivor doesn't already have, drop the rest.
+    const kept = await prisma.artistFollow.findMany({
+      where: { artistId: surv.id },
+      select: { userId: true },
+    });
+    const have = new Set(kept.map((f) => f.userId));
+    const moving = await prisma.artistFollow.findMany({ where: { artistId: dup.id } });
+    for (const f of moving) {
+      if (have.has(f.userId)) {
+        await prisma.artistFollow.delete({ where: { id: f.id } });
+      } else {
+        await prisma.artistFollow.update({ where: { id: f.id }, data: { artistId: surv.id } });
+      }
+    }
+
+    // Collab credits ride an implicit join table — reconnect by hand.
+    const collabs = await prisma.submission.findMany({
+      where: { collaborators: { some: { id: dup.id } } },
+      select: { id: true },
+    });
+    for (const c of collabs) {
+      await prisma.submission.update({
+        where: { id: c.id },
+        data: { collaborators: { disconnect: { id: dup.id }, connect: { id: surv.id } } },
+      });
+    }
+
+    // The member's page wins; staged info only fills the gaps.
+    await prisma.artistProfile.update({
+      where: { id: surv.id },
+      data: {
+        city: surv.city ?? dup.city,
+        portfolioUrl: surv.portfolioUrl ?? dup.portfolioUrl,
+        sellsOnline: surv.sellsOnline ?? dup.sellsOnline,
+        onboardedById: surv.onboardedById ?? dup.onboardedById,
+        viewCount: surv.viewCount + dup.viewCount,
+        status: "APPROVED",
+      },
+    });
+    await prisma.artistProfile.delete({ where: { id: dup.id } });
+    console.log(
+      `Merged duplicate artist: ${dup.slug} (@${dupIg}) folded into ${surv.slug} (@${survIg}).`
+    );
+    }
+
+    // If the merge landed two copies of the same piece on the survivor
+    // (staged copy + their own upload), keep the one carrying battles
+    // or votes and drop the unreferenced stray. Never delete a piece
+    // that's in a battle.
+    const pieces = await prisma.submission.findMany({
+      where: { artistId: surv.id },
+      include: {
+        _count: { select: { votes: true } },
+        battlesAsA: { select: { id: true } },
+        battlesAsB: { select: { id: true } },
+      },
+    });
+    const byTitle = new Map();
+    for (const p of pieces) {
+      const key = p.title.trim().toLowerCase();
+      if (!byTitle.has(key)) byTitle.set(key, []);
+      byTitle.get(key).push(p);
+    }
+    for (const [, group] of byTitle) {
+      if (group.length < 2) continue;
+      const referenced = (p) =>
+        p.battlesAsA.length + p.battlesAsB.length > 0 || p._count.votes > 0;
+      const keep =
+        group.find(referenced) ?? group[0];
+      for (const p of group) {
+        if (p.id === keep.id) continue;
+        if (referenced(p)) continue; // both live — leave for a human
+        await prisma.submission.delete({ where: { id: p.id } }).catch(() => {});
+        console.log(`Merge dedupe: removed stray copy of "${p.title}".`);
+      }
+    }
+  }
+}
+
+
+/**
+ * Named promotions: the owner's scout account rides the deploy — keyed
+ * by account NAME so it works whatever email the account used.
+ * Idempotent; logs only when it actually promotes.
+ */
+/**
+ * Handle restore: @the_gifted_7 is Dekota's real Instagram (confirmed
+ * by the owner) — an earlier pass wrongly forced @dekota_customz onto
+ * the merged page. Put the real handle back on his page. Idempotent:
+ * once it reads the_gifted_7 this is a no-op. Account linkage (which
+ * login owns the page) is a separate repair done from the admin tool,
+ * because it needs real production data a seed script shouldn't guess.
+ */
+async function restoreDekotaHandle() {
+  const p = await prisma.artistProfile.findFirst({
+    where: {
+      OR: [
+        { slug: "justin-dekota" },
+        { instagram: { equals: "dekota_customz", mode: "insensitive" } },
+      ],
+    },
+  });
+  if (!p || (p.instagram ?? "").toLowerCase() === "the_gifted_7") return;
+  await prisma.artistProfile.update({
+    where: { id: p.id },
+    data: { instagram: "the_gifted_7" },
+  });
+  console.log(`Handle restore: ${p.slug} now wears @the_gifted_7 (owner's real IG).`);
+}
+
+/**
+ * Staff seats are granted, never matched.
+ *
+ * This used to promote any MEMBER whose DISPLAY NAME matched a hard-coded
+ * pair of strings, on every boot. A display name is a free-text field the
+ * account holder controls: open /profile, type the name, wait for the
+ * next deploy, and the seed handed you EDITOR. Editors can reassign
+ * unclaimed artist pages with outreachInvite and get the claim URL back,
+ * so that is a roster takeover reachable by anyone with an account and a
+ * keyboard — the same escalation that was just closed at signup,
+ * re-opened through the back door.
+ *
+ * Names are not identity. The admin Team panel already grants editor by
+ * EMAIL, which at least requires control of a mailbox, and it writes an
+ * audit entry. That is the only door now; this function is deliberately
+ * empty of any promotion and kept only as the place this note lives.
+ *
+ * If a seat needs restoring after this change: Admin → Settings → Team →
+ * grant editor by email. One click, and it survives deploys because it
+ * is a real database grant rather than a string match re-applied at boot.
+ */
+async function promoteNamedEditors() {
+  // Intentionally does nothing. See the note above.
+}
+
+/**
+ * The charter members of the Founding 100.
+ *
+ * The offer says "the first hundred artists", and these two were here
+ * before it existed — so the honest seat count on day one is 98, not 100.
+ * Handing them #1 and #2 makes the number on the pricing page true rather
+ * than merely aspirational, and it costs nothing to be accurate about who
+ * showed up first.
+ *
+ * Ordered. Position in this list IS the seat number, so the list is the
+ * record of who was first and shouldn't be reordered casually.
+ *
+ * Keyed by SLUG, never by display name — a display name is free text the
+ * account holder can change, and the last thing anchored to one of those
+ * turned into a way for anybody to grant themselves a staff seat.
+ *
+ * The rules here mirror lib/founding.ts, which is the source of truth for
+ * the app: twelve months, price zero, status "founding", no Stripe object
+ * of any kind. They are restated rather than imported because this file
+ * is plain ESM run by node at boot and cannot load the TypeScript module.
+ * verify:founding asserts the two agree, so the duplication is checked
+ * rather than trusted.
+ */
+const FOUNDING_CHARTER = ["hitman-benji", "justin-dekota"];
+
+/** Mirrors addMonths() in lib/founding.ts — clamps to the last valid day. */
+function addMonthsSeed(from, months) {
+  const d = new Date(from.getTime());
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
+  return d;
+}
+
+async function grantFoundingCharter() {
+  const now = new Date();
+  const through = addMonthsSeed(now, 12);
+
+  for (const slug of FOUNDING_CHARTER) {
+    const a = await prisma.artistProfile.findUnique({
+      where: { slug },
+      select: { id: true, displayName: true, status: true, foundingNumber: true, firstSubscribedAt: true },
+    });
+    // Not on this database yet, already holds a seat, or not approved —
+    // all three mean "nothing to do", and re-granting on every boot is
+    // exactly the kind of thing that would silently extend their year.
+    if (!a || a.foundingNumber !== null || a.status !== "APPROVED") continue;
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const taken = await prisma.artistProfile.count({ where: { foundingNumber: { not: null } } });
+      if (taken >= 100) break; // room is full; the charter doesn't get to jump a real member
+      try {
+        await prisma.artistProfile.update({
+          where: { id: a.id },
+          data: {
+            foundingNumber: taken + 1,
+            foundingGrantedAt: now,
+            plan: "PRO",
+            planStatus: "founding",
+            planPriceCents: 0,
+            planInterval: null,
+            paidThrough: through,
+            firstSubscribedAt: a.firstSubscribedAt ?? now,
+          },
+        });
+        console.log(`Founding 100: ${a.displayName} seated at #${taken + 1}.`);
+        break;
+      } catch (e) {
+        // Somebody claimed that number in the gap — the unique index is
+        // what makes the cap real. Recount and try the next one.
+        if (e?.code !== "P2002") throw e;
+      }
+    }
+  }
+}
+
+// The Editor's Pick — a quietly hand-picked feature, independent of the
+// Heat List. The designer is Hitman Benji; the giveaway is a 1-of-1 vest
+// he builds for the winner. Kept understated on purpose — prestige, not a
+// flex. Idempotent: once a human edits the name/note in admin, this stops
+// overwriting it.
+//
+// The alias is the only name that belongs in this repository. It is
+// public, this file is public, and pairing a working alias with the legal
+// name behind it in source is a doxx that no feature needed — the code
+// never had to know who anyone really is to feature their work.
+const BENJI_EDITORIAL_NOTE =
+  "Hitman Benji turns tactical vest blanks into one-of-one wearable armor — brocade, hand-laid lace, inked centerpieces, finished like couture. The kind of work you feel before anybody tells you to.";
+const BENJI_BIO =
+  "Custom apparel and wearable-armor designer. Builds one-of-one statement vests — hand-painted, hand-stitched, no two alike — and treats a tactical blank like a canvas.";
+
+async function featureBenjiChase() {
+  // Find his page: prefer the campaign slug, then the staged persona, then
+  // any account carrying his name.
+  let artist = await prisma.artistProfile.findFirst({
+    where: {
+      OR: [
+        { slug: "hitman-benji" },
+        { displayName: { equals: "Hitman Benji", mode: "insensitive" } },
+      ],
+    },
+  });
+
+  // No page yet (fresh launch DB) — stand one up so the pick always exists.
+  if (!artist) {
+    // Looked up by the account's own address, not by a display name:
+    // display names are free text that anybody can type into /profile, so
+    // matching on one lets a stranger inherit whatever the match confers.
+    let user = await prisma.user.findFirst({
+      where: { email: "hitman.benji@theheatchart.com" },
+      select: { id: true },
+    });
+    if (!user) {
+      user = await prisma.user.create({
+        data: { email: "hitman.benji@theheatchart.com", name: "Hitman Benji" },
+        select: { id: true },
+      });
+    }
+    // Guard against a stray profile already on this user.
+    const existing = await prisma.artistProfile.findUnique({ where: { userId: user.id }, select: { id: true } });
+    if (existing) {
+      artist = await prisma.artistProfile.findUnique({ where: { id: existing.id } });
+    } else {
+      artist = await prisma.artistProfile.create({
+        data: {
+          userId: user.id,
+          slug: "hitman-benji",
+          displayName: "Hitman Benji",
+          status: "APPROVED",
+          bio: BENJI_BIO,
+        },
+      });
+    }
+  }
+  if (!artist) return;
+
+  // The designer name is Hitman Benji — keep it.
+  //
+  // The two strings below are a SCRUB LIST, not a record of who anyone
+  // is: earlier code published a legal name onto this public page, and
+  // this is what renames it back to the alias wherever that already
+  // happened in a live database. They stay until there is no chance a
+  // production row still carries one. Never clobbers a name a human
+  // deliberately set to something else.
+  const data = { editorsPick: true, editorialNote: artist.editorialNote || BENJI_EDITORIAL_NOTE };
+  if (artist.displayName === "Benji Chase" || artist.displayName === "Benjamin Chase")
+    data.displayName = "Hitman Benji";
+  if (!artist.bio) data.bio = BENJI_BIO;
+  await prisma.artistProfile.update({ where: { id: artist.id }, data });
+
+  // Give the pick a face if his page is empty (fresh launch DB) — his real
+  // custom-vest photo ships in public/seed. Never duplicates: skips if he
+  // already has any piece.
+  const pieces = await prisma.submission.count({ where: { artistId: artist.id } });
+  if (pieces === 0) {
+    const owner = await prisma.user.findUnique({ where: { id: artist.userId }, select: { email: true } });
+    await prisma.submission.create({
+      data: {
+        title: "Red Cupid Vest",
+        artistId: artist.id,
+        artistName: data.displayName || artist.displayName,
+        email: owner?.email || "benji.chase@theheatchart.com",
+        baseShoe: "Tactical vest blank",
+        category: "apparel",
+        status: "APPROVED",
+        imageUrl: "/seed/hb-cupid-1.webp",
+        description:
+          "Black tactical vest rebuilt over red-and-gold cherub brocade — hand-laid black lace angel wings across the shoulders, inked cupid-girl centerpiece, and the crossed-pistol mark punched underneath. One of one.",
+      },
+    });
+    console.log("Editor's Pick: seeded Benji's vest piece (page had none).");
+  }
+
+  // Exactly one Editor's Pick at a time — clear the crown everywhere else.
+  await prisma.artistProfile.updateMany({
+    where: { editorsPick: true, id: { not: artist.id } },
+    data: { editorsPick: false },
+  });
+  console.log(`Editor's Pick: ${data.displayName || artist.displayName} (${artist.slug}) is the house designer.`);
+}
+
+// The live giveaway is no longer a shoe — it's a 1-of-1 custom vest Benji
+// Chase builds for the winner. Convert the known Tour Yellow shoe giveaway
+// in place; never touch a giveaway that's already the vest or something a
+// human set to something else.
+const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Hitman Benji";
+const VEST_DESC =
+  "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
+
+async function refreshFeaturedGiveaway() {
+  const g = await prisma.giveaway.findFirst({
+    where: { status: "ACTIVE" },
+    orderBy: { endsAt: "asc" },
+  });
+  if (!g) return;
+  const blob = `${g.prize} ${g.description ?? ""}`;
+  const alreadyVest = /vest|benji/i.test(g.prize);
+  const wasTheShoe = /jordan|tour yellow|sneaker|deadstock|shoe/i.test(blob);
+  if (alreadyVest || !wasTheShoe) return; // don't clobber a human's choice
+  await prisma.giveaway.update({
+    where: { id: g.id },
+    data: { title: "Editor's Pick Giveaway", prize: VEST_PRIZE, description: VEST_DESC },
+  });
+  console.log("Giveaway swapped: Tour Yellow shoe → Hitman Benji custom vest.");
+}
+
+/** Normalize a shoe name for fuzzy title↔catalog matching. */
+function normShoeName(s) {
+  return (s || "")
+    .toLowerCase()
+    .replace(/['’"]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Every article about a shoe should wear that shoe's photo — the catalog
+ * is full of them. Match cover-less articles to a catalog shoe by style
+ * code first, then by normalized name, and borrow its image. Idempotent:
+ * only touches articles that have no cover, only when the catalog has a
+ * photo to lend.
+ */
+async function backfillArticleCovers() {
+  const articles = await prisma.article.findMany({
+    where: { OR: [{ coverImage: null }, { coverImage: "" }] },
+    select: { id: true, title: true, sku: true },
+  });
+  if (articles.length === 0) return;
+
+  const shoes = await prisma.catalogShoe.findMany({
+    where: { imageUrl: { not: null } },
+    select: { sku: true, name: true, imageUrl: true },
+  });
+  if (shoes.length === 0) return;
+
+  const bySku = new Map();
+  const byName = new Map();
+  for (const s of shoes) {
+    bySku.set(s.sku.toUpperCase(), s.imageUrl);
+    const k = normShoeName(s.name);
+    if (k && !byName.has(k)) byName.set(k, s.imageUrl);
+  }
+
+  let applied = 0;
+  for (const a of articles) {
+    let img = a.sku ? bySku.get(a.sku.toUpperCase()) : null;
+    if (!img) img = byName.get(normShoeName(a.title.split(/[—:|(]/)[0]));
+    if (img) {
+      await prisma.article.update({ where: { id: a.id }, data: { coverImage: img } });
+      applied++;
+    }
+  }
+  if (applied > 0) console.log(`Article covers: matched ${applied} article(s) to catalog photos.`);
+}
+
+// The OG Drops board reads real retail releases from the catalog, priced
+// against resale. Nothing ever seeded the catalog — it only filled from the
+// KicksDB admin import — so before an import is run the board sits empty.
+// This ships a curated floor of real, iconic pairs (accurate SKUs + retail,
+// with resale snapshots on the pairs whose premium is durable) so the board
+// is never empty. Idempotent and non-destructive: a pair is created if its
+// SKU is missing, and on an existing row ONLY blank fields are filled — a
+// later KicksDB/eBay refresh (richer data, live prices, images) always wins.
+async function seedOgCatalog() {
+  const d = (s) => new Date(s + "T00:00:00Z");
+  // sku, name, brand, silhouette, colorway, retail¢, market¢|null, release|null
+  const SHOES = [
+    ["DZ5485-612", "Air Jordan 1 Retro High OG Lost & Found", "Jordan", "Air Jordan 1", "Chicago Lost & Found", 18000, 38000, d("2022-11-19")],
+    ["555088-610", "Air Jordan 1 Retro High OG Bred Toe", "Jordan", "Air Jordan 1", "Bred Toe", 16000, 30000, d("2018-02-24")],
+    ["555088-711", "Air Jordan 1 Retro High OG University Blue", "Jordan", "Air Jordan 1", "University Blue", 17000, 25000, d("2021-03-06")],
+    ["DM7866-162", "Air Jordan 1 Low OG Travis Scott Reverse Mocha", "Jordan", "Air Jordan 1", "Reverse Mocha", 15000, 85000, d("2022-07-21")],
+    ["DN3707-100", "Air Jordan 3 Retro White Cement Reimagined", "Jordan", "Air Jordan 3", "White Cement", 21000, null, d("2023-03-11")],
+    ["CU1110-010", "Air Jordan 4 Retro Black Cat", "Jordan", "Air Jordan 4", "Black Cat", 19000, 42000, d("2020-01-22")],
+    ["308497-060", "Air Jordan 4 Retro Bred", "Jordan", "Air Jordan 4", "Bred", 20000, 34000, d("2019-05-04")],
+    ["CT8012-005", "Air Jordan 11 Retro Cool Grey", "Jordan", "Air Jordan 11", "Cool Grey", 22500, null, d("2021-12-11")],
+    ["DD1391-100", "Nike Dunk Low Retro Panda", "Nike", "Dunk Low", "Black/White", 11000, 13000, d("2021-01-14")],
+    ["DD1391-102", "Nike Dunk Low Retro UNC", "Nike", "Dunk Low", "University Blue", 11000, 15000, d("2021-03-10")],
+    ["CW2288-111", "Nike Air Force 1 '07 White", "Nike", "Air Force 1", "Triple White", 11500, null, null],
+    ["DQ3989-100", "Nike Air Max 1 '86 OG Big Bubble", "Nike", "Air Max 1", "Big Bubble", 16000, null, d("2023-03-26")],
+    ["CT5053-001", "Nike SB Dunk Low Travis Scott", "Nike", "SB Dunk Low", "Travis Scott", 15000, 140000, d("2020-02-29")],
+    ["BQ6806-100", "Nike Blazer Mid '77 Vintage", "Nike", "Blazer Mid", "White/Black", 10500, null, null],
+    ["JF3484-006", "Nike Air Max 1000.2 Glacier Blue", "Nike", "Air Max 1000", "Black/Glacier Blue", 18000, null, d("2026-07-30")],
+    ["AA3834-101", "Air Jordan 1 x Off-White Chicago (The Ten)", "Nike", "Air Jordan 1", "Off-White", 19000, 550000, d("2017-11-01")],
+    ["CP9654", "adidas Yeezy Boost 350 V2 Zebra", "adidas", "Yeezy 350 V2", "Zebra", 22000, 28000, d("2017-02-25")],
+    ["CP9652", "adidas Yeezy Boost 350 V2 Bred", "adidas", "Yeezy 350 V2", "Black/Red", 22000, 38000, d("2016-12-17")],
+    ["B75571", "adidas Yeezy Boost 700 Wave Runner", "adidas", "Yeezy 700", "Wave Runner", 30000, 40000, d("2017-11-01")],
+    ["B75806", "adidas Samba OG Cloud White", "adidas", "Samba", "Cloud White/Black", 10000, 12000, null],
+    ["HQ8708", "adidas Campus 00s Core Black", "adidas", "Campus", "Core Black", 11000, null, null],
+    ["BB550WT1", "New Balance 550 White Green", "New Balance", "550", "White/Green", 12000, 13000, d("2021-05-13")],
+    ["M990GL6", "New Balance 990v6 Grey", "New Balance", "990", "Grey", 20000, null, d("2023-04-14")],
+    ["M2002RDA", "New Balance 2002R Rain Cloud", "New Balance", "2002R", "Rain Cloud", 15000, 20000, d("2021-11-19")],
+    ["U9060ECA", "New Balance 9060 Sea Salt", "New Balance", "9060", "Sea Salt", 15000, null, d("2023-01-13")],
+    ["162050C", "Converse Chuck 70 High Black", "Converse", "Chuck 70", "Black", 8500, null, null],
+    ["L41086600", "Salomon XT-6 Black Phantom", "Salomon", "XT-6", "Black/Phantom", 20000, null, null],
+    ["1201A019", "ASICS Gel-Kayano 14 Cream Black", "ASICS", "Gel-Kayano 14", "Cream/Black", 16000, 17000, null],
+  ];
+
+  let created = 0;
+  let filled = 0;
+  for (const [sku, name, brand, silhouette, colorway, retail, market, release] of SHOES) {
+    const existing = await prisma.catalogShoe.findUnique({
+      where: { sku },
+      select: {
+        retailPriceCents: true, marketPriceCents: true, releaseDate: true,
+        brand: true, silhouette: true, colorway: true,
+      },
+    });
+    if (!existing) {
+      await prisma.catalogShoe.create({
+        data: {
+          sku, name, brand, silhouette, colorway,
+          retailPriceCents: retail, marketPriceCents: market,
+          releaseDate: release, gender: "mens", source: "seed",
+        },
+      });
+      created++;
+      continue;
+    }
+    // Fill only what's blank — never overwrite a live import's data.
+    const patch = {};
+    if (existing.retailPriceCents == null && retail != null) patch.retailPriceCents = retail;
+    if (existing.marketPriceCents == null && market != null) patch.marketPriceCents = market;
+    if (existing.releaseDate == null && release != null) patch.releaseDate = release;
+    if (!existing.brand && brand) patch.brand = brand;
+    if (!existing.silhouette && silhouette) patch.silhouette = silhouette;
+    if (!existing.colorway && colorway) patch.colorway = colorway;
+    if (Object.keys(patch).length) {
+      await prisma.catalogShoe.update({ where: { sku }, data: patch });
+      filled++;
+    }
+  }
+  if (created || filled) {
+    console.log(`OG catalog floor: ${created} pair(s) seeded, ${filled} price-filled.`);
+  }
+}
+
+// Re-attach pieces that lost their maker link. artistId is SetNull on
+// delete, and some staged pieces were created before the link existed, so
+// a real custom can end up with an artistName but no artistId — which the
+// Heat List (rightly) won't credit to anyone. Match the name back to an
+// artist page and restore the link rather than hiding the work.
+async function relinkOrphanPieces() {
+  const orphans = await prisma.submission.findMany({
+    where: { artistId: null },
+    select: { id: true, artistName: true },
+  });
+  if (orphans.length === 0) return;
+  const artists = await prisma.artistProfile.findMany({ select: { id: true, displayName: true } });
+  const byName = new Map(artists.map((a) => [a.displayName.trim().toLowerCase(), a.id]));
+  let fixed = 0;
+  for (const s of orphans) {
+    const id = byName.get((s.artistName || "").trim().toLowerCase());
+    if (!id) continue;
+    await prisma.submission.update({ where: { id: s.id }, data: { artistId: id } }).catch(() => {});
+    fixed++;
+  }
+  if (fixed) console.log(`Re-linked ${fixed} piece(s) to their artist page.`);
+}
+
 async function main() {
   // SEED_DEMO=false loads launch content only (trivia bank, articles,
   // shop, giveaway) and skips the placeholder artists/battles — use it
@@ -1438,9 +2025,17 @@ async function main() {
 
   // Team + careers seed runs in every mode (idempotent top-up).
   await seedTeamAndCareers();
+  await relinkOrphanPieces();
   await retireContent();
+  await seedOgCatalog();
   await backfillCatalogLanes();
   await scrubBlankImages();
+  await mergeDuplicateArtists();
+  await restoreDekotaHandle();
+  await promoteNamedEditors();
+  await grantFoundingCharter();
+  await featureBenjiChase();
+  await refreshFeaturedGiveaway();
 
   // Wipe in dependency order so reseeding is idempotent.
   // User accounts, quiz runs, credits, and giveaway entries are kept.
@@ -1540,9 +2135,51 @@ async function main() {
     // pieces are keyed by title and created when missing. Admin/artist
     // edits always survive — the seed only fills blanks and replaces
     // photos whose upload files no longer exist on this machine.
+    // Is this photo still really there?
+    //
+    // This question decides whether the seed overwrites an artist's own
+    // cover photo with the stock image from the repo, so getting it wrong
+    // destroys the exact thing the platform exists to hold. It WAS wrong.
+    //
+    // It only ever looked on the local filesystem. But uploads are stored
+    // in one of three places depending on configuration: S3 when it's
+    // set, otherwise a Postgres blob (bytea), and only as a last-ditch
+    // fallback the disk. Postgres-backed uploads still get a
+    // `/api/uploads/<name>` URL — the same shape as a disk file — so
+    // every one of them looked "missing" to a filesystem check, and the
+    // next deploy quietly reverted the maker's photo to repo stock and
+    // dropped their gallery shots with it.
+    //
+    // Production is currently on S3, whose absolute URLs take the early
+    // return, so this has not been firing there — but it is exactly the
+    // shape of the incident that lost Dakota's photos, and it re-arms the
+    // moment S3 is unset or a credential lapses.
+    //
+    // Now a name counts as present if the blob table has it OR the disk
+    // does. Loaded once up front rather than per-photo: a query inside a
+    // filter over every piece is its own kind of mistake.
+    let knownBlobs = new Set();
+    try {
+      const rows = await prisma.uploadBlob.findMany({ select: { name: true } });
+      knownBlobs = new Set(rows.map((r) => r.name));
+    } catch {
+      // No blob table yet (fresh database mid-migration). Fall through to
+      // the disk check — and note that an empty set can only make this
+      // MORE likely to call a photo missing, so pair it with the guard
+      // below, which refuses to "repair" anything when we cannot tell.
+    }
+    const blobLookupWorked = knownBlobs.size > 0;
+
     const uploadFileExists = (imageUrl) => {
-      if (!imageUrl?.startsWith("/api/uploads/")) return true; // seed/external URLs: not ours to judge
-      return existsSync(path.join(process.cwd(), "data", "uploads", path.basename(imageUrl)));
+      if (!imageUrl?.startsWith("/api/uploads/")) return true; // S3/seed/external URLs: not ours to judge
+      const base = path.basename(imageUrl);
+      if (knownBlobs.has(base)) return true;
+      if (existsSync(path.join(process.cwd(), "data", "uploads", base))) return true;
+      // Genuinely not found in either store. If we could not read the
+      // blob table at all, say "present" anyway: silently replacing a
+      // live photo is far worse than leaving a broken one on screen,
+      // where a human can see it and ask.
+      return !blobLookupWorked;
     };
 
     // Heal any legacy 'headwear' pieces: that category was briefly a
@@ -1623,6 +2260,20 @@ async function main() {
     for (const pa of preloadArtists) {
       const claimEmail = pa.email ?? `claim.${pa.slug}@theheatchart.com`;
       let profile = await prisma.artistProfile.findUnique({ where: { slug: pa.slug } });
+      if (!profile) {
+        // The artist may live under their own page now (self-signed-up
+        // or merged) — match by IG handle or name before minting a
+        // staged page, or the duplicate the merge just killed comes
+        // straight back on the next deploy.
+        const normIg = (v) => (v ?? "").replace(/^@/, "").trim().toLowerCase();
+        const all = await prisma.artistProfile.findMany();
+        profile =
+          all.find((p) => pa.instagram && normIg(p.instagram) === normIg(pa.instagram)) ??
+          all.find(
+            (p) => p.displayName.trim().toLowerCase() === pa.displayName.trim().toLowerCase()
+          ) ??
+          null;
+      }
       if (!profile) {
         const user = await prisma.user.upsert({
           where: { email: claimEmail },
@@ -1726,10 +2377,25 @@ async function main() {
     // the live game instead of freezing at whatever first seeded.
     // (Culture questions come from articles above; these are the
     // standalone trivia bank, keyed articleId = null.)
-    const bank = loadQuestions();
+    // Two banks now: the culture trivia and the markets curriculum. Same
+    // upsert either way — keyed on question text, additive, and never
+    // touching the admin's active toggle.
+    // Three banks: the culture trivia, the market-mechanics curriculum, and
+    // the instrument curriculum ported from the Street Credit Bureau
+    // taxonomy (WARRANT-TRACER). The last two are both the markets track —
+    // mechanics on rungs 1-5, instruments on 6-8 — so they deal as one
+    // laddered game rather than as two separate products bolted together.
+    const bank = [
+      ...loadQuestions().map((q) => ({ ...q, track: "culture" })),
+      ...loadQuestions("market-questions.json").map((q) => ({ ...q, track: "markets" })),
+      ...loadQuestions("instrument-questions.json").map((q) => ({ ...q, track: "markets" })),
+    ];
     const existingTrivia = await prisma.quizQuestion.findMany({
       where: { articleId: null },
-      select: { id: true, question: true, options: true, answerIndex: true },
+      select: {
+        id: true, question: true, options: true, answerIndex: true,
+        track: true, lesson: true, concept: true, level: true,
+      },
     });
     const byText = new Map(existingTrivia.map((q) => [q.question, q]));
     let newQuestions = 0;
@@ -1739,16 +2405,28 @@ async function main() {
         options: JSON.stringify(q.options),
         answerIndex: q.answerIndex,
         difficulty: [1, 2, 3].includes(q.difficulty) ? q.difficulty : 2,
-        category: q.category || "history",
+        category: q.category || (q.track === "markets" ? "markets" : "history"),
         explanation: q.explanation || null,
+        track: q.track,
+        lesson: q.lesson || null,
+        concept: q.concept || null,
+        level: Number.isInteger(q.level) ? q.level : 1,
       };
       const existing = byText.get(q.question);
       if (existing) {
-        // Repair the correctness fields when questions.json fixes a wrong
+        // Repair the correctness fields when a bank fixes a wrong
         // answer/options — otherwise a bad answerIndex would score players
-        // wrong forever and burn into the IQ ledger. Only touches content
-        // that actually differs; never flips the admin's `active` toggle.
-        if (existing.options !== content.options || existing.answerIndex !== content.answerIndex) {
+        // wrong forever and burn into the IQ ledger. Teaching fields count
+        // as correctness here: a markets question whose lesson never
+        // arrived is a question that teaches nothing.
+        const stale =
+          existing.options !== content.options ||
+          existing.answerIndex !== content.answerIndex ||
+          existing.track !== content.track ||
+          existing.lesson !== content.lesson ||
+          existing.concept !== content.concept ||
+          existing.level !== content.level;
+        if (stale) {
           await prisma.quizQuestion.update({ where: { id: existing.id }, data: content });
           fixedQuestions++;
         }
@@ -1767,16 +2445,17 @@ async function main() {
     if (!activeGiveaway) {
       await prisma.giveaway.create({
         data: {
-          title: "Launch Giveaway",
-          prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+          title: "Editor's Pick Giveaway",
+          prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
           description:
-            "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+            "Hitman Benji hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
           endsAt: new Date(Date.now() + 30 * DAY),
         },
       });
     }
     await seedIconArticles();
     await seedOgSeriesBattles();
+    await backfillArticleCovers();
     console.log("Seeded launch content only (no demo artists/battles): products, articles, quiz bank, giveaway.");
     return;
   }
@@ -1942,10 +2621,10 @@ async function main() {
   if (!activeGiveaway) {
     await prisma.giveaway.create({
       data: {
-        title: "Launch Giveaway",
-        prize: 'Air Jordan 4 "Tour Yellow" (winner\'s size)',
+        title: "Editor's Pick Giveaway",
+        prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
         description:
-          "Deadstock pair of September's first-ever Tour Yellow retro. Ships free in the continental US.",
+          "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
         endsAt: new Date(now + 30 * DAY),
       },
     });
@@ -2058,6 +2737,13 @@ async function main() {
   const totalPolls = await prisma.poll.count({ where: { active: true } });
 
   await seedOgSeriesBattles();
+
+  // Re-assert the Editor's Pick after the demo artist reseed so Benji's
+  // crown + real name survive a full demo reseed (idempotent; the launch
+  // path already ran these before returning above).
+  await featureBenjiChase();
+  await refreshFeaturedGiveaway();
+  await backfillArticleCovers();
 
   console.log(
     `Seeded ${submissions.length} submissions, ${battles.length} battles, ${products.length} products, ${totalArticles} articles (+${catalogAdded} catalog, ${reconciled} reconciled), ${questions.length} quiz questions, ${totalPolls} polls (+${pollsAdded} new).`

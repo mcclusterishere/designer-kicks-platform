@@ -1,6 +1,10 @@
+import Money from "@/components/Money";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import PriceHistoryCard from "@/components/PriceHistoryCard";
+import { getPriceSeries, getPriceTrack, sinceRelease } from "@/lib/priceHistory";
+import PairChart from "@/components/PairChart";
 import { retailKind } from "@/lib/taxonomy";
 import { buyLinks } from "@/lib/affiliates";
 
@@ -67,7 +71,7 @@ export default async function CatalogShoePage({
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <Link href="/catalog" className="tag text-smoke hover:text-white">← The Catalog</Link>
+      <Link href="/market?board=catalog" className="tag text-smoke hover:text-white">← The Market</Link>
 
       <div className="mt-4 grid grid-cols-1 gap-8 md:grid-cols-2 md:items-start">
         {/* Product PNG shown whole on a light plate — no square-crop butchery */}
@@ -84,6 +88,26 @@ export default async function CatalogShoePage({
           {shoe.brand && <p className="tag text-volt">{shoe.brand}</p>}
           <h1 className="display mt-1 text-3xl text-white sm:text-4xl">{shoe.name}</h1>
           <p className="mt-1 font-mono text-sm text-smoke">{shoe.sku}</p>
+
+          {/* The drop-to-today chart, drawable from the release anchor even
+              before the daily log has depth. */}
+          <PairChart
+            points={await getPriceTrack(shoe)}
+            name={shoe.name}
+            sku={shoe.sku}
+            className="mt-4"
+          />
+
+          <PriceHistoryCard
+            series={await getPriceSeries(shoe.id)}
+            since={sinceRelease(
+              shoe.retailPriceCents,
+              shoe.marketPriceCents || shoe.ebayNewCents || null,
+              shoe.releaseDate
+            )}
+            retailCents={shoe.retailPriceCents}
+            lastCents={shoe.marketPriceCents || shoe.ebayNewCents || null}
+          />
 
           {avg !== null && (
             <div className="mt-4 inline-flex items-baseline gap-2 rounded-xl border border-volt/40 bg-volt/10 px-4 py-2.5">
@@ -130,14 +154,14 @@ export default async function CatalogShoePage({
             {shoe.marketPriceCents && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Market value</dt>
-                <dd className="font-bold text-volt">≈ ${Math.round(shoe.marketPriceCents / 100)}</dd>
+                <dd className="font-bold text-volt"><Money cents={shoe.marketPriceCents} /></dd>
               </div>
             )}
             {shoe.retailPriceCents && (
               <div className="flex justify-between gap-4">
                 <dt className="text-smoke">Retail</dt>
                 <dd className={shoe.marketPriceCents ? "text-white" : "font-bold text-volt"}>
-                  ${Math.round(shoe.retailPriceCents / 100)}
+                  <Money cents={shoe.retailPriceCents} />
                 </dd>
               </div>
             )}

@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db";
+import GalleryRun from "@/components/GalleryRun";
 import { isAdmin, adminAccountOk, totpEnabled } from "@/lib/admin";
 import { finalizeExpiredBattles, getHeatList } from "@/lib/battles";
 import { finalizeExpiredOutfitBattles } from "@/lib/outfits";
 import {
   adminLogout,
+  scoutGalleriesAction,
   setSubmissionStatus,
   setAmbassadorStatus,
   endBattleNow,
@@ -37,6 +39,17 @@ import QuestionForm from "./QuestionForm";
 import AiQuestionForm from "./AiQuestionForm";
 import WeeklyBrief from "./WeeklyBrief";
 import CatalogPanel from "./CatalogPanel";
+import ResellerDesk from "./ResellerDesk";
+import OwnerDesk from "./OwnerDesk";
+import AuditPanel from "./AuditPanel";
+import DuplicatePanel from "./DuplicatePanel";
+import SaasPanel from "./SaasPanel";
+import CatalogRefreshButton from "./CatalogRefreshButton";
+import DropRadar from "./DropRadar";
+import RosterRun from "./RosterRun";
+import { getRosterRun } from "@/lib/rosterRun";
+import PieceManager from "./PieceManager";
+import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import { oauthProviders } from "@/auth";
@@ -44,6 +57,7 @@ import { siteUrl } from "@/lib/articles";
 import UtmBuilder from "./UtmBuilder";
 import TournamentForm from "./TournamentForm";
 import PreloadArtistForm from "./PreloadArtistForm";
+import ArtistRepairForm from "./ArtistRepairForm";
 import OnboardAgent from "@/app/editor/OnboardAgent";
 import BroadcastForm from "./BroadcastForm";
 import BattleBlast from "./BattleBlast";
@@ -55,12 +69,54 @@ import { placesConfigured } from "@/lib/stores";
 import { providersConfigured } from "@/lib/sneakerApi";
 import DropSyncControls from "./DropSyncControls";
 import FindSkuButton from "./FindSkuButton";
+import MatchPhotosButton from "./MatchPhotosButton";
+import FixPhotosButton from "./FixPhotosButton";
+import FullRefreshButton from "./FullRefreshButton";
+import DripFeed from "./DripFeed";
+import StorageHealthPanel from "@/components/StorageHealthPanel";
 import TwoFactorPanel from "./TwoFactorPanel";
 import { GrantEditorForm, NewJobForm } from "./TeamControls";
 import { editorRefLink } from "@/lib/editor";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+
+/** Distribution: destinations, their rules, and what's queued for each. */
+async function DripSection() {
+  const [targets, queue] = await Promise.all([
+    prisma.socialTarget.findMany({ orderBy: [{ platform: "asc" }, { label: "asc" }] }),
+    prisma.socialPost.findMany({
+      where: { status: { in: ["QUEUED", "BLOCKED", "FAILED"] } },
+      orderBy: [{ status: "asc" }, { scheduledFor: "asc" }],
+      take: 40,
+      include: { target: { select: { label: true } } },
+    }),
+  ]);
+
+  const counts = await prisma.socialPost.groupBy({
+    by: ["targetId", "status"],
+    _count: true,
+  });
+  const tally = (id: string, status: string) =>
+    counts.find((c) => c.targetId === id && c.status === status)?._count ?? 0;
+
+  return (
+    <DripFeed
+      targets={targets.map((t) => ({
+        id: t.id, platform: t.platform, name: t.name, label: t.label, active: t.active,
+        allowLinks: t.allowLinks, allowSelfPromo: t.allowSelfPromo,
+        allowAffiliate: t.allowAffiliate, requireFlair: t.requireFlair,
+        minHoursBetween: t.minHoursBetween, maxPerWeek: t.maxPerWeek, rulesNote: t.rulesNote,
+        queued: tally(t.id, "QUEUED"), blocked: tally(t.id, "BLOCKED"), posted: tally(t.id, "POSTED"),
+      }))}
+      queue={queue.map((q) => ({
+        id: q.id, targetLabel: q.target.label, title: q.title, status: q.status,
+        scheduledFor: q.scheduledFor.toISOString(),
+        blockedReason: q.blockedReason, result: q.result,
+      }))}
+    />
+  );
+}
 
 // The shoe knowledge base — its own async section so its queries only
 // run when the Market tab is open.
@@ -78,6 +134,7 @@ async function CatalogSection() {
       </p>
       <div className="mt-4">
         <CatalogPanel configured={catalogConfigured()} />
+        {catalogConfigured() && <CatalogRefreshButton />}
       </div>
       {stats.total > 0 && (
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-smoke">
@@ -128,6 +185,7 @@ export default async function AdminPage({
     prisma.submission.findMany({
       where: { status: "APPROVED" },
       orderBy: { createdAt: "desc" },
+      include: { _count: { select: { votes: true } } },
     }),
     prisma.battle.findMany({
       orderBy: { createdAt: "desc" },
@@ -168,6 +226,42 @@ export default async function AdminPage({
     }),
   ]);
 
+  // Flag approved pieces whose cover image was lost before the storage fix
+  // (record points at an /api/uploads file that has no bytes anymore), so
+  // pictureless / junk entries can be found and removed. External http
+  // images and seeded /public paths are treated as live.
+  const approvedLocalNames = approved
+    .map((s) => s.imageUrl)
+    .filter((u) => u.startsWith("/api/uploads/"))
+    .map((u) => u.slice("/api/uploads/".length));
+  const liveBlobNames = await existingBlobNames(approvedLocalNames);
+  // Drop Radar review queue: auto-drafted retail posts awaiting a one-tap
+  // publish. Kept out of the public newsroom until an editor approves.
+  const radarDrafts = articles
+    .filter((a) => a.status === "DRAFT" && (a.tags || "").includes("Drop Radar"))
+    .map((a) => ({
+      id: a.id,
+      title: a.title,
+      coverImage: a.coverImage,
+      sku: a.sku,
+      dropLabel: a.dropAt
+        ? a.dropAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+        : null,
+      excerpt: a.excerpt,
+    }));
+
+  const managePieces = approved.map((s) => ({
+    id: s.id,
+    title: s.title,
+    artistName: s.artistName,
+    imageUrl: s.imageUrl,
+    category: s.category,
+    votes: s._count?.votes ?? 0,
+    broken:
+      s.imageUrl.startsWith("/api/uploads/") &&
+      !liveBlobNames.has(s.imageUrl.slice("/api/uploads/".length)),
+  }));
+
   const pulse = await getSiteAnalytics();
   const traffic = await getTrafficPulse();
   // Which campaigns actually create accounts — the number that matters
@@ -184,6 +278,20 @@ export default async function AdminPage({
     where: { status: "PENDING" },
     orderBy: { createdAt: "asc" },
     include: { user: { select: { name: true, email: true, createdAt: true } } },
+  });
+
+  // Account-repair diagnostic: every page + which login owns it, and
+  // whether that account can actually sign in. A page whose owner
+  // can't log in is the "my profile is gone" case.
+  const artistOwners = await prisma.artistProfile.findMany({
+    where: { status: "APPROVED" },
+    orderBy: { displayName: "asc" },
+    select: {
+      slug: true,
+      displayName: true,
+      instagram: true,
+      user: { select: { email: true, passwordHash: true, accounts: { select: { provider: true } } } },
+    },
   });
 
   // Customizer-announced drops awaiting review before they hit /drops.
@@ -308,6 +416,9 @@ export default async function AdminPage({
     orderBy: [{ invitedAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
     include: { user: { select: { email: true } } },
   });
+  // Today's recruiting queue — who's due for a touch, already sorted.
+  const rosterRun = await getRosterRun(25);
+
   const humanizeAgo = (d: Date) => {
     const days = Math.floor((Date.now() - d.getTime()) / 86400000);
     return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
@@ -321,6 +432,9 @@ export default async function AdminPage({
 
   // Store Scout (beta): the prospecting board, grouped by pipeline stage.
   const storeLeads = await prisma.storeLead.findMany({
+    // Galleries share this table but not this board — without the filter
+    // they'd silently pad the store pipeline and skew every count on it.
+    where: { kind: "STORE" },
     orderBy: [{ createdAt: "desc" }],
     take: 150,
   });
@@ -413,8 +527,27 @@ export default async function AdminPage({
   // scroll. Deep links still work — editing a product or article jumps
   // straight to its tab.
   const { tab: tabParam } = await searchParams;
-  const TAB_IDS = ["pulse", "roster", "games", "content", "market", "team", "settings"];
-  const tab = editArticle ? "content" : edit ? "market" : TAB_IDS.includes(tabParam ?? "") ? (tabParam as string) : "pulse";
+  // Five rooms, not nine tabs.
+  //
+  // Nine top-level tabs is a menu you have to read every time. These are
+  // grouped by the question being asked rather than by which feature
+  // built them: who's on the platform, what we're selling, what we're
+  // publishing, how the business is doing, and the plumbing. Every old
+  // ?tab= link still resolves, because links to this panel exist in
+  // emails and nobody should hit a dead one.
+  const TAB_ALIAS: Record<string, string> = {
+    desk: "business", saas: "business", market: "selling",
+    games: "publishing", content: "publishing", team: "settings",
+  };
+  const TAB_IDS = ["pulse", "roster", "selling", "publishing", "business", "settings"];
+  const requested = TAB_ALIAS[tabParam ?? ""] ?? tabParam ?? "";
+  const tab = editArticle
+    ? "publishing"
+    : edit
+      ? "selling"
+      : TAB_IDS.includes(requested)
+        ? requested
+        : "pulse";
   const show = (t: string) => tab === t;
   const rosterAttention =
     pending.length +
@@ -445,14 +578,23 @@ export default async function AdminPage({
         <h1 className="display text-4xl text-white">Command Center</h1>
         <p className="mt-1.5 text-smoke">Everything that runs The Heat Chart, one room at a time.</p>
 
+        {/* Always-visible: is storage even holding the photos? then rescue HEIC.
+            The full refresh sits here rather than inside the Market tab — it
+            rebuilds every section, so burying it under one of them was the
+            reason it read as a catalog-only button. */}
+        <div className="mt-5 space-y-3">
+          <FullRefreshButton />
+          <StorageHealthPanel />
+          <FixPhotosButton />
+        </div>
+
         <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-2xl border border-edge bg-surface p-2">
           {[
             { id: "pulse", label: "Pulse", icon: "📊", n: 0 },
-            { id: "roster", label: "Roster", icon: "👟", n: rosterAttention },
-            { id: "games", label: "Games", icon: "🎮", n: 0 },
-            { id: "content", label: "Content", icon: "📰", n: 0 },
-            { id: "market", label: "Market", icon: "💰", n: 0 },
-            { id: "team", label: "Team", icon: "👥", n: 0 },
+            { id: "roster", label: "People", icon: "👟", n: rosterAttention },
+            { id: "selling", label: "Selling", icon: "💰", n: 0 },
+            { id: "publishing", label: "Publishing", icon: "📰", n: 0 },
+            { id: "business", label: "Business", icon: "📈", n: 0 },
             { id: "settings", label: "Settings", icon: "⚙️", n: 0 },
           ].map((t) => (
             <Link
@@ -477,6 +619,54 @@ export default async function AdminPage({
       {show("settings") && (
       <section className="mt-8">
         <TwoFactorPanel enabled={twoFactorOn} />
+      </section>
+      )}
+
+      {/* Artist account repair — fix "my profile is gone" */}
+      {show("settings") && (
+      <section className="mt-8 rounded-xl border border-heat/40 bg-surface p-5">
+        <h2 className="display text-2xl text-white">Artist account repair</h2>
+        <p className="mt-1 text-sm text-smoke">
+          A page whose owner <span className="text-heat">can&apos;t log in</span> is
+          the &ldquo;my profile is gone&rdquo; case — the artist signs in with a
+          different account than the one holding their page. Find their real
+          login email, then reassign the page to it below.
+        </p>
+        <div className="mt-4 max-h-72 overflow-y-auto rounded-lg border border-edge">
+          <table className="w-full text-left text-sm">
+            <thead className="sticky top-0 bg-panel text-xs uppercase tracking-wide text-smoke">
+              <tr>
+                <th className="px-3 py-2">Page</th>
+                <th className="px-3 py-2">Owner login</th>
+                <th className="px-3 py-2">Can sign in?</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-edge/60">
+              {artistOwners.map((a) => {
+                const canLogin = Boolean(a.user.passwordHash) || a.user.accounts.length > 0;
+                return (
+                  <tr key={a.slug}>
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-white">{a.displayName}</span>
+                      <span className="block text-xs text-smoke">
+                        /{a.slug}{a.instagram ? ` · @${a.instagram}` : ""}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-smoke">{a.user.email}</td>
+                    <td className="px-3 py-2">
+                      {canLogin ? (
+                        <span className="text-volt">yes</span>
+                      ) : (
+                        <span className="font-bold text-heat">no — claimable</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <ArtistRepairForm />
       </section>
       )}
 
@@ -522,7 +712,7 @@ export default async function AdminPage({
       )}
 
       {/* Team & Careers */}
-      {show("team") && (
+      {show("settings") && (
       <section className="mt-8 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">
           Team &amp; Careers{" "}
@@ -812,8 +1002,25 @@ export default async function AdminPage({
       </section>
       )}
 
+      {/* Manage / remove live pieces */}
+      {show("roster") && (
+      <section className="mt-10">
+        <h2 className="display text-2xl text-white">
+          Manage pieces <span className="text-smoke">({managePieces.length})</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          Every live (approved) piece. Search for one to remove junk or
+          pictureless entries — deleting is permanent and pulls the piece from
+          the Heat List, battles and the market. Pieces marked{" "}
+          <span className="text-heat">no image</span> lost their photo before the
+          storage fix; re-upload or delete them.
+        </p>
+        <PieceManager pieces={managePieces} />
+      </section>
+      )}
+
       {/* Broadcast: post to The Feed + every social channel at once */}
-      {show("content") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">Broadcast</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -1091,6 +1298,11 @@ export default async function AdminPage({
           vs 10% fees, keep every sale) plus their personal claim link. No
           Resend key set? You get the claim link to DM by hand instead.
         </p>
+
+        {/* The daily queue: who's due, why, and what to send them. */}
+        <div className="mt-4">
+          <RosterRun items={rosterRun.items} counts={rosterRun.counts} />
+        </div>
         {outreachLeads.length === 0 ? (
           <p className="mt-3 text-sm text-smoke">
             No cold leads — every artist page on the chart is claimed. 🔥
@@ -1111,6 +1323,35 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+      </section>
+      )}
+
+      {/* Gallery Run: outreach to the rooms that decide what counts as art */}
+      {show("roster") && (
+      <section className="mt-12 rounded-xl border border-heat/40 bg-panel p-5">
+        <h2 className="display text-2xl text-white">
+          Gallery <span className="text-gradient-heat">Run</span>
+        </h2>
+        <p className="mt-1 text-sm text-smoke">
+          A show is provenance. A gallery relationship is what turns
+          &ldquo;sneaker guy&rdquo; into a represented artist — and it&apos;s what makes
+          the sale record mean something to anyone outside the culture.
+          Scan a city, then work the queue: the letter is written for you
+          from confirmed sales only.
+        </p>
+
+        <form action={scoutGalleriesAction} className="mt-4 flex flex-wrap gap-2">
+          <input
+            name="where"
+            placeholder="Atlanta, GA or 30310"
+            className="min-w-0 flex-1 rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50"
+          />
+          <button className="rounded-lg btn-hard px-5 py-2 tag font-bold">Scan for galleries</button>
+        </form>
+
+        <div className="mt-4">
+          <GalleryRun />
+        </div>
       </section>
       )}
 
@@ -1406,7 +1647,7 @@ export default async function AdminPage({
       )}
 
       {/* Create battle */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-edge bg-surface p-5">
         <h2 className="display text-2xl text-white">Start A Battle</h2>
         <div className="mt-4">
@@ -1429,7 +1670,7 @@ export default async function AdminPage({
       )}
 
       {/* Battles */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Battles</h2>
         <div className="mt-4 space-y-2">
@@ -1469,7 +1710,7 @@ export default async function AdminPage({
       )}
 
       {/* Outfit Studio: assemble house fits, match fit battles */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12 rounded-xl border border-volt/40 bg-panel p-5">
         <h2 className="display text-2xl text-white">
           Outfit <span className="text-gradient-volt">Studio</span>
@@ -1576,7 +1817,7 @@ export default async function AdminPage({
       )}
 
       {/* Tournaments */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Tournaments</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1624,7 +1865,7 @@ export default async function AdminPage({
       )}
 
       {/* Giveaways */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">Giveaways</h2>
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1664,7 +1905,7 @@ export default async function AdminPage({
       )}
 
       {/* Quiz questions */}
-      {show("games") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Quiz Questions{" "}
@@ -1840,10 +2081,49 @@ export default async function AdminPage({
       </section>
       )}
 
-      {show("market") && <CatalogSection />}
+      {show("selling") && <CatalogSection />}
+
+      {/* The reseller desk: pairs the house owns outright. Its own room
+          because it is the only section on this page describing our own
+          capital rather than other people's inventory. */}
+      {/* Ownership sits under People: it is a queue of humans to call,
+          not a report to read. */}
+      {show("roster") && (
+        <section className="mt-8">
+          <OwnerDesk />
+        </section>
+      )}
+
+      {/* Duplicate cleanup sits under People: it's a queue of artists to
+          tidy up for, not a report to read. */}
+      {show("people") && (
+        <section className="mt-8">
+          <DuplicatePanel />
+        </section>
+      )}
+
+      {show("settings") && (
+        <section className="mt-8">
+          <AuditPanel />
+        </section>
+      )}
+
+      {show("business") && (
+        <section className="mt-8">
+          <ResellerDesk />
+        </section>
+      )}
+
+      {/* The subscription business: funnel first, revenue second. */}
+      {show("business") && (
+        <section className="mt-8">
+          <SaasPanel />
+        </section>
+      )}
+      {show("publishing") && <DripSection />}
 
       {/* Sales ledger */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Sales Ledger <span className="text-smoke">({sales.length})</span>
@@ -1899,7 +2179,7 @@ export default async function AdminPage({
       )}
 
       {/* Newsroom */}
-      {show("content") && (
+      {show("publishing") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Newsroom <span className="text-smoke">({articles.length})</span>
@@ -1912,6 +2192,16 @@ export default async function AdminPage({
             withSku={articles.filter((a) => a.sku).length}
             total={articles.length}
           />
+        </div>
+
+        {/* Photo backfill: article → catalog shoe photo */}
+        <div className="mt-4">
+          <MatchPhotosButton missing={articles.filter((a) => !a.coverImage).length} />
+        </div>
+
+        {/* Drop Radar: auto-drafted retail drop posts, review-and-publish */}
+        <div id="drop-radar" className="mt-4">
+          <DropRadar drafts={radarDrafts} />
         </div>
 
         <div className="mt-4 rounded-xl border border-edge bg-surface p-5">
@@ -1999,7 +2289,7 @@ export default async function AdminPage({
       )}
 
       {/* Market Pulse: the affiliate money funnel */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12" data-testid="market-pulse">
         <h2 className="display text-2xl text-white">Market Pulse</h2>
         <p className="mt-1 text-sm text-smoke">
@@ -2061,7 +2351,7 @@ export default async function AdminPage({
       )}
 
       {/* Products */}
-      {show("market") && (
+      {show("selling") && (
       <section className="mt-12">
         <h2 className="display text-2xl text-white">
           Shop Products <span className="text-smoke">({products.length})</span>

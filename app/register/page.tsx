@@ -1,24 +1,49 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { auth, signIn, oauthProviders } from "@/auth";
 import RegisterForm from "./RegisterForm";
 
 export const metadata = { title: "Create Account — The Heat Chart" };
 
-export default async function RegisterPage() {
-  const session = await auth();
-  if (session?.user) redirect("/profile");
+/** Same-origin only. `?next=` is attacker-supplied; see app/signin/page.tsx. */
+function safeNext(raw: string | undefined): string {
+  if (!raw) return "/profile";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/profile";
+  return raw;
+}
 
-  const hasOAuth = oauthProviders.google || oauthProviders.facebook;
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const next = safeNext((await searchParams).next);
+  const session = await auth();
+  if (session?.user) redirect(next);
+
+  // Inside the iOS shell (App Store 4.8): email signup only — no
+  // third-party login buttons.
+  const inApp = ((await headers()).get("user-agent") ?? "").includes("HeatChartApp");
+  const hasOAuth = !inApp && (oauthProviders.google || oauthProviders.facebook);
 
   return (
     <div className="mx-auto max-w-md px-4 py-12">
       <p className="tag text-volt">Join the culture</p>
       <h1 className="display mt-2 text-4xl text-white">Create Account</h1>
+      {/* "The Heat Check" and "collector closet" are names for things a
+          person meeting this page has never seen. Naming them here spends
+          the reader's attention on decoding instead of deciding. Say what
+          they DO; the names can introduce themselves later, attached to
+          the actual thing. */}
       <p className="mt-2 text-sm text-smoke">
-        A fan account is instant — vote in battles, play the Heat Check,
-        win giveaways, and build your collector closet. Artists apply for
-        an upgraded account after joining (approval required).
+        Free, and it takes a minute. You can vote on which customs are best, play the
+        sneaker-knowledge game, enter giveaways, and keep the pairs you own on your own
+        page.
+      </p>
+      <p className="mt-2 text-sm text-smoke">
+        Make custom sneakers yourself? Join first, then apply for an artist account —
+        we check every one by hand.
       </p>
 
       {hasOAuth && (
@@ -60,7 +85,7 @@ export default async function RegisterPage() {
       )}
 
       <div className="mt-6">
-        <RegisterForm />
+        <RegisterForm next={next} />
       </div>
       <p className="mt-6 text-sm text-smoke">
         Already have an account?{" "}

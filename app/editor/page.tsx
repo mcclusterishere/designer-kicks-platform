@@ -1,3 +1,4 @@
+import LocalPay from "@/components/LocalPay";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -146,6 +147,13 @@ function Scoreboard({ stats }: { stats: OnboardingStats }) {
         <StatTile value={stats.totalDone} label="Set up · all-time" tone="sage" />
         <StatTile value={earned} label="Earned · so far" tone="clay" />
         <StatTile value="$0.50" label="Each finished page" />
+      </div>
+      {/* Scouts abroad see their money in their money. */}
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+        <span className="text-[var(--d-soft)]">Your rate, your currency:</span>
+        <LocalPay usd={0.5} />
+        <span className="text-[var(--d-soft)]">· earned:</span>
+        <LocalPay usd={stats.earningsCents / 100} />
       </div>
       {stats.refLink && (
         <CopyField value={stats.refLink} label="Your link — anyone who visits or gets added through it is counted as yours" />

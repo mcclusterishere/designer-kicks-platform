@@ -16,7 +16,7 @@ import {
   type PublicQuestion,
   type StrikeState,
 } from "@/lib/quiz";
-import { cultureIQ } from "@/lib/iq";
+import { cultureIQ, marketIQ } from "@/lib/iq";
 import { getTasteProfile, brandsInText } from "@/lib/taste";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -29,7 +29,15 @@ export type QuizState = {
   wrongCount: number; // this run
   usedPaidStrikes: boolean;
   entryEarned: boolean; // this run has minted its free giveaway entry
-  iq: number; // all-time Culture IQ (the score you climb the board with)
+  /** Which game this run is playing — the panel labels itself from this. */
+  track: "culture" | "markets";
+  /**
+   * The score for the track being played. Showing Culture IQ during a
+   * markets run is technically true (Culture IQ counts every track) and
+   * useless: it doesn't tell you how you're doing at the thing you're
+   * actually doing.
+   */
+  iq: number;
   answered: number; // all-time questions answered
   strikes: StrikeState;
   question: PublicQuestion | null;
@@ -40,6 +48,14 @@ export type AnswerFeedback = {
   correctAnswer: string;
   explanation: string | null;
   earnedEntry: boolean;
+  /**
+   * The transferable idea behind a markets question, shown whether they got
+   * it right or wrong. The explanation says why this answer; the lesson says
+   * what to take away — and the one you most need to read is the one you got
+   * wrong, which is exactly when a game normally shows you nothing.
+   */
+  lesson?: string | null;
+  concept?: string | null;
 };
 
 export type QuizActionResult =
@@ -66,14 +82,16 @@ export async function buildState(
     entryGranted: boolean;
     questionIds: string;
     currentIndex: number;
+    track?: string;
   }
 ): Promise<QuizState> {
+  const track = run.track === "markets" ? "markets" : "culture";
   const [strikes, question, iq] = await Promise.all([
     getStrikeState(userId),
     run.status === "ACTIVE" || run.status === "NEEDS_CREDITS"
       ? getCurrentQuestion(run)
       : null,
-    cultureIQ(userId),
+    track === "markets" ? marketIQ(userId) : cultureIQ(userId),
   ]);
   return {
     runId: run.id,
@@ -82,6 +100,7 @@ export async function buildState(
     wrongCount: run.wrongCount,
     usedPaidStrikes: run.usedPaidStrikes,
     entryEarned: run.entryGranted,
+    track,
     iq: iq.iq,
     answered: iq.correct + iq.misses + iq.cleared,
     strikes,
@@ -126,12 +145,15 @@ async function maybeGrantEntry(run: {
   return true;
 }
 
-export async function startQuizRun(): Promise<QuizActionResult> {
+export async function startQuizRun(track: "culture" | "markets" = "culture"): Promise<QuizActionResult> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Sign in to play." };
   const userId = session.user.id;
+  const playing = track === "markets" ? "markets" : "culture";
 
   // Resume an in-flight run instead of letting people re-roll questions.
+  // A run keeps the track it started on — switching mid-run would mean
+  // abandoning questions, which is the re-roll this guard exists to stop.
   const existing = await getActiveRun(userId);
   if (existing) return { ok: true, state: await buildState(userId, existing) };
 
@@ -140,8 +162,8 @@ export async function startQuizRun(): Promise<QuizActionResult> {
   // come back (that's the Culture IQ ledger rule).
   const [questions, burned, taste] = await Promise.all([
     prisma.quizQuestion.findMany({
-      where: { active: true },
-      select: { id: true, question: true },
+      where: { active: true, track: playing },
+      select: { id: true, question: true, level: true },
     }),
     prisma.quizAnswer.findMany({
       where: { userId },
@@ -150,14 +172,33 @@ export async function startQuizRun(): Promise<QuizActionResult> {
     getTasteProfile(userId),
   ]);
   const burnedIds = new Set(burned.map((b) => b.questionId));
-  const pool = questions.filter((q) => !burnedIds.has(q.id));
+  let pool = questions.filter((q) => !burnedIds.has(q.id));
+
+  // Markets questions are laddered: nobody gets asked about margin calls
+  // before they've been asked what a bid is. You're served your current
+  // rung and everything below it, so earlier ideas keep coming back around
+  // as the foundation for the new ones.
+  if (playing === "markets") {
+    const { marketIQ, rankFor } = await import("@/lib/iq");
+    const { correct } = await marketIQ(userId);
+    const unlocked = rankFor(correct).level;
+    const inRange = pool.filter((q) => q.level <= unlocked);
+    // Only narrow if the ladder still leaves a playable run; running dry at
+    // the top of your rank should deal the next rung, not refuse to deal.
+    if (inRange.length >= MIN_RUN_POOL) pool = inRange;
+  }
+
   if (pool.length < MIN_RUN_POOL) {
     return {
       ok: false,
       error:
-        burned.length > 0
-          ? "You've answered nearly every question on the site — new ones land with every drop article. Check back after the next drop."
-          : "The question bank is still being loaded — check back soon.",
+        playing === "markets"
+          ? burned.length > 0
+            ? "You've cleared the markets bank — new lessons land as the market teaches us new things."
+            : "The markets bank is still being loaded — check back soon."
+          : burned.length > 0
+            ? "You've answered nearly every question on the site — new ones land with every drop article. Check back after the next drop."
+            : "The question bank is still being loaded — check back soon.",
     };
   }
 
@@ -167,7 +208,15 @@ export async function startQuizRun(): Promise<QuizActionResult> {
   // matches) → plain shuffle, exactly as before.
   const topBrands = (taste?.brands ?? []).slice(0, 3).map((b) => b.name);
   let picked: string[];
-  if (topBrands.length > 0) {
+  if (playing === "markets") {
+    // No taste weave here: a markets question mentioning Jordan isn't a
+    // Jordan question, so weighting by favourite brand would sort on a
+    // coincidence. Deal easiest-first instead, so a run builds.
+    picked = shuffle(pool)
+      .sort((a, b) => a.level - b.level)
+      .map((q) => q.id)
+      .slice(0, RUN_QUEUE_SIZE);
+  } else if (topBrands.length > 0) {
     const matched: string[] = [];
     const rest: string[] = [];
     for (const q of pool) {
@@ -186,7 +235,7 @@ export async function startQuizRun(): Promise<QuizActionResult> {
     picked = shuffle(pool.map((q) => q.id)).slice(0, RUN_QUEUE_SIZE);
   }
   const run = await prisma.quizRun.create({
-    data: { userId, questionIds: JSON.stringify(picked) },
+    data: { userId, track: playing, questionIds: JSON.stringify(picked) },
   });
   return { ok: true, state: await buildState(userId, run) };
 }
@@ -260,7 +309,7 @@ export async function answerQuestion(
     return {
       ok: true,
       state: await buildState(userId, updated ?? run),
-      feedback: { correct: true, correctAnswer, explanation: question.explanation, earnedEntry },
+      feedback: { correct: true, correctAnswer, explanation: question.explanation, earnedEntry, lesson: question.lesson, concept: question.concept },
     };
   }
 
@@ -276,7 +325,7 @@ export async function answerQuestion(
     return {
       ok: true,
       state: await buildState(userId, fresh ?? run),
-      feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry: false },
+      feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry: false, lesson: question.lesson, concept: question.concept },
     };
   }
   try {
@@ -302,7 +351,7 @@ export async function answerQuestion(
   return {
     ok: true,
     state: await buildState(userId, updated),
-    feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry },
+    feedback: { correct: false, correctAnswer, explanation: question.explanation, earnedEntry, lesson: question.lesson, concept: question.concept },
   };
 }
 

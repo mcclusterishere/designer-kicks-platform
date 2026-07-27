@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { loginUser } from "@/app/account-actions";
 import type { ActionResult } from "@/app/actions";
+import PasswordField from "@/components/PasswordField";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
 
-export default function LoginForm() {
+export default function LoginForm({ next = "/profile" }: { next?: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
     loginUser,
@@ -18,7 +19,7 @@ export default function LoginForm() {
 
   useEffect(() => {
     if (state?.ok) {
-      router.push("/profile");
+      router.push(next);
       router.refresh();
     }
   }, [state?.ok, router]);
@@ -29,10 +30,10 @@ export default function LoginForm() {
         <label htmlFor="email" className="tag text-smoke">Email</label>
         <input id="email" name="email" type="email" required autoComplete="email" className={inputClass} />
       </div>
-      <div>
-        <label htmlFor="password" className="tag text-smoke">Password</label>
-        <input id="password" name="password" type="password" required autoComplete="current-password" className={inputClass} />
-      </div>
+      {/* Reveal here too, no confirm — you're recalling a password, not
+          setting one, and a second box would just be a second thing to
+          get wrong. */}
+      <PasswordField label="Password" autoComplete="current-password" />
       {state?.error && <p className="text-sm text-heat" role="alert">{state.error}</p>}
       <button
         type="submit"

@@ -44,6 +44,15 @@ export default function TermsPage() {
             or have permission to post. We may remove content that infringes
             others&apos; rights or breaks these terms.
           </p>
+          <p className="mt-2">
+            We have zero tolerance for objectionable content or abusive
+            behavior. Every post and comment carries a report control, and
+            you can block any member to remove their content from your
+            feed. Reported content is reviewed and acted on within 24
+            hours; accounts that post objectionable material are ejected.
+            You can permanently delete your account at any time from your
+            profile page.
+          </p>
         </section>
         <section>
           <h2 className="display text-xl text-white">4. The market is an index, not a store</h2>

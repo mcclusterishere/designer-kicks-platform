@@ -19,8 +19,9 @@ export default async function BattlePage({
 
   const result = await getBattleWithVotes(id);
   if (!result) notFound();
-  const { battle, aVotes, bVotes } = result;
+  const { battle, aVotes, bVotes, aGuest, bGuest } = result;
 
+  const session = await auth();
   // The B corner is a custom or the retail original, depending on format.
   const B = sideB(battle);
   if (!B) notFound();
@@ -29,22 +30,23 @@ export default async function BattlePage({
   const aKey = battle.subA.id;
   const bKey = isOG ? "og" : B.id;
 
-  const session = await auth();
-  const myVote = session?.user?.id
+  // Whoever this is — account or a device that already voted — look up their
+  // ballot by the same key castVote would have written.
+  const { existingGuestKey } = await import("@/lib/guest");
+  const voterKey = session?.user?.id ?? (await existingGuestKey());
+  const myVote = voterKey
     ? await prisma.vote.findUnique({
-        where: {
-          battleId_voterKey: { battleId: battle.id, voterKey: session.user.id },
-        },
+        where: { battleId_voterKey: { battleId: battle.id, voterKey } },
       })
     : null;
   // Read the corner, not the submission — an OG vote carries no submission.
   const yourVote = myVote ? (myVote.side === "A" ? aKey : bKey) : null;
-
-  const active = battle.status === "ACTIVE";
   // Winner as a ballot key, so the panel highlights the right corner even
   // when OG culture takes it (winnerId is null in that case by design).
   const winnerKey =
     battle.winnerSide === "A" ? aKey : battle.winnerSide === "B" ? bKey : null;
+
+  const active = battle.status === "ACTIVE";
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
@@ -52,14 +54,9 @@ export default async function BattlePage({
         ← All battles
       </Link>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="display text-3xl text-white sm:text-4xl">
-            {battle.title ?? (isOG ? "Custom vs OG" : "Head to Head")}
-          </h1>
-          {isOG && (
-            <p className="tag mt-1 text-heat">Custom culture vs OG culture</p>
-          )}
-        </div>
+        <h1 className="display text-3xl text-white sm:text-4xl">
+          {battle.title ?? "Head to Head"}
+        </h1>
         <div className="rounded-lg border border-edge bg-surface px-4 py-2">
           {active ? (
             <>
@@ -87,7 +84,6 @@ export default async function BattlePage({
             <p className="w-full truncate text-center text-xs font-bold text-white">
               {battle.subA.artistName}
             </p>
-            {isOG && <p className="tag text-volt">Custom</p>}
           </div>
           <div className="flex shrink-0 flex-col items-center px-2">
             {active ? (
@@ -132,8 +128,7 @@ export default async function BattlePage({
           yourVote={yourVote}
           winnerId={winnerKey}
           a={{
-            submissionId: aKey,
-            kind: "custom",
+            submissionId: battle.subA.id,
             title: battle.subA.title,
             artistName: battle.subA.artistName,
             artistSlug: battle.subA.artist?.slug ?? null,
@@ -141,6 +136,7 @@ export default async function BattlePage({
             baseShoe: battle.subA.baseShoe,
             category: battle.subA.category,
             imageUrl: battle.subA.imageUrl,
+            videoUrl: battle.subA.videoUrl,
             extraImages: battle.subA.extraImages,
             votes: aVotes,
           }}
@@ -154,6 +150,7 @@ export default async function BattlePage({
             baseShoe: B.shoe ?? "",
             category: isOG ? "sneakers" : battle.subB?.category ?? "sneakers",
             imageUrl: B.imageUrl ?? "/placeholder.svg",
+            videoUrl: isOG ? null : battle.subB?.videoUrl ?? null,
             extraImages: isOG ? [] : battle.subB?.extraImages ?? [],
             votes: bVotes,
           }}
@@ -161,9 +158,9 @@ export default async function BattlePage({
       </div>
 
       {(() => {
-        // The customs in this battle — one in a custom-vs-OG matchup, two
-        // in a head-to-head. The OG isn't a custom and has no donor shoe:
-        // it IS the donor shoe.
+        // The customs in this battle — one in a custom-vs-OG matchup, two in
+        // a head-to-head. The OG isn't a custom and has no donor shoe: it IS
+        // the donor shoe.
         const customs = [battle.subA, ...(isOG ? [] : battle.subB ? [battle.subB] : [])];
         const sneakers = customs.filter((s) => s.category === "sneakers");
         if (!sneakers.length && !isOG) return null;

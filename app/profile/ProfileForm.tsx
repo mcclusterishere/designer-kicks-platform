@@ -71,23 +71,34 @@ export default function ProfileForm({ defaults }: { defaults: Defaults }) {
         </div>
       </div>
       <div>
-        <label htmlFor="p-shopfor" className="tag text-smoke">Who do you shop for?</label>
+        {/* "Lane" and "wild cards" are our words, not anybody else's.
+            Inside the team they're obvious; to a person who just signed up
+            they're two pieces of jargon in a sentence that's supposed to
+            be a simple question about shoe sizes. Say the actual thing:
+            which section, and whether to mix in the others. */}
+        <label htmlFor="p-shopfor" className="tag text-smoke">
+          Which shoes should we show you?
+        </label>
         <select id="p-shopfor" name="shopFor" defaultValue={defaults.shopFor} className={inputClass}>
-          <option value="">Pick a lane…</option>
+          <option value="">Choose one…</option>
           <option value="mens">Men&apos;s</option>
           <option value="womens">Women&apos;s</option>
           <option value="kids">Kids</option>
-          <option value="all">Show me everything</option>
+          <option value="all">All of them</option>
         </select>
         <p className="mt-1 text-xs text-smoke/70">
-          Who you shop <em>for</em> — yourself, your partner, whoever. We deal
-          about two-thirds from your lane and sprinkle in wild cards from the
-          rest, so you never miss heat. Flip lanes any time.
+          Pick who you&apos;re shopping <em>for</em> — yourself, your partner, your kids,
+          whoever. Most of what you see will be from that section, with a few pairs from
+          the others mixed in so you don&apos;t miss something great. Change it whenever
+          you like.
         </p>
       </div>
-      <label className="flex items-center gap-2 text-sm text-smoke">
-        <input type="checkbox" name="laneStrict" defaultChecked={defaults.laneStrict} className="h-4 w-4 accent-[#f04e45]" />
-        Only my lane — skip the wild cards
+      <label className="flex items-start gap-2 text-sm text-smoke">
+        <input type="checkbox" name="laneStrict" defaultChecked={defaults.laneStrict} className="mt-0.5 h-4 w-4 accent-[#f04e45]" />
+        <span>
+          Show me <strong className="text-white">only</strong> the section I picked — don&apos;t
+          mix in pairs from the others.
+        </span>
       </label>
       <label className="flex items-center gap-2 text-sm text-smoke">
         <input type="checkbox" name="battleAlerts" defaultChecked={defaults.battleAlerts} className="h-4 w-4 accent-[#f04e45]" />

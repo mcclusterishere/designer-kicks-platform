@@ -106,9 +106,11 @@ export default function PrivacyPage() {
             <li>Edit or remove profile details anytime from your profile.</li>
             <li>Marketing email is opt-in and every send has an unsubscribe.</li>
             <li>
-              Want your account and data deleted? Email{" "}
+              Delete your account yourself, anytime: your profile page has a
+              &ldquo;Delete account&rdquo; control that permanently removes
+              your personal information and disables sign-in. Prefer email?{" "}
               <span className="text-white">hello@theheatchart.com</span> from
-              your account address and we&apos;ll handle it.
+              your account address works too.
             </li>
           </ul>
         </section>

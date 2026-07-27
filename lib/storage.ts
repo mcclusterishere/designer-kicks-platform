@@ -1,5 +1,6 @@
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { uploadDir } from "./uploadDir";
 
 /**
  * Upload storage with two drivers:
@@ -15,7 +16,6 @@ import path from "path";
  *   wrong for serverless platforms where the filesystem is ephemeral.
  */
 
-const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
 
 function s3Config() {
   const bucket = process.env.S3_BUCKET;
@@ -43,6 +43,36 @@ export async function saveUpload(
   fileName: string,
   contentType: string
 ): Promise<string> {
+  // Every image is re-encoded to a clean JPEG so an iPhone/Safari photo
+  // (HEIC, or a mislabeled MIME) can never render blank in Chrome/Firefox.
+  // Videos pass through untouched. If we somehow can't decode it, keep the
+  // original bytes rather than lose the upload.
+  if (contentType.startsWith("image/")) {
+    try {
+      const { normalizeImage } = await import("./imageNormalize");
+      data = await normalizeImage(data);
+      contentType = "image/jpeg";
+      fileName = fileName.replace(/\.[^.]+$/, "") + ".jpg";
+    } catch {
+      /* undecodable — fall through with the original bytes */
+    }
+  } else if (contentType.startsWith("video/")) {
+    // Transcode to a universal H.264/AAC MP4 so an iPhone .mov (HEVC) plays
+    // on every device, not just Apple's. If ffmpeg is unavailable the
+    // original is kept — an upload is never lost over this.
+    try {
+      const { transcodeToMp4 } = await import("./videoNormalize");
+      const mp4 = await transcodeToMp4(data);
+      if (mp4) {
+        data = mp4;
+        contentType = "video/mp4";
+        fileName = fileName.replace(/\.[^.]+$/, "") + ".mp4";
+      }
+    } catch {
+      /* keep the original clip */
+    }
+  }
+
   const cfg = s3Config();
 
   if (cfg) {
@@ -68,7 +98,19 @@ export async function saveUpload(
     return `${cfg.publicUrl}/${key}`;
   }
 
-  await mkdir(LOCAL_UPLOAD_DIR, { recursive: true });
-  await writeFile(path.join(LOCAL_UPLOAD_DIR, fileName), data);
-  return `/api/uploads/${fileName}`;
+  // No object storage configured → persist in Postgres (bytea). This is
+  // the reliable default here: it survives every redeploy without needing
+  // a mounted disk volume. Served via /api/uploads/<name>, same as before.
+  try {
+    const { saveBlob } = await import("./blobStore");
+    await saveBlob(fileName, contentType, data);
+    return `/api/uploads/${fileName}`;
+  } catch {
+    // Last-ditch fallback to local disk (e.g. DB unreachable). Better a
+    // best-effort write than a lost upload; the DB path is the norm.
+    const dir = uploadDir();
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, fileName), data);
+    return `/api/uploads/${fileName}`;
+  }
 }

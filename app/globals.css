@@ -12,9 +12,11 @@
   --color-edge: #232321;
   --color-volt: #f04e45;
   --color-heat: #d9b96a;
-  /* Muted text: lightened to clear WCAG AA (4.5:1) on the dark
-     surfaces for normal-size body copy. */
-  --color-smoke: #b9b6ac;
+  /* Muted text: brightened well past WCAG AA (now ~6:1 on the dark
+     surfaces) so description copy reads without squinting. Paired with
+     the weight bump below — thin muted grey on black was murder on
+     any eye over thirty. */
+  --color-smoke: #cbc8bf;
   --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
@@ -23,6 +25,21 @@ body {
   background: var(--color-ink);
   color: #f5f5f5;
   font-family: var(--font-sans);
+  /* Body copy rides a touch heavier than hairline-400 so description
+     text carries weight. Headers set their own weight (.display, the
+     font-semibold/bold utilities) and are unaffected. */
+  font-weight: 450;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Muted "smoke" text is the site's convention for description/body
+   copy. Give it real weight so it stops disappearing — but keep it in
+   the base layer so any explicit font-bold/semibold utility still wins.
+   This is the single biggest legibility lever on the whole app. */
+@layer base {
+  .text-smoke {
+    font-weight: 520;
+  }
 }
 
 /* Finish details — the stuff you feel more than see */
@@ -274,6 +291,24 @@ main {
 .rate-card-exit {
   animation: card-exit 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
+/* Arena voting deck — next matchup deals in the same way */
+.deck-in {
+  animation: card-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Competitive-floor chips: a heartbeat ring radiates off each one so
+   the row reads as live doors, not dead labels. Staggered per chip. */
+@keyframes chip-ping {
+  0% { box-shadow: 0 0 0 0 rgba(240, 78, 69, 0.5); }
+  70% { box-shadow: 0 0 0 12px rgba(240, 78, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(240, 78, 69, 0); }
+}
+.chip-pulse {
+  animation: chip-ping 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip-pulse { animation: none; }
+}
 .flame-btn:not(:disabled):hover {
   transform: translateY(-2px) scale(1.04);
 }
@@ -456,6 +491,235 @@ time, .tabular {
   .btn-hard:hover,
   .btn-hard-volt:hover,
   .card-lift:hover {
+    transform: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   LIGHT MODE — the white-paper read. Dark stays the house default;
+   [data-theme="light"] flips the token values and remaps the literal
+   white utilities the dark build leans on. Brand red/champagne stay.
+   ───────────────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-ink: #ffffff;
+  --color-surface: #f6f5f2;
+  --color-panel: #edece7;
+  /* Daylight contrast: borders you can see, secondary text near-black,
+     and the accents re-tuned for paper — night-club red and champagne
+     sit at 3.5:1 and 1.9:1 on white, which reads as fog. */
+  --color-edge: #cfccc1;
+  --color-smoke: #363b42;
+  --color-volt: #c9342c;
+  --color-heat: #7d5f18;
+}
+[data-theme="light"] body {
+  background: #ffffff;
+  color: #15171a;
+}
+[data-theme="light"] body::before {
+  background:
+    radial-gradient(60rem 40rem at 80% -10%, rgba(240, 78, 69, 0.05), transparent 60%),
+    radial-gradient(50rem 35rem at -10% 110%, rgba(217, 185, 106, 0.05), transparent 60%);
+}
+[data-theme="light"] body::after {
+  opacity: 0.028;
+}
+/* The dark build says text-white everywhere — on paper that means ink. */
+[data-theme="light"] .text-white {
+  color: #15171a !important;
+}
+[data-theme="light"] [class*="text-white/"] {
+  color: rgba(21, 23, 26, 0.86) !important;
+}
+[data-theme="light"] [class*="border-white"] {
+  border-color: rgba(21, 23, 26, 0.16) !important;
+}
+[data-theme="light"] [class*="hover:text-white"]:hover {
+  color: #15171a !important;
+}
+/* White badges over photos become ink chips on paper — except a printable
+   document, which is white paper by definition and keeps its own ink. */
+[data-theme="light"] .bg-white:not(.paper-sheet) {
+  background: #15171a !important;
+  color: #ffffff !important;
+}
+[data-theme="light"] .paper-sheet :is(h1, h2, h3, strong) {
+  color: #0d0f12;
+}
+[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.72);
+}
+[data-theme="light"] .ghost-word {
+  -webkit-text-stroke-color: rgba(21, 23, 26, 0.08);
+}
+[data-theme="light"] .card-lift:hover {
+  box-shadow: 0 16px 40px rgba(21, 23, 26, 0.14), 0 0 0 1px rgba(240, 78, 69, 0.35);
+}
+[data-theme="light"] ::selection {
+  background: var(--color-volt);
+  color: #ffffff;
+}
+/* Gradient display type: the champagne ramp's light stops vanish on
+   paper — swap to a bronze ramp that holds. */
+[data-theme="light"] .text-gradient-heat {
+  background: linear-gradient(100deg, #a8853d 0%, #8a6a1f 55%, #5f470f 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+[data-theme="light"] .text-gradient-volt {
+  background: linear-gradient(100deg, #e05a4a 0%, #c9342c 45%, #8a0f13 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ── Long-form reading ──────────────────────────────────────────────
+   Article prose is the one place on the site where someone reads for
+   minutes rather than glances for seconds, so it gets its own token
+   instead of borrowing a utility. It had been pinned to a literal pale
+   grey, which is legible on black and effectively invisible on paper —
+   and since the theme defaults to light between 7am and 7pm, that meant
+   most daytime readers got a blank page. Body copy now lands near-black
+   on paper (about 15:1) and warm off-white at night (about 14:1).
+   ─────────────────────────────────────────────────────────────────── */
+.article-body {
+  color: #e7e5e0;
+}
+[data-theme="light"] .article-body {
+  color: #16181c;
+}
+[data-theme="light"] .article-body :is(h2, h3, h4, strong, b) {
+  color: #0d0f12 !important;
+}
+[data-theme="light"] .article-body :is(blockquote, figcaption) {
+  color: #363b42 !important;
+}
+/* Links in running text need to beat the body copy they sit in, not tie it. */
+[data-theme="light"] .article-body a {
+  color: #b02a22 !important;
+  text-decoration-thickness: 0.09em;
+  text-underline-offset: 0.16em;
+}
+
+/* A literal pale neutral is always a dark-mode assumption. On paper it
+   reads as an empty page, so remap the whole family rather than trust
+   every future call site to remember. Card interiors that are genuinely
+   white in both themes opt out with .on-dark. */
+[data-theme="light"]
+  :is(.text-neutral-100, .text-neutral-200, .text-neutral-300, .text-neutral-400,
+      .text-gray-100, .text-gray-200, .text-gray-300, .text-gray-400,
+      .text-zinc-100, .text-zinc-200, .text-zinc-300, .text-zinc-400):not(.on-dark *):not(.on-dark) {
+  color: #363b42 !important;
+}
+
+/* Members who ask their device for more contrast get more contrast. */
+@media (prefers-contrast: more) {
+  :root {
+    --color-smoke: #d6d3ca;
+    --color-edge: #45453f;
+  }
+  [data-theme="light"] {
+    --color-smoke: #24272c;
+    --color-edge: #a9a699;
+  }
+}
+
+/* ── Agency motion kit — the drafted page's scroll language ── */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.float-slow { animation: float-slow 5s ease-in-out infinite; }
+.float-slower { animation: float-slow 7s ease-in-out 1s infinite; }
+
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-x {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 24s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-slow, .float-slower, .marquee-x { animation: none; }
+  .reveal-item { transition: none !important; }
+}
+
+/* The tape: one seamless loop of the movers across the trading floor.
+   The track holds the list twice, so translating exactly -50% lands on an
+   identical frame and the scroll never visibly jumps. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track {
+  animation: ticker-scroll 45s linear infinite;
+}
+.ticker-track:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+}
+
+/* ---------- Trading floor motion ---------- */
+
+/* The index line draws itself once on load. */
+@keyframes line-draw {
+  from { stroke-dashoffset: 1200; }
+  to   { stroke-dashoffset: 0; }
+}
+.line-draw {
+  stroke-dasharray: 1200;
+  animation: line-draw 1.4s cubic-bezier(.22,.61,.36,1) forwards;
+}
+@keyframes area-fade { from { opacity: 0; } to { opacity: 1; } }
+.area-fade { animation: area-fade 1.6s ease-out forwards; }
+
+/* Latest reading breathes so the board reads as live. */
+@keyframes pulse-dot {
+  0%,100% { r: 3.5; opacity: 1; }
+  50%     { r: 5;   opacity: .65; }
+}
+.pulse-dot { animation: pulse-dot 2.4s ease-in-out infinite; }
+
+/* Breadth bar sweeps out to its real proportion. */
+@keyframes breadth-grow { from { width: 0 !important; } }
+.breadth-grow { animation: breadth-grow 1.1s cubic-bezier(.22,.61,.36,1) both; }
+
+/* Order-book rows cascade in — staggered by index via --i. */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.row-in {
+  animation: row-in .45s ease-out both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+/* The price ladder fills left→right on reveal. */
+@keyframes ladder-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.ladder-grow { transform-origin: left; animation: ladder-grow .7s cubic-bezier(.22,.61,.36,1) both; }
+
+/* Modal scrim.
+   NOT bg-ink/N. --color-ink flips to #ffffff under [data-theme="light"],
+   so an ink scrim over a light page is a white wash: it doesn't dim
+   anything, the content behind stays fully legible, and the dialog loses
+   its separation from the page. A scrim's whole job is to darken, so this
+   one is a literal that both themes share. */
+.scrim { background-color: rgba(11, 11, 12, 0.72); }
+
+/* Explainer sheet: rises from the bottom on a phone, fades in on a desktop
+   where there's no edge for it to rise from. */
+.sheet-rise { animation: sheet-up .28s cubic-bezier(.22,.61,.36,1) both; }
+@media (min-width: 640px) {
+  .sheet-rise { animation: sheet-fade .2s ease-out both; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-draw, .area-fade, .pulse-dot, .breadth-grow, .row-in, .ladder-grow, .sheet-rise {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
     transform: none;
   }
 }
