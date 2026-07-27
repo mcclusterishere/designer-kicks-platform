@@ -12,6 +12,7 @@ import RecordSaleForm from "@/components/RecordSaleForm";
 import AddPhotosForm from "@/components/AddPhotosForm";
 import ClaimProfileForm from "@/components/ClaimProfileForm";
 import { isAdmin } from "@/lib/admin";
+import AdminOverride from "./AdminOverride";
 import { formatUsd } from "@/lib/market";
 import { platformLabel } from "@/lib/sellPlatforms";
 import { categoryLabel } from "@/lib/categories";
@@ -135,6 +136,25 @@ export default async function ArtistPage({ params }: Props) {
       <Link href="/artists" className="tag text-smoke hover:text-white">
         ← League rankings
       </Link>
+
+      {/* Admin standing on somebody's page edits it from the page itself. */}
+      {admin && (
+        <div className="mt-4">
+          <AdminOverride
+            artist={{
+              id: artist.id,
+              slug: artist.slug,
+              displayName: artist.displayName,
+              bio: artist.bio,
+              instagram: artist.instagram,
+              city: artist.city,
+              portfolioUrl: artist.portfolioUrl,
+              status: artist.status,
+              plan: artist.plan,
+            }}
+          />
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>

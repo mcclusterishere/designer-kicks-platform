@@ -312,17 +312,21 @@ export default async function MarketPage({
   const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "" } = sp;
   const sym = (sp.sym ?? "").trim();
 
-  // One tab, four views. The exchange leads because the chart is the thing
-  // people came to look at; "og" is kept as an alias so every link already
-  // in the wild still lands on the book.
-  const raw = sp.board ?? "exchange";
-  const board: "exchange" | "catalog" | "customs" | "instock" = raw === "customs"
-    ? "customs"
-    : raw === "catalog"
-      ? "catalog"
+  // The customs floor is the front door — one-of-ones are the thing this
+  // house is actually for, so the market opens on them rather than on
+  // other people's retail.
+  //
+  // Chart and Browse used to be two tabs asking people to guess which one
+  // held the shoes; they were always the same pairs read two ways, so they
+  // are one tab now — the book up top, the grid underneath. "catalog" and
+  // "og" stay as aliases so every link already in the wild still lands.
+  const raw = sp.board ?? "customs";
+  const board: "exchange" | "customs" | "instock" =
+    raw === "exchange" || raw === "catalog" || raw === "og"
+      ? "exchange"
       : raw === "instock"
         ? "instock"
-        : "exchange";
+        : "customs";
   const og = board === "exchange";
   const needle = q.trim().toLowerCase();
 
@@ -379,12 +383,10 @@ export default async function MarketPage({
           <h1 className="display mt-1 text-4xl text-white">The Market</h1>
           <p className="mt-1 text-sm text-smoke">
             {board === "exchange"
-              ? "Retail drops tracked against live resale — chart, book and spread."
-              : board === "catalog"
-                ? "The same pairs, laid out to browse."
-                : board === "instock"
-                  ? "Pairs we own outright and sell direct — our stock, our shipping."
-                  : "One-of-one customs priced by the artists who built them."}
+              ? "Retail drops tracked against live resale — chart, book and spread, then the whole rack to browse."
+              : board === "instock"
+                ? "Pairs we own outright and sell direct — our stock, our shipping."
+                : "One-of-one customs priced by the artists who built them."}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Link
@@ -402,9 +404,9 @@ export default async function MarketPage({
           </div>
         </div>
 
-        {/* One market, three ways to read it. The catalog used to be its own
-            top-level tab, which asked people to know that two words meant one
-            set of shoes — it's a view here now. */}
+        {/* Customs first: it is the default board and the reason the house
+            exists. Chart carries the retail side — the book and the browse
+            grid together, since they were only ever the same pairs. */}
         <div
           className="flex w-full max-w-full items-center overflow-x-auto rounded-full border border-edge bg-surface p-1 sm:w-auto sm:overflow-x-visible"
           role="tablist"
@@ -412,9 +414,8 @@ export default async function MarketPage({
         >
           {(
             [
-              { key: "exchange", label: "📈 Chart", tone: "bg-heat text-ink" },
-              { key: "catalog", label: "▦ Browse", tone: "bg-volt text-ink" },
-              { key: "customs", label: "✦ Customs", tone: "bg-volt text-ink" },
+              { key: "customs", label: "✦ Customs", tone: "bg-heat text-ink" },
+              { key: "exchange", label: "📈 Chart", tone: "bg-volt text-ink" },
               // Ours, kept visibly separate from the boards that list
               // other people's inventory.
               { key: "instock", label: "🏷 In Stock", tone: "bg-volt text-ink" },
@@ -422,7 +423,7 @@ export default async function MarketPage({
           ).map((t) => (
             <Link
               key={t.key}
-              href={t.key === "exchange" ? "/market" : `/market?board=${t.key}`}
+              href={t.key === "customs" ? "/market" : `/market?board=${t.key}`}
               role="tab"
               aria-selected={board === t.key}
               className={`${switchBase} ${board === t.key ? t.tone : "text-smoke hover:text-white"}`}
@@ -444,10 +445,19 @@ export default async function MarketPage({
 
       {board === "instock" ? (
         <HouseStock />
-      ) : board === "catalog" ? (
-        <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
       ) : og && ogBoard ? (
-        <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />
+        <>
+          <ExchangeFloor exchange={ogBoard!} hotBases={hotBases} q={q} sort={sort} brand={brand} />
+          {/* The rack, under the book — same pairs, laid out to browse. */}
+          <div className="mt-12">
+            <div className="rule w-16" />
+            <h2 className="display mt-2 text-2xl text-white">Browse the rack</h2>
+            <p className="mt-1 text-sm text-smoke">
+              Every pair on the board, laid out to scroll.
+            </p>
+            <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
+          </div>
+        </>
       ) : customsBoard ? (
         <CustomsBoardView
           board={customsBoard}
