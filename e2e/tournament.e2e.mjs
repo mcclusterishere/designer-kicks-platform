@@ -37,7 +37,7 @@ const matchLinks = await page.locator("a[href^='/battles/']").count();
 check("bracket matches link to battle pages", matchLinks >= 3);
 
 // Admin: force the final to end → winner advances → champion crowned
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=publishing`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
 await page.getByText("Tournaments").first().waitFor({ timeout: 10000 });

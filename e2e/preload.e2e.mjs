@@ -20,7 +20,7 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
 const page = await ctx.newPage();
 
 // Admin pre-loads the artist
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
 await page.getByText("Pre-load An Artist").waitFor({ timeout: 10000 });
@@ -169,7 +169,7 @@ await reg.locator("[data-testid=register-note]").waitFor({ timeout: 15000 });
 check("pending claim surfaced at signup", await reg.getByText(/still in review/).isVisible());
 await regCtx.close();
 
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.getByText("Profile Claims").waitFor({ timeout: 10000 });
 check("claim visible to admin", await page.getByText("@preloadtest").first().isVisible());
 check(
@@ -227,7 +227,7 @@ check("claim banner gone after handover", !(await page.getByRole("button", { nam
 // ---- Multi-piece preload: same email stacks pieces on one profile ----
 // (Run BEFORE claim it would reuse the same token; after claim it must
 // skip the claim link entirely and not break the account.)
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.getByText("Pre-load An Artist").waitFor({ timeout: 10000 });
 await page.fill("#pl-name", "Preload Test Artist");
 await page.fill("#pl-email", EMAIL);
@@ -255,7 +255,7 @@ const wallKicks = await prisma.submission.create({
 const wallChain = await prisma.submission.create({
   data: { title: "Wall Chain", artistName: "Preload Test Artist", email: EMAIL, baseShoe: "Cuban link", imageUrl: "/seed/custom-2.svg", status: "APPROVED", category: "accessories", artistId: artist.id },
 });
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=publishing`, { waitUntil: "networkidle" });
 await page.getByText("Start a Battle", { exact: false }).first().waitFor({ timeout: 10000 }).catch(() => {});
 await page.selectOption("#subAId", wallChain.id);
 check("side B announces the wall", await page.getByText(/Accessories only — category wall/).isVisible());

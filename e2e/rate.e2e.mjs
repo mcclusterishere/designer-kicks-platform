@@ -42,7 +42,7 @@ for (let i = 0; i < 8; i++) {
   galleryImgs = await page.locator("[data-testid=rate-gallery] img").count();
   if (galleryImgs > 1) break;
   const t = await page.locator("[data-testid=rate-card] h2").innerText();
-  await page.getByRole("button", { name: /Pass — show me another/ }).click();
+  await page.getByRole("button", { name: /Show Me Another/i }).click();
   await cardSettled(t);
 }
 check("deck deals a multi-photo card", galleryImgs > 1);
@@ -85,7 +85,7 @@ await cardSettled(firstTitle);
 
 // Pass skips without rating
 const secondTitle = await page.locator("[data-testid=rate-card] h2").innerText();
-await page.getByRole("button", { name: /Pass — show me another/ }).click();
+await page.getByRole("button", { name: /Show Me Another/i }).click();
 await cardSettled(secondTitle);
 check("pass skips without storing a rating", (await prisma.designRating.count({ where: { userId: fan.id } })) === 1);
 

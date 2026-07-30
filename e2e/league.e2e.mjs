@@ -49,7 +49,7 @@ check("pending state shown on submit page", await page.getByText("Application Un
 check("pending artist hidden from public league", !(await (await fetch(`${BASE}/artists/league-test-studio`)).ok));
 
 // Admin approves the application (admin cookie coexists with the session)
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
 await page.getByText("Artist Applications").waitFor({ timeout: 10000 });
@@ -75,7 +75,7 @@ check("submission linked to approved artist", sub?.artistId === approved?.id);
 check("extra angle stored for the swipe gallery", sub?.extraImages?.length === 1);
 
 // Approve the shoe so it shows in the closet
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.locator("div", { hasText: "League Test Custom" }).locator("button", { hasText: "Approve" }).first().click();
 await page.waitForTimeout(1500);
 
@@ -220,9 +220,11 @@ const secondSale = await prisma.sale.findUnique({ where: { id: offerSale.id } })
 check("buy-back transfers ownership to the artist", bounced?.ownerId === artistUser?.id);
 check("offer sale confirms unverified (no evidence)", secondSale?.status === "CONFIRMED" && secondSale?.verified === false);
 
-// Admin sales ledger shows the evidence-verified sale + Site Pulse analytics
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+// Admin sales ledger shows the evidence-verified sale + Site Pulse analytics.
+// Two rooms: the ledger is money (Selling), the pulse is the front page.
+await page.goto(`${BASE}/admin?tab=selling`, { waitUntil: "networkidle" });
 check("sale in admin ledger, evidence-verified", await page.getByText("✓ verified (evidence)").first().isVisible());
+await page.goto(`${BASE}/admin?tab=pulse`, { waitUntil: "networkidle" });
 check("site pulse renders for admin", await page.getByText("Site Pulse").isVisible());
 check("pulse tracks sales volume", await page.getByText("Sales volume").isVisible());
 check("pulse charts the last 14 days", (await page.locator("svg[aria-label*='Last 14 days']").count()) >= 2);

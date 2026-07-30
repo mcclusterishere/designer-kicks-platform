@@ -15,7 +15,7 @@ await prisma.groupLead.deleteMany({ where: { name: NAME } });
 
 const browser = await launchBrowser();
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
 await page.getByRole("heading", { name: "Group Scout" }).waitFor({ timeout: 10000 });

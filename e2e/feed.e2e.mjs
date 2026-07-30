@@ -44,7 +44,7 @@ check("diversity pass breaks up runs of one type", !runs);
 // ---------- Admin broadcasts a pinned post ----------
 const browser = await launchBrowser();
 const admin = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-await admin.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await admin.goto(`${BASE}/admin?tab=publishing`, { waitUntil: "networkidle" });
 await admin.fill("#password", ADMIN_PASSWORD);
 await admin.getByRole("button", { name: "Enter" }).click();
 await admin.getByRole("heading", { name: "Broadcast" }).waitFor({ timeout: 10000 });

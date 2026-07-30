@@ -106,7 +106,7 @@ await page.screenshot({ path: `${SHOTS}/outfits-fan-builder.png` });
 // ---------- Admin curates house fits and matches battles ----------
 const adminCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const admin = await adminCtx.newPage();
-await admin.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await admin.goto(`${BASE}/admin?tab=publishing`, { waitUntil: "networkidle" });
 await admin.fill("#password", ADMIN_PASSWORD);
 await admin.getByRole("button", { name: "Enter" }).click();
 await admin.getByRole("heading", { name: "Outfit Studio" }).waitFor({ timeout: 10000 });
@@ -239,7 +239,9 @@ await prisma.artistProfile.create({
   },
 });
 
-await admin.reload({ waitUntil: "networkidle" });
+// The outreach queue is in the People room, not the one the fit battles
+// were built in.
+await admin.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await admin.getByText("Outreach", { exact: false }).first().waitFor({ timeout: 10000 });
 const leadRow = admin.locator("div.rounded-xl", { hasText: "Outreach Test Lead" }).first();
 check("cold lead listed as never invited", await leadRow.getByText("Never invited").isVisible());

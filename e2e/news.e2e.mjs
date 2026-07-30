@@ -43,7 +43,7 @@ const rssText = await rss.text();
 check("RSS feed serves items", rss.headers.get("content-type")?.includes("rss") === true && rssText.includes("<item>"));
 
 // --- Admin authoring flow ---
-await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await page.goto(`${BASE}/admin?tab=publishing`, { waitUntil: "networkidle" });
 await page.fill("#password", ADMIN_PASSWORD);
 await page.getByRole("button", { name: "Enter" }).click();
 await page.getByText("Newsroom").waitFor({ timeout: 10000 });

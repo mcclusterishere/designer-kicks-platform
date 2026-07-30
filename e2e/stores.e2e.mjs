@@ -17,7 +17,7 @@ const browser = await launchBrowser();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 950 } });
 const admin = await ctx.newPage();
 
-await admin.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+await admin.goto(`${BASE}/admin?tab=roster`, { waitUntil: "networkidle" });
 await admin.fill("#password", ADMIN_PASSWORD);
 await admin.getByRole("button", { name: "Enter" }).click();
 await admin.getByRole("heading", { name: /Store/ }).waitFor({ timeout: 10000 });
