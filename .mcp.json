@@ -3,6 +3,10 @@
     "agentopus": {
       "type": "http",
       "url": "https://api.opus.pro/api/agent-mcp"
+    },
+    "meta_developer_tools": {
+      "type": "http",
+      "url": "https://mcp.facebook.com/devtools"
     }
   }
 }
