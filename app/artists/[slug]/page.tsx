@@ -45,6 +45,10 @@ export async function generateMetadata({ params }: Props) {
 // rename — old links land on the artist, never a 404.
 const SLUG_ALIASES: Record<string, string> = {
   "justin-dekota-2": "justin-dekota",
+  // Hitman Benji became Hitman Halo. The old address is in DMs, posts and
+  // the giveaway copy that already went out; a rename that 404s those is
+  // a rename that costs the artist their existing audience.
+  "hitman-benji": "hitman-halo",
 };
 
 /** How densely the maker chose to hang the wall. */

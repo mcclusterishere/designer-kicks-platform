@@ -227,7 +227,31 @@ async function main() {
   const seed = readFileSync("prisma/seed.mjs", "utf8");
   const charter = /const FOUNDING_CHARTER = \[([^\]]*)\]/.exec(seed)?.[1] ?? "";
   const slugs = [...charter.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
-  check("the charter names exactly two artists", slugs.length === 2, slugs.join(", "));
+
+  // An artist who has been renamed appears in the charter under both
+  // addresses, because a live database may still be on the old one when
+  // this runs and the seat must be found either way. That is two entries
+  // for one person, so the count that matters is of PEOPLE — resolved
+  // through the same alias map the artist page redirects with, which also
+  // stops the two lists drifting apart.
+  const page = readFileSync("app/artists/[slug]/page.tsx", "utf8");
+  const aliasBlock = /const SLUG_ALIASES: Record<string, string> = \{([\s\S]*?)\n\};/.exec(page)?.[1] ?? "";
+  const aliases = new Map(
+    [...aliasBlock.matchAll(/"([^"]+)":\s*"([^"]+)"/g)].map((m) => [m[1], m[2]])
+  );
+  const people = new Set(slugs.map((s) => aliases.get(s) ?? s));
+
+  check("the charter names exactly two artists", people.size === 2, [...people].join(", "));
+  check(
+    "every extra entry is a retired address of one of them, not a third person",
+    slugs.every((s) => people.has(s) || aliases.get(s) !== undefined),
+    "an unaliased third slug would quietly seat somebody nobody agreed to"
+  );
+  check(
+    "a retired address in the charter still redirects on the public page",
+    slugs.filter((s) => !people.has(s)).every((s) => aliases.get(s) !== undefined),
+    "otherwise the seat is granted to a page whose URL 404s"
+  );
   check(
     "and it identifies them by SLUG, never by display name",
     slugs.every((s) => /^[a-z0-9-]+$/.test(s)),

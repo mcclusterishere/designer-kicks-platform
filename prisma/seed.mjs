@@ -1178,9 +1178,9 @@ const preloadArtists = [
     // Already created on the live site from the admin panel — email:null
     // means the seed NEVER touches this page's ownership or claim link,
     // it only guarantees the pieces and their photos survive deploys.
-    slug: "hitman-benji",
+    slug: "hitman-halo",
     email: null,
-    displayName: "Hitman Benji",
+    displayName: "Hitman Halo",
     instagram: null,
     city: null,
     pieces: [
@@ -1679,7 +1679,7 @@ async function promoteNamedEditors() {
  * verify:founding asserts the two agree, so the duplication is checked
  * rather than trusted.
  */
-const FOUNDING_CHARTER = ["hitman-benji", "justin-dekota"];
+const FOUNDING_CHARTER = ["hitman-halo", "hitman-benji", "justin-dekota"];
 
 /** Mirrors addMonths() in lib/founding.ts — clamps to the last valid day. */
 function addMonthsSeed(from, months) {
@@ -1735,7 +1735,7 @@ async function grantFoundingCharter() {
 }
 
 // The Editor's Pick — a quietly hand-picked feature, independent of the
-// Heat List. The designer is Hitman Benji; the giveaway is a 1-of-1 vest
+// Heat List. The designer is Hitman Halo; the giveaway is a 1-of-1 vest
 // he builds for the winner. Kept understated on purpose — prestige, not a
 // flex. Idempotent: once a human edits the name/note in admin, this stops
 // overwriting it.
@@ -1744,18 +1744,23 @@ async function grantFoundingCharter() {
 // public, this file is public, and pairing a working alias with the legal
 // name behind it in source is a doxx that no feature needed — the code
 // never had to know who anyone really is to feature their work.
-const BENJI_EDITORIAL_NOTE =
-  "Hitman Benji turns tactical vest blanks into one-of-one wearable armor — brocade, hand-laid lace, inked centerpieces, finished like couture. The kind of work you feel before anybody tells you to.";
-const BENJI_BIO =
+const HOUSE_EDITORIAL_NOTE =
+  "Hitman Halo turns tactical vest blanks into one-of-one wearable armor — brocade, hand-laid lace, inked centerpieces, finished like couture. The kind of work you feel before anybody tells you to.";
+const HOUSE_BIO =
   "Custom apparel and wearable-armor designer. Builds one-of-one statement vests — hand-painted, hand-stitched, no two alike — and treats a tactical blank like a canvas.";
 
-async function featureBenjiChase() {
+async function featureHouseDesigner() {
   // Find his page: prefer the campaign slug, then the staged persona, then
   // any account carrying his name.
+  // Matches BOTH brands on purpose. Production still carries the old slug
+  // until this deploy renames it, and a lookup that only knew the new name
+  // would fail to find the existing page and mint a second one beside it.
   let artist = await prisma.artistProfile.findFirst({
     where: {
       OR: [
+        { slug: "hitman-halo" },
         { slug: "hitman-benji" },
+        { displayName: { equals: "Hitman Halo", mode: "insensitive" } },
         { displayName: { equals: "Hitman Benji", mode: "insensitive" } },
       ],
     },
@@ -1772,7 +1777,7 @@ async function featureBenjiChase() {
     });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: "hitman.benji@theheatchart.com", name: "Hitman Benji" },
+        data: { email: "hitman.benji@theheatchart.com", name: "Hitman Halo" },
         select: { id: true },
       });
     }
@@ -1784,29 +1789,62 @@ async function featureBenjiChase() {
       artist = await prisma.artistProfile.create({
         data: {
           userId: user.id,
-          slug: "hitman-benji",
-          displayName: "Hitman Benji",
+          slug: "hitman-halo",
+          displayName: "Hitman Halo",
           status: "APPROVED",
-          bio: BENJI_BIO,
+          bio: HOUSE_BIO,
         },
       });
     }
   }
   if (!artist) return;
 
-  // The designer name is Hitman Benji — keep it.
+  // The brand is Hitman Halo now. Hitman Benji is retired.
   //
-  // The two strings below are a SCRUB LIST, not a record of who anyone
-  // is: earlier code published a legal name onto this public page, and
-  // this is what renames it back to the alias wherever that already
-  // happened in a live database. They stay until there is no chance a
-  // production row still carries one. Never clobbers a name a human
-  // deliberately set to something else.
-  const data = { editorsPick: true, editorialNote: artist.editorialNote || BENJI_EDITORIAL_NOTE };
-  if (artist.displayName === "Benji Chase" || artist.displayName === "Benjamin Chase")
-    data.displayName = "Hitman Benji";
-  if (!artist.bio) data.bio = BENJI_BIO;
+  // This list is a RENAME LIST, not a record of who anyone is. Two of the
+  // entries are a legal name an earlier version of this code published
+  // onto a public page; the third is the retired alias. All three resolve
+  // to the current brand wherever a live database still carries them.
+  //
+  // A name a human deliberately set to something else is never clobbered —
+  // only these three known-stale values are.
+  const STALE_NAMES = ["Benji Chase", "Benjamin Chase", "Hitman Benji"];
+
+  // A note somebody wrote by hand keeps its words — only the retired brand
+  // inside it is swapped. Rewriting the whole note would throw away
+  // editorial work; leaving it alone would keep the dead name on the most
+  // prominent block of copy on the home page.
+  const rebrand = (s) =>
+    STALE_NAMES.reduce((t, stale) => t.split(stale).join("Hitman Halo"), s ?? "");
+
+  const data = {
+    editorsPick: true,
+    editorialNote: artist.editorialNote ? rebrand(artist.editorialNote) : HOUSE_EDITORIAL_NOTE,
+  };
+  if (STALE_NAMES.includes(artist.displayName)) data.displayName = "Hitman Halo";
+  // The slug is the public URL, so moving it breaks every link already
+  // sitting in a DM. app/artists/[slug] redirects the old one to the new.
+  if (artist.slug === "hitman-benji") data.slug = "hitman-halo";
+  if (!artist.bio) data.bio = HOUSE_BIO;
   await prisma.artistProfile.update({ where: { id: artist.id }, data });
+
+  // Every piece carries a COPY of the artist's name, written at upload and
+  // never re-read from the profile. Battle cards and the catalog render
+  // that copy, not the page — so renaming the profile alone leaves the
+  // retired brand sitting on the most-viewed screens on the site.
+  for (const stale of STALE_NAMES) {
+    await prisma.submission.updateMany({
+      where: { artistId: artist.id, artistName: stale },
+      data: { artistName: "Hitman Halo" },
+    });
+  }
+
+  // And the account's own name, which is what the header greets him by and
+  // what a few admin lists fall back to when there's no artist page.
+  await prisma.user.updateMany({
+    where: { id: artist.userId, name: { in: STALE_NAMES } },
+    data: { name: "Hitman Halo" },
+  });
 
   // Give the pick a face if his page is empty (fresh launch DB) — his real
   // custom-vest photo ships in public/seed. Never duplicates: skips if he
@@ -1828,7 +1866,7 @@ async function featureBenjiChase() {
           "Black tactical vest rebuilt over red-and-gold cherub brocade — hand-laid black lace angel wings across the shoulders, inked cupid-girl centerpiece, and the crossed-pistol mark punched underneath. One of one.",
       },
     });
-    console.log("Editor's Pick: seeded Benji's vest piece (page had none).");
+    console.log("Editor's Pick: seeded the house designer's vest piece (page had none).");
   }
 
   // Exactly one Editor's Pick at a time — clear the crown everywhere else.
@@ -1839,13 +1877,13 @@ async function featureBenjiChase() {
   console.log(`Editor's Pick: ${data.displayName || artist.displayName} (${artist.slug}) is the house designer.`);
 }
 
-// The live giveaway is no longer a shoe — it's a 1-of-1 custom vest Benji
-// Chase builds for the winner. Convert the known Tour Yellow shoe giveaway
+// The live giveaway is no longer a shoe — it's a 1-of-1 custom vest the
+// house designer builds for the winner. Convert the known Tour Yellow shoe giveaway
 // in place; never touch a giveaway that's already the vest or something a
 // human set to something else.
-const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Hitman Benji";
+const VEST_PRIZE = "A 1-of-1 custom vest, hand-built by Hitman Halo";
 const VEST_DESC =
-  "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
+  "Hitman Halo hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.";
 
 async function refreshFeaturedGiveaway() {
   const g = await prisma.giveaway.findFirst({
@@ -1854,14 +1892,25 @@ async function refreshFeaturedGiveaway() {
   });
   if (!g) return;
   const blob = `${g.prize} ${g.description ?? ""}`;
-  const alreadyVest = /vest|benji/i.test(g.prize);
+  // A live giveaway advertising the retired brand is the loudest place the
+  // old name survives, and it's checked BEFORE the don't-clobber guard: it
+  // isn't a human's choice, it's this script's own earlier output.
+  if (/benji/i.test(blob)) {
+    await prisma.giveaway.update({
+      where: { id: g.id },
+      data: { prize: VEST_PRIZE, description: VEST_DESC },
+    });
+    console.log("Giveaway re-branded: Hitman Benji → Hitman Halo.");
+    return;
+  }
+  const alreadyVest = /vest/i.test(g.prize);
   const wasTheShoe = /jordan|tour yellow|sneaker|deadstock|shoe/i.test(blob);
   if (alreadyVest || !wasTheShoe) return; // don't clobber a human's choice
   await prisma.giveaway.update({
     where: { id: g.id },
     data: { title: "Editor's Pick Giveaway", prize: VEST_PRIZE, description: VEST_DESC },
   });
-  console.log("Giveaway swapped: Tour Yellow shoe → Hitman Benji custom vest.");
+  console.log("Giveaway swapped: Tour Yellow shoe → Hitman Halo custom vest.");
 }
 
 /** Normalize a shoe name for fuzzy title↔catalog matching. */
@@ -2034,7 +2083,7 @@ async function main() {
   await restoreDekotaHandle();
   await promoteNamedEditors();
   await grantFoundingCharter();
-  await featureBenjiChase();
+  await featureHouseDesigner();
   await refreshFeaturedGiveaway();
 
   // Wipe in dependency order so reseeding is idempotent.
@@ -2446,9 +2495,9 @@ async function main() {
       await prisma.giveaway.create({
         data: {
           title: "Editor's Pick Giveaway",
-          prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
+          prize: "A 1-of-1 custom vest, hand-built by Hitman Halo",
           description:
-            "Hitman Benji hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
+            "Hitman Halo hand-builds a one-of-one custom vest for one winner \u2014 his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
           endsAt: new Date(Date.now() + 30 * DAY),
         },
       });
@@ -2622,9 +2671,9 @@ async function main() {
     await prisma.giveaway.create({
       data: {
         title: "Editor's Pick Giveaway",
-        prize: "A 1-of-1 custom vest, hand-built by Hitman Benji",
+        prize: "A 1-of-1 custom vest, hand-built by Hitman Halo",
         description:
-          "Hitman Benji hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
+          "Hitman Halo hand-builds a one-of-one custom vest for one winner — his art, worn as armor. No two exist and it's never sold. Ships free in the continental US.",
         endsAt: new Date(now + 30 * DAY),
       },
     });
@@ -2738,10 +2787,10 @@ async function main() {
 
   await seedOgSeriesBattles();
 
-  // Re-assert the Editor's Pick after the demo artist reseed so Benji's
-  // crown + real name survive a full demo reseed (idempotent; the launch
+  // Re-assert the Editor's Pick after the demo artist reseed so the house
+  // designer's crown + brand survive a full demo reseed (idempotent; the launch
   // path already ran these before returning above).
-  await featureBenjiChase();
+  await featureHouseDesigner();
   await refreshFeaturedGiveaway();
   await backfillArticleCovers();
 
