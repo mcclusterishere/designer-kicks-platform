@@ -29,21 +29,27 @@ export async function blastBattle(
     include: {
       subA: { select: { title: true, artistName: true, imageUrl: true } },
       subB: { select: { title: true, artistName: true, imageUrl: true } },
+      ogShoe: { select: { name: true, brand: true, imageUrl: true } },
     },
   });
   if (!battle) return { ok: false, error: "Battle not found." };
   if (battle.status !== "ACTIVE") return { ok: false, error: "That battle already ended." };
 
   const custom = String(formData.get("text") ?? "").trim();
+  // The B corner is a custom or the retail OG, depending on the format.
+  const bTitle = battle.ogShoe?.name ?? battle.subB?.title ?? "the other pair";
+  const bImage = battle.ogShoe?.imageUrl ?? battle.subB?.imageUrl ?? null;
   const text =
     custom ||
-    `🔥 Which one you got — ${battle.subA.title} or ${battle.subB.title}? Come cast your vote.`;
+    (battle.type === "CUSTOM_VS_OG"
+      ? `🔥 Custom or OG — ${battle.subA.title} against the original ${bTitle}? Come cast your vote.`
+      : `🔥 Which one you got — ${battle.subA.title} or ${bTitle}? Come cast your vote.`);
   const link = `${siteUrl()}/battles/${battle.id}?utm_source=blast&utm_medium=social&utm_campaign=battle`;
 
   const results = await blastEverywhere({
     text,
     link,
-    imageUrls: [battle.subA.imageUrl, battle.subB.imageUrl],
+    imageUrls: [battle.subA.imageUrl, ...(bImage ? [bImage] : [])],
   });
 
   const posted = results.filter((r) => r.ok).length;

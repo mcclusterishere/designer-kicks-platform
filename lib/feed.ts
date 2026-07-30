@@ -145,10 +145,11 @@ export async function getFeed(
       include: {
         subA: { include: { artist: { select: { displayName: true } } } },
         subB: { include: { artist: { select: { displayName: true } } } },
+        ogShoe: { select: { id: true, name: true, brand: true, imageUrl: true } },
         // Vote rows (light: two ids each) let us split the tally per side
         // and spot whether THIS viewer already voted — the inline card
         // reveals the result instead of the buttons for them.
-        votes: { select: { submissionId: true, userId: true } },
+        votes: { select: { side: true, submissionId: true, userId: true } },
       },
       take: 25,
     }),
@@ -259,11 +260,16 @@ export async function getFeed(
   }
 
   for (const b of battles) {
-    const aVotes = b.votes.filter((v) => v.submissionId === b.subAId).length;
-    const bVotes = b.votes.filter((v) => v.submissionId === b.subBId).length;
-    const myPick = userId
-      ? (b.votes.find((v) => v.userId === userId)?.submissionId ?? null)
-      : null;
+    // By corner: a custom-vs-OG battle has no submission in the B slot.
+    const aVotes = b.votes.filter((v) => v.side === "A").length;
+    const bVotes = b.votes.filter((v) => v.side === "B").length;
+    // Whichever culture stands in the B corner, flattened to one shape.
+    const bKey = b.ogShoeId ? "og" : b.subBId ?? "";
+    const bTitle = b.ogShoe?.name ?? b.subB?.title ?? "";
+    const bImage = b.ogShoe?.imageUrl ?? b.subB?.imageUrl ?? "";
+    const bBy = b.ogShoe?.brand ?? b.subB?.artist?.displayName ?? b.subB?.artistName ?? "OG";
+    const mine = userId ? b.votes.find((v) => v.userId === userId) : undefined;
+    const myPick = mine ? (mine.side === "A" ? b.subAId : bKey) : null;
     scored.push({
       // A battle you haven't voted on floats up — the feed always keeps a
       // live matchup in front of you to tap.
@@ -287,11 +293,11 @@ export async function getFeed(
           votes: aVotes,
         },
         b: {
-          id: b.subBId,
-          title: b.subB.title,
-          imageUrl: b.subB.imageUrl,
-          videoUrl: b.subB.videoUrl,
-          artistName: b.subB.artist?.displayName ?? b.subB.artistName,
+          id: bKey,
+          title: bTitle,
+          imageUrl: bImage,
+          videoUrl: b.ogShoe ? null : b.subB?.videoUrl ?? null,
+          artistName: bBy,
           votes: bVotes,
         },
       },

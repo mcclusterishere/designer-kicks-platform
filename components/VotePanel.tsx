@@ -8,7 +8,10 @@ import SwipeGallery from "@/components/SwipeGallery";
 import PieceMedia from "@/components/PieceMedia";
 
 type Side = {
+  /** ballot key for this corner: a submission id, or "og" for the retail original */
   submissionId: string;
+  /** which culture stands here — an OG has no artist, it has a brand */
+  kind?: "custom" | "og";
   title: string;
   artistName: string;
   artistSlug: string | null;
@@ -118,14 +121,25 @@ export default function VotePanel({ battleId, a, b, active, isAuthed, yourVote, 
                 <SwipeGallery
                   testId="vote-gallery"
                   images={[side.imageUrl, ...side.extraImages]}
-                  alt={`${side.title} — custom ${side.baseShoe} by ${side.artistName}`}
+                  alt={
+                    side.kind === "og"
+                      ? `${side.title} — the original ${side.baseShoe}`
+                      : `${side.title} — custom ${side.baseShoe} by ${side.artistName}`
+                  }
                 />
               )}
               <div className="p-2.5 sm:p-4">
-                <p className="tag hidden text-smoke sm:block">{categoryLabel(side.category)} · {side.baseShoe}</p>
+                <p className="tag hidden text-smoke sm:block">
+                  {side.kind === "og" ? (
+                    <span className="text-heat">OG · retail</span>
+                  ) : (
+                    categoryLabel(side.category)
+                  )}{" "}
+                  · {side.baseShoe}
+                </p>
                 <h3 className="display mt-1 break-words text-base leading-tight text-white sm:text-xl">{side.title}</h3>
                 <p className="mt-1 text-xs text-smoke sm:text-sm">
-                  by{" "}
+                  {side.kind === "og" ? "straight out the box · " : "by "}
                   {side.artistSlug ? (
                     <a
                       href={`/artists/${side.artistSlug}`}

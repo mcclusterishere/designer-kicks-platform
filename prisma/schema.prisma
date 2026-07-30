@@ -516,19 +516,41 @@ model ArtistFollow {
   @@unique([artistId, userId])
 }
 
+// The arena runs two formats:
+//
+//   CUSTOM_VS_CUSTOM — two customizers, one category. The original
+//   format, and the only one tournaments use (a bracket is customs).
+//
+//   CUSTOM_VS_OG — custom culture against OG culture: a one-of-one
+//   against the untouched retail silhouette it was built from. Side B
+//   is a CatalogShoe, not a Submission, so an OG never has to be filed
+//   as somebody's custom to get in the ring.
+//
+// Side A is always a custom. Exactly one of subBId / ogShoeId is set,
+// decided by type.
 model Battle {
   id        String   @id @default(cuid())
   title     String?
   status    String   @default("ACTIVE") // ACTIVE | COMPLETED
+  type      String   @default("CUSTOM_VS_CUSTOM") // CUSTOM_VS_CUSTOM | CUSTOM_VS_OG
   startsAt  DateTime @default(now())
   endsAt    DateTime
   createdAt DateTime @default(now())
 
   subAId String
   subA   Submission @relation("battleSubA", fields: [subAId], references: [id])
-  subBId String
-  subB   Submission @relation("battleSubB", fields: [subBId], references: [id])
+  // set when type = CUSTOM_VS_CUSTOM
+  subBId String?
+  subB   Submission? @relation("battleSubB", fields: [subBId], references: [id])
+  // set when type = CUSTOM_VS_OG — the retail original
+  ogShoeId String?
+  ogShoe   CatalogShoe? @relation("battleOG", fields: [ogShoeId], references: [id])
 
+  // Which corner took it: "A" | "B". The format-agnostic answer, and what
+  // finalization writes. winnerId stays the submission-level answer (null
+  // when the OG wins) so the Heat List and tournament brackets, which only
+  // ever count customs, keep working untouched.
+  winnerSide String?
   winnerId String?
   winner   Submission? @relation("battleWinner", fields: [winnerId], references: [id])
 
@@ -538,6 +560,7 @@ model Battle {
   // Hot path: lazy finalization scans (status ACTIVE, endsAt < now) and
   // the feed lists active battles — on nearly every page render.
   @@index([status, endsAt])
+  @@index([type, status])
 }
 
 // Posts in The Feed on the home page. artistId null = the house
@@ -709,8 +732,14 @@ model Vote {
   id           String     @id @default(cuid())
   battleId     String
   battle       Battle     @relation(fields: [battleId], references: [id], onDelete: Cascade)
-  submissionId String
-  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  // Which corner the vote went to: "A" | "B". This is what counting reads,
+  // because in a CUSTOM_VS_OG battle side B is a retail shoe with no
+  // submission to point at. Backfilled for every pre-existing vote.
+  side         String     @default("A")
+  // Still written when a custom takes the vote — the Heat List ranks
+  // submissions by votes collected. Null when the OG took it.
+  submissionId String?
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   voterKey     String // the voting user's id, a guest device key, or a seed key
   userId       String?
   // Anonymous votes count toward the visible split and nothing else. The
@@ -725,6 +754,7 @@ model Vote {
   @@unique([battleId, voterKey])
   @@index([battleId, submissionId])
   @@index([battleId, guest])
+  @@index([battleId, side])
 }
 
 // ---------- Accounts & auth (NextAuth models + profile fields) ----------
@@ -1392,6 +1422,9 @@ model CatalogShoe {
   updatedAt        DateTime  @updatedAt
 
   ratings      CatalogRating[]
+  // OG culture's side of the arena — every custom-vs-OG battle this
+  // silhouette has stood in.
+  battles      Battle[]        @relation("battleOG")
   priceHistory PriceSnapshot[]
   inventory    InventoryItem[]
   predictions  Prediction[]

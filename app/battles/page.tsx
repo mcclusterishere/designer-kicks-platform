@@ -6,7 +6,7 @@ import BattleCard from "@/components/BattleCard";
 import ArenaDeck, { type DeckBattle } from "@/components/ArenaDeck";
 
 export const metadata = {
-  title: "Battle Arena — Vote On Custom Sneaker Matchups | The Heat Chart",
+  title: "Battle Arena — Custom Culture vs OG Culture | The Heat Chart",
 };
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export default async function BattlesPage() {
   const [battles, activeTournaments] = await Promise.all([
     prisma.battle.findMany({
       orderBy: [{ status: "asc" }, { endsAt: "desc" }],
-      include: { subA: true, subB: true, votes: { select: { submissionId: true } } },
+      include: { subA: true, subB: true, ogShoe: true, votes: { select: { side: true } } },
     }),
     prisma.tournament.findMany({ where: { status: "ACTIVE" } }),
   ]);
@@ -51,7 +51,7 @@ export default async function BattlesPage() {
     .filter((b) => !votedIds.has(b.id))
     .map((b) => ({
       id: b.id,
-      label: b.title ?? `${b.subA.title} vs ${b.subB.title}`,
+      label: b.title ?? `${b.subA.title} vs ${b.ogShoe?.name ?? b.subB?.title ?? "the OG"}`,
       endsLabel: endsLabel(b.endsAt),
       a: {
         submissionId: b.subAId,
@@ -60,16 +60,17 @@ export default async function BattlesPage() {
         imageUrl: b.subA.imageUrl,
         videoUrl: b.subA.videoUrl,
         extraImages: b.subA.extraImages,
-        votes: b.votes.filter((v) => v.submissionId === b.subAId).length,
+        votes: b.votes.filter((v) => v.side === "A").length,
       },
       b: {
-        submissionId: b.subBId,
-        title: b.subB.title,
-        artistName: b.subB.artistName,
-        imageUrl: b.subB.imageUrl,
-        videoUrl: b.subB.videoUrl,
-        extraImages: b.subB.extraImages,
-        votes: b.votes.filter((v) => v.submissionId === b.subBId).length,
+        // custom, or the retail original in a custom-vs-OG battle
+        submissionId: b.ogShoeId ? "og" : b.subBId ?? "",
+        title: b.ogShoe?.name ?? b.subB?.title ?? "",
+        artistName: b.ogShoe?.brand ?? b.subB?.artistName ?? "OG",
+        imageUrl: b.ogShoe?.imageUrl ?? b.subB?.imageUrl ?? "",
+        videoUrl: b.ogShoe ? null : b.subB?.videoUrl ?? null,
+        extraImages: b.ogShoe ? [] : b.subB?.extraImages ?? [],
+        votes: b.votes.filter((v) => v.side === "B").length,
       },
     }));
 
@@ -137,8 +138,8 @@ export default async function BattlesPage() {
                 <BattleCard
                   key={b.id}
                   battle={b}
-                  aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-                  bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+                  aVotes={b.votes.filter((v) => v.side === "A").length}
+                  bVotes={b.votes.filter((v) => v.side === "B").length}
                 />
               ))}
             </div>
@@ -151,7 +152,10 @@ export default async function BattlesPage() {
         <p className="tag text-heat">Vote-offs</p>
         <h1 className="display mt-2 text-4xl text-white sm:text-5xl">Battle Arena</h1>
         <p className="mt-3 max-w-xl text-smoke">
-          Two customs enter. The culture votes. Winners take a spot on the{" "}
+          Custom culture against OG culture — and customizer against
+          customizer. A one-of-one takes on the untouched retail silhouette it
+          was cut from, or squares up with another maker. The culture votes.
+          Winners take a spot on the{" "}
           <Link href="/heat-list" className="text-volt underline">
             Heat List
           </Link>
@@ -219,8 +223,8 @@ export default async function BattlesPage() {
               <BattleCard
                 key={b.id}
                 battle={b}
-                aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-                bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+                aVotes={b.votes.filter((v) => v.side === "A").length}
+                bVotes={b.votes.filter((v) => v.side === "B").length}
               />
             ))}
           </div>
@@ -234,8 +238,8 @@ export default async function BattlesPage() {
                 <BattleCard
                   key={b.id}
                   battle={b}
-                  aVotes={b.votes.filter((v) => v.submissionId === b.subAId).length}
-                  bVotes={b.votes.filter((v) => v.submissionId === b.subBId).length}
+                  aVotes={b.votes.filter((v) => v.side === "A").length}
+                  bVotes={b.votes.filter((v) => v.side === "B").length}
                 />
               ))}
             </div>

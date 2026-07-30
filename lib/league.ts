@@ -39,7 +39,9 @@ async function metricForCustoms(ids: string[]): Promise<Map<string, number>> {
     prisma.battle.groupBy({ by: ["winnerId"], where: { winnerId: { in: ids } }, _count: true }),
     prisma.sale.groupBy({ by: ["submissionId"], where: { submissionId: { in: ids }, status: "CONFIRMED" }, _count: true }),
   ]);
-  for (const v of votes) m.set(v.submissionId, (m.get(v.submissionId) ?? 0) + v._count * 2);
+  // An OG's votes carry no submissionId — they score no customizer.
+  for (const v of votes)
+    if (v.submissionId) m.set(v.submissionId, (m.get(v.submissionId) ?? 0) + v._count * 2);
   for (const w of wins) if (w.winnerId) m.set(w.winnerId, (m.get(w.winnerId) ?? 0) + w._count * 50);
   for (const s of sales) m.set(s.submissionId, (m.get(s.submissionId) ?? 0) + s._count * 300);
   return m;

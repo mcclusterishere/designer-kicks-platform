@@ -178,7 +178,7 @@ export default async function AdminPage({
   await finalizeExpiredOutfitBattles();
   const { edit, editArticle } = await searchParams;
 
-  const [pending, approved, battles, products, editProduct, articles, editArticleRow] = await Promise.all([
+  const [pending, approved, battles, products, editProduct, articles, editArticleRow, ogShoes] = await Promise.all([
     prisma.submission.findMany({
       where: { status: "PENDING" },
       orderBy: { createdAt: "asc" },
@@ -190,13 +190,21 @@ export default async function AdminPage({
     }),
     prisma.battle.findMany({
       orderBy: { createdAt: "desc" },
-      include: { subA: true, subB: true, _count: { select: { votes: true } } },
+      include: { subA: true, subB: true, ogShoe: true, _count: { select: { votes: true } } },
       take: 20,
     }),
     prisma.product.findMany({ orderBy: [{ category: "asc" }, { sortOrder: "asc" }] }),
     edit ? prisma.product.findUnique({ where: { id: edit } }) : null,
     prisma.article.findMany({ orderBy: { createdAt: "desc" } }),
     editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
+    // OG culture's bench: real retail silhouettes that can stand in the
+    // B corner of a custom-vs-OG battle. Named ones only, newest first.
+    prisma.catalogShoe.findMany({
+      where: { NOT: { name: "" } },
+      orderBy: [{ brand: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, brand: true, silhouette: true },
+      take: 500,
+    }),
   ]);
 
   const [giveaways, questions, users, tournaments] = await Promise.all([
@@ -1661,6 +1669,12 @@ export default async function AdminPage({
               artistName: s.artistName,
               category: s.category,
             }))}
+            ogOptions={ogShoes.map((o) => ({
+              id: o.id,
+              name: o.name,
+              brand: o.brand,
+              silhouette: o.silhouette,
+            }))}
           />
         </div>
       </section>
@@ -1678,12 +1692,18 @@ export default async function AdminPage({
             >
               <div>
                 <Link href={`/battles/${b.id}`} className="font-bold text-white hover:text-volt">
-                  {b.subA.title} vs {b.subB.title}
+                  {b.subA.title} vs {b.ogShoe?.name ?? b.subB?.title}
                 </Link>
                 <p className="text-xs text-smoke">
                   {b.status} · {b._count.votes} votes · ends{" "}
                   {b.endsAt.toISOString().slice(0, 10)}
-                  {b.winnerId && ` · winner: ${b.winnerId === b.subAId ? b.subA.title : b.subB.title}`}
+                  {b.type === "CUSTOM_VS_OG" && " · custom vs OG"}
+                  {b.winnerSide &&
+                    ` · winner: ${
+                      b.winnerSide === "A"
+                        ? b.subA.title
+                        : b.ogShoe?.name ?? b.subB?.title ?? "the OG"
+                    }`}
                 </p>
               </div>
               {b.status === "ACTIVE" && (
@@ -1988,7 +2008,7 @@ export default async function AdminPage({
               .filter((b) => b.status === "ACTIVE")
               .map((b) => ({
                 id: b.id,
-                label: b.title ?? `${b.subA.title} vs ${b.subB.title}`,
+                label: b.title ?? `${b.subA.title} vs ${b.ogShoe?.name ?? b.subB?.title}`,
               }))}
           />
         </div>

@@ -603,6 +603,102 @@ export async function preloadArtist(
   return { ok: true, artistSlug: artist.slug, claimUrl, inviteText, emailSent, alreadyClaimed };
 }
 
+/* ============================================================
+   THE OVERRIDE — the admin editing any page from the page itself.
+
+   The desk shouldn't have to be a separate screen you go and find. An
+   admin standing on somebody's artist page can change what's wrong right
+   there: the name, the handle, the city, the bio, the standing.
+
+   Everything here is admin-gated and written to the audit log, because
+   the whole point of the log is that the widest-reaching powers are the
+   ones that get recorded.
+   ============================================================ */
+export async function adminUpdateArtist(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("artistId") ?? "");
+  if (!id) return { ok: false, error: "No page named." };
+
+  const before = await prisma.artistProfile.findUnique({ where: { id } });
+  if (!before) return { ok: false, error: "That page doesn't exist." };
+
+  const str = (k: string, max: number) => String(formData.get(k) ?? "").trim().slice(0, max);
+  const displayName = str("displayName", 80);
+  const bio = str("bio", 1200);
+  const instagram = str("instagram", 60).replace(/^@+/, "");
+  const city = str("city", 80);
+  const portfolioUrl = str("portfolioUrl", 300);
+  const status = str("status", 12);
+  const plan = str("plan", 8);
+
+  if (!displayName) return { ok: false, error: "A page needs a name." };
+  if (status && !["PENDING", "APPROVED", "REJECTED"].includes(status)) {
+    return { ok: false, error: "Unknown standing." };
+  }
+  if (plan && !["FREE", "PRO"].includes(plan)) return { ok: false, error: "Unknown plan." };
+
+  // Renaming re-slugs the page, but only when the name actually moved —
+  // a slug change breaks every link already pointing here, so it is never
+  // done casually. The old slug stops resolving; that is the trade.
+  let slug = before.slug;
+  if (displayName !== before.displayName) {
+    const wanted = String(formData.get("slug") ?? "").trim().toLowerCase();
+    slug = wanted && wanted !== before.slug
+      ? wanted.replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+      : before.slug;
+    if (slug !== before.slug) {
+      const taken = await prisma.artistProfile.findUnique({ where: { slug } });
+      if (taken && taken.id !== id) return { ok: false, error: `The handle "${slug}" is already taken.` };
+    }
+  }
+
+  const after = await prisma.artistProfile.update({
+    where: { id },
+    data: {
+      displayName,
+      slug,
+      bio: bio || null,
+      instagram: instagram || null,
+      city: city || null,
+      portfolioUrl: portfolioUrl || null,
+      ...(status ? { status } : {}),
+      ...(plan ? { plan } : {}),
+    },
+  });
+
+  // What actually changed, in words, so the log reads like a sentence.
+  const moved: string[] = [];
+  if (before.displayName !== after.displayName) moved.push(`name "${before.displayName}" → "${after.displayName}"`);
+  if (before.slug !== after.slug) moved.push(`handle ${before.slug} → ${after.slug}`);
+  if ((before.instagram ?? "") !== (after.instagram ?? "")) moved.push("instagram");
+  if ((before.city ?? "") !== (after.city ?? "")) moved.push("city");
+  if ((before.bio ?? "") !== (after.bio ?? "")) moved.push("bio");
+  if ((before.portfolioUrl ?? "") !== (after.portfolioUrl ?? "")) moved.push("portfolio link");
+  if (before.status !== after.status) moved.push(`standing ${before.status} → ${after.status}`);
+  if (before.plan !== after.plan) moved.push(`plan ${before.plan} → ${after.plan}`);
+
+  if (moved.length) {
+    const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+    await recordStaffAction({
+      actor: actorFrom(await auth().catch(() => null), "admin"),
+      action: "artist.page.edit",
+      targetType: "artistProfile",
+      targetId: after.id,
+      targetOwnerId: after.userId,
+      summary: `Edited ${after.displayName}'s page from the page itself — ${moved.join(", ")}`,
+    });
+  }
+
+  revalidatePath(`/artists/${before.slug}`);
+  revalidatePath(`/artists/${after.slug}`);
+  revalidatePath("/artists");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
 export async function setArtistStatus(id: string, status: "APPROVED" | "REJECTED") {
   await requireAdmin();
   const profile = await prisma.artistProfile.update({
@@ -1881,13 +1977,32 @@ export async function castVote(battleId: string, submissionId: string): Promise<
   const battle = await prisma.battle.findUnique({ where: { id: battleId } });
   if (!battle) return { ok: false, error: "Battle not found." };
   if (battle.status !== "ACTIVE") return { ok: false, error: "This battle has ended." };
-  if (submissionId !== battle.subAId && submissionId !== battle.subBId) {
+
+  // The ballot names a corner. Customs still vote by submission id; the
+  // OG corner votes as the literal "og" (or the catalog id), because a
+  // retail silhouette has no submission row to point at.
+  let side: "A" | "B";
+  let votedSubmissionId: string | null;
+  if (submissionId === battle.subAId) {
+    side = "A";
+    votedSubmissionId = battle.subAId;
+  } else if (battle.subBId && submissionId === battle.subBId) {
+    side = "B";
+    votedSubmissionId = battle.subBId;
+  } else if (
+    battle.type === "CUSTOM_VS_OG" &&
+    battle.ogShoeId &&
+    (submissionId === "og" || submissionId === battle.ogShoeId)
+  ) {
+    side = "B";
+    votedSubmissionId = null;
+  } else {
     return { ok: false, error: "That shoe isn't in this battle." };
   }
 
   try {
     await prisma.vote.create({
-      data: { battleId, submissionId, voterKey, userId, guest },
+      data: { battleId, side, submissionId: votedSubmissionId, voterKey, userId, guest },
     });
   } catch (e: unknown) {
     if (typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002") {
@@ -2196,13 +2311,62 @@ export async function createBattle(
   await requireAdmin();
   const subAId = String(formData.get("subAId") ?? "");
   const subBId = String(formData.get("subBId") ?? "");
+  const ogShoeId = String(formData.get("ogShoeId") ?? "");
+  const type = String(formData.get("type") ?? "CUSTOM_VS_CUSTOM");
   const days = Number(formData.get("days") ?? 7);
   const title = String(formData.get("title") ?? "").trim();
 
-  if (!subAId || !subBId) return { ok: false, error: "Pick two shoes." };
-  if (subAId === subBId) return { ok: false, error: "A shoe can't battle itself." };
+  if (type !== "CUSTOM_VS_CUSTOM" && type !== "CUSTOM_VS_OG") {
+    return { ok: false, error: "Unknown battle format." };
+  }
+  if (!subAId) return { ok: false, error: "Pick the custom in the A corner." };
+  if (type === "CUSTOM_VS_CUSTOM" && !subBId) return { ok: false, error: "Pick two shoes." };
+  if (type === "CUSTOM_VS_CUSTOM" && subAId === subBId) {
+    return { ok: false, error: "A shoe can't battle itself." };
+  }
   if (!Number.isFinite(days) || days < 1 || days > 30) return { ok: false, error: "Battle length must be 1–30 days." };
 
+  // ---- custom culture vs OG culture ----
+  if (type === "CUSTOM_VS_OG") {
+    const custom = await prisma.submission.findUnique({ where: { id: subAId } });
+    if (!custom || custom.status !== "APPROVED") {
+      return { ok: false, error: "The A corner must be an approved custom." };
+    }
+    if (!ogShoeId) return { ok: false, error: "Pick the OG standing in the B corner." };
+    const og = await prisma.catalogShoe.findUnique({ where: { id: ogShoeId } });
+    if (!og) return { ok: false, error: "That OG isn't in the catalog." };
+    // The category wall still holds: only sneakers have a retail original
+    // in the catalog, so a hat can never be matched against one.
+    if (custom.category !== "sneakers") {
+      return {
+        ok: false,
+        error: `Custom vs OG is a sneaker format — "${custom.title}" is ${categoryLabel(custom.category)}.`,
+      };
+    }
+    const ogBattle = await prisma.battle.create({
+      data: {
+        type,
+        subAId,
+        ogShoeId,
+        title: title || null,
+        endsAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      },
+    });
+    notifyBattleStart({
+      battleId: ogBattle.id,
+      aTitle: custom.title,
+      aArtist: custom.artistName,
+      bTitle: og.name,
+      bArtist: og.brand ?? "OG",
+      endsAt: ogBattle.endsAt,
+    }).catch(() => {});
+    revalidatePath("/battles");
+    revalidatePath("/admin");
+    revalidatePath("/");
+    return { ok: true };
+  }
+
+  // ---- customizer vs customizer ----
   const [a, b] = await Promise.all([
     prisma.submission.findUnique({ where: { id: subAId } }),
     prisma.submission.findUnique({ where: { id: subBId } }),
@@ -2220,6 +2384,7 @@ export async function createBattle(
 
   const battle = await prisma.battle.create({
     data: {
+      type,
       subAId,
       subBId,
       title: title || null,
