@@ -9,6 +9,8 @@ import {
   postToInstagram,
   postToInstagramReel,
 } from "./social";
+import { postImageToThreads, threadsConfigured } from "./threads";
+import { fanOutToArtistChannels } from "./crosspost";
 
 /**
  * The poster machine: every piece that clears review posts ITSELF — to
@@ -33,10 +35,24 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
     where: { id: submissionId },
     select: {
       title: true, artistName: true, imageUrl: true, videoUrl: true, baseShoe: true,
-      artist: { select: { id: true, slug: true, displayName: true } },
+      artist: { select: { id: true, slug: true, displayName: true, userId: true } },
     },
   });
   if (!s) return;
+
+  // If the artist connected their own Instagram, the HOUSE post can
+  // credit them for real: a clickable @mention in the caption and a tag
+  // on the media itself, which notifies them and puts the piece in
+  // their Tagged tab. (Facebook Pages can't tag users via API at all —
+  // there the name stays plain text, because that's the platform's
+  // actual capability, not a gap in ours.)
+  const igAcct = s.artist?.userId
+    ? await prisma.socialAccount.findFirst({
+        where: { userId: s.artist.userId, provider: "instagram", status: "ACTIVE" },
+        select: { handle: true },
+      })
+    : null;
+  const igUsername = igAcct?.handle?.replace(/^@/, "") ?? null;
 
   const artistName = s.artist?.displayName ?? s.artistName;
   const pagePath = s.artist?.slug ? `/artists/${s.artist.slug}` : "/heat-list";
@@ -58,7 +74,10 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
   // (FB video post + IG Reel); photo-only pieces post as photos.
   const photo = absoluteMediaUrl(s.imageUrl);
   const fbLink = `${siteUrl()}${pagePath}?utm_source=facebook&utm_medium=autopost&utm_campaign=new-heat`;
-  const igCaption = `${body}\n\nVote at theheatchart.com — link in bio.`;
+  const igCaption = `${
+    igUsername ? body.replace(`by ${artistName}`, `by @${igUsername} (${artistName})`) : body
+  }\n\nVote at theheatchart.com — link in bio.`;
+  const threadsLink = `${siteUrl()}${pagePath}?utm_source=threads&utm_medium=autopost&utm_campaign=new-heat`;
   const results = await Promise.allSettled([
     facebookConfigured()
       ? s.videoUrl
@@ -67,16 +86,33 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
       : Promise.resolve(null),
     instagramConfigured()
       ? s.videoUrl
-        ? postToInstagramReel(s.videoUrl, igCaption)
-        : postToInstagram(photo, igCaption)
+        ? postToInstagramReel(s.videoUrl, igCaption, { tagUsername: igUsername })
+        : postToInstagram(photo, igCaption, { tagUsername: igUsername })
+      : Promise.resolve(null),
+    // House Threads gets the photo post — Threads video needs its own
+    // ingestion dance and the photo travels further there anyway.
+    threadsConfigured()
+      ? postImageToThreads(`${body}\n\n${threadsLink}`, photo)
       : Promise.resolve(null),
   ]);
   for (const [i, r] of results.entries()) {
-    const channel = i === 0 ? "facebook" : "instagram";
+    const channel = ["facebook", "instagram", "threads"][i];
     if (r.status === "rejected") {
       console.error(`[autopost] ${channel} failed for ${submissionId}:`, r.reason);
     } else if (r.value && !r.value.ok) {
       console.error(`[autopost] ${channel} declined for ${submissionId}: ${r.value.detail}`);
     }
+  }
+
+  // 3. The artist's own connected channels — their voice, their feed,
+  // their audience. Everything above was the house megaphone; this is
+  // the artist's.
+  try {
+    const fanned = await fanOutToArtistChannels(submissionId);
+    for (const f of fanned) {
+      if (!f.ok) console.error(`[autopost] own-${f.provider} declined for ${submissionId}: ${f.detail}`);
+    }
+  } catch (e) {
+    console.error(`[autopost] artist fan-out failed for ${submissionId}:`, e);
   }
 }

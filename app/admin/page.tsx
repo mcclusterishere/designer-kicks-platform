@@ -43,6 +43,7 @@ import ResellerDesk from "./ResellerDesk";
 import OwnerDesk from "./OwnerDesk";
 import AuditPanel from "./AuditPanel";
 import CleanupPanel from "./CleanupPanel";
+import EngagePanel from "./EngagePanel";
 import DuplicatePanel from "./DuplicatePanel";
 import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
@@ -53,6 +54,7 @@ import PieceManager from "./PieceManager";
 import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
+import { threadsConfigured } from "@/lib/threads";
 import { oauthProviders } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import UtmBuilder from "./UtmBuilder";
@@ -1985,6 +1987,10 @@ export default async function AdminPage({
           {[
             { name: "Facebook Page posting", on: facebookConfigured(), fix: "FB_PAGE_ID + FB_PAGE_ACCESS_TOKEN" },
             { name: "Instagram posting", on: instagramConfigured(), fix: "IG_USER_ID + FB_PAGE_ACCESS_TOKEN" },
+            { name: "Threads posting (house)", on: threadsConfigured(), fix: "THREADS_USER_ID + THREADS_ACCESS_TOKEN" },
+            { name: "Editor channel connect — Instagram", on: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET), fix: "INSTAGRAM_APP_ID + INSTAGRAM_APP_SECRET" },
+            { name: "Editor channel connect — Threads", on: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET), fix: "THREADS_APP_ID + THREADS_APP_SECRET" },
+            { name: "Meta webhooks (comments/DMs stream)", on: Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN), fix: "META_WEBHOOK_VERIFY_TOKEN + subscribe in the app dashboard" },
             { name: "Facebook / Instagram login", on: oauthProviders.facebook, fix: "FACEBOOK_CLIENT_ID + FACEBOOK_CLIENT_SECRET" },
             { name: "Google login", on: oauthProviders.google, fix: "GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET" },
             { name: "Footer socials", on: Boolean(process.env.NEXT_PUBLIC_INSTAGRAM_URL || process.env.NEXT_PUBLIC_FACEBOOK_URL || process.env.NEXT_PUBLIC_YOUTUBE_URL), fix: "NEXT_PUBLIC_INSTAGRAM_URL / _FACEBOOK_URL / _YOUTUBE_URL" },
@@ -2041,6 +2047,13 @@ export default async function AdminPage({
           )}
         </div>
       </section>
+      )}
+
+      {/* What people say back to us on Meta, answered from one desk. */}
+      {show("pulse") && (
+        <section className="mt-8">
+          <EngagePanel />
+        </section>
       )}
 
       {show("pulse") && (

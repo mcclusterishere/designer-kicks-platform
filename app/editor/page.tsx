@@ -8,6 +8,7 @@ import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import ArticleForm from "@/app/admin/ArticleForm";
 import PreloadArtistForm from "@/app/admin/PreloadArtistForm";
 import { OutreachRow } from "@/app/admin/OutfitStudioForms";
+import ChannelsCard from "@/components/ChannelsCard";
 import EditorBroadcastForm from "./EditorBroadcastForm";
 import StageProspectForm from "./StageProspectForm";
 import MessageOffice from "./MessageOffice";
@@ -165,12 +166,12 @@ function Scoreboard({ stats }: { stats: OnboardingStats }) {
 export default async function EditorDesk({
   searchParams,
 }: {
-  searchParams: Promise<{ editArticle?: string }>;
+  searchParams: Promise<{ editArticle?: string; connected?: string }>;
 }) {
   const [me, admin] = await Promise.all([currentUserRole(), isAdmin()]);
   if (!(me?.role === "EDITOR" || admin)) redirect(me ? "/" : "/signin");
 
-  const { editArticle } = await searchParams;
+  const { editArticle, connected } = await searchParams;
   const [articles, editArticleRow, prospects, thread, outreachLeads, stats] = await Promise.all([
     prisma.article.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
     editArticle ? prisma.article.findUnique({ where: { id: editArticle } }) : null,
@@ -384,6 +385,12 @@ export default async function EditorDesk({
           {/* 03 · Share */}
           <Panel id="socials" index="03" title="Share it"
             desc="The site is home; socials point back to it. Post once, share everywhere.">
+            {/* The self-promotion machine: their accounts, wired once. */}
+            {me && (
+              <div className="mb-5">
+                <ChannelsCard userId={me.id} connectedFlag={connected} />
+              </div>
+            )}
             <div className="mb-5">
               <FreeSocials fb={fb} ig={ig} />
             </div>

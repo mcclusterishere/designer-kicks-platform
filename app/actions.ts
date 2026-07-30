@@ -6567,3 +6567,188 @@ export async function purgeAccountsAction(
     note: `Gone: ${res.usersDeleted} account(s), ${res.profilesDeleted} artist page(s), ${res.piecesDeleted} piece(s).`,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Connected social channels                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The two switches an editor gets on their own connected channel:
+ * pause auto-promotion, or cut the cord. Both scoped in the WHERE to
+ * the caller's own rows — the id alone is never authority.
+ */
+export async function socialChannelAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Sign in first." };
+  const id = String(formData.get("accountId") ?? "");
+  const op = String(formData.get("op") ?? "");
+
+  if (op === "disconnect") {
+    const gone = await prisma.socialAccount.deleteMany({
+      where: { id, userId: session.user.id },
+    });
+    if (gone.count === 0) return { ok: false, error: "That channel isn't yours to disconnect." };
+    revalidatePath("/editor");
+    revalidatePath("/studio");
+    return { ok: true, note: "Disconnected. Nothing more will post there." };
+  }
+  if (op === "toggle") {
+    const acct = await prisma.socialAccount.findFirst({
+      where: { id, userId: session.user.id },
+      select: { autoPromote: true },
+    });
+    if (!acct) return { ok: false, error: "That channel isn't yours." };
+    await prisma.socialAccount.update({
+      where: { id },
+      data: { autoPromote: !acct.autoPromote },
+    });
+    revalidatePath("/editor");
+    revalidatePath("/studio");
+    return {
+      ok: true,
+      note: acct.autoPromote ? "Paused — approved pieces won't post there." : "Back on.",
+    };
+  }
+  return { ok: false, error: "Unknown operation." };
+}
+
+/* ------------------------------------------------------------------ */
+/* The admin Engagement desk                                           */
+/* ------------------------------------------------------------------ */
+
+export async function engageReplyAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const eventId = String(formData.get("eventId") ?? "");
+  const text = String(formData.get("reply") ?? "").trim();
+  if (!text) return { ok: false, error: "Write the reply first." };
+
+  const event = await prisma.metaEvent.findUnique({ where: { id: eventId } });
+  if (!event) return { ok: false, error: "That event is gone." };
+
+  const { replyToComment, sendDmReply } = await import("@/lib/metaEngage");
+  try {
+    if (event.kind === "comment") {
+      await replyToComment(event.platform, event.objectId, text);
+    } else if (event.kind === "message" && event.fromId) {
+      await sendDmReply(event.fromId, text);
+    } else {
+      return { ok: false, error: "This event type can't be replied to." };
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Meta refused the reply." };
+  }
+  await prisma.metaEvent.update({ where: { id: eventId }, data: { status: "HANDLED" } });
+  revalidatePath("/admin");
+  return { ok: true, note: "Replied." };
+}
+
+export async function engageModerateAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const eventId = String(formData.get("eventId") ?? "");
+  const op = String(formData.get("op") ?? "");
+  const event = await prisma.metaEvent.findUnique({ where: { id: eventId } });
+  if (!event) return { ok: false, error: "That event is gone." };
+
+  if (op === "hide" && event.kind === "comment") {
+    const { hideComment } = await import("@/lib/metaEngage");
+    try {
+      await hideComment(event.objectId, true);
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Couldn't hide it." };
+    }
+    await prisma.metaEvent.update({ where: { id: eventId }, data: { status: "HIDDEN" } });
+  } else if (op === "done") {
+    await prisma.metaEvent.update({ where: { id: eventId }, data: { status: "HANDLED" } });
+  } else {
+    return { ok: false, error: "Unknown operation." };
+  }
+  revalidatePath("/admin");
+  return { ok: true, note: op === "hide" ? "Hidden on the page." : "Marked handled." };
+}
+
+export async function inboxReplyAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const senderId = String(formData.get("senderId") ?? "");
+  const text = String(formData.get("reply") ?? "").trim();
+  if (!senderId || !text) return { ok: false, error: "Write the reply first." };
+  const { sendDmReply } = await import("@/lib/metaEngage");
+  try {
+    await sendDmReply(senderId, text);
+  } catch (e) {
+    // The most common refusal is the 24-hour window closing. Say what
+    // that means instead of relaying a Graph error code.
+    const msg = e instanceof Error ? e.message : "";
+    return {
+      ok: false,
+      error: /window|24|time/i.test(msg)
+        ? "Meta closed the reply window — more than 24 hours since their last message. They have to message again first."
+        : msg || "Meta refused the reply.",
+    };
+  }
+  revalidatePath("/admin");
+  return { ok: true, note: "Sent." };
+}
+
+export async function socialRuleAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const op = String(formData.get("op") ?? "save");
+  if (op === "delete") {
+    await prisma.socialRule.delete({ where: { id: String(formData.get("ruleId") ?? "") } }).catch(() => {});
+    revalidatePath("/admin");
+    return { ok: true, note: "Rule removed." };
+  }
+  if (op === "toggle") {
+    const id = String(formData.get("ruleId") ?? "");
+    const rule = await prisma.socialRule.findUnique({ where: { id }, select: { active: true } });
+    if (!rule) return { ok: false, error: "Rule is gone." };
+    await prisma.socialRule.update({ where: { id }, data: { active: !rule.active } });
+    revalidatePath("/admin");
+    return { ok: true, note: rule.active ? "Rule paused." : "Rule live." };
+  }
+
+  const kind = String(formData.get("kind") ?? "");
+  const trigger = String(formData.get("trigger") ?? "").trim();
+  const reply = String(formData.get("reply") ?? "").trim();
+  if (kind !== "comment_keyword" && kind !== "dm_welcome") {
+    return { ok: false, error: "Pick what the rule listens for." };
+  }
+  if (kind === "comment_keyword" && !trigger) {
+    return { ok: false, error: "A keyword rule needs its keyword." };
+  }
+  if (!reply) return { ok: false, error: "Write what it should say back." };
+  await prisma.socialRule.create({
+    data: { kind, trigger: kind === "dm_welcome" ? null : trigger, reply },
+  });
+  revalidatePath("/admin");
+  return { ok: true, note: "Rule is live. It only ever answers people who talk to us first." };
+}
+
+export async function igLookupAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const handle = String(formData.get("handle") ?? "");
+  const { discoverInstagramAccount } = await import("@/lib/metaEngage");
+  const found = await discoverInstagramAccount(handle);
+  if ("error" in found) return { ok: false, error: found.error };
+  return {
+    ok: true,
+    note: `@${found.username} — ${found.followers.toLocaleString()} followers, ${found.mediaCount} posts${found.name ? ` · ${found.name}` : ""}${found.website ? ` · ${found.website}` : ""}`,
+  };
+}

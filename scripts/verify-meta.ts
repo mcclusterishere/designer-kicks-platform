@@ -1,0 +1,217 @@
+/**
+ * The Meta integration layer, checked at the seams.
+ *
+ * Nothing here talks to Meta. What breaks integrations like this in
+ * practice is never the happy-path POST — it's the seams: a webhook
+ * accepted without checking its signature, a rules engine that answers
+ * its own replies forever, a caption that blows the 500-char Threads
+ * cap, an OAuth callback that trusts whatever state it's handed. Those
+ * are all pure logic, so they're all testable without a token.
+ *
+ * Run: npm run verify:meta   (dev database; every row it makes it deletes)
+ */
+import { createHmac } from "crypto";
+import { PrismaClient } from "@prisma/client";
+import {
+  parseWebhookPayload,
+  ruleMatches,
+  storeEvents,
+  verifyWebhookSignature,
+} from "../lib/metaEngage";
+import { authorizeUrl, connectRedirectUri, isConnectProvider } from "../lib/metaConnect";
+import { ownChannelCaption } from "../lib/crosspost";
+
+const prisma = new PrismaClient();
+
+let pass = 0;
+let fail = 0;
+const log: string[] = [];
+function check(name: string, ok: boolean, extra = "") {
+  if (ok) pass++;
+  else fail++;
+  log.push(`${ok ? "PASS" : "FAIL"} ${name}${extra ? " — " + extra : ""}`);
+}
+
+const TAG = "vmeta";
+const SECRET = "test-app-secret";
+
+function sign(body: string): string {
+  return "sha256=" + createHmac("sha256", SECRET).update(body, "utf8").digest("hex");
+}
+
+async function main() {
+  process.env.FB_PAGE_ID = "111000111";
+  process.env.IG_USER_ID = "222000222";
+  process.env.INSTAGRAM_APP_ID = "ig-app";
+  process.env.THREADS_APP_ID = "th-app";
+  process.env.FACEBOOK_CLIENT_ID = process.env.FACEBOOK_CLIENT_ID || "fb-app";
+
+  // ---- Webhook signatures --------------------------------------------
+  const body = JSON.stringify({ object: "page", entry: [] });
+  check("a correctly signed payload verifies", verifyWebhookSignature(body, sign(body), SECRET));
+  check("a tampered payload is refused", !verifyWebhookSignature(body + " ", sign(body), SECRET));
+  check("a missing header is refused", !verifyWebhookSignature(body, null, SECRET));
+  check(
+    "an empty app secret refuses everything",
+    !verifyWebhookSignature(body, sign(body), ""),
+    "fail closed: no secret must never mean no check"
+  );
+  check(
+    "a malformed header is refused, not crashed on",
+    !verifyWebhookSignature(body, "sha256=zzzz", SECRET)
+  );
+
+  // ---- Payload parsing ------------------------------------------------
+  const commentPayload = {
+    object: "page",
+    entry: [
+      {
+        changes: [
+          {
+            field: "feed",
+            value: {
+              item: "comment",
+              comment_id: `${TAG}-c1`,
+              post_id: `${TAG}-p1`,
+              from: { id: "999", name: "A Fan" },
+              message: "What's the price on these?",
+            },
+          },
+          {
+            field: "feed",
+            value: {
+              item: "comment",
+              comment_id: `${TAG}-c2`,
+              from: { id: "111000111", name: "The Page" },
+              message: "Our own reply echoing back",
+            },
+          },
+          { field: "feed", value: { item: "like", post_id: `${TAG}-p1` } },
+        ],
+      },
+    ],
+  };
+  const parsed = parseWebhookPayload(commentPayload);
+  check("a visitor comment is captured", parsed.some((e) => e.objectId === `${TAG}-c1`));
+  check(
+    "our own reply is filtered out",
+    !parsed.some((e) => e.objectId === `${TAG}-c2`),
+    "without this the rules engine answers itself in a loop"
+  );
+  check("a like is not an event", parsed.length === 1, `${parsed.length} captured`);
+
+  const dmPayload = {
+    object: "page",
+    entry: [
+      {
+        messaging: [
+          { sender: { id: "888" }, message: { mid: `${TAG}-m1`, text: "yo is the vest still up" } },
+          { sender: { id: "111000111" }, message: { mid: `${TAG}-m2`, text: "our outbound", is_echo: true } },
+        ],
+      },
+    ],
+  };
+  const dms = parseWebhookPayload(dmPayload);
+  check("an inbound DM is captured", dms.some((e) => e.objectId === `${TAG}-m1`));
+  check("our own outbound echo is not", !dms.some((e) => e.objectId === `${TAG}-m2`));
+
+  const igPayload = {
+    object: "instagram",
+    entry: [
+      {
+        changes: [
+          {
+            field: "comments",
+            value: { id: `${TAG}-ig1`, from: { id: "777", username: "sneakfan" }, text: "🔥🔥" },
+          },
+        ],
+      },
+    ],
+  };
+  const ig = parseWebhookPayload(igPayload);
+  check("an IG comment is captured with its platform", ig[0]?.platform === "instagram");
+
+  // ---- Storage dedup --------------------------------------------------
+  const stored1 = await storeEvents(parsed);
+  const stored2 = await storeEvents(parsed);
+  check("events store once", stored1 === 1, `${stored1}`);
+  check("a redelivered webhook stores nothing", stored2 === 0, "Meta redelivers; the desk must not double up");
+
+  // ---- Rules ----------------------------------------------------------
+  check(
+    "a keyword rule matches its comment, case-insensitively",
+    ruleMatches({ kind: "comment_keyword", trigger: "PRICE" }, { kind: "comment", text: "what's the price?" })
+  );
+  check(
+    "and not an unrelated comment",
+    !ruleMatches({ kind: "comment_keyword", trigger: "price" }, { kind: "comment", text: "clean work" })
+  );
+  check(
+    "a keyword rule never touches DMs",
+    !ruleMatches({ kind: "comment_keyword", trigger: "price" }, { kind: "message", text: "price?" })
+  );
+  check(
+    "a welcome rule fires on messages only",
+    ruleMatches({ kind: "dm_welcome", trigger: null }, { kind: "message", text: "hi" }) &&
+      !ruleMatches({ kind: "dm_welcome", trigger: null }, { kind: "comment", text: "hi" })
+  );
+  check(
+    "an unknown rule kind matches nothing",
+    !ruleMatches({ kind: "cold_outreach", trigger: "x" }, { kind: "message", text: "x" }),
+    "the shape of the engine is the policy: only replies exist"
+  );
+
+  // ---- OAuth plumbing -------------------------------------------------
+  check("provider whitelist holds", isConnectProvider("instagram") && !isConnectProvider("tiktok"));
+  const igUrl = new URL(authorizeUrl("instagram", "nonce123"));
+  check("IG authorize goes to instagram.com", igUrl.hostname.endsWith("instagram.com"));
+  check(
+    "IG asks for the Instagram-Login scope family",
+    igUrl.searchParams.get("scope") === "instagram_business_basic,instagram_business_content_publish",
+    "the FB-login flavor's scope names would silently fail here"
+  );
+  check("state rides the IG url", igUrl.searchParams.get("state") === "nonce123");
+  const thUrl = new URL(authorizeUrl("threads", "n"));
+  check("Threads authorize goes to threads.net", thUrl.hostname.endsWith("threads.net"));
+  const fbUrl = new URL(authorizeUrl("facebook_page", "n"));
+  check(
+    "Facebook asks for Pages scopes — profiles aren't a thing any app can post to",
+    (fbUrl.searchParams.get("scope") ?? "").includes("pages_manage_posts")
+  );
+  check(
+    "callback paths are per-provider",
+    connectRedirectUri("threads").endsWith("/api/social/callback/threads")
+  );
+
+  // ---- Caption budget -------------------------------------------------
+  const caption = ownChannelCaption({
+    title: "A Very Long Title For A Custom Shoe Indeed Yes",
+    baseShoe: "Air Force 1 Low '07 White",
+  });
+  const link = "https://theheatchart.com/artists/some-long-artist-slug?utm_source=artist-channel&utm_medium=autopost&utm_campaign=own-work";
+  check(
+    "caption + link stays under the Threads 500-char cap",
+    caption.length + 2 + link.length <= 500,
+    `${caption.length + 2 + link.length} chars`
+  );
+  check("the caption speaks as the artist, not about them", !caption.includes(" by "));
+}
+
+async function cleanup() {
+  await prisma.metaEvent.deleteMany({ where: { objectId: { startsWith: TAG } } });
+}
+
+main()
+  .catch((e) => {
+    fail++;
+    log.push(`FAIL threw — ${e instanceof Error ? e.message : String(e)}`);
+  })
+  .then(cleanup)
+  .catch(() => {})
+  .finally(async () => {
+    await prisma.$disconnect();
+    console.log("\n=== THE META LAYER, CHECKED AT THE SEAMS ===");
+    for (const l of log) console.log(l);
+    console.log(`\n${pass} passed, ${fail} failed`);
+    process.exit(fail === 0 ? 0 : 1);
+  });

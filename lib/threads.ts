@@ -54,6 +54,63 @@ export function todaysPost(now: Date = new Date()): string {
 
 export type ThreadsResult = { ok: boolean; detail: string };
 
+/**
+ * Photo post on the house Threads account: create an IMAGE container,
+ * wait for Meta to ingest the photo, publish. Threads counts the whole
+ * text (link included) against its 500-character cap, so callers keep
+ * captions short.
+ */
+export async function postImageToThreads(text: string, imageUrl: string): Promise<ThreadsResult> {
+  if (!threadsConfigured()) return { ok: false, detail: "Threads not connected" };
+  try {
+    const userId = process.env.THREADS_USER_ID!;
+    const token = process.env.THREADS_ACCESS_TOKEN!;
+
+    const createRes = await fetch(`${THREADS_API}/${userId}/threads`, {
+      method: "POST",
+      body: new URLSearchParams({ media_type: "IMAGE", image_url: imageUrl, text, access_token: token }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const created = (await createRes.json().catch(() => ({}))) as {
+      id?: string;
+      error?: { message?: string };
+    };
+    if (!createRes.ok || !created.id) {
+      return { ok: false, detail: created.error?.message || `Threads create ${createRes.status}` };
+    }
+
+    // Image containers usually finish in seconds; give them a minute.
+    for (let i = 0; i < 12; i++) {
+      const statusRes = await fetch(
+        `${THREADS_API}/${created.id}?fields=status_code&access_token=${encodeURIComponent(token)}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+      const status = (await statusRes.json().catch(() => ({}))) as { status_code?: string };
+      if (status.status_code === "FINISHED") break;
+      if (status.status_code === "ERROR") {
+        return { ok: false, detail: "Threads couldn't process the image" };
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+
+    const publishRes = await fetch(`${THREADS_API}/${userId}/threads_publish`, {
+      method: "POST",
+      body: new URLSearchParams({ creation_id: created.id, access_token: token }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const published = (await publishRes.json().catch(() => ({}))) as {
+      id?: string;
+      error?: { message?: string };
+    };
+    if (!publishRes.ok || !published.id) {
+      return { ok: false, detail: published.error?.message || `Threads publish ${publishRes.status}` };
+    }
+    return { ok: true, detail: `Posted to Threads (${published.id})` };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : "Threads post failed" };
+  }
+}
+
 /** Two-step publish: create the text container, then publish it. */
 export async function postToThreads(text: string): Promise<ThreadsResult> {
   if (!threadsConfigured()) return { ok: false, detail: "Threads not connected" };

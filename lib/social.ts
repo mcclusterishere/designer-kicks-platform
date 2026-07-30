@@ -120,7 +120,8 @@ async function graphGet(path: string, params: Record<string, string>): Promise<R
  */
 export async function postToInstagramReel(
   videoUrl: string,
-  caption: string
+  caption: string,
+  opts: { tagUsername?: string | null } = {}
 ): Promise<SocialResult> {
   if (!instagramConfigured()) return { ok: false, detail: "Instagram not connected" };
   try {
@@ -129,6 +130,10 @@ export async function postToInstagramReel(
       media_type: "REELS",
       video_url: absoluteMediaUrl(videoUrl),
       caption,
+      // Reel tags are username-only — no x/y on video.
+      ...(opts.tagUsername
+        ? { user_tags: JSON.stringify([{ username: opts.tagUsername }]) }
+        : {}),
     });
     const creationId = String(media.id);
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -150,7 +155,8 @@ export async function postToInstagramReel(
 
 export async function postToInstagram(
   imageUrl: string | null,
-  caption: string
+  caption: string,
+  opts: { tagUsername?: string | null } = {}
 ): Promise<SocialResult> {
   if (!instagramConfigured()) return { ok: false, detail: "Instagram not connected" };
   if (!imageUrl) return { ok: false, detail: "Instagram needs a photo — add one to cross-post there" };
@@ -159,6 +165,14 @@ export async function postToInstagram(
     const media = await graphPost(`${igId}/media`, {
       image_url: absoluteMediaUrl(imageUrl),
       caption,
+      // Real attribution: the artist is tagged ON the photo, notified,
+      // and the piece shows in their Tagged tab (subject to their own
+      // approve-tags setting). Photo tags need x/y — bottom-centre
+      // reads like a signature. Only public accounts are taggable, and
+      // an untaggable one just drops the tag rather than the post.
+      ...(opts.tagUsername
+        ? { user_tags: JSON.stringify([{ username: opts.tagUsername, x: 0.5, y: 0.9 }]) }
+        : {}),
     });
     await graphPost(`${igId}/media_publish`, { creation_id: String(media.id) });
     return { ok: true, detail: "Posted to Instagram" };

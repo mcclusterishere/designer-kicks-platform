@@ -537,11 +537,11 @@ model Battle {
   endsAt    DateTime
   createdAt DateTime @default(now())
 
-  subAId String
-  subA   Submission @relation("battleSubA", fields: [subAId], references: [id])
+  subAId   String
+  subA     Submission   @relation("battleSubA", fields: [subAId], references: [id])
   // set when type = CUSTOM_VS_CUSTOM
-  subBId String?
-  subB   Submission? @relation("battleSubB", fields: [subBId], references: [id])
+  subBId   String?
+  subB     Submission?  @relation("battleSubB", fields: [subBId], references: [id])
   // set when type = CUSTOM_VS_OG — the retail original
   ogShoeId String?
   ogShoe   CatalogShoe? @relation("battleOG", fields: [ogShoeId], references: [id])
@@ -551,8 +551,8 @@ model Battle {
   // when the OG wins) so the Heat List and tournament brackets, which only
   // ever count customs, keep working untouched.
   winnerSide String?
-  winnerId String?
-  winner   Submission? @relation("battleWinner", fields: [winnerId], references: [id])
+  winnerId   String?
+  winner     Submission? @relation("battleWinner", fields: [winnerId], references: [id])
 
   votes           Vote[]
   tournamentMatch TournamentMatch?
@@ -729,13 +729,13 @@ model TournamentMatch {
 }
 
 model Vote {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   battleId     String
-  battle       Battle     @relation(fields: [battleId], references: [id], onDelete: Cascade)
+  battle       Battle      @relation(fields: [battleId], references: [id], onDelete: Cascade)
   // Which corner the vote went to: "A" | "B". This is what counting reads,
   // because in a CUSTOM_VS_OG battle side B is a retail shoe with no
   // submission to point at. Backfilled for every pre-existing vote.
-  side         String     @default("A")
+  side         String      @default("A")
   // Still written when a custom takes the vote — the Heat List ranks
   // submissions by votes collected. Null when the OG took it.
   submissionId String?
@@ -747,9 +747,9 @@ model Vote {
   // key can be rotated and an artist's standing has to be defensible when
   // they ask why they lost. Keeping both means the signup wall comes down
   // without the league becoming spoofable.
-  guest        Boolean    @default(false)
-  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt    DateTime   @default(now())
+  guest        Boolean     @default(false)
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
 
   @@unique([battleId, voterKey])
   @@index([battleId, submissionId])
@@ -853,6 +853,7 @@ model User {
   sentMessages     DirectMessage[] @relation("sentMessages")
   receivedMessages DirectMessage[] @relation("receivedMessages")
   pushSubs         PushSub[]
+  socialAccounts   SocialAccount[]
 
   // Play limits. Every regime that lets people stake anything requires the
   // account holder to be able to bind their own future behaviour, and
@@ -1974,4 +1975,124 @@ model AuditLog {
   /// "what was done to my stuff" view.
   @@index([createdAt])
   @@index([targetOwnerId, createdAt])
+}
+
+/// A social channel one of OUR people connected — an editor or artist
+/// authorizing this platform to publish to THEIR Instagram, THEIR
+/// Threads profile, or a Facebook Page THEY admin.
+///
+/// This is the "promote yourself without doing anything" table: when a
+/// connected artist's piece clears review, the autopost engine fans the
+/// post out to every ACTIVE account here that has autoPromote on.
+///
+/// Deliberate limits, so nobody is surprised later:
+///   - Personal Facebook PROFILES are absent because Meta removed that
+///     capability from the API in 2018. Pages only. Nothing we build
+///     can change that.
+///   - Tokens are the user's own grant, revocable by them on Meta's
+///     side at any time; status flips to EXPIRED when a publish fails
+///     with an auth error rather than silently retrying forever.
+model SocialAccount {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// instagram | threads | facebook_page
+  provider  String
+  /// The numeric id Meta knows the account by (IG user id, Threads user
+  /// id, or Page id).
+  accountId String
+  /// @handle or Page name — what we show in the UI and write into
+  /// attribution copy.
+  handle    String?
+  name      String?
+
+  accessToken    String
+  /// Long-lived Meta tokens run ~60 days. Refreshed lazily at publish
+  /// time when inside the renewal window, so no cron has to exist for
+  /// tokens to stay alive.
+  tokenExpiresAt DateTime?
+  scopes         String?
+
+  /// When their piece goes live on the site, post it to this channel
+  /// too. On by default — connecting IS the opt-in — but switchable
+  /// per channel without disconnecting.
+  autoPromote Boolean @default(true)
+
+  /// ACTIVE | EXPIRED | REVOKED
+  status String @default("ACTIVE")
+
+  connectedAt     DateTime  @default(now())
+  lastRefreshedAt DateTime?
+  lastPostedAt    DateTime?
+  lastError       String?
+
+  @@unique([userId, provider, accountId])
+  @@index([provider, status])
+}
+
+/// One inbound thing that happened on a Meta surface we watch — a
+/// comment on the Page or IG, a mention, a new DM. Written by the
+/// webhook endpoint, read by the admin Engagement desk.
+///
+/// Stored rather than fetched live because webhook delivery is the only
+/// complete stream: polling every post for comments burns the rate
+/// budget and still misses edits between polls.
+model MetaEvent {
+  id String @id @default(cuid())
+
+  /// facebook | instagram — which surface fired the webhook.
+  platform String
+  /// comment | message | mention | reaction | other
+  kind     String
+  /// Meta's id for the object (comment id, message id) — used to reply
+  /// and to de-duplicate redelivered webhooks.
+  objectId String @unique
+
+  /// Who did it, as Meta reports it (name and/or id — PSIDs for
+  /// messages, user ids for comments).
+  fromName String?
+  fromId   String?
+
+  /// The text, if the event carries any.
+  text String?
+
+  /// The post/conversation this hangs off, when known.
+  parentId String?
+
+  /// NEW | HANDLED | HIDDEN — the admin queue state, not Meta's.
+  status String @default("NEW")
+
+  /// What automation did about it, if anything ("auto-replied: …").
+  autoNote String?
+
+  receivedAt DateTime @default(now())
+
+  @@index([status, receivedAt])
+  @@index([platform, kind])
+}
+
+/// A standing automation the admin wrote: when something inbound
+/// matches, answer it. Only ever REACTIVE — these fire on comments and
+/// DMs people send US. Nothing in this table can start a conversation,
+/// because Meta's platform terms (and the 24-hour messaging window)
+/// prohibit unsolicited outreach and we enforce that shape here, not in
+/// the UI.
+model SocialRule {
+  id String @id @default(cuid())
+
+  /// comment_keyword — reply to comments containing the trigger.
+  /// dm_welcome     — reply once to a brand-new inbound conversation.
+  kind String
+
+  /// Substring match, case-insensitive. Empty for dm_welcome.
+  trigger String?
+  reply   String
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  /// Times fired — visible in admin so a dead rule is obvious.
+  fired     Int      @default(0)
+
+  @@index([kind, active])
 }

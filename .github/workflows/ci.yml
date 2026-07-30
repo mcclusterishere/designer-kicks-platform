@@ -169,6 +169,11 @@ jobs:
       - name: Account cleanup
         run: npm run verify:purge
 
+      # The Meta layer, at the seams: webhook signatures, echo filtering,
+      # the reactive-only rules engine, OAuth scope families, caption caps.
+      - name: Meta integration
+        run: npm run verify:meta
+
   build:
     name: Production build
     runs-on: ubuntu-latest
