@@ -63,6 +63,11 @@ export async function registerAccount(page, { name, email, password }) {
   await page.fill("#name", name);
   await page.fill("#email", email);
   await page.fill("#password", password);
+  // Signup asks for it twice. The browser blocks submit on a mismatch, so
+  // a script that fills one box gets a form that never posts.
+  if (await page.locator("#confirmPassword").count()) {
+    await page.fill("#confirmPassword", password);
+  }
   await page.check("#age13");
   await page.check("#pma");
   await page.getByRole("button", { name: "Create Account" }).click();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * A password box you can actually see into, and — when you're setting one
@@ -46,6 +46,7 @@ export default function PasswordField({
   confirmName = "confirmPassword",
   confirmLabel = "Type it again",
   autoFocus = false,
+  idSuffix = "",
 }: {
   name?: string;
   label?: string;
@@ -56,10 +57,20 @@ export default function PasswordField({
   confirm?: boolean;
   confirmName?: string;
   confirmLabel?: string;
+  /** Only needed if a page ever renders two of these. */
+  idSuffix?: string;
 }) {
-  const uid = useId();
-  const id = `${name}${uid}`;
-  const confirmId = `${confirmName}${uid}`;
+  // The id is the field's own name, not a generated one.
+  //
+  // useId() was here so two instances could share a page. Nothing on the
+  // site does that, and the cost was steep: the generated id differs per
+  // render tree, so #password stopped existing as a selector — which is
+  // what the browser tests, accessibility tooling and any deep link all
+  // reach for. It also doesn't survive a copy-paste into a bug report.
+  //
+  // `idSuffix` is the escape hatch for the page that one day needs two.
+  const id = `${name}${idSuffix}`;
+  const confirmId = `${confirmName}${idSuffix}`;
   const [visible, setVisible] = useState(false);
   const [first, setFirst] = useState("");
   const [second, setSecond] = useState("");

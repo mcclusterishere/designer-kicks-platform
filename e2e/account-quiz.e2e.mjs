@@ -23,6 +23,7 @@ await page.goto(`${BASE}/register`, { waitUntil: "networkidle" });
 await page.fill("#name", "E2E Tester");
 await page.fill("#email", EMAIL);
 await page.fill("#password", "supersecret1");
+await page.fill("#confirmPassword", "supersecret1");
 await page.check("#age13");
 // Every account is an Equity Uprise PMA member; registration refuses
 // without the agreement, so the suite has to tick it like a real signup.
