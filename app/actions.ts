@@ -6361,3 +6361,44 @@ export async function confirmOwnershipAction(
   revalidatePath("/market");
   return { ok: true };
 }
+
+/**
+ * Destroy fixture accounts and everything attached to them.
+ *
+ * Irreversible, so it takes a typed confirmation rather than a click:
+ * a button that empties a database should be harder to press by accident
+ * than a button that doesn't.
+ */
+export async function purgeAccountsAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "DELETE") {
+    return { ok: false, error: 'Type DELETE in the box to confirm. Nothing was touched.' };
+  }
+  const ids = formData.getAll("userId").map(String).filter(Boolean);
+  const allowRoster = formData.get("allowRoster") === "on";
+
+  const { purgeAccounts } = await import("@/lib/purge");
+  const res = await purgeAccounts(ids, { allowRoster });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  const { recordStaffAction, actorFrom } = await import("@/lib/audit");
+  await recordStaffAction({
+    actor: actorFrom(await auth().catch(() => null), "admin"),
+    action: "accounts.purge",
+    targetType: "user",
+    targetId: ids[0] ?? "batch",
+    targetOwnerId: null,
+    summary: `Deleted ${res.usersDeleted} account(s), ${res.profilesDeleted} artist page(s) and ${res.piecesDeleted} piece(s)`,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/artists");
+  revalidatePath("/market");
+  return {
+    ok: true,
+    note: `Gone: ${res.usersDeleted} account(s), ${res.profilesDeleted} artist page(s), ${res.piecesDeleted} piece(s).`,
+  };
+}

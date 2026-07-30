@@ -42,6 +42,7 @@ import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
 import OwnerDesk from "./OwnerDesk";
 import AuditPanel from "./AuditPanel";
+import CleanupPanel from "./CleanupPanel";
 import DuplicatePanel from "./DuplicatePanel";
 import SaasPanel from "./SaasPanel";
 import CatalogRefreshButton from "./CatalogRefreshButton";
@@ -540,7 +541,17 @@ export default async function AdminPage({
       : TAB_IDS.includes(requested)
         ? requested
         : "pulse";
-  const show = (t: string) => tab === t;
+  // A typo'd tab id is invisible, not broken — the section simply never
+  // renders and the panel looks normal. That already happened once: a
+  // whole tool shipped behind show("people") when the room's id is
+  // "roster", and nothing anywhere said so. Failing loudly on an unknown
+  // id turns a silent disappearance into an error on the first render.
+  const show = (t: string) => {
+    if (!TAB_IDS.includes(t)) {
+      throw new Error(`Admin tab "${t}" doesn't exist. Rooms are: ${TAB_IDS.join(", ")}.`);
+    }
+    return tab === t;
+  };
   const rosterAttention =
     pending.length +
     profileClaims.filter((c) => c.status === "PENDING").length +
@@ -2076,9 +2087,18 @@ export default async function AdminPage({
 
       {/* Duplicate cleanup sits under People: it's a queue of artists to
           tidy up for, not a report to read. */}
-      {show("people") && (
+      {show("roster") && (
         <section className="mt-8">
           <DuplicatePanel />
+        </section>
+      )}
+
+      {/* Account cleanup sits next to the duplicate merge: both are "the
+          database has junk in it", and both are one wrong click away from
+          deleting something real. */}
+      {show("roster") && (
+        <section className="mt-8">
+          <CleanupPanel />
         </section>
       )}
 
