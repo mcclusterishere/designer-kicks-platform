@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { geminiChat, geminiConfigured } from "./gemini";
 import {
   engageConfigured,
+  replyToComment,
   sendDmReply,
   sendPrivateReply,
   type ParsedEvent,
@@ -40,28 +41,64 @@ import {
 const ENABLED_KEY = "chatbotEnabled";
 const AI_KEY = "chatbotAiFallback";
 const PERSONA_KEY = "chatbotPersona";
+const PUBLIC_KEY = "chatbotPublicReplies";
+const COMMENT_STYLE_KEY = "chatbotCommentStyle";
+
+/**
+ * Public replies are the highest-volume, most-visible thing the bot
+ * does, so they run under hard caps no setting can remove:
+ *
+ *   - at most one AI reply per commenter per day. A page that answers
+ *     the same person's every comment reads as a machine cornering
+ *     them, and repetitive bot interactions are exactly the engagement
+ *     pattern Meta's spam systems score.
+ *   - an hourly ceiling across all commenters. When the caps is hit,
+ *     comments simply stay in the Engagement desk for humans — the
+ *     failure mode is silence, never a flood.
+ *
+ * The ceiling is tunable (PUBLIC_REPLY_HOURLY_CAP) but never absent.
+ */
+const PUBLIC_REPLY_HOURLY_CAP = Math.max(
+  1,
+  Number(process.env.PUBLIC_REPLY_HOURLY_CAP || 30) || 30
+);
 
 export const DEFAULT_PERSONA =
   "You are the automated assistant for The Heat Chart (theheatchart.com), a custom-sneaker culture platform where artists post one-of-one customs, fans vote in battles, and the Heat List ranks the culture. Be brief, warm and hype — 1-3 sentences, no emojis walls. You are a bot and say so if asked. You help people find artists, enter the giveaway, play the games, or claim their artist page. If someone wants to buy, commission, or has a problem, tell them a real person will pick the thread up here shortly. Never invent prices or promises.";
 
+export const DEFAULT_COMMENT_STYLE =
+  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Pick up something specific from THEIR comment and ask a question back that steers toward shoes, customs or fashion. Where it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.";
+
 export async function chatbotSettings(): Promise<{
   enabled: boolean;
   aiFallback: boolean;
+  publicReplies: boolean;
   persona: string;
+  commentStyle: string;
 }> {
   const rows = await prisma.appSetting.findMany({
-    where: { key: { in: [ENABLED_KEY, AI_KEY, PERSONA_KEY] } },
+    where: { key: { in: [ENABLED_KEY, AI_KEY, PERSONA_KEY, PUBLIC_KEY, COMMENT_STYLE_KEY] } },
   });
   const get = (k: string) => rows.find((r) => r.key === k)?.value;
   return {
     enabled: get(ENABLED_KEY) === "true",
     aiFallback: get(AI_KEY) === "true",
+    publicReplies: get(PUBLIC_KEY) === "true",
     persona: get(PERSONA_KEY) || DEFAULT_PERSONA,
+    commentStyle: get(COMMENT_STYLE_KEY) || DEFAULT_COMMENT_STYLE,
   };
 }
 
-export async function setChatbotSetting(key: "enabled" | "ai" | "persona", value: string) {
-  const k = key === "enabled" ? ENABLED_KEY : key === "ai" ? AI_KEY : PERSONA_KEY;
+export async function setChatbotSetting(
+  key: "enabled" | "ai" | "persona" | "public" | "commentStyle",
+  value: string
+) {
+  const k =
+    key === "enabled" ? ENABLED_KEY
+    : key === "ai" ? AI_KEY
+    : key === "public" ? PUBLIC_KEY
+    : key === "commentStyle" ? COMMENT_STYLE_KEY
+    : PERSONA_KEY;
   await prisma.appSetting.upsert({
     where: { key: k },
     update: { value },
@@ -182,7 +219,12 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
     try {
       if (e.kind === "comment") {
         const flow = matchCommentFlow(flows, e.text, e.parentId);
-        if (!flow) continue;
+        if (!flow) {
+          // No campaign claimed this comment — the conversational AI
+          // gets a shot at it, under its own hard caps.
+          await maybePublicAiReply(e, settings, handled);
+          continue;
+        }
         const full = flows.find((f) => f.id === flow.id)!;
         // The one private reply this comment will ever get. Buttons on
         // it are the reply-bait: a tap IS the answer that opens the
@@ -296,6 +338,73 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
     }
   }
   return handled;
+}
+
+/* ------------------------------------------------------------------ */
+/* Public comment replies — the conversation starter                   */
+/* ------------------------------------------------------------------ */
+
+const PUBLIC_NOTE = "bot: public AI reply";
+
+/**
+ * Answer a comment IN PUBLIC, as the Page, in a way that starts a
+ * conversation: pick something up from what they said, ask back,
+ * steer to shoes, drop the giveaway where it fits. The private-reply
+ * campaigns get first claim on a comment; this catches the rest.
+ *
+ * The caps are the feature. A page that answers a thousand comments
+ * an hour with model output doesn't read as attentive, it reads as
+ * infested — to people and to Meta's spam scoring alike. So: one AI
+ * reply per commenter per day, a hard hourly ceiling, and a SKIP
+ * escape the model is told to use on anything hostile or hollow.
+ * Everything skipped stays NEW on the Engagement desk for humans.
+ */
+async function maybePublicAiReply(
+  e: ParsedEvent,
+  settings: { publicReplies: boolean; commentStyle: string },
+  handled: Set<string>
+): Promise<void> {
+  if (!settings.publicReplies || !geminiConfigured()) return;
+  if (!e.text || e.text.trim().length < 2) return;
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // Hard hourly ceiling across all commenters.
+  const lastHour = await prisma.metaEvent.count({
+    where: { autoNote: PUBLIC_NOTE, receivedAt: { gte: hourAgo } },
+  });
+  if (lastHour >= PUBLIC_REPLY_HOURLY_CAP) return;
+
+  // One per person per day.
+  if (e.fromId) {
+    const already = await prisma.metaEvent.count({
+      where: { fromId: e.fromId, autoNote: PUBLIC_NOTE, receivedAt: { gte: dayAgo } },
+    });
+    if (already > 0) return;
+  }
+
+  const reply = await geminiChat({
+    system: settings.commentStyle,
+    history: [
+      {
+        role: "user",
+        text: `${e.fromName ? `${e.fromName} commented` : "A comment"} on our ${e.platform} post: "${e.text.slice(0, 500)}"`,
+      },
+    ],
+    temperature: 0.8,
+  });
+  const clean = reply?.trim();
+  if (!clean || /^skip\b/i.test(clean)) return;
+
+  await replyToComment(e.platform, e.objectId, clean.slice(0, 280));
+  await prisma.metaEvent
+    .update({
+      where: { objectId: e.objectId },
+      data: { autoNote: PUBLIC_NOTE, status: "HANDLED" },
+    })
+    .catch(() => {});
+  handled.add(e.objectId);
 }
 
 /* ------------------------------------------------------------------ */

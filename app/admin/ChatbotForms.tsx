@@ -31,7 +31,15 @@ function Feedback({ state }: { state: ActionResult | null }) {
   );
 }
 
-export function BotToggles({ enabled, aiOn }: { enabled: boolean; aiOn: boolean }) {
+export function BotToggles({
+  enabled,
+  aiOn,
+  publicOn,
+}: {
+  enabled: boolean;
+  aiOn: boolean;
+  publicOn: boolean;
+}) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     chatbotSettingAction,
     null
@@ -42,9 +50,29 @@ export function BotToggles({ enabled, aiOn }: { enabled: boolean; aiOn: boolean 
         {enabled ? "Bot is ON" : "Bot is OFF — turn on"}
       </button>
       <button name="op" value="toggle-ai" disabled={pending} className={aiOn ? btn : ghost}>
-        {aiOn ? "AI fallback ON" : "AI fallback OFF"}
+        {aiOn ? "DM AI fallback ON" : "DM AI fallback OFF"}
+      </button>
+      <button name="op" value="toggle-public" disabled={pending} className={publicOn ? btn : ghost}>
+        {publicOn ? "Public comment replies ON" : "Public comment replies OFF"}
       </button>
       <Feedback state={state} />
+    </form>
+  );
+}
+
+export function CommentStyleForm({ style }: { style: string }) {
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(
+    chatbotSettingAction,
+    null
+  );
+  return (
+    <form action={action} className="mt-2">
+      <input type="hidden" name="op" value="commentStyle" />
+      <textarea name="commentStyle" defaultValue={style} rows={4} className={input} />
+      <div className="mt-2 flex items-center gap-3">
+        <button disabled={pending} className={btn}>{pending ? "…" : "Save comment style"}</button>
+        <Feedback state={state} />
+      </div>
     </form>
   );
 }

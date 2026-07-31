@@ -351,6 +351,20 @@ export async function runAutomation(events: ParsedEvent[]): Promise<void> {
     if (!rule) continue;
     try {
       if (e.kind === "comment") {
+        // The same canned line posted twice under one person's comments
+        // in a day is the exact texture of comment spam. One rule reply
+        // per author per day; the rest wait for a human.
+        if (e.fromId) {
+          const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const recent = await prisma.metaEvent.count({
+            where: {
+              fromId: e.fromId,
+              autoNote: { startsWith: "auto-replied" },
+              receivedAt: { gte: dayAgo },
+            },
+          });
+          if (recent > 0) continue;
+        }
         await replyToComment(e.platform, e.objectId, rule.reply);
       } else if (e.kind === "message" && e.fromId) {
         // One welcome per person: if we've already welcomed this sender,

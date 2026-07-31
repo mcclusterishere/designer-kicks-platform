@@ -6781,6 +6781,23 @@ export async function chatbotSettingAction(
         : "AI fallback on — Gemini answers what no flow catches.",
     };
   }
+  if (op === "toggle-public") {
+    await setChatbotSetting("public", current.publicReplies ? "false" : "true");
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      note: current.publicReplies
+        ? "Public replies off. Comments wait in the Engagement desk."
+        : "Public replies on — capped at one per person per day and a hard hourly ceiling. What it skips, you see in the desk.",
+    };
+  }
+  if (op === "commentStyle") {
+    const style = String(formData.get("commentStyle") ?? "").trim();
+    if (!style) return { ok: false, error: "The comment style can't be empty." };
+    await setChatbotSetting("commentStyle", style);
+    revalidatePath("/admin");
+    return { ok: true, note: "Comment voice updated." };
+  }
   if (op === "persona") {
     const persona = String(formData.get("persona") ?? "").trim();
     if (!persona) return { ok: false, error: "The persona can't be empty — it's the bot's voice." };

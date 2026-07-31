@@ -2,7 +2,14 @@ import { prisma } from "@/lib/db";
 import { chatbotSettings } from "@/lib/chatbot";
 import { geminiConfigured } from "@/lib/gemini";
 import { engageConfigured } from "@/lib/metaEngage";
-import { BotToggles, FlowButtons, FlowForm, InstallForm, PersonaForm } from "./ChatbotForms";
+import {
+  BotToggles,
+  CommentStyleForm,
+  FlowButtons,
+  FlowForm,
+  InstallForm,
+  PersonaForm,
+} from "./ChatbotForms";
 
 const TRIGGER_LABEL: Record<string, string> = {
   comment: "on comment",
@@ -61,11 +68,22 @@ export default async function ChatbotPanel() {
       )}
 
       <div className="mt-4">
-        <BotToggles enabled={settings.enabled} aiOn={settings.aiFallback} />
-        {settings.aiFallback && !geminiConfigured() && (
+        <BotToggles
+          enabled={settings.enabled}
+          aiOn={settings.aiFallback}
+          publicOn={settings.publicReplies}
+        />
+        {(settings.aiFallback || settings.publicReplies) && !geminiConfigured() && (
           <p className="mt-1.5 text-xs text-heat">
-            AI fallback is on but GEMINI_API_KEY isn&apos;t set — unmatched messages will wait
-            for a human until it is.
+            AI is switched on but GEMINI_API_KEY isn&apos;t set — nothing AI-written goes out
+            until it is.
+          </p>
+        )}
+        {settings.publicReplies && (
+          <p className="mt-1.5 text-xs text-smoke">
+            Public replies run capped: one per commenter per day, hard hourly ceiling, and the
+            AI skips anything hostile or hollow — those wait for you in the Engagement desk.
+            Campaign comments (keyword matches) get the private reply instead, never both.
           </p>
         )}
       </div>
@@ -116,9 +134,20 @@ export default async function ChatbotPanel() {
         <InstallForm hasOpeners={flows.some((f) => f.trigger === "icebreaker" && f.active)} />
       </div>
 
+      {/* ---- Comment voice ----------------------------------------- */}
+      <div className="mt-6">
+        <p className="tag text-volt">How it talks under comments</p>
+        <p className="mt-1 text-xs text-smoke">
+          The public-reply brief: pick something from their comment, ask back, steer to shoes,
+          mention the giveaway where it fits. It&apos;s told to skip anything it can&apos;t
+          answer genuinely.
+        </p>
+        <CommentStyleForm style={settings.commentStyle} />
+      </div>
+
       {/* ---- Voice ------------------------------------------------- */}
       <div className="mt-6">
-        <p className="tag text-volt">The AI&apos;s voice</p>
+        <p className="tag text-volt">The AI&apos;s voice in DMs</p>
         <p className="mt-1 text-xs text-smoke">
           What Gemini is told before answering anything a flow didn&apos;t catch. It introduces
           itself as a bot and hands anyone who asks to a human — keep both in whatever you

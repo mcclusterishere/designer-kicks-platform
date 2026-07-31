@@ -36,14 +36,50 @@ const PROVIDERS = [
   },
 ];
 
+/**
+ * Rollout gate: the connect buttons only show for admins (the test
+ * crew) until SOCIAL_CONNECT_LIVE=true flips them on for editors.
+ * Editors still SEE the card — a feature that's coming is a reason to
+ * stay, but only if they're told about it.
+ */
+export function channelsLiveFor(isStaffAdmin: boolean): boolean {
+  return isStaffAdmin || process.env.SOCIAL_CONNECT_LIVE === "true";
+}
+
 export default async function ChannelsCard({
   userId,
   connectedFlag,
+  live = false,
 }: {
   userId: string;
   /** The ?connected= flag the OAuth callback lands with. */
   connectedFlag?: string;
+  /** Compute with channelsLiveFor() — admins test first, editors later. */
+  live?: boolean;
 }) {
+  if (!live) {
+    return (
+      <div className="rounded-xl border border-edge bg-surface p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="display text-lg text-white">Your channels</h3>
+          <p className="tag text-volt">Coming soon</p>
+        </div>
+        <p className="mt-1 max-w-xl text-sm leading-relaxed text-smoke">
+          Soon you&apos;ll connect your own Instagram, Threads and Facebook Page here — once.
+          After that, every piece of yours that goes live also posts to your own feeds
+          automatically: your followers, your credit, a link back to your page. No
+          screenshots, no reposting.
+        </p>
+        <p className="mt-2 text-sm text-smoke">
+          It&apos;s built and in testing now — we&apos;re waiting on Meta&apos;s business
+          verification, which takes weeks, not days.{" "}
+          <span className="text-white">Expect it within the next month or two.</span> Meanwhile,
+          the house pages already auto-post your approved work, with you tagged on Instagram
+          once this ships.
+        </p>
+      </div>
+    );
+  }
   const [accounts, configured] = await Promise.all([
     prisma.socialAccount.findMany({
       where: { userId },

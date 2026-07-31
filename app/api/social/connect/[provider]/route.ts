@@ -24,6 +24,15 @@ export async function GET(
   if (!session?.user?.id) {
     return NextResponse.redirect(new URL("/signin?next=/editor", req.url));
   }
+  // Staged rollout: admins test first; editors get it when the flag
+  // flips. The UI already says "coming soon" — this backstop is for
+  // anyone who bookmarks the URL itself.
+  if (process.env.SOCIAL_CONNECT_LIVE !== "true") {
+    const { isAdmin } = await import("@/lib/admin");
+    if (!(await isAdmin())) {
+      return NextResponse.redirect(new URL("/editor?connected=soon", req.url));
+    }
+  }
   if (!connectConfigured()[provider]) {
     return NextResponse.json(
       { error: "This channel isn't configured yet — the app credentials are missing." },

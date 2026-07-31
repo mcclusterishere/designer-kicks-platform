@@ -8,7 +8,7 @@ import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import ArticleForm from "@/app/admin/ArticleForm";
 import PreloadArtistForm from "@/app/admin/PreloadArtistForm";
 import { OutreachRow } from "@/app/admin/OutfitStudioForms";
-import ChannelsCard from "@/components/ChannelsCard";
+import ChannelsCard, { channelsLiveFor } from "@/components/ChannelsCard";
 import EditorBroadcastForm from "./EditorBroadcastForm";
 import StageProspectForm from "./StageProspectForm";
 import MessageOffice from "./MessageOffice";
@@ -385,10 +385,16 @@ export default async function EditorDesk({
           {/* 03 · Share */}
           <Panel id="socials" index="03" title="Share it"
             desc="The site is home; socials point back to it. Post once, share everywhere.">
-            {/* The self-promotion machine: their accounts, wired once. */}
+            {/* The self-promotion machine: their accounts, wired once.
+                Admins see the live buttons (they're the test crew);
+                editors see the coming-soon card until the flag flips. */}
             {me && (
               <div className="mb-5">
-                <ChannelsCard userId={me.id} connectedFlag={connected} />
+                <ChannelsCard
+                  userId={me.id}
+                  connectedFlag={connected}
+                  live={channelsLiveFor(admin)}
+                />
               </div>
             )}
             <div className="mb-5">
