@@ -21,6 +21,7 @@ import {
   matchCommentFlow,
   matchMessageFlow,
   parseQuickReplies,
+  situationBlock,
   wantsHuman,
   type FlowLite,
 } from "../lib/chatbot";
@@ -206,8 +207,9 @@ async function main() {
   // demand the read, and the gif machinery has to be impossible to
   // leak: no bracket syntax in public, no URL the admin didn't stock.
   check(
-    "the brief tells the model to read the post before the comment",
-    /READ THE POST FIRST/.test(DEFAULT_COMMENT_STYLE)
+    "the brief tells the model to read the room before the comment",
+    /READ THE SITUATION FIRST/.test(DEFAULT_COMMENT_STYLE) &&
+      /follow the situation block over any assumption/.test(DEFAULT_COMMENT_STYLE)
   );
   check(
     "and to rotate its question angles rather than loop one",
@@ -379,6 +381,129 @@ async function main() {
   check(
     "a vote with no lineup still keeps the label",
     parseVoteChoice("3", null).label === "3" && parseVoteChoice("3", null).shoe === null
+  );
+
+  // ---- Reading the room --------------------------------------------------
+  // Not every post is a poll and not every post is about shoes. The
+  // situation block is what tells the model which conversation it is
+  // in, so these assert the wrong frame can never be handed over.
+  const sb = (
+    over: Partial<Parameters<typeof situationBlock>[0]> = {}
+  ) =>
+    situationBlock({
+      platform: "facebook",
+      brief: null,
+      postText: null,
+      thread: null,
+      photo: null,
+      fromName: "Dana",
+      commentText: "these go hard",
+      ...over,
+    });
+
+  const pollBlock = sb({
+    brief: { kind: "poll", topic: null, lineup: "1 = Air Jordan 4 Bred; 2 = Dunk Low Panda" },
+  });
+  check(
+    "a poll post is announced as a poll and carries its lineup",
+    /pick-one poll/.test(pollBlock) && /Air Jordan 4 Bred/.test(pollBlock)
+  );
+
+  const offTopic = sb({
+    brief: { kind: "off-topic", topic: "the owner's daughter graduating high school", lineup: null },
+  });
+  check(
+    "an off-topic post says so, and names what it IS about",
+    /NOT about sneakers/.test(offTopic) && /graduating high school/.test(offTopic)
+  );
+  check(
+    "an off-topic post forbids steering back to shoes or selling",
+    /Do not steer to sneakers/.test(offTopic) && /giveaway/.test(offTopic),
+    "the giveaway pitch under somebody's funeral post is the failure this prevents"
+  );
+  check(
+    "an off-topic post never leaks a poll frame",
+    !/pick-one poll/.test(offTopic) && !/their comment is a vote/.test(offTopic)
+  );
+
+  const prompt = sb({
+    brief: { kind: "photo-prompt", topic: "asking people to post their favorite pair", lineup: null },
+  });
+  check(
+    "a photo-prompt post bans the pick-a-number question",
+    /post their OWN photos/.test(prompt) && /never ask them to pick a number/.test(prompt)
+  );
+
+  const talk = sb({ brief: { kind: "shoe-talk", topic: "a new Dunk restock", lineup: null } });
+  check(
+    "a shoe post that isn't a poll says nobody is voting",
+    /NOT a poll/.test(talk) && /Nobody is voting/.test(talk)
+  );
+
+  check(
+    "an unreadable post does NOT default to the poll frame",
+    /could not read this post/.test(sb()) && !/pick-one poll/.test(sb()),
+    "guessing poll on an unknown post is what produced the wrong-room replies"
+  );
+
+  const pollNoLineup = sb({ brief: { kind: "poll", topic: null, lineup: null } });
+  check(
+    "a poll we couldn't read the lineup for forbids naming a shoe",
+    /do not name a shoe you were not given/i.test(pollNoLineup)
+  );
+
+  const known = sb({ photo: { identified: "New Balance 990v6 Grey" } });
+  check(
+    "an identified commenter photo hands over the real name and asks for an open question",
+    /New Balance 990v6 Grey/.test(known) && /open-ended question/.test(known)
+  );
+  const unknown = sb({ photo: { identified: null } });
+  check(
+    "an unidentified commenter photo explicitly forbids guessing the name",
+    /could NOT identify/.test(unknown) && /Do NOT guess/.test(unknown),
+    "a confident wrong shoe name is worse than no name"
+  );
+
+  check(
+    "a photo comment with no words still reads as a comment",
+    /no words, just the photo/.test(sb({ photo: { identified: null }, commentText: null }))
+  );
+  check(
+    "the thread brief only appears when we actually read the thread",
+    !/What else is being said/.test(sb()) &&
+      /What else is being said/.test(sb({ thread: "5 people picked 1" }))
+  );
+
+  check(
+    "the comment style tells the model to read the situation before assuming a poll",
+    /READ THE SITUATION FIRST/.test(DEFAULT_COMMENT_STYLE) &&
+      /Not every post is a poll/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "the comment style no longer claims most posts are picks",
+    !/Most of our posts are picks/.test(DEFAULT_COMMENT_STYLE),
+    "that line is what made the bot force a vote frame onto every post"
+  );
+  check(
+    "the comment style has a rule for photos people post of their own shoes",
+    /WHEN THEY POSTED A PHOTO/.test(DEFAULT_COMMENT_STYLE) &&
+      /open-ended question/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "the comment style has a rule for posts that aren't about shoes",
+    /WHEN THE POST ISN'T ABOUT SHOES/.test(DEFAULT_COMMENT_STYLE) &&
+      /Match the room/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "the comment style forbids inventing a shoe name it wasn't given",
+    /NEVER INVENT/.test(DEFAULT_COMMENT_STYLE) &&
+      /don't name a shoe you weren't told the name of/.test(DEFAULT_COMMENT_STYLE)
+  );
+
+  check(
+    "the public reply reads the post brief, not just the lineup",
+    botSrc.includes("describePost") && botSrc.includes("situationBlock({"),
+    "the reply prompt is built from the brief so off-topic posts get an off-topic frame"
   );
 
   // Structure: votes are banked BEFORE the reply caps, and the ticket
