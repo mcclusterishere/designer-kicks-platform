@@ -10,8 +10,10 @@
  * lights up the moment a key lands in the environment.
  *
  * Env: GEMINI_API_KEY (required to turn it on), GEMINI_MODEL (optional,
- * defaults to gemini-2.0-flash).
+ * defaults to the shared ladder's first rung).
  */
+
+import { defaultModel } from "./gemini";
 
 export type ProfileDraft = {
   displayName: string | null;
@@ -109,7 +111,11 @@ export async function researchProfile(input: {
     .filter(Boolean)
     .join("\n\n");
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  // gemini-2.0-flash sat here as the default until Google shut it
+  // down on 1 June 2026, which left this whole agent broken any time
+  // GEMINI_MODEL was unset. It now borrows the shared ladder's top
+  // rung so there is one place to change a model id, not two.
+  const model = process.env.GEMINI_MODEL || defaultModel();
   const apiBase = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com";
   const url = `${apiBase}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
   const body = {

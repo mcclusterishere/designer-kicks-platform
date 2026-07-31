@@ -72,6 +72,15 @@ const MODEL_LADDER = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-
  */
 let workingModel: string | null = null;
 
+/**
+ * The one model id to use when a caller builds its own request instead
+ * of going through geminiJson. There should be one place a model id
+ * lives, and this is it.
+ */
+export function defaultModel(): string {
+  return process.env.GEMINI_MODEL || workingModel || MODEL_LADDER[0];
+}
+
 function modelLadder(): string[] {
   if (process.env.GEMINI_MODEL) return [process.env.GEMINI_MODEL];
   if (!workingModel) return MODEL_LADDER;

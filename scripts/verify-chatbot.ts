@@ -592,6 +592,39 @@ async function main() {
       /\[workingModel, \.\.\.MODEL_LADDER\.filter/.test(gemSrc),
     "without this a dead id at the top taxes every call for the life of the process"
   );
+  // The lesson from this whole episode, made into a test rather than
+  // something anyone has to remember: no retired id, no floating alias.
+  const modelIds = (() => {
+    const out: Array<{ file: string; id: string }> = [];
+    for (const f of ["gemini.ts", "onboardAgent.ts", "shoeVision.ts", "chatbot.ts", "sneakerApi.ts"]) {
+      const src = readFileSync(join(process.cwd(), "lib", f), "utf8");
+      for (const line of src.split("\n")) {
+        if (line.trim().startsWith("*") || line.trim().startsWith("//")) continue; // prose
+        for (const m of line.matchAll(/["'`](gemini-[a-z0-9.\-]+)["'`]/g)) {
+          out.push({ file: f, id: m[1] });
+        }
+      }
+    }
+    return out;
+  })();
+  check(
+    "no retired 2.x model id is referenced in code anywhere",
+    !modelIds.some((m) => /^gemini-2\.0/.test(m.id)),
+    modelIds.filter((m) => /^gemini-2\.0/.test(m.id)).map((m) => `${m.file}:${m.id}`).join(", ") ||
+      "gemini-2.0-flash has been shut down since 1 June 2026"
+  );
+  check(
+    "no floating -latest alias is used",
+    !modelIds.some((m) => /latest$/.test(m.id)),
+    "an alias can be repointed to a pricier reasoning model without warning; always pin"
+  );
+  check(
+    "onboardAgent borrows the shared default instead of hardcoding a model",
+    /process\.env\.GEMINI_MODEL \|\| defaultModel\(\)/.test(
+      readFileSync(join(process.cwd(), "lib", "onboardAgent.ts"), "utf8")
+    ),
+    "it defaulted to the shut-down model, so it was broken whenever GEMINI_MODEL was unset"
+  );
   check(
     "GEMINI_MODEL still pins one model and skips the ladder",
     /if \(process\.env\.GEMINI_MODEL\) return \[process\.env\.GEMINI_MODEL\];/.test(gemSrc)
