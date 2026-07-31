@@ -14,6 +14,9 @@ import { createHmac } from "crypto";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { PrismaClient } from "@prisma/client";
+import { mmeLink, parseRef, refFor } from "../lib/mme";
+import { scheduleParams } from "../lib/social";
+import { menuItems } from "../lib/chatbot";
 import {
   buildDmMessage,
   parseWebhookPayload,
@@ -544,6 +547,88 @@ async function main() {
       readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8")
     ),
     "one private reply per comment, ever, so a blind resend burns the only shot at that person"
+  );
+
+  // ---- The always-on menu ----------------------------------------------
+  const botMenuSrcEarly = readFileSync(join(process.cwd(), "lib", "chatbot.ts"), "utf8");
+  const menu = menuItems();
+  check("the menu offers something to tap", menu.length > 0 && menu.length <= 5);
+  check(
+    "every menu item is a web_url with only the three portable keys",
+    menu.every(
+      (i) => JSON.stringify(Object.keys(i).sort()) === '["title","type","url"]' && i.type === "web_url"
+    ),
+    "messenger_extensions is what would drag in domain whitelisting"
+  );
+  check("no menu title runs past the cap", menu.every((i) => i.title.length <= 30));
+  const siteOrigin = new URL(
+    (process.env.NEXT_PUBLIC_SITE_URL || "https://theheatchart.com").replace(/\/$/, "")
+  ).origin;
+  check(
+    "every menu item points at OUR configured site, never somebody else's",
+    menu.every((i) => new URL(i.url).origin === siteOrigin)
+  );
+  check(
+    "a non-https site url refuses to install rather than pinning dead links",
+    /would install dead links/.test(botMenuSrcEarly),
+    "the menu is retroactive, so there is no quiet version of that mistake"
+  );
+  const botMenuSrc = readFileSync(join(process.cwd(), "lib", "chatbot.ts"), "utf8");
+  check(
+    "the composer stays enabled",
+    /composer_input_disabled: false/.test(botMenuSrc),
+    "a private reply does not open the messaging window, only their answer does, so they must be able to type"
+  );
+
+  // ---- m.me attribution -------------------------------------------------
+  process.env.FB_PAGE_USERNAME = "theheatchart";
+  check("a tracked door carries its ref", mmeLink("battle", 42) === "https://m.me/theheatchart?ref=battle_42");
+  check(
+    "a ref is stripped to a safe alphabet",
+    refFor("battle", "42?x=1&y=2") === "battle_42x1y2",
+    "the allowed character set is not published anywhere, so be stricter than Meta rather than guess looser"
+  );
+  check("a ref never runs past Meta's ceiling", refFor("x".repeat(500)).length <= 200);
+  check(
+    "the ref survives the round trip",
+    (() => {
+      const r = parseRef("battle_42");
+      return r?.kind === "battle" && r.id === "42";
+    })()
+  );
+  check("a kind with no id round-trips too", parseRef("giveaway")?.id === null);
+  check("an empty ref is nothing, not a blank link", parseRef("  ") === null);
+  const savedUser = process.env.FB_PAGE_USERNAME;
+  delete process.env.FB_PAGE_USERNAME;
+  const savedPage = process.env.FB_PAGE_ID;
+  delete process.env.FB_PAGE_ID;
+  check(
+    "no page configured means no link at all, never a broken one",
+    mmeLink("battle", 1) === null,
+    "a dead m.me in a caption is worse than no m.me"
+  );
+  if (savedUser) process.env.FB_PAGE_USERNAME = savedUser;
+  if (savedPage) process.env.FB_PAGE_ID = savedPage;
+
+  // ---- Scheduling -------------------------------------------------------
+  check("no date means an ordinary immediate post", scheduleParams(null) === null);
+  check(
+    "sooner than ten minutes is refused before we send it",
+    scheduleParams(new Date(Date.now() + 5 * 60_000)) === null
+  );
+  check(
+    "further out than 75 days is refused too",
+    scheduleParams(new Date(Date.now() + 80 * 86_400_000)) === null
+  );
+  const sched = scheduleParams(new Date(Date.now() + 3600_000));
+  check(
+    "a valid time sends BOTH params",
+    sched?.published === "false" && Boolean(sched?.scheduled_publish_time),
+    "a time without published=false just posts it immediately, which is the opposite of scheduling"
+  );
+  check(
+    "the timestamp is unix seconds, not milliseconds",
+    Number(sched!.scheduled_publish_time) < 1e11
   );
 
   const engSrcBtn = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");

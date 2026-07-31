@@ -167,20 +167,47 @@ async function waitForContainer(
 /** Publish a photo or reel to the connected user's own Instagram. */
 export async function publishToOwnInstagram(
   acct: Account,
-  opts: { imageUrl?: string | null; videoUrl?: string | null; caption: string }
+  opts: {
+    imageUrl?: string | null;
+    videoUrl?: string | null;
+    caption: string;
+    /**
+     * Instagram usernames to credit as co-authors. Once they accept, the
+     * SAME post appears on their profile too and reaches their audience
+     * as well as ours, which is the cheapest borrowed distribution on
+     * the platform and scales with the roster.
+     *
+     * Documented as up to 3, feed images / Reels / carousels only, never
+     * Stories. They must accept before it shows on their profile; we
+     * cannot force it. Sent as a JSON array of bare usernames.
+     */
+    collaborators?: string[] | null;
+  }
 ): Promise<PublishResult> {
   try {
     const token = await freshToken(acct);
+    // Strip the @ people habitually type, drop anything that is not a
+    // plausible IG handle, and cap at the documented three. A bad name
+    // here would fail the whole publish, and the post matters more than
+    // the credit.
+    const collab = (opts.collaborators ?? [])
+      .map((c) => c.trim().replace(/^@/, "").toLowerCase())
+      .filter((c) => /^[a-z0-9._]{1,30}$/.test(c))
+      .slice(0, 3);
+    const collabParam: Record<string, string> =
+      collab.length > 0 ? { collaborators: JSON.stringify(collab) } : {};
     const container = opts.videoUrl
       ? await api(IG_API, `${acct.accountId}/media`, {
           media_type: "REELS",
           video_url: absoluteMediaUrl(opts.videoUrl),
           caption: opts.caption,
+          ...collabParam,
           access_token: token,
         }, "POST", "instagram")
       : await api(IG_API, `${acct.accountId}/media`, {
           image_url: absoluteMediaUrl(opts.imageUrl ?? ""),
           caption: opts.caption,
+          ...collabParam,
           access_token: token,
         }, "POST", "instagram");
     const creationId = String(container.id);

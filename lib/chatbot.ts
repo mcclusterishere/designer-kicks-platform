@@ -953,17 +953,70 @@ async function maybeThankShare(
  * experience" onset: a new visitor sees the questions before they've
  * typed a word.
  */
+/**
+ * The always-on menu pinned inside every Messenger thread.
+ *
+ * This is the cheapest permanent surface Meta gives a Page, and it is
+ * retroactive: it appears in every conversation the funnel has ever
+ * touched the moment it is installed, not just in new ones.
+ *
+ * Shape confirmed against two independent sources, since Meta's own doc
+ * host is unreachable from this machine: the messenger4j SDK's
+ * serializer (persistent_menu -> localized entries of locale /
+ * composer_input_disabled / call_to_actions, with a web_url action
+ * carrying type, title, url) and a published example of the same POST
+ * body. Both agree.
+ *
+ * Only three keys per item, for the same reason the reply buttons carry
+ * only three: webview_height_ratio and messenger_extensions are
+ * optional, and messenger_extensions is what would drag in domain
+ * whitelisting. Leave them out and there is nothing to configure.
+ *
+ * composer_input_disabled stays FALSE. Disabling the text box would
+ * turn a conversation into a kiosk, and the whole funnel depends on
+ * people replying: a private reply does not open the messaging window,
+ * only their answer does.
+ */
+export function menuItems(): Array<{ type: "web_url"; title: string; url: string }> {
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://theheatchart.com").replace(/\/$/, "");
+  // Titles are capped at 30; these are all well under, and ordered by
+  // what actually moves somebody: vote, then shop, then the free entry.
+  return [
+    { type: "web_url", title: "Vote in today's battle", url: `${site}/battles` },
+    { type: "web_url", title: "Shop customs", url: `${site}/market` },
+    { type: "web_url", title: "Drop calendar", url: `${site}/drops` },
+    { type: "web_url", title: "Enter the giveaway", url: `${site}/giveaway` },
+  ];
+}
+
 export async function installMessengerProfile(opts: {
   greeting: string;
   iceBreakers: Array<{ question: string; flowId: string }>;
 }): Promise<{ ok: boolean; detail: string }> {
   const token = process.env.FB_PAGE_ACCESS_TOKEN;
   if (!token) return { ok: false, detail: "Page token not configured" };
+  // The menu is built from NEXT_PUBLIC_SITE_URL, which is localhost in
+  // development. Installing that onto the live Page would pin four dead
+  // links inside every conversation the Page has ever had, and the menu
+  // is retroactive, so there is no quiet version of that mistake.
+  if (!menuItems().every((i) => i.url.startsWith("https://"))) {
+    return {
+      ok: false,
+      detail: "NEXT_PUBLIC_SITE_URL is not an https site, so the menu would install dead links. Set it and retry.",
+    };
+  }
   const FB_API = process.env.GRAPH_API_URL || "https://graph.facebook.com/v23.0";
   const body: Record<string, unknown> = {
     get_started: { payload: "GET_STARTED" },
     greeting: [{ locale: "default", text: opts.greeting.slice(0, 160) }],
   };
+  body.persistent_menu = [
+    {
+      locale: "default",
+      composer_input_disabled: false,
+      call_to_actions: menuItems(),
+    },
+  ];
   if (opts.iceBreakers.length > 0) {
     body.ice_breakers = [
       {
@@ -992,7 +1045,11 @@ export async function installMessengerProfile(opts: {
     if (!res.ok || json.error) {
       return { ok: false, detail: json.error?.message || `Messenger profile ${res.status}` };
     }
-    return { ok: true, detail: "Front door installed — greeting, Get Started and openers are live." };
+    return {
+      ok: true,
+      detail:
+        "Front door installed. Greeting, Get Started, openers and the always-on menu are live, including in every thread you have already talked to.",
+    };
   } catch (e) {
     return { ok: false, detail: e instanceof Error ? e.message : "Messenger profile failed" };
   }

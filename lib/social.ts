@@ -82,13 +82,37 @@ async function commentLinkOnPost(postId: string, link: string): Promise<boolean>
   }
 }
 
+/**
+ * Queue rather than publish. Meta accepts a scheduled feed post between
+ * 10 minutes and 75 days out; anything outside that is refused, so this
+ * returns null instead of sending a request that cannot succeed.
+ *
+ * Returned as the two params Meta wants together: a post is scheduled by
+ * being UNPUBLISHED with a time on it, and sending the time without
+ * published=false just posts it immediately.
+ */
+export function scheduleParams(at: Date | null | undefined): Record<string, string> | null {
+  if (!at) return null;
+  const secs = Math.floor(at.getTime() / 1000);
+  const now = Math.floor(Date.now() / 1000);
+  if (secs < now + 600 || secs > now + 75 * 86400) return null;
+  return { published: "false", scheduled_publish_time: String(secs) };
+}
+
 export async function postToFacebookPage(
   message: string,
-  opts: { imageUrl?: string | null; link?: string | null } = {}
+  opts: { imageUrl?: string | null; link?: string | null; scheduledAt?: Date | null } = {}
 ): Promise<SocialResult> {
   if (!facebookConfigured()) return { ok: false, detail: "Facebook not connected" };
   try {
     const pageId = process.env.FB_PAGE_ID!;
+    const sched = scheduleParams(opts.scheduledAt);
+    if (opts.scheduledAt && !sched) {
+      return {
+        ok: false,
+        detail: "Schedule a post between 10 minutes and 75 days out — Meta refuses anything else.",
+      };
+    }
     let postId = "";
     if (opts.imageUrl) {
       // /photos answers with both its photo id and the id of the feed
@@ -96,11 +120,23 @@ export async function postToFacebookPage(
       const res = await graphPost(`${pageId}/photos`, {
         url: absoluteMediaUrl(opts.imageUrl),
         caption: message,
+        ...(sched ?? {}),
       });
       postId = String(res.post_id ?? res.id ?? "");
     } else {
-      const res = await graphPost(`${pageId}/feed`, { message });
+      const res = await graphPost(`${pageId}/feed`, { message, ...(sched ?? {}) });
       postId = String(res.id ?? "");
+    }
+    // A scheduled post has no comments yet and nobody can see it, so the
+    // first-comment link has to wait until it actually goes live. Saying
+    // so is better than silently dropping the link.
+    if (sched) {
+      return {
+        ok: true,
+        detail: opts.link
+          ? "Scheduled. Drop the link in the first comment once it publishes."
+          : "Scheduled.",
+      };
     }
     if (opts.link && postId) {
       const commented = await commentLinkOnPost(postId, opts.link);
