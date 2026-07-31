@@ -70,8 +70,11 @@ compatible; incompatible ones grey out and none of these should):
    no review needed to embed posts on the site. Only worth adding
    later for higher rate limits.
 
-Skip: "Create & manage app ads with Meta Ads Manager" (mobile-app
-install ads — explicitly does NOT include the Marketing API),
+Skip here: "Create & manage app ads with Meta Ads Manager" — that's
+mobile-app INSTALL campaigns, and its home is App 2, not this app
+(see below). It explicitly does not include the Marketing API, so
+website/giveaway/lead ads all come from the three use cases above.
+Also skip:
 "Fundraisers" (the API only creates person-for-CHARITY fundraisers —
 a for-profit cannot raise for itself, so it's only useful if we ever
 run a charity drop with a nonprofit beneficiary), Instant Games,
@@ -177,6 +180,14 @@ without review.
 - Valid OAuth Redirect URI:
   `https://theheatchart.com/api/auth/callback/facebook`
 - Same Basic-settings URLs as App 1.
+
+This app is the CONSUMER-facing one, which makes it the future home
+of the iOS app: when the App Store build ships, add the "Create &
+manage app ads with Meta Ads Manager" use case HERE (it's the one use
+case compatible with consumer Login — that's the pairing the create
+screen shows), register the iOS platform + App Events on this app,
+and run install campaigns against it. Nothing needs deciding today;
+use cases add any time.
 
 → Railway: `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` (App 2's
 pair — the site's sign-in button reads these).
