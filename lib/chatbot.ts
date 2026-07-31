@@ -3,6 +3,7 @@ import { businessSecret, proofParams } from "./appsecret";
 import { geminiChat, geminiConfigured } from "./gemini";
 import {
   engageConfigured,
+  likeObject,
   replyToComment,
   sendDmReply,
   sendPrivateReply,
@@ -123,7 +124,7 @@ export const DEFAULT_PERSONA =
   "You are the automated assistant for The Heat Chart (theheatchart.com), a custom-sneaker culture platform where artists post one-of-one customs, fans vote in battles, and the Heat List ranks the culture. Be brief, warm and hype — 1-3 sentences, no emojis walls. You are a bot and say so if asked. You help people find artists, enter the giveaway, play the games, or claim their artist page. If someone wants to buy, commission, or has a problem, tell them a real person will pick the thread up here shortly. Never invent prices or promises.";
 
 export const DEFAULT_COMMENT_STYLE =
-  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.\n\nREAD THE POST FIRST. You'll be shown what our post said. Most of our posts are picks: 'which shoe, 1/2/3' or 'which row, A/B/C'. When their comment is a pick ('2', 'B', 'the red ones', 'bottom left'), work out which shoe they chose from the post text, and if the post names it, use the actual name, 'the Jordan 4s', not 'option 2'. React to THEIR pick like you have an opinion about it too, then ask ONE question back.\n\nROTATE YOUR QUESTIONS, don't repeat the same angle down a thread. Angles to draw from: did they ever own a pair, and what happened to it. Would they actually buy it now or does it just photograph well. Style or storyline, do they rock it for the look or the history. What they'd wear it with. On-foot or on-display. Is the colorway the right one or is there a better make-up. Worth retail, worth resale, or worth neither. Did they have the original run or the retro. Would they let someone customize a pair or keep it stock. Which of the OTHER options in the post came second for them. First pair they ever loved. The one that got away.\n\nWhere it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in.\n\nHOW TO SOUND: dry and a little funny beats enthusiastic. React like someone who actually looked at the shoe. Specific over general, 'that midsole paint is clean' lands, 'so cool!' does not. Never open with Ah, Oh, Wow, Absolutely, Great question, or Love this. Never use em dashes or semicolons; short sentences instead. Never say 'we're thrilled', 'amazing', 'incredible', 'let's dive in', or 'reach out'. Contractions always. It's fine to be a little blunt. Do not compliment someone's taste and then pivot to a sales line in the same breath, pick one. Disagreeing with their pick occasionally is good, one playful line, never mean, and only about the shoe.\n\nGIF: if a reaction GIF would genuinely land, end the reply with [gif:tag] where tag is one word for the mood: fire, respect, thinking, sheesh, cold, classic, nah, crying, chef-kiss. Use one at most, and only on maybe one reply in four. The text must stand on its own without it.";
+  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.\n\nREAD THE POST FIRST. You'll be shown what our post said. Most of our posts are picks: 'which shoe, 1/2/3' or 'which row, A/B/C'. When their comment is a pick ('2', 'B', 'the red ones', 'bottom left'), work out which shoe they chose from the post text, and if the post names it, use the actual name, 'the Jordan 4s', not 'option 2'. React to THEIR pick like you have an opinion about it too, then ask ONE question back.\n\nMULTI-VOTERS: when the post says pick ONE and they picked several ('1 and 3', 'A and C', 'all of them', 'can't choose'), call it out playfully, that's cheating and they know it: 'nah you can't take all three lol, pick ONE' or 'that's cheating and you know it 😂 which one are you actually wearing'. ALWAYS soften the callout with lol or 😂 so it reads as a joke, never as actual annoyance, and never insult THEM, only the greedy vote. Then make them commit: if they could only keep one, which one.\n\nROTATE YOUR QUESTIONS, don't repeat the same angle down a thread. Angles to draw from: did they ever own a pair, and what happened to it. Would they actually buy it now or does it just photograph well. Style or storyline, do they rock it for the look or the history. What they'd wear it with. On-foot or on-display. Is the colorway the right one or is there a better make-up. Worth retail, worth resale, or worth neither. Did they have the original run or the retro. Would they let someone customize a pair or keep it stock. Which of the OTHER options in the post came second for them. First pair they ever loved. The one that got away.\n\nWhere it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in.\n\nHOW TO SOUND: dry and a little funny beats enthusiastic. React like someone who actually looked at the shoe. Specific over general, 'that midsole paint is clean' lands, 'so cool!' does not. Never open with Ah, Oh, Wow, Absolutely, Great question, or Love this. Never use em dashes or semicolons; short sentences instead. Never say 'we're thrilled', 'amazing', 'incredible', 'let's dive in', or 'reach out'. Contractions always. It's fine to be a little blunt. Do not compliment someone's taste and then pivot to a sales line in the same breath, pick one. Disagreeing with their pick occasionally is good, one playful line, never mean, and only about the shoe.\n\nGIF: if a reaction GIF would genuinely land, end the reply with [gif:tag] where tag is one word for the mood: fire, respect, thinking, sheesh, cold, classic, nah, crying, chef-kiss. Use one at most, and only on maybe one reply in four. The text must stand on its own without it.";
 
 export async function chatbotSettings(): Promise<{
   enabled: boolean;
@@ -278,6 +279,10 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
 
   for (const e of events) {
     try {
+      if (e.kind === "share") {
+        await maybeThankShare(e, settings, handled);
+        continue;
+      }
       if (e.kind === "comment") {
         const flow = matchCommentFlow(flows, e.text, e.parentId);
         if (!flow) {
@@ -481,6 +486,96 @@ async function maybePublicAiReply(
       where: { objectId: e.objectId },
       data: { autoNote: PUBLIC_NOTE, status: "HANDLED" },
     })
+    .catch(() => {});
+  handled.add(e.objectId);
+}
+
+const SHARE_NOTE = "auto-share-thanks";
+const SHARE_LIKE_NOTE = "auto-liked share";
+const SHARE_THANKS_HOURLY_CAP = Math.max(
+  1,
+  Number(process.env.SHARE_THANKS_HOURLY_CAP || 12) || 12
+);
+
+const SHARE_THANKS_STYLE =
+  "Someone just SHARED one of The Heat Chart's posts to their own Facebook. You're commenting a thank-you on THEIR share, as the page. You are a guest on their wall: 1-2 short sentences, warm, zero links, zero hashtags, at most one emoji, no selling, do not mention the giveaway. If they wrote a caption, react to what THEY said — their take is the whole point. If their caption is hostile, political, sensitive, or you can't add anything genuine, reply with exactly the single word SKIP. Never use em dashes or semicolons. Never open with Ah, Oh, Wow, or Love this.";
+
+/**
+ * Someone put our post on their wall. The full gesture is like +
+ * thank-you comment; privacy decides how much of it lands, and every
+ * refusal is an answer rather than an error:
+ *
+ *   like fails        → their share isn't visible to us. Done, quietly.
+ *   caption unreadable → can't read the room, so don't speak in it.
+ *                        The like stands alone.
+ *   comment refused   → comments off, or walled. The like stands.
+ *
+ * Same discipline as public replies: hard hourly cap, one thank-you
+ * per sharer per day, and the model can decline. A thank-you that
+ * shows up on every share within seconds reads as a machine — the
+ * caps are what keep it reading as a page that noticed.
+ */
+async function maybeThankShare(
+  e: ParsedEvent,
+  settings: { publicReplies: boolean; gifLibrary: string },
+  handled: Set<string>
+): Promise<void> {
+  if (!settings.publicReplies) return;
+  if (e.platform !== "facebook") return;
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // The cap bounds EVERY automated touch on shares, likes included — a
+  // wall of instant likes reads as a machine just like comments do.
+  const lastHour = await prisma.metaEvent.count({
+    where: { autoNote: { in: [SHARE_NOTE, SHARE_LIKE_NOTE] }, receivedAt: { gte: hourAgo } },
+  });
+  if (lastHour >= SHARE_THANKS_HOURLY_CAP) return;
+  if (e.fromId) {
+    const already = await prisma.metaEvent.count({
+      where: {
+        fromId: e.fromId,
+        autoNote: { in: [SHARE_NOTE, SHARE_LIKE_NOTE] },
+        receivedAt: { gte: dayAgo },
+      },
+    });
+    if (already > 0) return;
+  }
+
+  // The like leads. It's the one move privacy can't make embarrassing,
+  // and if even that is refused the share isn't ours to touch.
+  const liked = await likeObject(e.objectId);
+  if (!liked) return;
+
+  let note: string = SHARE_LIKE_NOTE;
+  // Their caption: sometimes on the webhook, otherwise fetched. Both
+  // empty means we can't read their wall — so we don't talk on it.
+  const { fetchPostContext } = await import("./metaEngage");
+  const caption = e.text || (await fetchPostContext("facebook", e.objectId));
+  if (caption && geminiConfigured()) {
+    const reply = await geminiChat({
+      system: SHARE_THANKS_STYLE,
+      history: [
+        {
+          role: "user",
+          text: `${e.fromName ? `${e.fromName} shared` : "Someone shared"} our post with this caption: "${caption.slice(0, 500)}"`,
+        },
+      ],
+      temperature: 0.8,
+    });
+    const clean = reply ? humanize(reply) : "";
+    if (clean && !/^skip\b/i.test(clean)) {
+      try {
+        await replyToComment("facebook", e.objectId, clean.slice(0, 280));
+        note = SHARE_NOTE;
+      } catch {
+        // Comments closed on their share. The like already said it.
+      }
+    }
+  }
+
+  await prisma.metaEvent
+    .update({ where: { objectId: e.objectId }, data: { autoNote: note, status: "HANDLED" } })
     .catch(() => {});
   handled.add(e.objectId);
 }

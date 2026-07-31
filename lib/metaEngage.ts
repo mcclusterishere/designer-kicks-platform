@@ -95,6 +95,25 @@ export function parseWebhookPayload(payload: unknown): ParsedEvent[] {
       const v = ch.value ?? {};
       if (ch.field === "feed" || ch.field === "comments") {
         const item = String(v.item ?? "comment");
+        // A share is someone putting OUR post on THEIR wall — the one
+        // feed item besides comments worth waking up for. Everything
+        // else (likes, reaction counts, edits) stays noise.
+        if (item === "share" && ch.field === "feed") {
+          const sharer = v.from as { id?: string; name?: string } | undefined;
+          if (sharer?.id && ourIds.has(sharer.id)) continue; // our own cross-post
+          const shareId = String(v.post_id ?? v.share_id ?? "");
+          if (!shareId) continue;
+          out.push({
+            platform,
+            kind: "share",
+            objectId: shareId,
+            fromName: sharer?.name ?? null,
+            fromId: sharer?.id ?? null,
+            text: (v.message as string) ?? null,
+            parentId: String(v.parent_id ?? "") || null,
+          });
+          continue;
+        }
         if (item !== "comment" && ch.field === "feed") continue;
         const from = v.from as { id?: string; name?: string; username?: string } | undefined;
         if (from?.id && ourIds.has(from.id)) continue; // our own reply echoing back
@@ -279,6 +298,22 @@ export async function fetchPostContext(
   }
   postCache.set(parentId, { text, at: Date.now() });
   return text;
+}
+
+/**
+ * Like something as the Page. Used on shares of our posts — the one
+ * gesture that works even when the sharer's privacy settings wall off
+ * everything else. A refusal here (friends-only post, deleted share)
+ * is the platform saying "you can't see this", which is an answer, not
+ * an error — so the caller treats false as "leave it be".
+ */
+export async function likeObject(objectId: string): Promise<boolean> {
+  try {
+    await graph(`${objectId}/likes`, {}, "POST");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

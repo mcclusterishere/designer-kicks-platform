@@ -41,6 +41,11 @@ function flow(over: Partial<FlowLite>): FlowLite {
 }
 
 async function main() {
+  // The self-filter reads our ids from env; without these the "is this
+  // us?" checks below would pass vacuously against an empty set.
+  process.env.FB_PAGE_ID = "111000111";
+  process.env.IG_USER_ID = "222000222";
+
   // ---- Keyword matching ----------------------------------------------
   check("a keyword matches inside a sentence, any case", keywordHit(["heat"], "ok HEAT me please"));
   check("* matches anything", keywordHit(["*"], "whatever"));
@@ -228,6 +233,88 @@ async function main() {
     "the reply path feeds the post text to the model",
     /fetchPostContext\(e\.platform, e\.parentId/.test(botSrc),
     "without this, 'which shoe do you like: 2' reads as noise"
+  );
+
+  // ---- Shares -----------------------------------------------------------
+  // Someone putting our post on their wall is the highest-value event
+  // the webhook carries, and privacy decides how much of the thank-you
+  // lands. Every refusal must be an answer, not an error.
+  const sharePayload = {
+    object: "page",
+    entry: [
+      {
+        changes: [
+          {
+            field: "feed",
+            value: {
+              item: "share",
+              post_id: "vbot-share-1",
+              from: { id: "444", name: "A Sharer" },
+              message: "these customs are insane, check this page out",
+              parent_id: "vbot-orig-9",
+            },
+          },
+          {
+            field: "feed",
+            value: { item: "share", post_id: "vbot-share-2", from: { id: "111000111", name: "Us" } },
+          },
+        ],
+      },
+    ],
+  };
+  const shares = parseWebhookPayload(sharePayload);
+  check("a share of our post becomes an event", shares.some((s) => s.kind === "share" && s.objectId === "vbot-share-1"));
+  check("the sharer's caption rides the event", shares[0]?.text === "these customs are insane, check this page out");
+  check("the original post id rides as parentId", shares[0]?.parentId === "vbot-orig-9");
+  check(
+    "our own cross-post share is filtered out",
+    !shares.some((s) => s.objectId === "vbot-share-2"),
+    "without this the page thanks itself in public"
+  );
+  check(
+    "the like leads and gates the rest",
+    /likeObject\(e\.objectId\);\s*\n\s*if \(!liked\) return/.test(botSrc),
+    "a refused like means the share isn't visible to us at all"
+  );
+  check(
+    "no caption means no comment — the like stands alone",
+    /caption && geminiConfigured\(\)/.test(botSrc),
+    "if we can't read their wall we don't talk on it"
+  );
+  check(
+    "a refused comment is swallowed, the like already said it",
+    /catch \{\s*\n\s*\/\/ Comments closed/.test(botSrc)
+  );
+  check(
+    "share thank-yous never carry a gif",
+    !/extractGif/.test(
+      botSrc.slice(botSrc.indexOf("async function maybeThankShare"), botSrc.indexOf("Messenger Profile"))
+    ),
+    "we're a guest on their wall"
+  );
+  check(
+    "share likes count against the same hourly cap as comments",
+    /autoNote: \{ in: \[SHARE_NOTE, SHARE_LIKE_NOTE\] \}/.test(botSrc),
+    "a wall of instant likes reads as a machine just like comments do"
+  );
+  check(
+    "the share brief bans selling on someone else's wall",
+    /do not mention the giveaway/.test(botSrc)
+  );
+
+  // ---- The multi-vote roast --------------------------------------------
+  check(
+    "picking several when told to pick one gets called out",
+    /MULTI-VOTERS/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "and the callout is required to carry a lol so it lands as a joke",
+    /soften the callout with lol or 😂/.test(DEFAULT_COMMENT_STYLE),
+    "people get sensitive; the lol is load-bearing"
+  );
+  check(
+    "the roast targets the vote, never the person",
+    /never insult THEM/.test(DEFAULT_COMMENT_STYLE)
   );
 }
 
