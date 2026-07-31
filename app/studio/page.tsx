@@ -76,6 +76,7 @@ export default async function StudioPage() {
       select: {
         id: true, title: true, imageUrl: true, size: true, description: true,
         askingPriceCents: true, category: true,
+        commissionedAt: true, releasedAt: true,
         closetHidden: true, closetSection: true,
         sales: { where: { status: "CONFIRMED" }, select: { id: true }, take: 1 },
       },
@@ -323,6 +324,11 @@ export default async function StudioPage() {
               closetHidden: p.closetHidden,
               closetSection: p.closetSection,
               featured: profile.featuredSubmissionId === p.id,
+              // A date input only speaks YYYY-MM-DD, and the column is
+              // stored at noon UTC, so slice rather than localise or the
+              // field shows the day before for anyone west of Greenwich.
+              commissionedAt: p.commissionedAt?.toISOString().slice(0, 10) ?? "",
+              releasedAt: p.releasedAt?.toISOString().slice(0, 10) ?? "",
             }))}
           />
         </div>

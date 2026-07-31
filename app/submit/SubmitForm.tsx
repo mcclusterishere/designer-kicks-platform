@@ -267,6 +267,25 @@ export default function SubmitForm({ artistDefaults }: Props) {
             <option value="ORIGINAL">Original — made for the open market</option>
             <option value="COMMISSION">Commission — made to order for a client</option>
           </select>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="commissionedAt" className="tag text-smoke">
+                Commissioned on
+              </label>
+              <input id="commissionedAt" name="commissionedAt" type="date" className={inputClass} />
+            </div>
+            <div>
+              <label htmlFor="releasedAt" className="tag text-smoke">
+                Released on
+              </label>
+              <input id="releasedAt" name="releasedAt" type="date" className={inputClass} />
+            </div>
+          </div>
+          <p className="mt-1.5 text-xs text-smoke/70">
+            Both optional. Posting older work? Put the real dates in and it
+            lands on the drop calendar where it actually belongs. A release
+            date in the future announces the piece before it drops.
+          </p>
           <p className="mt-1.5 text-xs text-smoke/70">
             Matters for your portfolio: open-market sales are stronger
             value evidence than commission fees.

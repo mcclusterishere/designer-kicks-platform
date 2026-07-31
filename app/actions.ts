@@ -182,6 +182,16 @@ export async function createSubmission(
   const provenanceType =
     String(formData.get("provenanceType") ?? "ORIGINAL") === "COMMISSION" ? "COMMISSION" : "ORIGINAL";
 
+  // The piece's own history. Optional, because a maker uploading old
+  // work often knows the year and not the day, and being unable to
+  // remember must never cost them the upload.
+  const { parsePieceDates } = await import("@/lib/pieceDates");
+  const dates = parsePieceDates(
+    String(formData.get("commissionedAt") ?? ""),
+    String(formData.get("releasedAt") ?? "")
+  );
+  if (!dates.ok) return { ok: false, error: dates.error };
+
   // Pricing at upload — the Market runs on the artists' own numbers.
   const askingRaw = String(formData.get("askingPrice") ?? "").trim();
   let askingPriceCents: number | null = null;
@@ -284,6 +294,8 @@ export async function createSubmission(
       askingPriceCents,
       provenanceType,
       size: size || null,
+      commissionedAt: dates.dates.commissionedAt,
+      releasedAt: dates.dates.releasedAt,
       description: description || null,
       imageUrl,
       extraImages: extra,
@@ -2127,6 +2139,9 @@ export async function adminLogout() {
 export async function setSubmissionStatus(id: string, status: "APPROVED" | "REJECTED") {
   await requireAdmin();
   await prisma.submission.update({ where: { id }, data: { status } });
+  // A piece with a release date is a calendar entry, and the calendar
+  // only shows APPROVED ones, so moderation moves it in or out.
+  revalidatePath("/drops");
   // First approval turns the upload into posts — site Feed + connected
   // socials — with nobody at the keyboard. Fire-and-forget: a Meta
   // outage must never make the approve button feel broken.
@@ -3289,14 +3304,25 @@ export async function updateMyPiece(
   const size = String(formData.get("size") ?? "").trim().slice(0, 24);
   const description = String(formData.get("description") ?? "").trim().slice(0, 2000);
 
+  const { parsePieceDates } = await import("@/lib/pieceDates");
+  const dates = parsePieceDates(
+    String(formData.get("commissionedAt") ?? ""),
+    String(formData.get("releasedAt") ?? "")
+  );
+  if (!dates.ok) return { ok: false, error: dates.error };
+
   await prisma.submission.update({
     where: { id: mine.id },
     data: {
       askingPriceCents,
       size: size || null,
       description: description || null,
+      commissionedAt: dates.dates.commissionedAt,
+      releasedAt: dates.dates.releasedAt,
     },
   });
+  // A release date that moved changes what the drop calendar shows.
+  revalidatePath("/drops");
   revalidatePath("/studio");
   revalidatePath("/market");
   revalidatePath("/available");

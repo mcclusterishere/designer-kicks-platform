@@ -69,6 +69,24 @@ model Submission {
   // so the valuation engine does too.
   provenanceType String @default("ORIGINAL") // ORIGINAL | COMMISSION
 
+  /// The piece's own history, not the platform's.
+  ///
+  /// A maker uploading ten years of work wants the record to say when
+  /// the work HAPPENED, not when they finally got around to posting it,
+  /// which is all createdAt can ever tell you. Both optional: nobody is
+  /// blocked from posting because they cannot remember a date.
+  ///
+  /// commissionedAt only means anything on COMMISSION work — it is when
+  /// the client asked, which is the date that makes a fee legible as a
+  /// fee rather than a market price.
+  commissionedAt DateTime?
+  /// When the piece went, or goes, public. A releasedAt in the FUTURE is
+  /// an announcement rather than a record: it puts the piece on the drop
+  /// calendar ahead of time. Deliberately derived from the date rather
+  /// than stored alongside an "unreleased" flag, because a flag and a
+  /// date will disagree eventually and then nobody knows which is true.
+  releasedAt     DateTime?
+
   consignment Consignment?
 
   // Collab pieces: co-artists beyond the primary submitter. The piece
@@ -127,6 +145,8 @@ model Submission {
   @@index([status])
   @@index([artistId])
   @@index([ownerId])
+  // The drop calendar asks for one month of released pieces at a time.
+  @@index([status, releasedAt])
 }
 
 model ArtistProfile {

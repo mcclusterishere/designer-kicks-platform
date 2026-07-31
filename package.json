@@ -12,6 +12,7 @@
     "lint": "eslint",
     "test:e2e": "node e2e/run-all.mjs",
     "verify:questions": "node scripts/verify-questions.mjs",
+    "verify:pieces": "rm -rf node_modules/.verifypc && tsc scripts/verify-pieces.ts --outDir node_modules/.verifypc --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node node_modules/.verifypc/scripts/verify-pieces.js",
     "verify:streaks": "rm -rf node_modules/.verifystk && tsc scripts/verify-streaks.ts --outDir node_modules/.verifystk --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifystk/scripts/verify-streaks.js",
     "verify:ledger": "rm -rf node_modules/.verify && tsc scripts/verify-ledger.ts --outDir node_modules/.verify --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verify/scripts/verify-ledger.js",
     "db:push": "prisma db push",

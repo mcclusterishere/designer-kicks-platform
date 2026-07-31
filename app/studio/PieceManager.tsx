@@ -25,6 +25,9 @@ export type MyPiece = {
   closetHidden: boolean;
   closetSection: string | null;
   featured: boolean;
+  /** YYYY-MM-DD, or "" — the shape an <input type="date"> wants. */
+  commissionedAt: string;
+  releasedAt: string;
 };
 
 /**
@@ -131,6 +134,26 @@ function EditRow({ piece }: { piece: MyPiece }) {
           <div>
             <label className="tag text-smoke">Size</label>
             <input name="size" maxLength={24} defaultValue={piece.size ?? ""} placeholder="US 10.5" className={field} />
+          </div>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div>
+            <label className="tag text-smoke">Commissioned on</label>
+            <input
+              name="commissionedAt"
+              type="date"
+              defaultValue={piece.commissionedAt ?? ""}
+              className={field}
+            />
+          </div>
+          <div>
+            <label className="tag text-smoke">Released on</label>
+            <input
+              name="releasedAt"
+              type="date"
+              defaultValue={piece.releasedAt ?? ""}
+              className={field}
+            />
           </div>
         </div>
         <div className="mt-2">

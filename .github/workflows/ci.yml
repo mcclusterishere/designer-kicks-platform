@@ -129,6 +129,9 @@ jobs:
       - name: Login streaks and giveaway entries
         run: npm run verify:streaks
 
+      - name: Piece history dates and the drop calendar
+        run: npm run verify:pieces
+
       - name: League payouts
         run: npm run verify:league
 

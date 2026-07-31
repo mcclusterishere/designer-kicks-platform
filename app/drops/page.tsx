@@ -39,7 +39,20 @@ export default async function DropsPage({
   const prevStart = new Date(Date.UTC(year, month - 1, 1));
 
   const artistDropInclude = { artist: { select: { slug: true, displayName: true } } };
-  const [monthDrops, nextUp, monthArtistDrops, nextUpArtist] = await Promise.all([
+  // Pieces carry their own release date now, which is how a maker's back
+  // catalogue gets onto this calendar at all: before this, the only
+  // history here was whatever somebody had separately announced. A date
+  // in the future works the same way and reads as upcoming.
+  const pieceSelect = {
+    id: true,
+    title: true,
+    description: true,
+    imageUrl: true,
+    releasedAt: true,
+    baseShoe: true,
+    artist: { select: { slug: true, displayName: true } },
+  } as const;
+  const [monthDrops, nextUp, monthArtistDrops, nextUpArtist, monthPieces] = await Promise.all([
     prisma.article.findMany({
       where: { status: "PUBLISHED", dropAt: { gte: monthStart, lt: nextStart } },
       orderBy: { dropAt: "asc" },
@@ -60,6 +73,13 @@ export default async function DropsPage({
       orderBy: { dropAt: "asc" },
       take: 5,
       include: artistDropInclude,
+    }),
+    // Approved only: a piece reaches the calendar through the same
+    // review every piece already goes through, not a second one.
+    prisma.submission.findMany({
+      where: { status: "APPROVED", releasedAt: { gte: monthStart, lt: nextStart } },
+      orderBy: { releasedAt: "asc" },
+      select: pieceSelect,
     }),
   ]);
 
@@ -103,6 +123,25 @@ export default async function DropsPage({
       href: ad.artist.slug ? `/artists/${ad.artist.slug}` : "/artists",
       linkLabel: `${ad.artist.displayName} →`,
       badge: "Artist drop",
+      hasIcs: false,
+    });
+  }
+
+  for (const p of monthPieces) {
+    if (!p.releasedAt) continue;
+    const d = p.releasedAt.getUTCDate();
+    (dropDays[d] ??= []).push({
+      slug: `piece-${p.id}`,
+      name: p.title,
+      excerpt:
+        p.description?.slice(0, 160) ??
+        `A custom ${p.baseShoe} by ${p.artist?.displayName ?? "one of ours"}.`,
+      cover: p.imageUrl,
+      dropAtISO: p.releasedAt.toISOString(),
+      links: [],
+      href: p.artist?.slug ? `/artists/${p.artist.slug}` : "/artists",
+      linkLabel: p.artist?.displayName ? `${p.artist.displayName} →` : "See the maker →",
+      badge: p.releasedAt.getTime() > now.getTime() ? "Upcoming custom" : "Custom",
       hasIcs: false,
     });
   }

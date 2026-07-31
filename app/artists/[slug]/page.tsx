@@ -1,4 +1,5 @@
 import Money from "@/components/Money";
+import { formatPieceDate, isUpcoming } from "@/lib/pieceDates";
 import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -420,6 +421,15 @@ export default async function ArtistPage({ params }: Props) {
                 <div className="p-4">
                   <p className="tag text-smoke">{categoryLabel(s.category)} · {s.baseShoe}{s.size && <span className="text-white"> · {s.size}</span>}</p>
                   <p className="mt-1 font-bold text-white">{s.title}</p>
+                  {(s.releasedAt || s.commissionedAt) && (
+                    <p className="mt-0.5 text-xs text-smoke">
+                      {s.releasedAt
+                        ? isUpcoming(s.releasedAt)
+                          ? `Drops ${formatPieceDate(s.releasedAt)}`
+                          : `Released ${formatPieceDate(s.releasedAt)}`
+                        : `Commissioned ${formatPieceDate(s.commissionedAt!)}`}
+                    </p>
+                  )}
                   {s.collaborators.length > 0 && (
                     <p className="mt-0.5 text-sm text-smoke">
                       with{" "}
