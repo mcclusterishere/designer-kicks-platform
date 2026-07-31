@@ -63,7 +63,27 @@ export function proofParams(
   return proof ? { appsecret_proof: proof } : {};
 }
 
-/** The business app's secret — signs every graph.facebook.com token. */
+/**
+ * The business app's secret — signs every graph.facebook.com token.
+ *
+ * This used to fall back to FACEBOOK_CLIENT_SECRET so a single-app dev
+ * setup kept working. That fallback is now removed, because the fleet
+ * split into separate apps and the two secrets stopped being
+ * interchangeable: FACEBOOK_CLIENT_* belongs to the consumer LOGIN app,
+ * while every Page token is issued by the BUSINESS app.
+ *
+ * Signing a business token with the login app's secret does not
+ * degrade — it produces a perfectly well-formed proof that Meta
+ * rejects with code 190 on every single call. That is indistinguishable
+ * from an expired token at the call site, and lib/metaPublish.ts treats
+ * code 190 as terminal and writes status EXPIRED onto connected
+ * accounts. So the fallback could permanently retire every artist's
+ * connection over a config typo, and reconnecting wouldn't fix it
+ * because the next publish would re-sign with the same wrong key.
+ *
+ * Returning "" instead means unsigned, which fails honestly and
+ * reversibly. Wrong-but-plausible is the worse failure.
+ */
 export function businessSecret(): string {
-  return process.env.META_BUSINESS_APP_SECRET || process.env.FACEBOOK_CLIENT_SECRET || "";
+  return process.env.META_BUSINESS_APP_SECRET || "";
 }

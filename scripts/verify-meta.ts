@@ -265,8 +265,9 @@ async function main() {
 
   delete process.env.META_BUSINESS_APP_SECRET;
   check(
-    "the login app's secret is still the documented dev fallback",
-    businessSecret() === "login-app-secret"
+    "the login app's secret is NOT borrowed when the business one is missing",
+    businessSecret() === "",
+    "wrong-app signing reads as code 190 and retires connected accounts as EXPIRED"
   );
   delete process.env.FACEBOOK_CLIENT_SECRET;
   check("no secret configured resolves to empty, not undefined", businessSecret() === "");

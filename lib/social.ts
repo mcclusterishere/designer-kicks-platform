@@ -17,7 +17,12 @@ import { businessSecret, proofParams } from "./appsecret";
 
 // GRAPH_API_URL override exists for tests (a local mock stands in for
 // Meta) — production always talks to the real Graph API.
-const GRAPH = process.env.GRAPH_API_URL || "https://graph.facebook.com/v21.0";
+// v23.0 to match metaEngage, metaPublish, metaConnect and chatbot. This
+// file sat on v21.0 while everything else moved, so the same process
+// spoke two Graph versions — harmless until v21 reaches end of life, at
+// which point house Page and IG posting would break while connected
+// editors' publishing kept working, presenting as a token fault.
+const GRAPH = process.env.GRAPH_API_URL || "https://graph.facebook.com/v23.0";
 
 export type SocialResult = { ok: boolean; detail: string };
 
