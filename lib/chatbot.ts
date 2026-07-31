@@ -256,6 +256,20 @@ async function contactFor(platform: string, psid: string, name: string | null) {
   return { contact: created, isNew: true };
 }
 
+/**
+ * The door every campaign message offers.
+ *
+ * Only on flows, deliberately. A flow is an admin-authored call to
+ * action and a button is the tappable version of what it already says;
+ * the free-form AI chat and the hand-off-to-a-human reply both stay
+ * plain, because a marketing button under "a real person will pick this
+ * up" reads exactly as badly as it sounds.
+ */
+function siteButton(): { title: string; url: string } {
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://theheatchart.com").replace(/\/$/, "");
+  return { title: "Open The Heat Chart", url: site };
+}
+
 async function runFlow(
   contact: { id: string; psid: string },
   flowId: string
@@ -263,7 +277,7 @@ async function runFlow(
   const flow = await prisma.chatFlow.findUnique({ where: { id: flowId } });
   if (!flow || !flow.active) return false;
   const buttons = parseQuickReplies(flow.quickReplies);
-  await sendDmReply(contact.psid, flow.message, buttons);
+  await sendDmReply(contact.psid, flow.message, buttons, "automation", siteButton());
   await prisma.chatMessage.create({
     data: { contactId: contact.id, direction: "out", text: flow.message, flowId: flow.id },
   });
@@ -321,11 +335,21 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
         // voter gets joined to the account they eventually make. Only
         // minted votes get one; a comment that couldn't be banked still
         // gets the flow's message, just without a personal link.
+        let claimUrl: string | null = null;
         if (vote?.claimToken) {
           const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://theheatchart.com").replace(/\/$/, "");
-          ticket = `${ticket}\n\n🎟️ Your ticket: ${site}/enter/${vote.claimToken}`;
+          claimUrl = `${site}/enter/${vote.claimToken}`;
+          ticket = `${ticket}\n\n🎟️ Your ticket: ${claimUrl}`;
         }
-        await sendPrivateReply(e.objectId, ticket, parseQuickReplies(full.quickReplies));
+        // The link stays in the words AS WELL as on the button. A ticket
+        // longer than the template's ceiling degrades to plain text, and
+        // a degraded ticket with no link in it is not a ticket.
+        await sendPrivateReply(
+          e.objectId,
+          ticket,
+          parseQuickReplies(full.quickReplies),
+          claimUrl ? { title: "Claim your ticket", url: claimUrl } : undefined
+        );
         await prisma.chatFlow.update({ where: { id: flow.id }, data: { fired: { increment: 1 } } });
         await prisma.metaEvent
           .update({

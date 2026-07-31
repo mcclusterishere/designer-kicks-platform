@@ -518,6 +518,34 @@ async function main() {
     "attachment" in (buildDmMessage("hi", undefined, { title: "Go", url: "https://www.theheatchart.com/x" }) as Msg)
   );
 
+  const botSrcBtn = readFileSync(join(process.cwd(), "lib", "chatbot.ts"), "utf8");
+  check(
+    "the ticket DM carries a button to claim it",
+    /title: "Claim your ticket", url: claimUrl/.test(botSrcBtn),
+    "the ticket is the whole point of that message"
+  );
+  check(
+    "and the claim link stays in the words too",
+    /🎟️ Your ticket: \$\{claimUrl\}/.test(botSrcBtn),
+    "a long ticket degrades to plain text, and a degraded ticket with no link is not a ticket"
+  );
+  check(
+    "campaign flows offer the site",
+    /siteButton\(\)\)/.test(botSrcBtn) && /"automation", siteButton\(\)/.test(botSrcBtn)
+  );
+  check(
+    "but the hand-off to a human does not",
+    !/real person from The Heat Chart[\s\S]{0,400}siteButton/.test(botSrcBtn),
+    "a marketing button under 'a real person will pick this up' reads as badly as it sounds"
+  );
+  check(
+    "a burned private reply is never resent after a timeout",
+    /Meta allows exactly ONE/.test(
+      readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8")
+    ),
+    "one private reply per comment, ever, so a blind resend burns the only shot at that person"
+  );
+
   const engSrcBtn = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
   check(
     "a refused button degrades to plain text, and only when Meta actually answered",

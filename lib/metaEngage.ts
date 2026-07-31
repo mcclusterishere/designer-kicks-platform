@@ -644,24 +644,29 @@ export async function sendDmReply(
 export async function sendPrivateReply(
   commentId: string,
   text: string,
-  quickReplies?: Array<{ label: string; payload: string }>
+  quickReplies?: Array<{ label: string; payload: string }>,
+  button?: ReplyButton
 ): Promise<void> {
-  const message: Record<string, unknown> = { text };
-  if (quickReplies && quickReplies.length > 0) {
-    message.quick_replies = quickReplies.slice(0, 13).map((q) => ({
-      content_type: "text",
-      title: q.label.slice(0, 20),
-      payload: q.payload,
-    }));
+  const recipient = JSON.stringify({ comment_id: commentId });
+  const message = buildDmMessage(text, quickReplies, button);
+  try {
+    await graph(
+      "me/messages",
+      { recipient, message: JSON.stringify(message) },
+      "POST"
+    );
+  } catch (e) {
+    // Same rule as sendDmReply: a refusal we can answer, a timeout we
+    // cannot. This one matters more than most — Meta allows exactly ONE
+    // private reply per comment, so a resend after a possible delivery
+    // burns the only shot at that person.
+    if (!("attachment" in message) || !(e instanceof GraphError)) throw e;
+    await graph(
+      "me/messages",
+      { recipient, message: JSON.stringify(buildDmMessage(text, quickReplies)) },
+      "POST"
+    );
   }
-  await graph(
-    "me/messages",
-    {
-      recipient: JSON.stringify({ comment_id: commentId }),
-      message: JSON.stringify(message),
-    },
-    "POST"
-  );
 }
 
 /* ------------------------------------------------------------------ */
