@@ -3825,7 +3825,7 @@ export async function setCommissionQueue(
     select: { id: true },
   });
 
-  let order = queue.map((q) => q.id);
+  const order = queue.map((q) => q.id);
   if (action === "waitlist") {
     if (!order.includes(req.id)) order.push(req.id);
     await prisma.commissionRequest.update({ where: { id: req.id }, data: { status: "WAITLIST" } });

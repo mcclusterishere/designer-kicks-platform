@@ -1,5 +1,31 @@
 import { storageDiagnostics } from "@/lib/storageDiag";
 
+// `min-w-0 break-all` on the value is load-bearing, not decoration.
+//
+// A flex item refuses to shrink below its content by default, and an S3
+// public URL is one unbreakable 60-character token. Without these two
+// classes that single row pushed the whole ADMIN PAGE wider than the
+// phone — every panel, the header and the tab bar shifted left with it,
+// and the fix looked like a layout bug in six places at once.
+//
+// It only ever showed in production, because these rows are empty
+// unless S3 is configured, and locally it isn't. That's what made it
+// invisible until someone opened the admin on a real phone.
+//
+// Module scope (not inside the component) because a component created
+// during render is a new type every render — React remounts it, state
+// would die, and the lint ratchet rightly counts each use as an error.
+const Row = ({ k, v, bad }: { k: string; v: string; bad?: boolean }) => (
+  <div className="flex justify-between gap-4 border-t border-edge/60 py-1.5 text-sm">
+    <span className="shrink-0 text-smoke">{k}</span>
+    <span className={`min-w-0 break-all text-right font-mono ${bad ? "text-heat" : "text-white"}`}>
+      {v}
+    </span>
+  </div>
+);
+
+const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1) + " MB";
+
 /**
  * Admin-only X-ray of where uploads live and whether they actually exist.
  * Async server component — reads the DB (+ filesystem) at render.
@@ -11,28 +37,6 @@ export default async function StorageHealthPanel() {
   const missing = d.dbCheck.missingOnDisk;
   const filesGone = (d.driver === "db" || d.driver === "local") && missing > 0;
   const alarm = filesGone;
-
-  const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1) + " MB";
-
-  // `min-w-0 break-all` on the value is load-bearing, not decoration.
-  //
-  // A flex item refuses to shrink below its content by default, and an S3
-  // public URL is one unbreakable 60-character token. Without these two
-  // classes that single row pushed the whole ADMIN PAGE wider than the
-  // phone — every panel, the header and the tab bar shifted left with it,
-  // and the fix looked like a layout bug in six places at once.
-  //
-  // It only ever showed in production, because these rows are empty
-  // unless S3 is configured, and locally it isn't. That's what made it
-  // invisible until someone opened the admin on a real phone.
-  const Row = ({ k, v, bad }: { k: string; v: string; bad?: boolean }) => (
-    <div className="flex justify-between gap-4 border-t border-edge/60 py-1.5 text-sm">
-      <span className="shrink-0 text-smoke">{k}</span>
-      <span className={`min-w-0 break-all text-right font-mono ${bad ? "text-heat" : "text-white"}`}>
-        {v}
-      </span>
-    </div>
-  );
 
   const driverLabel =
     d.driver === "s3"

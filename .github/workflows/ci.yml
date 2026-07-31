@@ -96,7 +96,7 @@ jobs:
           node -e "
             const r = require('/tmp/lint.json');
             const errors = r.reduce((t, f) => t + f.errorCount, 0);
-            const BASELINE = 47;
+            const BASELINE = 35;
             console.log('eslint errors:', errors, '(baseline', BASELINE + ')');
             if (errors > BASELINE) {
               console.error('New lint errors introduced. Fix them, or lower the baseline in ci.yml if you cleaned some up.');
