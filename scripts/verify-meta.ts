@@ -334,10 +334,35 @@ async function main() {
   }
 
   const engageSrc = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
+  const actionsSrc = readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8");
   check(
     "the tag rides on MESSAGE_TAG, never on RESPONSE",
-    /messaging_type:\s*byHuman\s*\?\s*"MESSAGE_TAG"\s*:\s*"RESPONSE"/.test(engageSrc),
+    /messaging_type:\s*"MESSAGE_TAG",\s*tag:\s*"HUMAN_AGENT"/.test(engageSrc) &&
+      (engageSrc.match(/"HUMAN_AGENT"/g) ?? []).length === 1,
     "Meta refuses a tag sent with messaging_type RESPONSE"
+  );
+  check(
+    "a refused tag falls back to a plain reply instead of failing",
+    /catch\s*\(e\)[\s\S]{0,400}messaging_type:\s*"RESPONSE"/.test(engageSrc),
+    "the feature isn't approved yet; without this every desk reply breaks"
+  );
+  check(
+    "but a non-capability refusal still reaches the caller",
+    /if\s*\(!\/[^/]*\/i\.test\(msg\)\)\s*throw e/.test(engageSrc),
+    "a closed window or dead token must not be silently retried into a lie"
+  );
+
+  // Hiding a comment names its parameter differently per platform, and
+  // the wrong one fails silently while the desk records HIDDEN.
+  check(
+    "hiding a comment branches on platform",
+    /platform === "instagram" \? \{ hide:/.test(engageSrc),
+    "Instagram takes hide=<bool>; is_hidden is Facebook-only and IG ignores it"
+  );
+  check(
+    "the hide caller passes the platform through",
+    /hideComment\(event\.platform,/.test(actionsSrc),
+    "defaulting to Facebook's spelling leaves IG comments live"
   );
   check(
     "automation is the default sender, so a forgotten argument fails safe",
@@ -345,7 +370,6 @@ async function main() {
     "defaulting the other way would tag every bot reply as human"
   );
 
-  const actionsSrc = readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8");
   const humanCalls = actionsSrc.match(/"human_agent"/g) ?? [];
   check(
     "only the admin desk sends as a human, and both its paths do",

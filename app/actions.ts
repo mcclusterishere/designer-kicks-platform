@@ -6663,7 +6663,7 @@ export async function engageModerateAction(
   if (op === "hide" && event.kind === "comment") {
     const { hideComment } = await import("@/lib/metaEngage");
     try {
-      await hideComment(event.objectId, true);
+      await hideComment(event.platform, event.objectId, true);
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : "Couldn't hide it." };
     }
@@ -6696,8 +6696,11 @@ export async function inboxReplyAction(
     const msg = e instanceof Error ? e.message : "";
     return {
       ok: false,
+      // The window is 24 hours until the Human Agent feature is
+      // approved and 7 days after, so the copy doesn't name a number
+      // it can't stand behind.
       error: /window|24|time|tag/i.test(msg)
-        ? "Meta closed the reply window — it's been more than 7 days since they messaged. They have to message again first."
+        ? "Meta closed the reply window — too long since their last message. They have to message again before we can write back."
         : msg || "Meta refused the reply.",
     };
   }

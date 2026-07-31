@@ -252,9 +252,25 @@ export async function replyToComment(
   }
 }
 
-/** Hide (or unhide) a comment without deleting the record of it. */
-export async function hideComment(commentId: string, hide: boolean): Promise<void> {
-  await graph(commentId, { is_hidden: String(hide) }, "POST");
+/**
+ * Hide (or unhide) a comment without deleting the record of it.
+ *
+ * The two platforms name this differently and neither complains about
+ * the other's spelling. Facebook's Page comment takes `is_hidden`;
+ * Instagram's is `POST /{ig-comment-id}?hide=<bool>`. Sending Facebook's
+ * name to Instagram doesn't throw — the comment simply stays visible
+ * while the desk records it as HIDDEN, which is the worst shape a bug
+ * can take: moderation that reports success and does nothing. Hence the
+ * platform argument, same as replyToComment above.
+ */
+export async function hideComment(
+  platform: string,
+  commentId: string,
+  hide: boolean
+): Promise<void> {
+  const params: Record<string, string> =
+    platform === "instagram" ? { hide: String(hide) } : { is_hidden: String(hide) };
+  await graph(commentId, params, "POST");
 }
 
 /**
@@ -303,17 +319,38 @@ export async function sendDmReply(
       payload: q.payload,
     }));
   }
-  const byHuman = sender === "human_agent";
-  await graph(
-    "me/messages",
-    {
-      recipient: JSON.stringify({ id: recipientId }),
-      messaging_type: byHuman ? "MESSAGE_TAG" : "RESPONSE",
-      ...(byHuman ? { tag: "HUMAN_AGENT" } : {}),
-      message: JSON.stringify(message),
-    },
-    "POST"
-  );
+  const body = {
+    recipient: JSON.stringify({ id: recipientId }),
+    message: JSON.stringify(message),
+  };
+  if (sender !== "human_agent") {
+    await graph("me/messages", { ...body, messaging_type: "RESPONSE" }, "POST");
+    return;
+  }
+
+  // The tag only works once the Human Agent feature is approved on the
+  // app. It is not today, and an app that hasn't got it has the tag
+  // refused outright — which would break every reply the desk sends,
+  // including the ones comfortably inside 24 hours that worked before.
+  //
+  // So: reach for the 7-day window, and if Meta says we may not, send
+  // the same message the ordinary way rather than failing. Once the
+  // feature is approved this silently starts reaching the full week
+  // with no redeploy. A refusal here is a capability answer, not an
+  // error worth surfacing — but a refusal for any OTHER reason (the
+  // window genuinely closed, a dead token) must still reach the caller,
+  // which is why the fallback is attempted rather than swallowed.
+  try {
+    await graph(
+      "me/messages",
+      { ...body, messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" },
+      "POST"
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (!/tag|permission|not allowed|unsupported|#100|#200/i.test(msg)) throw e;
+    await graph("me/messages", { ...body, messaging_type: "RESPONSE" }, "POST");
+  }
 }
 
 /**
