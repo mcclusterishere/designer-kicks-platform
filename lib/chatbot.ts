@@ -443,6 +443,102 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
 
 const PUBLIC_NOTE = "bot: public AI reply";
 
+export type ThreadRow = {
+  rawText: string;
+  choiceLabel: string | null;
+  shoeName: string | null;
+  commentId: string;
+};
+
+/**
+ * What the rest of the thread is saying, in one paragraph.
+ *
+ * Answering one comment without knowing the other forty reads like
+ * walking into a room mid-argument and talking about the weather. This
+ * is where the running count and a sample of what people actually
+ * wrote come from, so the reply can say "you're the only one holding
+ * out for the 3s" and be right about it.
+ *
+ * It costs nothing. Every comment is already banked as a SocialVote
+ * when it arrives, so the tally is a query against our own table, not
+ * a Graph call per commenter. That matters: reading the thread from
+ * Meta on every incoming comment would multiply our API budget by the
+ * size of the thread, which is exactly how a Page gets rate limited.
+ *
+ * Pure so the verify suite can hold it to account without a database.
+ */
+export function condenseThread(
+  rows: ThreadRow[],
+  exceptCommentId: string | null,
+  sampleSize = 6
+): string | null {
+  const others = rows.filter((r) => r.commentId !== exceptCommentId);
+  // One other voice isn't a conversation, it's a coincidence.
+  if (others.length < 2) return null;
+
+  const byLabel = new Map<string, { shoe: string | null; n: number }>();
+  let unpicked = 0;
+  for (const r of others) {
+    if (!r.choiceLabel) {
+      unpicked++;
+      continue;
+    }
+    const cur = byLabel.get(r.choiceLabel) ?? { shoe: r.shoeName, n: 0 };
+    cur.n++;
+    if (!cur.shoe && r.shoeName) cur.shoe = r.shoeName;
+    byLabel.set(r.choiceLabel, cur);
+  }
+
+  const lines: string[] = [
+    `${others.length} other ${others.length === 1 ? "person has" : "people have"} commented on this post.`,
+  ];
+
+  const ranked = [...byLabel.entries()].sort((a, b) => b[1].n - a[1].n);
+  if (ranked.length > 0) {
+    const parts = ranked.map(([label, v]) =>
+      v.shoe ? `${v.shoe} (${label}) has ${v.n}` : `option ${label} has ${v.n}`
+    );
+    if (unpicked > 0) {
+      parts.push(`${unpicked} said something without picking`);
+    }
+    lines.push(`Running count: ${parts.join(", ")}.`);
+  }
+
+  const sample = others
+    .slice(-sampleSize)
+    .map((r) => r.rawText.replace(/\s+/g, " ").trim().slice(0, 90))
+    .filter((t) => t.length > 0)
+    .map((t) => `"${t}"`);
+  if (sample.length > 0) {
+    lines.push(`Some of what people are saying: ${sample.join(", ")}.`);
+  }
+  lines.push(
+    "Use this to judge the mood and to avoid repeating what we already said to somebody else."
+  );
+
+  return lines.join("\n");
+}
+
+/**
+ * The banked thread for one post. Read-only, cheap, and never allowed
+ * to cost a reply: any failure just means the bot answers without
+ * knowing the room, which is what it did before this existed.
+ */
+async function threadBrief(postId: string | null, exceptCommentId: string): Promise<string | null> {
+  if (!postId) return null;
+  try {
+    const rows = await prisma.socialVote.findMany({
+      where: { postId },
+      orderBy: { createdAt: "asc" },
+      take: 300,
+      select: { rawText: true, choiceLabel: true, shoeName: true, commentId: true },
+    });
+    return condenseThread(rows, exceptCommentId);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The briefing the model reads before it answers one comment.
  *
@@ -574,6 +670,7 @@ async function maybePublicAiReply(
   const { describePost } = await import("./shoeVision");
   const ctx = await fetchPostContext(e.platform, e.parentId ?? null);
   const brief = await describePost(e.platform, e.parentId ?? null);
+  const thread = await threadBrief(e.parentId ?? null, e.objectId);
 
   const reply = await geminiChat({
     system: settings.commentStyle,
@@ -584,7 +681,7 @@ async function maybePublicAiReply(
           platform: e.platform,
           brief,
           postText: ctx.text,
-          thread: null,
+          thread,
           photo: null,
           fromName: e.fromName,
           commentText: e.text,

@@ -20,6 +20,7 @@ import {
   parseGifLibrary,
   matchCommentFlow,
   matchMessageFlow,
+  condenseThread,
   parseQuickReplies,
   situationBlock,
   wantsHuman,
@@ -504,6 +505,74 @@ async function main() {
     "the public reply reads the post brief, not just the lineup",
     botSrc.includes("describePost") && botSrc.includes("situationBlock({"),
     "the reply prompt is built from the brief so off-topic posts get an off-topic frame"
+  );
+
+  // ---- Knowing the rest of the room --------------------------------------
+  // The tally comes from votes we already banked, so it costs a query
+  // rather than a Graph call per commenter.
+  const row = (over: Partial<Parameters<typeof condenseThread>[0][number]>) => ({
+    rawText: "whatever",
+    choiceLabel: null,
+    shoeName: null,
+    commentId: "c" + Math.random().toString(36).slice(2),
+    ...over,
+  });
+  const thread = [
+    row({ commentId: "mine", rawText: "1 for me", choiceLabel: "1", shoeName: "Air Jordan 4 Bred" }),
+    row({ rawText: "gotta be the 4s", choiceLabel: "1", shoeName: "Air Jordan 4 Bred" }),
+    row({ rawText: "2 all day", choiceLabel: "2", shoeName: "Dunk Low Panda" }),
+    row({ rawText: "these are all trash", choiceLabel: null }),
+  ];
+
+  check("one other voice is not a thread", condenseThread(thread.slice(0, 2), "mine") === null);
+
+  const brief3 = condenseThread(thread, "mine") ?? "";
+  check(
+    "the thread brief excludes the comment being answered",
+    !/1 for me/.test(brief3) && /3 other people have commented/.test(brief3),
+    "quoting someone their own comment back as 'what people are saying' reads broken"
+  );
+  check(
+    "the running count names the shoe, not just the number",
+    /Air Jordan 4 Bred \(1\) has 1/.test(brief3) && /Dunk Low Panda \(2\) has 1/.test(brief3)
+  );
+  check(
+    "comments with no pick are counted, not dropped",
+    /1 said something without picking/.test(brief3),
+    "an opinion with no vote is still part of the mood"
+  );
+  check(
+    "the brief samples what people actually wrote",
+    /"2 all day"/.test(brief3) && /"these are all trash"/.test(brief3)
+  );
+  check(
+    "the leading option is listed first",
+    (() => {
+      const lead = condenseThread(
+        [
+          row({ choiceLabel: "2", shoeName: "Dunk Low Panda" }),
+          row({ choiceLabel: "1", shoeName: "Air Jordan 4 Bred" }),
+          row({ choiceLabel: "1", shoeName: "Air Jordan 4 Bred" }),
+        ],
+        null
+      ) ?? "";
+      return lead.indexOf("Air Jordan 4 Bred") < lead.indexOf("Dunk Low Panda");
+    })()
+  );
+  check(
+    "the brief tells the model not to repeat what we said to someone else",
+    /avoid repeating what we already said/.test(brief3)
+  );
+  check(
+    "the public reply actually reads the thread before answering",
+    botSrc.includes("threadBrief(e.parentId"),
+    "the tally is useless if the reply never sees it"
+  );
+  check(
+    "the thread is read from our own banked votes, not a Graph call per comment",
+    /prisma\.socialVote\.findMany/.test(botSrc) &&
+      !/fetchThread|graph\(.*comments/.test(botSrc),
+    "reading the thread from Meta on every comment is how a Page gets rate limited"
   );
 
   // Structure: votes are banked BEFORE the reply caps, and the ticket
