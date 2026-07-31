@@ -52,6 +52,51 @@ itself or skipped on purpose.
 
 ---
 
+## LIVE STATE (read this first)
+
+Confirmed through Meta's Developer Tools MCP, not assumed:
+
+| Fact | Value |
+|---|---|
+| **App 1 id** | `1014131787921113` — this is the real one |
+| **Duplicate to ignore/delete** | `1052753210625265` — same name, created 2 min later, zero permissions on it |
+| **Business verification** | **PASSED.** The long pole is done. |
+| **Compliance** | Compliant. Zero violations, zero required actions. |
+| Privacy policy URL | NOT SET — fix this, App Review needs it |
+| App mode | dev_mode / not live (expected for a Business app) |
+
+**An App Review submission is open and blocking further submissions.**
+`can_submit: false` — "Cannot submit to App Review while a previous
+submission is in review." The open submission is for **Marketing API
+Access Tier**, with three steps incomplete: `use_case`,
+`api_precheck`, `data_use_checkup`.
+
+That submission was not necessary. Marketing API Access Tier is the
+RATE-LIMIT upgrade (Limited tier = 60 points per ad account per 5
+minutes → Full tier ≈ 9,000). Managing our OWN ad account works on
+Standard Access with no review at all — Meta's authorization doc:
+"If your app is only managing your ad account, standard access to the
+ads_read and ads_management permissions are sufficient." Nothing in
+the platform is blocked by it. But while it sits open, no other
+submission can be filed — which matters the day Advanced Access is
+needed for the editor connect flow. Either finish its three steps
+(the Data Use Checkup is worth doing regardless) or withdraw it.
+
+Permissions confirmed attached to App 1: `pages_show_list`,
+`pages_read_engagement`, `pages_manage_metadata`, `pages_manage_ads`,
+`pages_messaging`, `instagram_basic`, `threads_basic`,
+`ads_management`, `ads_read`, `leads_retrieval`, `catalog_management`,
+`business_management`, `publish_video`, `ads_mcp_management`,
+`Live Video API`, `Marketing API Access Tier`.
+
+A `grant_status` of `REJECTED` with `access_level: none` on these is
+the NORMAL default for a new app — it means "no Advanced Access yet,"
+not that anything was reviewed and denied. The `rejection_reasons`
+objects are empty, which confirms it. Standard Access is what the
+platform runs on.
+
+---
+
 ## App 1 — the business app
 
 **Create App** → select ALL of these use cases (they're mutually
