@@ -25,6 +25,11 @@ pulled via their Developer Tools MCP. Three rules drive everything:
 Also: you can hold a role on at most **15 apps** unless they're
 connected to a verified business portfolio. Three is fine.
 
+The dashboard groups the 20 use cases as Ads and monetization (7),
+Content management (5), Business messaging (3), Others (5). App 1
+takes eleven of them; the skip list below says why each remaining one
+is skipped rather than leaving it unexplained.
+
 | App | Type | Serves |
 |---|---|---|
 | **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Live Video |
@@ -42,8 +47,7 @@ compatible; incompatible ones grey out and none of these should):
    moderation, insights. Under Customize, add: `pages_manage_posts`,
    `pages_read_engagement`, `pages_manage_engagement`,
    `pages_read_user_content`, `pages_manage_metadata`,
-   `read_insights`. Its optional features include the
-   **Live Video API** — tick it while you're there.
+   `read_insights`.
 2. **Engage with customers on Messenger from Meta** — this is where
    `pages_messaging` lives (NOT in the Pages use case) — the chat
    bot's inbox depends on it.
@@ -65,16 +69,41 @@ compatible; incompatible ones grey out and none of these should):
 6. **Capture & manage ad leads with Marketing API** —
    `leads_retrieval` + the leadgen webhook.
 7. **Measure ad performance data with Marketing API** — reporting.
-~~8. Embed content (oEmbed)~~ — **skip it**: since June 15, 2026
-   Meta's oEmbed endpoints are tokenless for public content — no app,
-   no review needed to embed posts on the site. Only worth adding
-   later for higher rate limits.
+8. **Create & manage ads with ads MCP server** — "build AI agents
+   that manage ads on behalf of advertisers." This is what lets
+   Claude run campaigns directly through Meta's ads MCP instead of
+   handing over instructions. Highest-leverage box on the screen.
+9. **Manage products with Catalog API** — feeds the shoe catalog and
+   marketplace into dynamic ads and Meta commerce surfaces.
+10. **Access the Live Video API** — a STANDALONE use case in the live
+   dashboard (Meta's docs describe it as a feature inside Pages; the
+   UI is the authority). Streaming to the Page needs no extra
+   permission beyond `pages_manage_posts`, but Facebook requires the
+   Page to have 100+ followers and a 60-day-old account to go live.
+11. **Embed content (oEmbed)** — tokenless since June 15, 2026, so
+   embedding public posts works without it; adding it costs nothing
+   and buys higher rate limits.
 
-Skip here: "Create & manage app ads with Meta Ads Manager" — that's
-mobile-app INSTALL campaigns, and its home is App 2, not this app
-(see below). It explicitly does not include the Marketing API, so
-website/giveaway/lead ads all come from the three use cases above.
-Also skip:
+SKIP LIST, each for its own reason:
+
+- **Create & manage app ads with Meta Ads Manager** — mobile-app
+  INSTALL campaigns; its home is App 2 (see below). Explicitly does
+  not include the Marketing API.
+- **Advertise on your app with Meta Audience Network** — the
+  opposite of the business model: it places OTHER advertisers' ads
+  inside our product to monetise it. We sell subscriptions and
+  marketplace sales; renting our users' attention to competitors
+  works against both.
+- **Allow users to transfer their data to other apps** — an
+  obligation, not a capability. It commits us to building and
+  maintaining a data-export endpoint Meta tests.
+- **Join ThreatExchange** — threat-intelligence sharing for security
+  teams. Unrelated.
+- **Connect with customers through WhatsApp** — a real capability but
+  a whole second messaging stack (dedicated business number, message
+  templates, its own approval). Addable any time; add it when a
+  WhatsApp channel is actually wanted.
+- Also skip:
 "Fundraisers" (the API only creates person-for-CHARITY fundraisers —
 a for-profit cannot raise for itself, so it's only useful if we ever
 run a charity drop with a nonprofit beneficiary), Instant Games,
