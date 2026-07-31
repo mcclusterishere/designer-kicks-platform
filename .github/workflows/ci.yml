@@ -124,6 +124,11 @@ jobs:
       - name: Credit ledger
         run: npm run verify:ledger
 
+      # Guards the published sweepstakes terms against the code that
+      # awards entries. If one moves without the other, this fails.
+      - name: Login streaks and giveaway entries
+        run: npm run verify:streaks
+
       - name: League payouts
         run: npm run verify:league
 

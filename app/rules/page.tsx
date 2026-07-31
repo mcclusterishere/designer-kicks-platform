@@ -1,4 +1,7 @@
 import Link from "next/link";
+// The published terms read the same constants the code awards from, so
+// the rules cannot quietly drift out of step with the behaviour.
+import { STREAK_ENTRIES_PER_DAY, STREAK_MILESTONES } from "@/lib/streaks";
 
 export const metadata = {
   title: "Giveaway Official Rules — The Heat Chart",
@@ -20,10 +23,10 @@ export default function RulesPage() {
         <section className="rounded-xl border border-volt/50 bg-volt/5 p-4">
           <p className="text-white">
             <strong>NO PURCHASE NECESSARY. A purchase does not improve your
-            chances of winning — ever.</strong> Entries are earned exclusively
-            by passing the Heat Check trivia game using free daily strikes.
-            Paid strike packs apply only to leaderboard play and can never
-            produce an entry.
+            chances of winning — ever.</strong> Every way to earn an entry is
+            free: passing the Heat Check trivia game using free daily strikes,
+            and simply visiting the site while signed in. Paid strike packs
+            apply only to leaderboard play and can never produce an entry.
           </p>
         </section>
         <section>
@@ -45,12 +48,32 @@ export default function RulesPage() {
         <section>
           <h2 className="display text-xl text-white">3. How to enter</h2>
           <p className="mt-2">
-            Create a free account and pass the Heat Check ({" "}
+            Create a free account. There are two free ways to earn entries
+            during the entry period, and you can use both.
+          </p>
+          <p className="mt-2">
+            <strong className="text-white">Play.</strong> Pass the Heat Check ({" "}
             <Link href="/quiz" className="text-volt underline">theheatchart.com/quiz</Link>{" "}
-            ) during the entry period using free daily strikes — each qualifying
-            pass earns one (1) entry. Free strikes refill every day, so free
-            entry is available daily. Entry limits, the prize, and the entry
-            period for each giveaway are stated on the{" "}
+            ) using free daily strikes — each qualifying pass earns one (1)
+            entry. Free strikes refill every day.
+          </p>
+          <p className="mt-2">
+            <strong className="text-white">Show up.</strong> Visit the site
+            while signed in and that day earns you{" "}
+            {STREAK_ENTRIES_PER_DAY} ({STREAK_ENTRIES_PER_DAY}) entry, once per
+            calendar day (UTC). Consecutive days build a streak:{" "}
+            {STREAK_MILESTONES.map((m, i) => (
+              <span key={m.days}>
+                {i > 0 ? ", and " : ""}reaching {m.days} days in a row earns{" "}
+                {m.bonus} bonus entries
+              </span>
+            ))}
+            . Missing a day resets the streak to one; entries already earned
+            are kept. Daily entries are only issued while a giveaway is
+            running.
+          </p>
+          <p className="mt-2">
+            The prize and the entry period for each giveaway are stated on the{" "}
             <Link href="/giveaway" className="text-volt underline">giveaway page</Link>.
           </p>
         </section>

@@ -88,9 +88,24 @@ export default async function RootLayout({
   let needsPma = false;
   if (session?.user?.id) {
     const member = await prisma.user
-      .findUnique({ where: { id: session.user.id }, select: { pmaAcceptedAt: true } })
+      .findUnique({
+        where: { id: session.user.id },
+        select: { pmaAcceptedAt: true, lastSeenDay: true },
+      })
       .catch(() => null);
     needsPma = Boolean(member && !member.pmaAcceptedAt);
+    // Counting the day has to happen here rather than in an auth
+    // sign-in event: sessions are JWTs, so somebody who never signs out
+    // fires signIn exactly once and would sit on a streak of 1 forever.
+    // This runs on every render, which is why the day-key is compared
+    // first and the write only happens on the first visit of a new day.
+    if (member) {
+      const { todayStr } = await import("@/lib/quiz");
+      if (member.lastSeenDay !== todayStr()) {
+        const { touchStreak } = await import("@/lib/streaks");
+        await touchStreak(session.user.id).catch(() => null);
+      }
+    }
   }
   const { unreadCount } = await import("@/lib/messages");
   const unread = session?.user?.id ? await unreadCount(session.user.id).catch(() => 0) : 0;

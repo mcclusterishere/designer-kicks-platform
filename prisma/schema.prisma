@@ -877,6 +877,18 @@ model User {
    */
   ageVerifiedAt     DateTime?
 
+  // Showing up, day after day. currentStreak/longestStreak are the
+  // denormalised read model; LoginDay is the ledger that proves them,
+  // the same shape CreditTransaction uses (stored value + rows that can
+  // detect drift rather than a number nobody can audit).
+  //
+  // lastSeenDay is the fast path: every page render checks it, and only
+  // the first render of a new day does any writing at all.
+  lastSeenDay   String? // YYYY-MM-DD, UTC, same convention as freeStrikesDate
+  currentStreak Int        @default(0)
+  longestStreak Int        @default(0)
+  loginDays     LoginDay[]
+
   editorMessages   EditorMessage[]
   stagedProspects  OutreachProspect[]
   onboardedArtists ArtistProfile[]    @relation("onboardedArtists")
@@ -1289,6 +1301,30 @@ model Giveaway {
   createdAt   DateTime @default(now())
 
   entries GiveawayEntry[]
+}
+
+/**
+ * One row per day a member showed up. The unique constraint IS the
+ * idempotency guard: the layout runs on every page render, so two
+ * concurrent renders on the first visit of a new day both try to write
+ * this, and exactly one wins. Nothing else needs to be clever.
+ */
+model LoginDay {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// YYYY-MM-DD, UTC.
+  day     String
+  /// The streak this day landed on, kept so the ledger can be read back
+  /// without recomputing it from every row since the account opened.
+  streak  Int    @default(1)
+  /// Giveaway entries minted for this day, milestone bonus included.
+  entries Int    @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, day])
+  @@index([userId, day])
 }
 
 model GiveawayEntry {
@@ -2048,25 +2084,25 @@ model SocialAccount {
 /// profile. Page-scoped commenter ids can't be matched to site logins
 /// any other way without App Review, so the claim link IS the join.
 model SocialVote {
-  id       String @id @default(cuid())
-  platform String
+  id          String   @id @default(cuid())
+  platform    String
   /// The poll post this comment sat under.
-  postId   String
+  postId      String
   /// Meta's comment id — the natural dedup key for redelivered webhooks.
-  commentId String @unique
-  fromId   String?
-  fromName String?
-  rawText  String
+  commentId   String   @unique
+  fromId      String?
+  fromName    String?
+  rawText     String
   /// Which option they picked ("1", "b"), when parseable. Null is fine:
   /// an opinion without a pick is still taste data.
   choiceLabel String?
   /// The actual shoe, when the caption or the vision pass resolved it.
-  shoeName String?
+  shoeName    String?
   /// Rides the ticket DM as a personal link; whoever signs up holding
   /// it is this voter.
-  claimToken String  @unique @default(cuid())
-  userId     String?
-  createdAt  DateTime @default(now())
+  claimToken  String   @unique @default(cuid())
+  userId      String?
+  createdAt   DateTime @default(now())
 
   @@index([postId])
   @@index([fromId])

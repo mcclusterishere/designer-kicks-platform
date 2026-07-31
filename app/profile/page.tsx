@@ -5,6 +5,7 @@ import CreditStatement from "@/components/CreditStatement";
 import DeskRank from "@/components/DeskRank";
 import DeskPartner, { partnerUrl } from "@/components/DeskPartner";
 import { unreadCount } from "@/lib/messages";
+import { streakFor } from "@/lib/streaks";
 import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -85,6 +86,7 @@ export default async function ProfilePage() {
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
   const badges = computeBadges({ answered, correct });
+  const streak = await streakFor(user.id);
 
   // Culture IQ + the misses that can be cleared with credits.
   const [iqData, missRows, creditUser] = await Promise.all([
@@ -242,6 +244,8 @@ export default async function ProfilePage() {
           { label: "Quiz runs", value: user._count.quizRuns },
           { label: "Culture IQ", value: iqData.iq },
           { label: "Giveaway entries", value: user._count.giveawayEntries },
+          { label: "Day streak", value: streak.current },
+          { label: "Best streak", value: streak.longest },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-edge bg-surface p-4 text-center">
             <p className="display text-3xl text-volt">{s.value}</p>

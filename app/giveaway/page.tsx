@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getActiveGiveaway } from "@/lib/quiz";
 import { getEditorsPick } from "@/lib/editorsPick";
+import { streakFor, streakRuleLines } from "@/lib/streaks";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
@@ -26,6 +27,11 @@ export default async function GiveawayPage() {
           where: { giveawayId: giveaway.id, userId: session.user.id },
         })
       : 0;
+
+  // By the time this renders the root layout has already counted today,
+  // so a member arriving here sees the day they are standing in, not the
+  // one before it.
+  const streak = session?.user?.id ? await streakFor(session.user.id) : null;
 
   const pastWinners = await prisma.giveaway.findMany({
     where: { status: "DRAWN" },
@@ -68,7 +74,19 @@ export default async function GiveawayPage() {
                 You have {yourEntries} {yourEntries === 1 ? "entry" : "entries"}
               </span>
             )}
+            {streak && streak.current > 0 && (
+              <span className="text-white">
+                🔥 {streak.current}-day streak
+                {streak.longest > streak.current ? ` (best ${streak.longest})` : ""}
+              </span>
+            )}
           </div>
+          {streak?.countedToday && (
+            <p className="mt-3 text-xs text-smoke">
+              Today is counted. Come back tomorrow and the streak keeps
+              climbing.
+            </p>
+          )}
           <Link
             href="/quiz"
             className="mt-5 inline-block rounded-lg bg-heat px-8 py-3.5 tag font-bold text-white glow-heat"
@@ -132,11 +150,14 @@ export default async function GiveawayPage() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong>No purchase necessary, and purchases never affect your
-            odds.</strong> Giveaway entries are earned exclusively by playing a
-            Heat Check run on free daily strikes. Purchased strike packs apply
-            only to leaderboard play and can never produce an entry or change
-            your chance of winning.
+            odds.</strong> Every way to earn an entry is free: a Heat Check run
+            on free daily strikes, or just showing up while signed in.
+            Purchased strike packs apply only to leaderboard play and can never
+            produce an entry or change your chance of winning.
           </li>
+          {streakRuleLines().map((line) => (
+            <li key={line}>{line}</li>
+          ))}
           <li>Open to legal residents 18 years or older. Void where prohibited.</li>
           <li>One winner drawn at random from all entries after the end date.</li>
           <li>Winner is contacted via account email and must respond within 7 days.</li>
