@@ -316,11 +316,16 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
         // quote a bit of what THEY said, name the shoe they picked —
         // and falls back to the flow's own words when it isn't.
         const base = (full as { privateReply: string | null }).privateReply || full.message;
-        await sendPrivateReply(
-          e.objectId,
-          await personalizeTicket(e, base, vote),
-          parseQuickReplies(full.quickReplies)
-        );
+        let ticket = await personalizeTicket(e, base, vote);
+        // The personal claim link IS the ticket — it's how this exact
+        // voter gets joined to the account they eventually make. Only
+        // minted votes get one; a comment that couldn't be banked still
+        // gets the flow's message, just without a personal link.
+        if (vote?.claimToken) {
+          const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://theheatchart.com").replace(/\/$/, "");
+          ticket = `${ticket}\n\n🎟️ Your ticket: ${site}/enter/${vote.claimToken}`;
+        }
+        await sendPrivateReply(e.objectId, ticket, parseQuickReplies(full.quickReplies));
         await prisma.chatFlow.update({ where: { id: flow.id }, data: { fired: { increment: 1 } } });
         await prisma.metaEvent
           .update({
