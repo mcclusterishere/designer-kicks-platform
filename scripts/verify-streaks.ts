@@ -132,6 +132,17 @@ async function main() {
     "this runs on every render; without the guard it is a write per page view"
   );
 
+  const nudges = readFileSync(join(process.cwd(), "lib", "nudges.ts"), "utf8");
+  check(
+    "the home page nudges the streak so it is not invisible until you visit the giveaway",
+    /streakFor\(userId\)/.test(nudges)
+  );
+  check(
+    "but not on day one",
+    /streak\.current >= 2/.test(nudges),
+    "telling somebody they are on a 1-day streak reminds them they have nothing yet"
+  );
+
   // ---- Behaviour, against the real database ------------------------------
   const email = `streaktest-${Date.now()}@example.com`;
   const user = await prisma.user.create({ data: { email, name: "Streak Test" } });

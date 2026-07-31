@@ -87,6 +87,26 @@ export async function getMemberNudges(userId: string): Promise<Nudge[]> {
     nudges.push({ label: "Your artist application is under review", href: "/profile", emoji: "🎨" });
   }
 
+  // The streak, last in the list but first in the point of it. By the
+  // time this renders the layout has already counted today, so this is
+  // always the run INCLUDING the visit they are currently making.
+  //
+  // Deliberately only shown from day two: telling somebody they are on
+  // a one-day streak is not a reason to come back, it is a reminder
+  // that they have nothing yet.
+  const { streakFor, STREAK_MILESTONES } = await import("./streaks");
+  const streak = await streakFor(userId);
+  if (streak.current >= 2) {
+    const next = STREAK_MILESTONES.find((m) => m.days > streak.current);
+    nudges.push({
+      label: next
+        ? `${streak.current}-day streak, ${next.days - streak.current} to go for ${next.bonus} bonus entries`
+        : `${streak.current}-day streak, don't break it`,
+      href: "/giveaway",
+      emoji: "🔥",
+    });
+  }
+
   // Cap the strip; hot items already floated to the front.
   void dayAgo;
   return nudges.slice(0, 4);
