@@ -342,15 +342,24 @@ async function main() {
       (engageSrc.match(/"HUMAN_AGENT"/g) ?? []).length === 1,
     "Meta refuses a tag sent with messaging_type RESPONSE"
   );
-  check(
-    "a refused tag falls back to a plain reply instead of failing",
-    /catch\s*\(e\)[\s\S]{0,400}messaging_type:\s*"RESPONSE"/.test(engageSrc),
-    "the feature isn't approved yet; without this every desk reply breaks"
+  const tagBlock = engageSrc.slice(
+    engageSrc.indexOf('messaging_type: "MESSAGE_TAG"'),
+    engageSrc.indexOf("/* ---", engageSrc.indexOf('messaging_type: "MESSAGE_TAG"'))
   );
   check(
-    "but a non-capability refusal still reaches the caller",
-    /if\s*\(!\/[^/]*\/i\.test\(msg\)\)\s*throw e/.test(engageSrc),
-    "a closed window or dead token must not be silently retried into a lie"
+    "ANY refused tag falls back to a plain reply",
+    /catch\s*\{[\s\S]{0,400}messaging_type:\s*"RESPONSE"/.test(tagBlock),
+    "the feature isn't approved yet; the fallback carries 100% of desk replies today"
+  );
+  check(
+    "and no error-string allowlist gates that fallback",
+    !/test\(msg\)/.test(tagBlock),
+    "guessing Meta's refusal prose from memory broke the desk once already"
+  );
+  check(
+    "a failed fallback still surfaces ITS error",
+    !/catch\s*\{[\s\S]{0,200}catch/.test(tagBlock),
+    "the RESPONSE attempt is unguarded, so a closed window or dead token throws honestly"
   );
 
   // Hiding a comment names its parameter differently per platform, and

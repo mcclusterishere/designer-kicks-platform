@@ -172,6 +172,27 @@ async function main() {
     "an em dash is not a hyphen and the difference matters"
   );
   check(
+    "a digit range keeps its dash — a comma would change the claim",
+    humanize("sizes 9–11 available, ships in 5–7 days") ===
+      "sizes 9–11 available, ships in 5–7 days",
+    humanize("sizes 9–11 available, ships in 5–7 days")
+  );
+  check(
+    "a winky emoticon survives the semicolon rule",
+    humanize("Nice ;)") === "Nice ;)",
+    humanize("Nice ;)")
+  );
+  check(
+    "a reply that opens with a dash doesn't open with a comma",
+    humanize("— that colorway is nuts") === "that colorway is nuts",
+    humanize("— that colorway is nuts")
+  );
+  check(
+    "a DM's paragraph break survives the whitespace collapse",
+    humanize("para one.\n\npara two.") === "para one.\n\npara two.",
+    "blank lines are formatting, not sloppiness"
+  );
+  check(
     "the comment style tells the model the same rule the code enforces",
     /em dash/i.test(DEFAULT_COMMENT_STYLE),
     "belt and braces: prompt asks, code guarantees"

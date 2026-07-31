@@ -416,26 +416,27 @@ export async function sendDmReply(
   }
 
   // The tag only works once the Human Agent feature is approved on the
-  // app. It is not today, and an app that hasn't got it has the tag
-  // refused outright — which would break every reply the desk sends,
-  // including the ones comfortably inside 24 hours that worked before.
+  // app, which it isn't yet — so today the fallback below carries 100%
+  // of desk replies. An earlier version gated the fallback on an
+  // allowlist of refusal strings guessed from memory, which meant an
+  // unrecognized refusal ("(#3) Application does not have the
+  // capability…" matches none of them) would rethrow and the desk
+  // couldn't reply to ANYONE, inside the window or not.
   //
-  // So: reach for the 7-day window, and if Meta says we may not, send
-  // the same message the ordinary way rather than failing. Once the
-  // feature is approved this silently starts reaching the full week
-  // with no redeploy. A refusal here is a capability answer, not an
-  // error worth surfacing — but a refusal for any OTHER reason (the
-  // window genuinely closed, a dead token) must still reach the caller,
-  // which is why the fallback is attempted rather than swallowed.
+  // The honest design needs no allowlist: on ANY tag failure, retry as
+  // a plain RESPONSE — the strictest send there is, so the downgrade is
+  // always policy-safe. If the window is genuinely closed or the token
+  // is dead, the retry fails the same way and ITS error — accurate,
+  // current, from the send that actually mattered — is what the desk
+  // sees. Once Human Agent is approved, the first attempt just starts
+  // succeeding. No redeploy, no string-matching Meta's error prose.
   try {
     await graph(
       "me/messages",
       { ...body, messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" },
       "POST"
     );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
-    if (!/tag|permission|not allowed|unsupported|#100|#200/i.test(msg)) throw e;
+  } catch {
     await graph("me/messages", { ...body, messaging_type: "RESPONSE" }, "POST");
   }
 }

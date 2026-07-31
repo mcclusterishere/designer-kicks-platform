@@ -127,9 +127,16 @@ async function freshToken(acct: Account): Promise<string> {
       },
     });
     return token;
-  } catch {
+  } catch (e) {
     // A failed refresh isn't fatal — the current token may still have
-    // days left. The publish attempt is the real verdict.
+    // days left, and the publish attempt is the real verdict. But a
+    // SYSTEMATICALLY failing refresh (wrong secret, endpoint rejecting
+    // the proof) would otherwise be invisible until tokens hard-expire
+    // at day 60 and the whole fleet needs reconnecting — so it logs.
+    console.error(
+      `[metaPublish] token refresh failed for ${acct.provider}/${acct.id}:`,
+      e instanceof Error ? e.message : e
+    );
     return acct.accessToken;
   }
 }

@@ -79,13 +79,24 @@ const PUBLIC_REPLY_HOURLY_CAP = Math.max(
  * Nothing else about the sentence changes.
  */
 export function humanize(text: string): string {
-  return text
-    .replace(/\s*[—–]\s*/g, ", ")
-    .replace(/\s*;\s*/g, ", ")
-    .replace(/,\s*,/g, ",")
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+([.,!?])/g, "$1")
-    .trim();
+  return (
+    text
+      // Dashes become commas — EXCEPT between digits, where the dash is
+      // a range ("sizes 9–11", "5–7 business days") and a comma would
+      // change what the sentence claims.
+      .replace(/(?<![0-9])[^\S\n]*[—–][^\S\n]*(?![0-9])/g, ", ")
+      // Semicolons splicing clauses become commas; a semicolon glued to
+      // the next char is an emoticon ;) and stays.
+      .replace(/[^\S\n]*;[^\S\n]+(?=[A-Za-z])/g, ", ")
+      .replace(/,[^\S\n]*,/g, ",")
+      // Collapse runs of spaces but never newlines — a DM's paragraph
+      // break is formatting, not sloppiness.
+      .replace(/[^\S\n]{2,}/g, " ")
+      .replace(/[^\S\n]+([.,!?])/g, "$1")
+      // A reply that OPENED with a dash leaves a leading comma behind.
+      .replace(/^[,\s]+/, "")
+      .trim()
+  );
 }
 
 /**
@@ -384,9 +395,14 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
           temperature: 0.5,
         });
         if (reply) {
-          await sendDmReply(contact.psid, humanize(reply).slice(0, 1900));
+          // One value, sent and stored: the transcript is the desk's
+          // memory AND Gemini's next-turn history, so storing the raw
+          // text would show the model its own em-dash style as accepted
+          // prior turns and quietly teach it back.
+          const sent = humanize(reply).slice(0, 1900);
+          await sendDmReply(contact.psid, sent);
           await prisma.chatMessage.create({
-            data: { contactId: contact.id, direction: "out", text: reply.slice(0, 1900), flowId: "ai" },
+            data: { contactId: contact.id, direction: "out", text: sent, flowId: "ai" },
           });
           await prisma.metaEvent
             .update({

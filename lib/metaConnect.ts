@@ -45,11 +45,17 @@ const FB_AUTH = process.env.FB_AUTH_URL || "https://www.facebook.com/v23.0";
  * Facebook Login use case (the site's fan sign-in) cannot share an app
  * with any business use case. FACEBOOK_CLIENT_* stays the LOGIN app
  * (auth.ts); the business app — Pages, Messenger, Instagram, Threads,
- * Marketing — is META_BUSINESS_APP_*. The fallback keeps a
- * single-app setup working in dev.
+ * Marketing — is META_BUSINESS_APP_*.
+ *
+ * NO fallback on either half, and symmetry is the point: the secret
+ * side dropped its FACEBOOK_CLIENT_SECRET fallback when the apps
+ * split, and an ID that still fell back would let a half-configured
+ * env pair the LOGIN app's client_id with the BUSINESS app's secret —
+ * an OAuth exchange that can only fail, behind a connectConfigured()
+ * that reports true because both halves are merely non-empty.
  */
 function businessAppId(): string {
-  return process.env.META_BUSINESS_APP_ID || process.env.FACEBOOK_CLIENT_ID || "";
+  return process.env.META_BUSINESS_APP_ID || "";
 }
 /**
  * One resolver, deliberately. This used to be a second copy of the
