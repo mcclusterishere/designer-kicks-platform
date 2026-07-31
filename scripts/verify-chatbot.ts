@@ -13,6 +13,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   DEFAULT_COMMENT_STYLE,
+  DEFAULT_PERSONA,
   extractGif,
   humanize,
   keywordHit,
@@ -321,6 +322,32 @@ async function main() {
   check(
     "the share brief bans selling on someone else's wall",
     /do not mention the giveaway/.test(botSrc)
+  );
+
+  // ---- The giveaway pitch ----------------------------------------------
+  // Entry moved from "DM us HEAT" to "make an account on the site" —
+  // the giveaway is now the front door to accounts and streaks. And it
+  // stays generic apparel: naming items invites promises we can't keep.
+  check(
+    "the comment pitch sends people to the site, not the DMs",
+    /making an account at theheatchart\.com/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "the DM persona thanks voters before anything else",
+    /THANK THEM for the vote/.test(DEFAULT_PERSONA)
+  );
+  check(
+    "the giveaway stays generic apparel — no item or brand names",
+    /never name specific items or brands/i.test(DEFAULT_PERSONA) &&
+      /never name specific giveaway items or brands/i.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "streaks are the retention hook in the DM pitch",
+    /builds a streak/.test(DEFAULT_PERSONA)
+  );
+  check(
+    "the persona still promises no prices, odds or deadlines",
+    /Never invent prices, odds, deadlines or promises/.test(DEFAULT_PERSONA)
   );
 
   // ---- The multi-vote roast --------------------------------------------

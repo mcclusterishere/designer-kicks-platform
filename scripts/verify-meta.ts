@@ -387,6 +387,41 @@ async function main() {
     `${humanCalls.length} call sites — expected the two behind requireAdmin()`
   );
 
+  // ---- Links ride the first comment, never the caption -----------------
+  // A Facebook post with an outbound link in its text is a link post,
+  // and link posts reach fewer people. The whole point of the link is
+  // the click, so the post publishes clean and the link lands as our
+  // own first comment. House rule across BOTH publish paths.
+  const socialSrc = readFileSync(join(process.cwd(), "lib", "social.ts"), "utf8");
+  const mpSrc = readFileSync(join(process.cwd(), "lib", "metaPublish.ts"), "utf8");
+  check(
+    "the house caption never carries the link",
+    !/caption: opts\.link/.test(socialSrc),
+    "appending the link to the photo caption was the old shape"
+  );
+  check(
+    "the house feed post never passes Facebook's link parameter",
+    !/\.\.\.\(opts\.link \? \{ link:/.test(socialSrc),
+    "the link param is what makes Facebook classify it as a link post"
+  );
+  check(
+    "the house link lands as a comment on the new post",
+    /commentLinkOnPost/.test(socialSrc) && /\/comments`, \{ message: link \}/.test(socialSrc)
+  );
+  check(
+    "editors' Page posts follow the same rule",
+    !/caption: opts\.link/.test(mpSrc) && !/\.\.\.\(opts\.link \? \{ link:/.test(mpSrc)
+  );
+  check(
+    "and their link comments on the post id, not the page",
+    /\$\{postId\}\/comments/.test(mpSrc)
+  );
+  check(
+    "a refused link comment doesn't unwind a published post",
+    /\/comments[\s\S]{0,200}\.catch\(/.test(mpSrc),
+    "the post is up either way; only the comment is best-effort"
+  );
+
   // ---- Caption budget -------------------------------------------------
   const caption = ownChannelCaption({
     title: "A Very Long Title For A Custom Shoe Indeed Yes",

@@ -231,18 +231,31 @@ export async function publishToOwnFacebookPage(
 ): Promise<PublishResult> {
   try {
     const token = await freshToken(acct);
+    // Same house rule as lib/social.ts: the link rides the first
+    // comment, never the caption — a link in the text makes Facebook
+    // show the post to fewer people, which defeats the link.
+    let postId = "";
     if (opts.imageUrl) {
-      await api(FB_API, `${acct.accountId}/photos`, {
+      const res = await api(FB_API, `${acct.accountId}/photos`, {
         url: absoluteMediaUrl(opts.imageUrl),
-        caption: opts.link ? `${opts.message}\n\n${opts.link}` : opts.message,
+        caption: opts.message,
         access_token: token,
       }, "POST", "facebook_page");
+      postId = String(res.post_id ?? res.id ?? "");
     } else {
-      await api(FB_API, `${acct.accountId}/feed`, {
+      const res = await api(FB_API, `${acct.accountId}/feed`, {
         message: opts.message,
-        ...(opts.link ? { link: opts.link } : {}),
         access_token: token,
       }, "POST", "facebook_page");
+      postId = String(res.id ?? "");
+    }
+    if (opts.link && postId) {
+      await api(FB_API, `${postId}/comments`, {
+        message: opts.link,
+        access_token: token,
+      }, "POST", "facebook_page").catch(() => {
+        // The post is up; a refused comment shouldn't unwind it.
+      });
     }
     return { ok: true, detail: "Posted to their Facebook Page" };
   } catch (e) {

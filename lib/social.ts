@@ -64,6 +64,24 @@ async function graphPost(
   return json;
 }
 
+/**
+ * The link rides the FIRST COMMENT, never the caption. Facebook's feed
+ * treats a post with an outbound link in its text as a link post and
+ * shows it to fewer people — the exact opposite of why the link is
+ * there. So the post publishes clean, and the link lands as our own
+ * first comment on it, where reach is untouched and the click still
+ * has somewhere to go. House rule, not a preference: nothing in this
+ * file may put a link in a caption or pass Facebook's link parameter.
+ */
+async function commentLinkOnPost(postId: string, link: string): Promise<boolean> {
+  try {
+    await graphPost(`${postId}/comments`, { message: link });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function postToFacebookPage(
   message: string,
   opts: { imageUrl?: string | null; link?: string | null } = {}
@@ -71,16 +89,27 @@ export async function postToFacebookPage(
   if (!facebookConfigured()) return { ok: false, detail: "Facebook not connected" };
   try {
     const pageId = process.env.FB_PAGE_ID!;
+    let postId = "";
     if (opts.imageUrl) {
-      await graphPost(`${pageId}/photos`, {
+      // /photos answers with both its photo id and the id of the feed
+      // story it created — the comment goes on the story.
+      const res = await graphPost(`${pageId}/photos`, {
         url: absoluteMediaUrl(opts.imageUrl),
-        caption: opts.link ? `${message}\n\n${opts.link}` : message,
+        caption: message,
       });
+      postId = String(res.post_id ?? res.id ?? "");
     } else {
-      await graphPost(`${pageId}/feed`, {
-        message,
-        ...(opts.link ? { link: opts.link } : {}),
-      });
+      const res = await graphPost(`${pageId}/feed`, { message });
+      postId = String(res.id ?? "");
+    }
+    if (opts.link && postId) {
+      const commented = await commentLinkOnPost(postId, opts.link);
+      return {
+        ok: true,
+        detail: commented
+          ? "Posted — link dropped in the first comment"
+          : "Posted, but the link comment was refused — add it by hand",
+      };
     }
     return { ok: true, detail: "Posted to the Facebook page" };
   } catch (e) {
