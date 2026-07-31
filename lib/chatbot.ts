@@ -44,6 +44,7 @@ const AI_KEY = "chatbotAiFallback";
 const PERSONA_KEY = "chatbotPersona";
 const PUBLIC_KEY = "chatbotPublicReplies";
 const COMMENT_STYLE_KEY = "chatbotCommentStyle";
+const GIF_LIBRARY_KEY = "chatbotGifLibrary";
 
 /**
  * Public replies are the highest-volume, most-visible thing the bot
@@ -86,11 +87,43 @@ export function humanize(text: string): string {
     .trim();
 }
 
+/**
+ * The GIF library: `tag  url` lines the admin curates in the Chatbot
+ * panel. The model asks for a mood by tag; the code decides whether a
+ * real URL backs it. Shipped EMPTY on purpose — a broken image under
+ * the Page's name is worse than no GIF, and no URL goes in this file
+ * that nobody has watched actually load.
+ */
+export function parseGifLibrary(raw: string | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of (raw ?? "").split("\n")) {
+    const m = line.trim().match(/^(\S+)\s+(https?:\/\/\S+)$/);
+    if (m) out[m[1].toLowerCase()] = m[2];
+  }
+  return out;
+}
+
+/**
+ * Pull a trailing [gif:tag] request out of a reply. The tag is the
+ * model's mood vote, not a URL — it only becomes an attachment when the
+ * admin's library has that tag, and it's stripped from the text either
+ * way so an unstocked library never leaks bracket syntax to the public.
+ */
+export function extractGif(
+  reply: string,
+  library: Record<string, string>
+): { text: string; gifUrl: string | null } {
+  const m = reply.match(/\[\s*gif\s*:\s*([a-z0-9_-]+)\s*\]/i);
+  if (!m) return { text: reply.trim(), gifUrl: null };
+  const text = reply.replace(m[0], "").replace(/\s{2,}/g, " ").trim();
+  return { text, gifUrl: library[m[1].toLowerCase()] ?? null };
+}
+
 export const DEFAULT_PERSONA =
   "You are the automated assistant for The Heat Chart (theheatchart.com), a custom-sneaker culture platform where artists post one-of-one customs, fans vote in battles, and the Heat List ranks the culture. Be brief, warm and hype — 1-3 sentences, no emojis walls. You are a bot and say so if asked. You help people find artists, enter the giveaway, play the games, or claim their artist page. If someone wants to buy, commission, or has a problem, tell them a real person will pick the thread up here shortly. Never invent prices or promises.";
 
 export const DEFAULT_COMMENT_STYLE =
-  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Pick up something specific from THEIR comment and ask a question back that steers toward shoes, customs or fashion. Where it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.\n\nHOW TO SOUND: dry and a little funny beats enthusiastic. React like someone who actually looked at the shoe. Specific over general — 'that midsole paint is clean' lands, 'so cool!' does not. Never open with Ah, Oh, Wow, Absolutely, Great question, or Love this. Never use em dashes or semicolons; short sentences instead. Never say 'we're thrilled', 'amazing', 'incredible', 'let's dive in', or 'reach out'. Contractions always. It's fine to be a little blunt. Do not compliment someone's taste and then pivot to a sales line in the same breath — pick one.";
+  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.\n\nREAD THE POST FIRST. You'll be shown what our post said. Most of our posts are picks: 'which shoe, 1/2/3' or 'which row, A/B/C'. When their comment is a pick ('2', 'B', 'the red ones', 'bottom left'), work out which shoe they chose from the post text, and if the post names it, use the actual name, 'the Jordan 4s', not 'option 2'. React to THEIR pick like you have an opinion about it too, then ask ONE question back.\n\nROTATE YOUR QUESTIONS, don't repeat the same angle down a thread. Angles to draw from: did they ever own a pair, and what happened to it. Would they actually buy it now or does it just photograph well. Style or storyline, do they rock it for the look or the history. What they'd wear it with. On-foot or on-display. Is the colorway the right one or is there a better make-up. Worth retail, worth resale, or worth neither. Did they have the original run or the retro. Would they let someone customize a pair or keep it stock. Which of the OTHER options in the post came second for them. First pair they ever loved. The one that got away.\n\nWhere it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in.\n\nHOW TO SOUND: dry and a little funny beats enthusiastic. React like someone who actually looked at the shoe. Specific over general, 'that midsole paint is clean' lands, 'so cool!' does not. Never open with Ah, Oh, Wow, Absolutely, Great question, or Love this. Never use em dashes or semicolons; short sentences instead. Never say 'we're thrilled', 'amazing', 'incredible', 'let's dive in', or 'reach out'. Contractions always. It's fine to be a little blunt. Do not compliment someone's taste and then pivot to a sales line in the same breath, pick one. Disagreeing with their pick occasionally is good, one playful line, never mean, and only about the shoe.\n\nGIF: if a reaction GIF would genuinely land, end the reply with [gif:tag] where tag is one word for the mood: fire, respect, thinking, sheesh, cold, classic, nah, crying, chef-kiss. Use one at most, and only on maybe one reply in four. The text must stand on its own without it.";
 
 export async function chatbotSettings(): Promise<{
   enabled: boolean;
@@ -98,9 +131,12 @@ export async function chatbotSettings(): Promise<{
   publicReplies: boolean;
   persona: string;
   commentStyle: string;
+  gifLibrary: string;
 }> {
   const rows = await prisma.appSetting.findMany({
-    where: { key: { in: [ENABLED_KEY, AI_KEY, PERSONA_KEY, PUBLIC_KEY, COMMENT_STYLE_KEY] } },
+    where: {
+      key: { in: [ENABLED_KEY, AI_KEY, PERSONA_KEY, PUBLIC_KEY, COMMENT_STYLE_KEY, GIF_LIBRARY_KEY] },
+    },
   });
   const get = (k: string) => rows.find((r) => r.key === k)?.value;
   return {
@@ -109,11 +145,12 @@ export async function chatbotSettings(): Promise<{
     publicReplies: get(PUBLIC_KEY) === "true",
     persona: get(PERSONA_KEY) || DEFAULT_PERSONA,
     commentStyle: get(COMMENT_STYLE_KEY) || DEFAULT_COMMENT_STYLE,
+    gifLibrary: get(GIF_LIBRARY_KEY) || "",
   };
 }
 
 export async function setChatbotSetting(
-  key: "enabled" | "ai" | "persona" | "public" | "commentStyle",
+  key: "enabled" | "ai" | "persona" | "public" | "commentStyle" | "gifs",
   value: string
 ) {
   const k =
@@ -121,6 +158,7 @@ export async function setChatbotSetting(
     : key === "ai" ? AI_KEY
     : key === "public" ? PUBLIC_KEY
     : key === "commentStyle" ? COMMENT_STYLE_KEY
+    : key === "gifs" ? GIF_LIBRARY_KEY
     : PERSONA_KEY;
   await prisma.appSetting.upsert({
     where: { key: k },
@@ -384,7 +422,7 @@ const PUBLIC_NOTE = "bot: public AI reply";
  */
 async function maybePublicAiReply(
   e: ParsedEvent,
-  settings: { publicReplies: boolean; commentStyle: string },
+  settings: { publicReplies: boolean; commentStyle: string; gifLibrary: string },
   handled: Set<string>
 ): Promise<void> {
   if (!settings.publicReplies || !geminiConfigured()) return;
@@ -407,20 +445,37 @@ async function maybePublicAiReply(
     if (already > 0) return;
   }
 
+  // What OUR post said is what turns "2" from noise into a vote. A
+  // failed fetch degrades to the old contextless behavior rather than
+  // costing the reply.
+  const { fetchPostContext } = await import("./metaEngage");
+  const postText = await fetchPostContext(e.platform, e.parentId ?? null);
+
   const reply = await geminiChat({
     system: settings.commentStyle,
     history: [
       {
         role: "user",
-        text: `${e.fromName ? `${e.fromName} commented` : "A comment"} on our ${e.platform} post: "${e.text.slice(0, 500)}"`,
+        text: [
+          postText ? `Our ${e.platform} post says: "${postText.slice(0, 600)}"` : null,
+          `${e.fromName ? `${e.fromName} commented` : "A comment"}: "${e.text.slice(0, 500)}"`,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
       },
     ],
     temperature: 0.8,
   });
-  const clean = reply ? humanize(reply) : "";
+  if (!reply) return;
+
+  // The gif tag comes out before humanize so the bracket syntax never
+  // reaches the dash cleanup, and the tag only becomes an attachment
+  // when the admin's library actually stocks it.
+  const { text: bare, gifUrl } = extractGif(reply, parseGifLibrary(settings.gifLibrary));
+  const clean = humanize(bare);
   if (!clean || /^skip\b/i.test(clean)) return;
 
-  await replyToComment(e.platform, e.objectId, clean.slice(0, 280));
+  await replyToComment(e.platform, e.objectId, clean.slice(0, 280), gifUrl);
   await prisma.metaEvent
     .update({
       where: { objectId: e.objectId },

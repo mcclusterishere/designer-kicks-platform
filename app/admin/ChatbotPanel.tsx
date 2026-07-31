@@ -5,6 +5,7 @@ import { engageConfigured } from "@/lib/metaEngage";
 import {
   BotToggles,
   CommentStyleForm,
+  GifLibraryForm,
   FlowButtons,
   FlowForm,
   InstallForm,
@@ -143,6 +144,17 @@ export default async function ChatbotPanel() {
           answer genuinely.
         </p>
         <CommentStyleForm style={settings.commentStyle} />
+      </div>
+
+      {/* ---- Reaction GIFs ----------------------------------------- */}
+      <div className="mt-6">
+        <p className="tag text-volt">Reaction GIFs</p>
+        <p className="mt-1 text-xs text-smoke">
+          The bot asks for a mood; this list decides whether a GIF backs it. Stock it with links
+          you&apos;ve watched load — anything not listed just goes out as text, so an empty box
+          is safe.
+        </p>
+        <GifLibraryForm gifs={settings.gifLibrary} />
       </div>
 
       {/* ---- Voice ------------------------------------------------- */}

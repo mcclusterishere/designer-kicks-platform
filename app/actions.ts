@@ -6812,6 +6812,29 @@ export async function chatbotSettingAction(
     revalidatePath("/admin");
     return { ok: true, note: "Voice updated." };
   }
+  if (op === "gifs") {
+    // Empty is a valid library — it just means text-only replies. The
+    // parse runs here so a malformed line is caught at save time, in
+    // the admin's face, not at reply time in a customer's.
+    const raw = String(formData.get("gifs") ?? "").trim();
+    const { parseGifLibrary } = await import("@/lib/chatbot");
+    const parsed = parseGifLibrary(raw);
+    const lines = raw ? raw.split("\n").filter((l) => l.trim()).length : 0;
+    if (lines > 0 && Object.keys(parsed).length < lines) {
+      return {
+        ok: false,
+        error: `Only ${Object.keys(parsed).length} of ${lines} lines parse. Each line is: tag, a space, then the GIF's direct URL.`,
+      };
+    }
+    await setChatbotSetting("gifs", raw);
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      note: lines
+        ? `GIF library saved — ${Object.keys(parsed).length} reaction${Object.keys(parsed).length === 1 ? "" : "s"} the bot can reach for.`
+        : "GIF library cleared — replies go out as text.",
+    };
+  }
   return { ok: false, error: "Unknown operation." };
 }
 

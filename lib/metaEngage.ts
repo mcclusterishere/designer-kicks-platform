@@ -239,16 +239,68 @@ async function graph(
   return json;
 }
 
-/** Public reply under a comment. IG replies use a different edge. */
+/**
+ * What OUR post said, fetched by the parent id a comment webhook
+ * carries. This is the difference between the bot reading "2" as noise
+ * and reading it as a vote — the Page runs "which shoe: 1, 2 or 3?"
+ * posts, so the comment only means something next to the caption.
+ *
+ * One post pulls hundreds of comments, so the caption is cached in
+ * memory: a viral post costs one Graph call, not one per commenter.
+ * Railway runs a single long-lived process, which is what makes a
+ * module-level map an honest cache here.
+ */
+const postCache = new Map<string, { text: string | null; at: number }>();
+const POST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const POST_CACHE_MAX = 500;
+
+export async function fetchPostContext(
+  platform: string,
+  parentId: string | null
+): Promise<string | null> {
+  if (!parentId) return null;
+  const hit = postCache.get(parentId);
+  if (hit && Date.now() - hit.at < POST_CACHE_TTL_MS) return hit.text;
+  let text: string | null = null;
+  try {
+    // FB posts carry `message`; IG media carries `caption`. Asking for
+    // both costs nothing — Graph returns whichever exists.
+    const json = await graph(parentId, { fields: "message,caption" });
+    text = (json.message as string) ?? (json.caption as string) ?? null;
+  } catch {
+    // A deleted post or a permissions hiccup shouldn't kill the reply —
+    // the bot just answers without context, like it did before this
+    // existed. Cache the miss too, so a dead post isn't re-fetched per
+    // comment.
+  }
+  if (postCache.size >= POST_CACHE_MAX) {
+    const oldest = postCache.keys().next().value;
+    if (oldest !== undefined) postCache.delete(oldest);
+  }
+  postCache.set(parentId, { text, at: Date.now() });
+  return text;
+}
+
+/**
+ * Public reply under a comment. IG replies use a different edge, and
+ * only Facebook comments can carry a GIF — attachment_share_url is a
+ * Pages-comment parameter with no Instagram equivalent, so the gif is
+ * quietly dropped there rather than failing the reply.
+ */
 export async function replyToComment(
   platform: string,
   commentId: string,
-  text: string
+  text: string,
+  gifUrl?: string | null
 ): Promise<void> {
   if (platform === "instagram") {
     await graph(`${commentId}/replies`, { message: text }, "POST");
   } else {
-    await graph(`${commentId}/comments`, { message: text }, "POST");
+    await graph(
+      `${commentId}/comments`,
+      { message: text, ...(gifUrl ? { attachment_share_url: gifUrl } : {}) },
+      "POST"
+    );
   }
 }
 

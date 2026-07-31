@@ -9,10 +9,14 @@
  * Run: npm run verify:chatbot   (dev database; every row it makes it deletes)
  */
 import { PrismaClient } from "@prisma/client";
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   DEFAULT_COMMENT_STYLE,
+  extractGif,
   humanize,
   keywordHit,
+  parseGifLibrary,
   matchCommentFlow,
   matchMessageFlow,
   parseQuickReplies,
@@ -166,6 +170,64 @@ async function main() {
     "the comment style tells the model the same rule the code enforces",
     /em dash/i.test(DEFAULT_COMMENT_STYLE),
     "belt and braces: prompt asks, code guarantees"
+  );
+
+  // ---- Post context + reaction GIFs ------------------------------------
+  // The Page runs "which shoe: 1, 2 or 3?" posts. A comment that says
+  // "2" only means something next to the caption, so the brief has to
+  // demand the read, and the gif machinery has to be impossible to
+  // leak: no bracket syntax in public, no URL the admin didn't stock.
+  check(
+    "the brief tells the model to read the post before the comment",
+    /READ THE POST FIRST/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "and to rotate its question angles rather than loop one",
+    /ROTATE YOUR QUESTIONS/.test(DEFAULT_COMMENT_STYLE)
+  );
+  check(
+    "picks get answered by shoe name, not option number",
+    /not 'option 2'/.test(DEFAULT_COMMENT_STYLE)
+  );
+
+  const lib = parseGifLibrary("fire https://cdn.example/fire.gif\nSHEESH https://cdn.example/sheesh.gif\nbroken-line-no-url\n");
+  check("the gif library parses tag-space-url lines", lib.fire === "https://cdn.example/fire.gif");
+  check("library tags are case-insensitive on save", lib.sheesh === "https://cdn.example/sheesh.gif");
+  check("a line without a URL is dropped, not mangled", Object.keys(lib).length === 2);
+  check("an empty library parses to nothing", Object.keys(parseGifLibrary("")).length === 0);
+
+  const stocked = extractGif("Cold pick, the 4s win that row. [gif:fire]", lib);
+  check("a stocked tag becomes an attachment", stocked.gifUrl === "https://cdn.example/fire.gif");
+  check("and the bracket never reaches the public text", !stocked.text.includes("["), stocked.text);
+
+  const unstocked = extractGif("Respect the choice. [gif:chef-kiss]", lib);
+  check("an unstocked tag is stripped, not attached", unstocked.gifUrl === null);
+  check("stripped cleanly", unstocked.text === "Respect the choice.");
+  check(
+    "case and spacing in the tag don't matter",
+    extractGif("Nah. [ GIF: Fire ]", lib).gifUrl === "https://cdn.example/fire.gif"
+  );
+  check(
+    "plain text passes through untouched",
+    extractGif("Those are clean.", lib).text === "Those are clean."
+  );
+
+  const botSrc = readFileSync(join(process.cwd(), "lib", "chatbot.ts"), "utf8");
+  check(
+    "the gif comes out BEFORE humanize touches the text",
+    /extractGif\(reply[\s\S]{0,200}humanize\(bare\)/.test(botSrc),
+    "humanize would eat the bracket's spacing and orphan the tag"
+  );
+  const engSrc = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
+  check(
+    "Instagram replies drop the gif instead of failing",
+    /platform === "instagram"[\s\S]{0,80}\{ message: text \}/.test(engSrc),
+    "attachment_share_url is a Pages parameter with no IG equivalent"
+  );
+  check(
+    "the reply path feeds the post text to the model",
+    /fetchPostContext\(e\.platform, e\.parentId/.test(botSrc),
+    "without this, 'which shoe do you like: 2' reads as noise"
   );
 }
 

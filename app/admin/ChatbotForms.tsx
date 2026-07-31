@@ -77,6 +77,34 @@ export function CommentStyleForm({ style }: { style: string }) {
   );
 }
 
+export function GifLibraryForm({ gifs }: { gifs: string }) {
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(
+    chatbotSettingAction,
+    null
+  );
+  return (
+    <form action={action} className="mt-2">
+      <input type="hidden" name="op" value="gifs" />
+      <textarea
+        name="gifs"
+        defaultValue={gifs}
+        rows={5}
+        placeholder={"fire https://…/fire.gif\nsheesh https://…/sheesh.gif\nrespect https://…/salute.gif"}
+        className={input}
+      />
+      <p className="mt-1 text-xs opacity-60">
+        One per line: tag, space, direct GIF link. Tags the bot knows: fire, respect, thinking,
+        sheesh, cold, classic, nah, crying, chef-kiss. Empty tags stay text-only. Facebook comments
+        only — Instagram can&apos;t take comment GIFs.
+      </p>
+      <div className="mt-2 flex items-center gap-3">
+        <button disabled={pending} className={btn}>{pending ? "…" : "Save GIF library"}</button>
+        <Feedback state={state} />
+      </div>
+    </form>
+  );
+}
+
 export function PersonaForm({ persona }: { persona: string }) {
   const [state, action, pending] = useActionState<ActionResult | null, FormData>(
     chatbotSettingAction,
