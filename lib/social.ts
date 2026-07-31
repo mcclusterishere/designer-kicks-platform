@@ -1,4 +1,5 @@
 import { siteUrl } from "./articles";
+import { businessSecret, proofParams } from "./appsecret";
 
 /**
  * Cross-posting to Matt's own pages via the Meta Graph API.
@@ -37,9 +38,11 @@ async function graphPost(
   path: string,
   params: Record<string, string>
 ): Promise<Record<string, unknown>> {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN ?? "";
   const body = new URLSearchParams({
     ...params,
-    access_token: process.env.FB_PAGE_ACCESS_TOKEN ?? "",
+    access_token: token,
+    ...proofParams(token, businessSecret()),
   });
   const res = await fetch(`${GRAPH}/${path}`, {
     method: "POST",
@@ -102,7 +105,12 @@ export async function postToFacebookVideo(
 }
 
 async function graphGet(path: string, params: Record<string, string>): Promise<Record<string, unknown>> {
-  const qs = new URLSearchParams({ ...params, access_token: process.env.FB_PAGE_ACCESS_TOKEN ?? "" });
+  const token = process.env.FB_PAGE_ACCESS_TOKEN ?? "";
+  const qs = new URLSearchParams({
+    ...params,
+    access_token: token,
+    ...proofParams(token, businessSecret()),
+  });
   const res = await fetch(`${GRAPH}/${path}?${qs}`, { signal: AbortSignal.timeout(15000) });
   const json = (await res.json().catch(() => ({}))) as {
     error?: { message?: string };

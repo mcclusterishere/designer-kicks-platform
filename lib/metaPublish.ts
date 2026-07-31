@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { absoluteMediaUrl } from "./social";
+import { businessSecret, proofParams } from "./appsecret";
 
 /**
  * Publishing to a channel somebody CONNECTED, with their token — as
@@ -39,13 +40,29 @@ type Account = {
   tokenExpiresAt: Date | null;
 };
 
+/**
+ * Which app secret signs a token, by the host it was minted against.
+ * Getting this wrong makes Meta reject the call, so it's derived from
+ * the provider rather than guessed.
+ */
+function secretFor(provider: string): string {
+  if (provider === "instagram") return process.env.INSTAGRAM_APP_SECRET ?? "";
+  if (provider === "threads") return process.env.THREADS_APP_SECRET ?? "";
+  return businessSecret();
+}
+
 async function api(
   base: string,
   path: string,
   params: Record<string, string>,
-  method: "GET" | "POST" = "POST"
+  method: "GET" | "POST" = "POST",
+  provider?: string
 ): Promise<Record<string, unknown>> {
-  const qs = new URLSearchParams(params);
+  const token = params.access_token ?? "";
+  const qs = new URLSearchParams({
+    ...params,
+    ...(provider && token ? proofParams(token, secretFor(provider)) : {}),
+  });
   const url = method === "GET" ? `${base}/${path}?${qs}` : `${base}/${path}`;
   const res = await fetch(url, {
     method,
@@ -116,10 +133,17 @@ async function waitForContainer(
   base: string,
   containerId: string,
   token: string,
+  provider: string,
   tries = 12
 ): Promise<boolean> {
   for (let i = 0; i < tries; i++) {
-    const status = await api(base, containerId, { fields: "status_code", access_token: token }, "GET");
+    const status = await api(
+      base,
+      containerId,
+      { fields: "status_code", access_token: token },
+      "GET",
+      provider
+    );
     if (status.status_code === "FINISHED") return true;
     if (status.status_code === "ERROR") return false;
     await new Promise((r) => setTimeout(r, 5000));
@@ -140,22 +164,22 @@ export async function publishToOwnInstagram(
           video_url: absoluteMediaUrl(opts.videoUrl),
           caption: opts.caption,
           access_token: token,
-        })
+        }, "POST", "instagram")
       : await api(IG_API, `${acct.accountId}/media`, {
           image_url: absoluteMediaUrl(opts.imageUrl ?? ""),
           caption: opts.caption,
           access_token: token,
-        });
+        }, "POST", "instagram");
     const creationId = String(container.id);
     // Videos need ingestion time; images are usually instant but the
     // status check is harmless and saves a race.
-    if (opts.videoUrl && !(await waitForContainer(IG_API, creationId, token))) {
+    if (opts.videoUrl && !(await waitForContainer(IG_API, creationId, token, "instagram"))) {
       return { ok: false, detail: "Instagram couldn't process the clip" };
     }
     await api(IG_API, `${acct.accountId}/media_publish`, {
       creation_id: creationId,
       access_token: token,
-    });
+    }, "POST", "instagram");
     return { ok: true, detail: "Posted to their Instagram" };
   } catch (e) {
     return failed(acct, e);
@@ -172,15 +196,15 @@ export async function publishToOwnThreads(
     const params: Record<string, string> = opts.imageUrl
       ? { media_type: "IMAGE", image_url: absoluteMediaUrl(opts.imageUrl), text: opts.text, access_token: token }
       : { media_type: "TEXT", text: opts.text, access_token: token };
-    const container = await api(THREADS_API, `${acct.accountId}/threads`, params);
+    const container = await api(THREADS_API, `${acct.accountId}/threads`, params, "POST", "threads");
     const creationId = String(container.id);
-    if (opts.imageUrl && !(await waitForContainer(THREADS_API, creationId, token))) {
+    if (opts.imageUrl && !(await waitForContainer(THREADS_API, creationId, token, "threads"))) {
       return { ok: false, detail: "Threads couldn't process the image" };
     }
     await api(THREADS_API, `${acct.accountId}/threads_publish`, {
       creation_id: creationId,
       access_token: token,
-    });
+    }, "POST", "threads");
     return { ok: true, detail: "Posted to their Threads" };
   } catch (e) {
     return failed(acct, e);
@@ -199,13 +223,13 @@ export async function publishToOwnFacebookPage(
         url: absoluteMediaUrl(opts.imageUrl),
         caption: opts.link ? `${opts.message}\n\n${opts.link}` : opts.message,
         access_token: token,
-      });
+      }, "POST", "facebook_page");
     } else {
       await api(FB_API, `${acct.accountId}/feed`, {
         message: opts.message,
         ...(opts.link ? { link: opts.link } : {}),
         access_token: token,
-      });
+      }, "POST", "facebook_page");
     }
     return { ok: true, detail: "Posted to their Facebook Page" };
   } catch (e) {

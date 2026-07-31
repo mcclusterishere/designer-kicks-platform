@@ -14,7 +14,14 @@
  *   THREADS_API_URL      (test override)
  */
 
+import { proofParams } from "./appsecret";
+
 const THREADS_API = process.env.THREADS_API_URL || "https://graph.threads.net/v1.0";
+
+/** House Threads token is minted by the Threads app, so it signs. */
+function threadsProof(token: string): Record<string, string> {
+  return proofParams(token, process.env.THREADS_APP_SECRET);
+}
 
 // Day 1 of the automated era. The escalating day count is social
 // proof — it says "this program is alive" without saying it.
@@ -68,7 +75,7 @@ export async function postImageToThreads(text: string, imageUrl: string): Promis
 
     const createRes = await fetch(`${THREADS_API}/${userId}/threads`, {
       method: "POST",
-      body: new URLSearchParams({ media_type: "IMAGE", image_url: imageUrl, text, access_token: token }),
+      body: new URLSearchParams({ media_type: "IMAGE", image_url: imageUrl, text, access_token: token, ...threadsProof(token) }),
       signal: AbortSignal.timeout(15000),
     });
     const created = (await createRes.json().catch(() => ({}))) as {
@@ -82,7 +89,7 @@ export async function postImageToThreads(text: string, imageUrl: string): Promis
     // Image containers usually finish in seconds; give them a minute.
     for (let i = 0; i < 12; i++) {
       const statusRes = await fetch(
-        `${THREADS_API}/${created.id}?fields=status_code&access_token=${encodeURIComponent(token)}`,
+        `${THREADS_API}/${created.id}?fields=status_code&${new URLSearchParams({ access_token: token, ...threadsProof(token) })}`,
         { signal: AbortSignal.timeout(15000) }
       );
       const status = (await statusRes.json().catch(() => ({}))) as { status_code?: string };
@@ -95,7 +102,7 @@ export async function postImageToThreads(text: string, imageUrl: string): Promis
 
     const publishRes = await fetch(`${THREADS_API}/${userId}/threads_publish`, {
       method: "POST",
-      body: new URLSearchParams({ creation_id: created.id, access_token: token }),
+      body: new URLSearchParams({ creation_id: created.id, access_token: token, ...threadsProof(token) }),
       signal: AbortSignal.timeout(15000),
     });
     const published = (await publishRes.json().catch(() => ({}))) as {
@@ -120,7 +127,7 @@ export async function postToThreads(text: string): Promise<ThreadsResult> {
 
     const createRes = await fetch(`${THREADS_API}/${userId}/threads`, {
       method: "POST",
-      body: new URLSearchParams({ media_type: "TEXT", text, access_token: token }),
+      body: new URLSearchParams({ media_type: "TEXT", text, access_token: token, ...threadsProof(token) }),
       signal: AbortSignal.timeout(15000),
     });
     const created = (await createRes.json().catch(() => ({}))) as {
@@ -133,7 +140,7 @@ export async function postToThreads(text: string): Promise<ThreadsResult> {
 
     const publishRes = await fetch(`${THREADS_API}/${userId}/threads_publish`, {
       method: "POST",
-      body: new URLSearchParams({ creation_id: created.id, access_token: token }),
+      body: new URLSearchParams({ creation_id: created.id, access_token: token, ...threadsProof(token) }),
       signal: AbortSignal.timeout(15000),
     });
     const published = (await publishRes.json().catch(() => ({}))) as {

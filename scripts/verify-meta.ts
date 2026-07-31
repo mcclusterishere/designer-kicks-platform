@@ -19,6 +19,7 @@ import {
   verifyWebhookSignature,
 } from "../lib/metaEngage";
 import { authorizeUrl, connectRedirectUri, isConnectProvider } from "../lib/metaConnect";
+import { appsecretProof, proofParams } from "../lib/appsecret";
 import { ownChannelCaption } from "../lib/crosspost";
 
 const prisma = new PrismaClient();
@@ -185,6 +186,47 @@ async function main() {
   check(
     "callback paths are per-provider",
     connectRedirectUri("threads").endsWith("/api/social/callback/threads")
+  );
+
+  // ---- appsecret_proof ------------------------------------------------
+  // Meta's spec: HMAC-SHA256 of the ACCESS TOKEN, keyed by the APP
+  // SECRET, hex-encoded. Getting the operand order backwards produces a
+  // plausible-looking hash that Meta rejects on every call, so the
+  // known-answer test is the point.
+  const KNOWN = createHmac("sha256", "the-app-secret").update("the-token").digest("hex");
+  check(
+    "proof is HMAC(token) keyed by secret, hex",
+    appsecretProof("the-token", "the-app-secret") === KNOWN,
+    "reversing the operands is the classic way to get this wrong"
+  );
+  check(
+    "the same pair always yields the same proof",
+    appsecretProof("t", "s") === appsecretProof("t", "s")
+  );
+  check(
+    "a different secret yields a different proof",
+    appsecretProof("t", "s1") !== appsecretProof("t", "s2"),
+    "each app signs only its own tokens"
+  );
+  check(
+    "a different token yields a different proof",
+    appsecretProof("t1", "s") !== appsecretProof("t2", "s")
+  );
+  check("proof is 64 hex chars", /^[0-9a-f]{64}$/.test(appsecretProof("t", "s") ?? ""));
+
+  // Degrading rather than throwing is what lets the code ship BEFORE
+  // the dashboard toggle flips.
+  check("no secret means no proof, not a crash", appsecretProof("t", "") === null);
+  check("no token means no proof", appsecretProof("", "s") === null);
+  check("params are empty when unconfigured", Object.keys(proofParams("t", undefined)).length === 0);
+  check(
+    "params carry the proof when configured",
+    proofParams("t", "s").appsecret_proof === appsecretProof("t", "s"),
+    ""
+  );
+  check(
+    "the proof never leaks the secret itself",
+    !JSON.stringify(proofParams("t", "super-secret")).includes("super-secret")
   );
 
   // ---- Caption budget -------------------------------------------------

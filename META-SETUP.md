@@ -266,6 +266,17 @@ deployed (Meta calls the URL during the handshake):
 (Once the app is granted to the Developer Tools MCP, Claude can run
 the webhook subscription itself.)
 
+**Advanced settings → Security:** turn on **Require App Secret** and
+**Require 2-factor reauthorization**. Every Graph call the platform
+makes now sends an `appsecret_proof` (HMAC-SHA256 of the token, keyed
+by the issuing app's secret), so a leaked Page token is useless to
+anyone who doesn't also hold the app secret. Also set the
+**Deauthorize Callback URL** to
+`https://theheatchart.com/api/meta/webhooks` — it's a required field
+for the Threads use case anyway. Leave the server IP allowlist EMPTY:
+Railway rotates outbound IPs and pinning them silently kills posting
+on a redeploy.
+
 **App Roles:** team as Testers (FB accounts), Instagram Testers (IG
 accounts — accept inside the IG app), Threads testers (accept inside
 Threads → Settings → Account → Website permissions).

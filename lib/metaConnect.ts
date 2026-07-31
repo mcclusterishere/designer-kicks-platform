@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { siteUrl } from "./articles";
+import { proofParams } from "./appsecret";
 
 /**
  * The onboarding handshake: an editor clicks "Connect my Instagram",
@@ -181,7 +182,10 @@ export async function exchangeCode(
     );
     const token = String(long.access_token);
     const me = await getJson(
-      `${IG_API}/me?fields=user_id,username,name&access_token=${encodeURIComponent(token)}`
+      `${IG_API}/me?fields=user_id,username,name&${new URLSearchParams({
+        access_token: token,
+        ...proofParams(token, process.env.INSTAGRAM_APP_SECRET),
+      })}`
     );
     return [
       {
@@ -211,7 +215,10 @@ export async function exchangeCode(
     );
     const token = String(long.access_token);
     const me = await getJson(
-      `${THREADS_API}/me?fields=id,username,name&access_token=${encodeURIComponent(token)}`
+      `${THREADS_API}/me?fields=id,username,name&${new URLSearchParams({
+        access_token: token,
+        ...proofParams(token, process.env.THREADS_APP_SECRET),
+      })}`
     );
     return [
       {
@@ -243,9 +250,10 @@ export async function exchangeCode(
     )}&fb_exchange_token=${encodeURIComponent(String(userTok.access_token))}`
   );
   const pages = await getJson(
-    `${FB_API}/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(
-      String(longUser.access_token)
-    )}`
+    `${FB_API}/me/accounts?fields=id,name,access_token&${new URLSearchParams({
+      access_token: String(longUser.access_token),
+      ...proofParams(String(longUser.access_token), businessAppSecret()),
+    })}`
   );
   const list = Array.isArray(pages.data) ? (pages.data as Record<string, unknown>[]) : [];
   return list

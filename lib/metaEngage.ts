@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "./db";
+import { businessSecret, proofParams } from "./appsecret";
 
 /**
  * The engagement side of the Meta integration: what comes IN (comments,
@@ -219,7 +220,11 @@ async function graph(
 ): Promise<Record<string, unknown>> {
   const token = pageToken();
   if (!token) throw new Error("Page token not configured");
-  const qs = new URLSearchParams({ ...params, access_token: token });
+  const qs = new URLSearchParams({
+    ...params,
+    access_token: token,
+    ...proofParams(token, businessSecret()),
+  });
   const url = method === "GET" ? `${FB_API}/${path}?${qs}` : `${FB_API}/${path}`;
   const res = await fetch(url, {
     method,
