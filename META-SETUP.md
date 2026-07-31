@@ -27,7 +27,7 @@ connected to a verified business portfolio. Three is fine.
 
 The dashboard groups the 20 use cases as Ads and monetization (7),
 Content management (5), Business messaging (3), Others (5). App 1
-takes eleven of them; the skip list below says why each remaining one
+takes twelve of them; the skip list below says why each remaining one
 is skipped rather than leaving it unexplained.
 
 | App | Type | Serves |
@@ -83,6 +83,18 @@ compatible; incompatible ones grey out and none of these should):
 11. **Embed content (oEmbed)** — tokenless since June 15, 2026, so
    embedding public posts works without it; adding it costs nothing
    and buys higher rate limits.
+12. **Allow users to transfer their data to other apps** — ticking
+   this in the wizard is genuinely free: it just tags the app.
+   Actually becoming an export destination is a whole separate,
+   opt-in process the checkbox does NOT start — registering with the
+   third-party DTI Trust Registry, a verified Business Manager
+   account, real receiving API endpoints, a security review, and
+   hands-on testing with a Meta engineer (see
+   developers.facebook.com/docs/data-portability). None of that
+   fires just from having the use case. Take it now for free; build
+   the receiving side only if a real reason shows up (e.g. an artist
+   importing their IG photo history straight into their Heat Chart
+   portfolio during onboarding).
 
 SKIP LIST, each for its own reason:
 
@@ -94,20 +106,16 @@ SKIP LIST, each for its own reason:
   inside our product to monetise it. We sell subscriptions and
   marketplace sales; renting our users' attention to competitors
   works against both.
-- **Allow users to transfer their data to other apps** — an
-  obligation, not a capability. It commits us to building and
-  maintaining a data-export endpoint Meta tests.
 - **Join ThreatExchange** — threat-intelligence sharing for security
-  teams. Unrelated.
+  teams about malware/CSAM/terrorism signals. Unrelated to us.
+- **Share or create fundraisers on Facebook and Instagram** — the
+  API only creates person-for-CHARITY fundraisers; a for-profit
+  cannot raise for itself. Only useful if a charity drop with a real
+  nonprofit beneficiary happens.
 - **Connect with customers through WhatsApp** — a real capability but
   a whole second messaging stack (dedicated business number, message
   templates, its own approval). Addable any time; add it when a
   WhatsApp channel is actually wanted.
-- Also skip:
-"Fundraisers" (the API only creates person-for-CHARITY fundraisers —
-a for-profit cannot raise for itself, so it's only useful if we ever
-run a charity drop with a nonprofit beneficiary), Instant Games,
-Audience Network, WhatsApp (later, deliberately).
 
 Marketing API notes: managing YOUR OWN ad account needs NO App Review
 — Standard Access covers it. But the starting ("Limited") tier is a
