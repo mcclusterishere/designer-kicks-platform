@@ -42,6 +42,7 @@ import CatalogPanel from "./CatalogPanel";
 import ResellerDesk from "./ResellerDesk";
 import OwnerDesk from "./OwnerDesk";
 import AuditPanel from "./AuditPanel";
+import ChatbotPanel from "./ChatbotPanel";
 import CleanupPanel from "./CleanupPanel";
 import EngagePanel from "./EngagePanel";
 import DuplicatePanel from "./DuplicatePanel";
@@ -2053,6 +2054,13 @@ export default async function AdminPage({
       {show("pulse") && (
         <section className="mt-8">
           <EngagePanel />
+        </section>
+      )}
+
+      {/* The comment-to-DM machine and its flow graph. */}
+      {show("pulse") && (
+        <section className="mt-8">
+          <ChatbotPanel />
         </section>
       )}
 

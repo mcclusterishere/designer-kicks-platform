@@ -47,10 +47,16 @@ export async function POST(req: NextRequest) {
   }
 
   const events = parseWebhookPayload(payload);
-  // Store first, automate after — a rules-engine crash must never cost
-  // the desk its record of what came in.
-  await storeEvents(events);
-  runAutomation(events).catch((e) => console.error("[webhooks] automation:", e));
+  // Store first, automate after — a bot crash must never cost the desk
+  // its record of what came in. Only FRESH events route onward, so
+  // Meta's redeliveries can't make anything answer twice.
+  const fresh = await storeEvents(events);
+  (async () => {
+    const { runChatbot } = await import("@/lib/chatbot");
+    const handled = await runChatbot(fresh);
+    // The older keyword rules get whatever the bot didn't take.
+    await runAutomation(fresh.filter((e) => !handled.has(e.objectId)));
+  })().catch((e) => console.error("[webhooks] automation:", e));
 
   return NextResponse.json({ received: events.length });
 }

@@ -174,6 +174,11 @@ jobs:
       - name: Meta integration
         run: npm run verify:meta
 
+      # The bot's routing: campaign-vs-net precedence, the human escape
+      # hatch, payload plumbing. All the ways auto-DM goes wrong.
+      - name: Chat bot
+        run: npm run verify:chatbot
+
   build:
     name: Production build
     runs-on: ubuntu-latest

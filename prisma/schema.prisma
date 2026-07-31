@@ -2096,3 +2096,83 @@ model SocialRule {
 
   @@index([kind, active])
 }
+
+/// One node of the chat bot's conversation tree.
+///
+/// The whole bot is flows pointing at flows: a trigger starts one, its
+/// quick-reply buttons carry the visitor to the next. That's the same
+/// architecture ManyChat and Chatfuel sell — a node graph — expressed
+/// as rows instead of a drag-and-drop canvas, which is why an admin
+/// form is enough to edit it.
+///
+/// Triggers:
+///   comment    — someone commented on our FB/IG post. Sends ONE
+///                private reply into their inbox (Meta's approved
+///                comment-to-DM entry point; one per comment, ever).
+///   message    — an inbound DM matches a keyword.
+///   icebreaker — one of the tap-to-start questions new visitors see
+///                before typing (installed via the Messenger Profile).
+///   welcome    — first message from a brand-new contact.
+///   default    — a DM nothing else matched (runs before AI fallback).
+model ChatFlow {
+  id   String @id @default(cuid())
+  name String
+
+  trigger  String
+  /// Match words for comment/message triggers. "*" matches anything.
+  keywords String[] @default([])
+  /// Restrict a comment trigger to one post (empty = every post).
+  postId   String?
+
+  /// comment flows: the one private reply that lands in their inbox.
+  privateReply String?
+
+  /// The DM this flow sends once a conversation exists.
+  message String
+
+  /// [{label, flowId}] — max 13, labels get cut to 20 chars (Meta's
+  /// caps, enforced at send time so old rows can't break sends).
+  quickReplies Json @default("[]")
+
+  active    Boolean  @default(true)
+  fired     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([trigger, active])
+}
+
+/// Somebody who has messaged the Page or IG account — the audience the
+/// bot is building. The platform+psid pair is Meta's identity for them;
+/// lastInboundAt is what makes the 24-hour messaging window checkable
+/// before every send instead of discovered via a refusal.
+model ChatContact {
+  id       String  @id @default(cuid())
+  platform String // facebook | instagram
+  psid     String
+  name     String?
+
+  firstSeenAt   DateTime  @default(now())
+  lastInboundAt DateTime?
+  lastFlowId    String?
+
+  messages ChatMessage[]
+
+  @@unique([platform, psid])
+  @@index([lastInboundAt])
+}
+
+/// The transcript, both directions — what the admin panel shows when
+/// checking how the bot is treating people.
+model ChatMessage {
+  id        String      @id @default(cuid())
+  contactId String
+  contact   ChatContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  direction String // in | out
+  text      String
+  /// Which flow produced an outbound message; "ai" for fallback.
+  flowId    String?
+  createdAt DateTime @default(now())
+
+  @@index([contactId, createdAt])
+}

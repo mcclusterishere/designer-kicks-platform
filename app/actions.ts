@@ -6752,3 +6752,140 @@ export async function igLookupAction(
     note: `@${found.username} — ${found.followers.toLocaleString()} followers, ${found.mediaCount} posts${found.name ? ` · ${found.name}` : ""}${found.website ? ` · ${found.website}` : ""}`,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* The chat bot                                                        */
+/* ------------------------------------------------------------------ */
+
+export async function chatbotSettingAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const op = String(formData.get("op") ?? "");
+  const { chatbotSettings, setChatbotSetting } = await import("@/lib/chatbot");
+  const current = await chatbotSettings();
+
+  if (op === "toggle") {
+    await setChatbotSetting("enabled", current.enabled ? "false" : "true");
+    revalidatePath("/admin");
+    return { ok: true, note: current.enabled ? "Bot off. The desk handles everything." : "Bot on." };
+  }
+  if (op === "toggle-ai") {
+    await setChatbotSetting("ai", current.aiFallback ? "false" : "true");
+    revalidatePath("/admin");
+    return {
+      ok: true,
+      note: current.aiFallback
+        ? "AI fallback off — unmatched messages wait for a human."
+        : "AI fallback on — Gemini answers what no flow catches.",
+    };
+  }
+  if (op === "persona") {
+    const persona = String(formData.get("persona") ?? "").trim();
+    if (!persona) return { ok: false, error: "The persona can't be empty — it's the bot's voice." };
+    await setChatbotSetting("persona", persona);
+    revalidatePath("/admin");
+    return { ok: true, note: "Voice updated." };
+  }
+  return { ok: false, error: "Unknown operation." };
+}
+
+export async function chatFlowSaveAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const name = String(formData.get("name") ?? "").trim();
+  const trigger = String(formData.get("trigger") ?? "");
+  const message = String(formData.get("message") ?? "").trim();
+  const privateReply = String(formData.get("privateReply") ?? "").trim();
+  const postId = String(formData.get("postId") ?? "").trim();
+  const keywords = String(formData.get("keywords") ?? "")
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
+
+  if (!name) return { ok: false, error: "Name the flow." };
+  if (!["comment", "message", "icebreaker", "welcome", "default"].includes(trigger)) {
+    return { ok: false, error: "Pick what starts this flow." };
+  }
+  if (!message) return { ok: false, error: "Write what it sends." };
+  if ((trigger === "comment" || trigger === "message") && keywords.length === 0) {
+    return { ok: false, error: 'Give it keywords, or * to catch everything.' };
+  }
+
+  // Buttons arrive as parallel field arrays: qrLabel[] + qrFlow[].
+  const labels = formData.getAll("qrLabel").map(String);
+  const targets = formData.getAll("qrFlow").map(String);
+  const quickReplies = labels
+    .map((label, i) => ({ label: label.trim(), flowId: targets[i] ?? "" }))
+    .filter((q) => q.label && q.flowId);
+
+  // One welcome, one default — a second would be unreachable, and
+  // unreachable config is where confusion lives.
+  if (trigger === "welcome" || trigger === "default") {
+    const dupe = await prisma.chatFlow.findFirst({ where: { trigger, active: true } });
+    if (dupe) {
+      return { ok: false, error: `There's already an active ${trigger} flow ("${dupe.name}"). Edit or retire that one.` };
+    }
+  }
+
+  await prisma.chatFlow.create({
+    data: {
+      name,
+      trigger,
+      keywords,
+      postId: postId || null,
+      privateReply: privateReply || null,
+      message,
+      quickReplies,
+    },
+  });
+  revalidatePath("/admin");
+  return { ok: true, note: `"${name}" is live.` };
+}
+
+export async function chatFlowOpAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const id = String(formData.get("flowId") ?? "");
+  const op = String(formData.get("op") ?? "");
+  const flow = await prisma.chatFlow.findUnique({ where: { id } });
+  if (!flow) return { ok: false, error: "That flow is gone." };
+  if (op === "toggle") {
+    await prisma.chatFlow.update({ where: { id }, data: { active: !flow.active } });
+    revalidatePath("/admin");
+    return { ok: true, note: flow.active ? "Paused." : "Live again." };
+  }
+  if (op === "delete") {
+    await prisma.chatFlow.delete({ where: { id } });
+    revalidatePath("/admin");
+    return { ok: true, note: "Deleted. Buttons that pointed here now do nothing — rewire them." };
+  }
+  return { ok: false, error: "Unknown operation." };
+}
+
+export async function chatbotInstallAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const greeting = String(formData.get("greeting") ?? "").trim();
+  if (!greeting) return { ok: false, error: "Write the greeting people see first." };
+  const flows = await prisma.chatFlow.findMany({
+    where: { trigger: "icebreaker", active: true },
+    orderBy: { createdAt: "asc" },
+    take: 4,
+  });
+  const { installMessengerProfile } = await import("@/lib/chatbot");
+  const res = await installMessengerProfile({
+    greeting,
+    iceBreakers: flows.map((f) => ({ question: f.name, flowId: f.id })),
+  });
+  if (!res.ok) return { ok: false, error: res.detail };
+  revalidatePath("/admin");
+  return { ok: true, note: `${res.detail} ${flows.length} opener(s) installed.` };
+}

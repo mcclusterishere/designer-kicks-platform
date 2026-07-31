@@ -1,0 +1,349 @@
+import { prisma } from "./db";
+import { geminiChat, geminiConfigured } from "./gemini";
+import {
+  engageConfigured,
+  sendDmReply,
+  sendPrivateReply,
+  type ParsedEvent,
+} from "./metaEngage";
+
+/**
+ * The chat bot: the platform's own ManyChat, running on the webhook.
+ *
+ * The growth mechanic it exists for: a post says "comment HEAT and
+ * I'll send you X". A thousand comments arrive. Each commenter gets
+ * ONE private reply into their inbox (Meta's sanctioned comment-to-DM
+ * door), written to earn an answer — because the private reply does
+ * NOT open the 24-hour messaging window; only their answer does. Once
+ * they answer, the flow graph takes over: every flow is a message with
+ * tap buttons, every button points at another flow, and the admin
+ * builds the graph as rows in a panel instead of paying $65/month for
+ * a canvas.
+ *
+ * Routing order for an inbound DM, most-specific first:
+ *   1. a quick-reply tap / postback / m.me ref  -> the flow it names
+ *   2. the human-escalation words                -> hand off, go quiet
+ *   3. a keyword match on message-trigger flows
+ *   4. first-ever contact                        -> the welcome flow
+ *   5. the default flow
+ *   6. AI fallback (Gemini), if switched on
+ *   7. silence — the Engagement desk still has the event
+ *
+ * Two lines this file will not cross, because Meta's platform terms
+ * draw them: it never messages anyone who hasn't commented or written
+ * first, and it always sends as RESPONSE inside the window. The
+ * "outreach goes crazy" happens at the door (comments), not by
+ * knocking on strangers' inboxes — there is no API that does that.
+ */
+
+/** AppSetting keys — one row each, edited from the admin panel. */
+const ENABLED_KEY = "chatbotEnabled";
+const AI_KEY = "chatbotAiFallback";
+const PERSONA_KEY = "chatbotPersona";
+
+export const DEFAULT_PERSONA =
+  "You are the automated assistant for The Heat Chart (theheatchart.com), a custom-sneaker culture platform where artists post one-of-one customs, fans vote in battles, and the Heat List ranks the culture. Be brief, warm and hype — 1-3 sentences, no emojis walls. You are a bot and say so if asked. You help people find artists, enter the giveaway, play the games, or claim their artist page. If someone wants to buy, commission, or has a problem, tell them a real person will pick the thread up here shortly. Never invent prices or promises.";
+
+export async function chatbotSettings(): Promise<{
+  enabled: boolean;
+  aiFallback: boolean;
+  persona: string;
+}> {
+  const rows = await prisma.appSetting.findMany({
+    where: { key: { in: [ENABLED_KEY, AI_KEY, PERSONA_KEY] } },
+  });
+  const get = (k: string) => rows.find((r) => r.key === k)?.value;
+  return {
+    enabled: get(ENABLED_KEY) === "true",
+    aiFallback: get(AI_KEY) === "true",
+    persona: get(PERSONA_KEY) || DEFAULT_PERSONA,
+  };
+}
+
+export async function setChatbotSetting(key: "enabled" | "ai" | "persona", value: string) {
+  const k = key === "enabled" ? ENABLED_KEY : key === "ai" ? AI_KEY : PERSONA_KEY;
+  await prisma.appSetting.upsert({
+    where: { key: k },
+    update: { value },
+    create: { key: k, value },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Pure routing logic — the part the verify suite hammers              */
+/* ------------------------------------------------------------------ */
+
+export type FlowLite = {
+  id: string;
+  trigger: string;
+  keywords: string[];
+  postId: string | null;
+  active: boolean;
+};
+
+/** Does this comment/message text hit this flow's keywords? */
+export function keywordHit(keywords: string[], text: string | null): boolean {
+  if (keywords.includes("*")) return true;
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return keywords.some((k) => k && t.includes(k.toLowerCase()));
+}
+
+/** Pick the flow a fresh COMMENT should trigger, specific post first. */
+export function matchCommentFlow(flows: FlowLite[], text: string | null, postId: string | null): FlowLite | null {
+  const candidates = flows.filter((f) => f.active && f.trigger === "comment");
+  // A flow pinned to this exact post outranks a catch-all — that's how
+  // "comment HEAT on THIS post" campaigns coexist with a general net.
+  const pinned = candidates.filter((f) => f.postId && postId && postId.includes(f.postId));
+  for (const pool of [pinned, candidates.filter((f) => !f.postId)]) {
+    const hit = pool.find((f) => keywordHit(f.keywords, text));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** Pick the flow an inbound DM's TEXT should trigger. */
+export function matchMessageFlow(flows: FlowLite[], text: string | null): FlowLite | null {
+  return (
+    flows.find((f) => f.active && f.trigger === "message" && keywordHit(f.keywords, text)) ?? null
+  );
+}
+
+/** The escape hatch — these words always reach a human. */
+export function wantsHuman(text: string | null): boolean {
+  if (!text) return false;
+  return /\b(human|real person|agent|somebody real|stop|unsubscribe)\b/i.test(text);
+}
+
+type QuickReply = { label: string; payload: string };
+
+export function parseQuickReplies(raw: unknown): QuickReply[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((q): q is { label?: unknown; flowId?: unknown } => Boolean(q) && typeof q === "object")
+    .map((q) => ({ label: String(q.label ?? ""), payload: `flow:${String(q.flowId ?? "")}` }))
+    .filter((q) => q.label && q.payload !== "flow:");
+}
+
+/* ------------------------------------------------------------------ */
+/* The runtime                                                         */
+/* ------------------------------------------------------------------ */
+
+async function contactFor(platform: string, psid: string, name: string | null) {
+  const existing = await prisma.chatContact.findUnique({
+    where: { platform_psid: { platform, psid } },
+  });
+  if (existing) {
+    const updated = await prisma.chatContact.update({
+      where: { id: existing.id },
+      data: { lastInboundAt: new Date(), ...(name ? { name } : {}) },
+    });
+    return { contact: updated, isNew: false };
+  }
+  const created = await prisma.chatContact.create({
+    data: { platform, psid, name, lastInboundAt: new Date() },
+  });
+  return { contact: created, isNew: true };
+}
+
+async function runFlow(
+  contact: { id: string; psid: string },
+  flowId: string
+): Promise<boolean> {
+  const flow = await prisma.chatFlow.findUnique({ where: { id: flowId } });
+  if (!flow || !flow.active) return false;
+  const buttons = parseQuickReplies(flow.quickReplies);
+  await sendDmReply(contact.psid, flow.message, buttons);
+  await prisma.chatMessage.create({
+    data: { contactId: contact.id, direction: "out", text: flow.message, flowId: flow.id },
+  });
+  await prisma.chatContact.update({
+    where: { id: contact.id },
+    data: { lastFlowId: flow.id },
+  });
+  await prisma.chatFlow.update({ where: { id: flow.id }, data: { fired: { increment: 1 } } });
+  return true;
+}
+
+/**
+ * Route freshly stored webhook events through the bot. Returns the
+ * objectIds it handled, so the older SocialRule layer can skip them
+ * instead of double-answering.
+ */
+export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
+  const handled = new Set<string>();
+  if (events.length === 0 || !engageConfigured()) return handled;
+  const settings = await chatbotSettings();
+  if (!settings.enabled) return handled;
+
+  const flows = await prisma.chatFlow.findMany({ where: { active: true } });
+
+  for (const e of events) {
+    try {
+      if (e.kind === "comment") {
+        const flow = matchCommentFlow(flows, e.text, e.parentId);
+        if (!flow) continue;
+        const full = flows.find((f) => f.id === flow.id)!;
+        // The one private reply this comment will ever get. Buttons on
+        // it are the reply-bait: a tap IS the answer that opens the
+        // 24-hour window and hands the conversation to the flow graph.
+        await sendPrivateReply(
+          e.objectId,
+          (full as { privateReply: string | null }).privateReply || full.message,
+          parseQuickReplies(full.quickReplies)
+        );
+        await prisma.chatFlow.update({ where: { id: flow.id }, data: { fired: { increment: 1 } } });
+        await prisma.metaEvent
+          .update({
+            where: { objectId: e.objectId },
+            data: { autoNote: `bot: private reply via "${full.name}"`, status: "HANDLED" },
+          })
+          .catch(() => {});
+        handled.add(e.objectId);
+        continue;
+      }
+
+      if (e.kind !== "message" || !e.fromId) continue;
+
+      const { contact, isNew } = await contactFor(e.platform, e.fromId, e.fromName);
+      if (e.text || e.payload) {
+        await prisma.chatMessage.create({
+          data: {
+            contactId: contact.id,
+            direction: "in",
+            text: e.text ?? `[${e.payload}]`,
+          },
+        });
+      }
+
+      // 1. A tapped button names its flow outright.
+      const payloadFlow =
+        e.payload?.startsWith("flow:") ? e.payload.slice(5)
+        : e.payload?.startsWith("ref:") ? flows.find((f) => f.trigger === "message" && keywordHit(f.keywords, e.payload!.slice(4)))?.id ?? null
+        : e.payload === "GET_STARTED" ? flows.find((f) => f.trigger === "welcome")?.id ?? null
+        : e.payload ? flows.find((f) => f.id === e.payload)?.id ?? null
+        : null;
+      if (payloadFlow && (await runFlow(contact, payloadFlow))) {
+        handled.add(e.objectId);
+        continue;
+      }
+
+      // 2. Somebody asking for a person gets a person — the bot's one
+      // non-negotiable manner. The event stays NEW for the desk.
+      if (wantsHuman(e.text)) {
+        await sendDmReply(
+          contact.psid,
+          "Got you — a real person from The Heat Chart will pick this up right here. Leave your question below."
+        );
+        await prisma.chatMessage.create({
+          data: { contactId: contact.id, direction: "out", text: "[handed to human]", flowId: null },
+        });
+        handled.add(e.objectId);
+        continue;
+      }
+
+      // 3. Keywords.
+      const kw = matchMessageFlow(flows, e.text);
+      if (kw && (await runFlow(contact, kw.id))) {
+        handled.add(e.objectId);
+        continue;
+      }
+
+      // 4. First contact -> welcome. 5. Otherwise the default net.
+      const fallbackFlow = isNew
+        ? flows.find((f) => f.trigger === "welcome") ?? flows.find((f) => f.trigger === "default")
+        : flows.find((f) => f.trigger === "default");
+      if (fallbackFlow && (await runFlow(contact, fallbackFlow.id))) {
+        handled.add(e.objectId);
+        continue;
+      }
+
+      // 6. The open half of the bot: Gemini answers in the site's
+      // voice, with the recent transcript for context. Only when the
+      // admin turned it on, and never for people who asked for a human
+      // (they were caught above).
+      if (settings.aiFallback && geminiConfigured() && e.text) {
+        const recent = await prisma.chatMessage.findMany({
+          where: { contactId: contact.id },
+          orderBy: { createdAt: "desc" },
+          take: 8,
+        });
+        const reply = await geminiChat({
+          system: settings.persona,
+          history: recent
+            .reverse()
+            .map((m) => ({ role: m.direction === "in" ? ("user" as const) : ("model" as const), text: m.text })),
+          temperature: 0.5,
+        });
+        if (reply) {
+          await sendDmReply(contact.psid, reply.slice(0, 1900));
+          await prisma.chatMessage.create({
+            data: { contactId: contact.id, direction: "out", text: reply.slice(0, 1900), flowId: "ai" },
+          });
+          await prisma.metaEvent
+            .update({
+              where: { objectId: e.objectId },
+              data: { autoNote: "bot: AI answered", status: "HANDLED" },
+            })
+            .catch(() => {});
+          handled.add(e.objectId);
+        }
+      }
+      // 7. Nothing matched and AI is off — the Engagement desk shows
+      // the message untouched. Silence beats a wrong answer.
+    } catch (err) {
+      console.error(`[chatbot] failed on ${e.objectId}:`, err);
+    }
+  }
+  return handled;
+}
+
+/* ------------------------------------------------------------------ */
+/* Messenger Profile — the front door                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Install the conversation's front door on the Page: the Get Started
+ * button, the greeting above it, and up to four tap-to-ask ice
+ * breakers — each one wired to a flow. This is the "pick your own
+ * experience" onset: a new visitor sees the questions before they've
+ * typed a word.
+ */
+export async function installMessengerProfile(opts: {
+  greeting: string;
+  iceBreakers: Array<{ question: string; flowId: string }>;
+}): Promise<{ ok: boolean; detail: string }> {
+  const token = process.env.FB_PAGE_ACCESS_TOKEN;
+  if (!token) return { ok: false, detail: "Page token not configured" };
+  const FB_API = process.env.GRAPH_API_URL || "https://graph.facebook.com/v23.0";
+  const body: Record<string, unknown> = {
+    get_started: { payload: "GET_STARTED" },
+    greeting: [{ locale: "default", text: opts.greeting.slice(0, 160) }],
+  };
+  if (opts.iceBreakers.length > 0) {
+    body.ice_breakers = [
+      {
+        locale: "default",
+        call_to_actions: opts.iceBreakers.slice(0, 4).map((b) => ({
+          question: b.question.slice(0, 80),
+          payload: `flow:${b.flowId}`,
+        })),
+      },
+    ];
+  }
+  try {
+    const res = await fetch(`${FB_API}/me/messenger_profile?access_token=${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    });
+    const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    if (!res.ok || json.error) {
+      return { ok: false, detail: json.error?.message || `Messenger profile ${res.status}` };
+    }
+    return { ok: true, detail: "Front door installed — greeting, Get Started and openers are live." };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : "Messenger profile failed" };
+  }
+}

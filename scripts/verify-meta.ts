@@ -134,8 +134,12 @@ async function main() {
   // ---- Storage dedup --------------------------------------------------
   const stored1 = await storeEvents(parsed);
   const stored2 = await storeEvents(parsed);
-  check("events store once", stored1 === 1, `${stored1}`);
-  check("a redelivered webhook stores nothing", stored2 === 0, "Meta redelivers; the desk must not double up");
+  check("events store once", stored1.length === 1, `${stored1.length}`);
+  check(
+    "a redelivered webhook stores nothing",
+    stored2.length === 0,
+    "Meta redelivers; the chat bot only routes what storeEvents says is fresh"
+  );
 
   // ---- Rules ----------------------------------------------------------
   check(

@@ -57,6 +57,10 @@ export type ParsedEvent = {
   fromId: string | null;
   text: string | null;
   parentId: string | null;
+  /// A quick-reply tap, a postback button, or an m.me ?ref= — the
+  /// machine-readable half of what the person did. Not persisted on
+  /// MetaEvent; consumed in-flight by the chat bot's router.
+  payload?: string | null;
 };
 
 /**
@@ -120,40 +124,88 @@ export function parseWebhookPayload(payload: unknown): ParsedEvent[] {
       }
     }
 
-    // Messenger / IG direct messages.
+    // Messenger / IG direct messages, quick-reply taps, button
+    // postbacks and m.me referrals — everything a person can DO in a
+    // conversation, normalised to one shape so the router upstream has
+    // a single case to handle.
     const messaging = (entry.messaging ?? []) as Array<Record<string, unknown>>;
     for (const m of messaging) {
-      const msg = m.message as { mid?: string; text?: string; is_echo?: boolean } | undefined;
-      if (!msg?.mid || msg.is_echo) continue; // echoes are us talking
       const sender = m.sender as { id?: string } | undefined;
       if (sender?.id && ourIds.has(sender.id)) continue;
-      out.push({
-        platform,
-        kind: "message",
-        objectId: msg.mid,
-        fromName: null,
-        fromId: sender?.id ?? null,
-        text: msg.text ?? null,
-        parentId: null,
-      });
+
+      const msg = m.message as
+        | { mid?: string; text?: string; is_echo?: boolean; quick_reply?: { payload?: string } }
+        | undefined;
+      if (msg?.mid && !msg.is_echo) {
+        out.push({
+          platform,
+          kind: "message",
+          objectId: msg.mid,
+          fromName: null,
+          fromId: sender?.id ?? null,
+          text: msg.text ?? null,
+          parentId: null,
+          payload: msg.quick_reply?.payload ?? null,
+        });
+        continue;
+      }
+
+      // A postback (Get Started, ice breaker, menu button) has no mid;
+      // sender + timestamp is the stable identity Meta gives us.
+      const postback = m.postback as
+        | { payload?: string; title?: string; referral?: { ref?: string } }
+        | undefined;
+      if (postback?.payload && sender?.id) {
+        out.push({
+          platform,
+          kind: "message",
+          objectId: `pb-${sender.id}-${String(m.timestamp ?? "")}`,
+          fromName: null,
+          fromId: sender.id,
+          text: postback.title ?? null,
+          parentId: null,
+          payload: postback.payload,
+        });
+        continue;
+      }
+
+      // Someone arrived through an m.me/…?ref= link mid-conversation.
+      const referral = m.referral as { ref?: string } | undefined;
+      if (referral?.ref && sender?.id) {
+        out.push({
+          platform,
+          kind: "message",
+          objectId: `ref-${sender.id}-${String(m.timestamp ?? "")}`,
+          fromName: null,
+          fromId: sender.id,
+          text: null,
+          parentId: null,
+          payload: `ref:${referral.ref}`,
+        });
+      }
     }
   }
   return out;
 }
 
-/** Store parsed events, skipping webhook redeliveries. */
-export async function storeEvents(events: ParsedEvent[]): Promise<number> {
-  let stored = 0;
+/**
+ * Store parsed events, skipping webhook redeliveries. Returns the ones
+ * that were genuinely new — the chat bot routes ONLY those, so a
+ * redelivered webhook can never make it answer the same person twice.
+ */
+export async function storeEvents(events: ParsedEvent[]): Promise<ParsedEvent[]> {
+  const fresh: ParsedEvent[] = [];
   for (const e of events) {
     try {
-      await prisma.metaEvent.create({ data: e });
-      stored++;
+      const { payload: _payload, ...row } = e;
+      await prisma.metaEvent.create({ data: row });
+      fresh.push(e);
     } catch {
       // Unique collision on objectId — Meta redelivered, we already
       // have it. Exactly what the unique index is for.
     }
   }
-  return stored;
+  return fresh;
 }
 
 /* ------------------------------------------------------------------ */
@@ -201,17 +253,67 @@ export async function hideComment(commentId: string, hide: boolean): Promise<voi
 }
 
 /**
- * Reply to an inbound DM. messaging_type RESPONSE = answering within
+ * Send into a conversation. messaging_type RESPONSE = answering within
  * the 24-hour window a person opens by messaging us. That constant is
  * the legal boundary, not a default to change.
+ *
+ * `quickReplies` renders as tap buttons under the message — Meta caps
+ * them at 13 with 20-character labels, enforced here so a fat-fingered
+ * flow row degrades to a trimmed button instead of a failed send.
  */
-export async function sendDmReply(recipientId: string, text: string): Promise<void> {
+export async function sendDmReply(
+  recipientId: string,
+  text: string,
+  quickReplies?: Array<{ label: string; payload: string }>
+): Promise<void> {
+  const message: Record<string, unknown> = { text };
+  if (quickReplies && quickReplies.length > 0) {
+    message.quick_replies = quickReplies.slice(0, 13).map((q) => ({
+      content_type: "text",
+      title: q.label.slice(0, 20),
+      payload: q.payload,
+    }));
+  }
   await graph(
     "me/messages",
     {
       recipient: JSON.stringify({ id: recipientId }),
       messaging_type: "RESPONSE",
-      message: JSON.stringify({ text }),
+      message: JSON.stringify(message),
+    },
+    "POST"
+  );
+}
+
+/**
+ * The comment-to-DM door: a PRIVATE reply to a public comment, landing
+ * in the commenter's inbox. Meta's one sanctioned way to start a
+ * conversation with someone who hasn't messaged us — and it's strictly
+ * one per comment, ever, enforced by Meta and respected by the caller
+ * (which only routes freshly stored events).
+ *
+ * The private reply itself does NOT open the 24-hour window; only the
+ * person's answer to it does. So the text has to earn a reply, not
+ * just deliver a link.
+ */
+export async function sendPrivateReply(
+  commentId: string,
+  text: string,
+  quickReplies?: Array<{ label: string; payload: string }>
+): Promise<void> {
+  const message: Record<string, unknown> = { text };
+  if (quickReplies && quickReplies.length > 0) {
+    message.quick_replies = quickReplies.slice(0, 13).map((q) => ({
+      content_type: "text",
+      title: q.label.slice(0, 20),
+      payload: q.payload,
+    }));
+  }
+  await graph(
+    "me/messages",
+    {
+      recipient: JSON.stringify({ comment_id: commentId }),
+      message: JSON.stringify(message),
     },
     "POST"
   );

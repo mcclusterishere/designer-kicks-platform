@@ -32,7 +32,8 @@
     "verify:founding": "rm -rf node_modules/.verifyfnd && tsc scripts/verify-founding.ts --outDir node_modules/.verifyfnd --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyfnd/scripts/verify-founding.js",
     "verify:dupes": "rm -rf node_modules/.verifydup && tsc scripts/verify-dupes.ts --outDir node_modules/.verifydup --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifydup/scripts/verify-dupes.js",
     "verify:purge": "rm -rf node_modules/.verifypurge && tsc scripts/verify-purge.ts --outDir node_modules/.verifypurge --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifypurge/scripts/verify-purge.js",
-    "verify:meta": "rm -rf node_modules/.verifymeta && tsc scripts/verify-meta.ts --outDir node_modules/.verifymeta --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifymeta/scripts/verify-meta.js"
+    "verify:meta": "rm -rf node_modules/.verifymeta && tsc scripts/verify-meta.ts --outDir node_modules/.verifymeta --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifymeta/scripts/verify-meta.js",
+    "verify:chatbot": "rm -rf node_modules/.verifybot && tsc scripts/verify-chatbot.ts --outDir node_modules/.verifybot --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifybot/scripts/verify-chatbot.js"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
