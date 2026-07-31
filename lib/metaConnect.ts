@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { siteUrl } from "./articles";
-import { proofParams } from "./appsecret";
+import { businessSecret, proofParams } from "./appsecret";
 
 /**
  * The onboarding handshake: an editor clicks "Connect my Instagram",
@@ -51,8 +51,17 @@ const FB_AUTH = process.env.FB_AUTH_URL || "https://www.facebook.com/v23.0";
 function businessAppId(): string {
   return process.env.META_BUSINESS_APP_ID || process.env.FACEBOOK_CLIENT_ID || "";
 }
+/**
+ * One resolver, deliberately. This used to be a second copy of the
+ * same fallback chain, and the two copies key different halves of the
+ * system: this one verifies INBOUND webhook signatures, the appsecret
+ * copy signs OUTBOUND calls. Two literals that must agree forever and
+ * have no compile-time link is a split-brain waiting to happen — edit
+ * one and Meta's events start failing signature while publishing
+ * still works, or vice versa.
+ */
 export function businessAppSecret(): string {
-  return process.env.META_BUSINESS_APP_SECRET || process.env.FACEBOOK_CLIENT_SECRET || "";
+  return businessSecret();
 }
 
 export function connectRedirectUri(provider: ConnectProvider): string {

@@ -11,6 +11,8 @@
  * Run: npm run verify:meta   (dev database; every row it makes it deletes)
  */
 import { createHmac } from "crypto";
+import { readFileSync, readdirSync, statSync } from "fs";
+import { join } from "path";
 import { PrismaClient } from "@prisma/client";
 import {
   parseWebhookPayload,
@@ -19,7 +21,8 @@ import {
   verifyWebhookSignature,
 } from "../lib/metaEngage";
 import { authorizeUrl, connectRedirectUri, isConnectProvider } from "../lib/metaConnect";
-import { appsecretProof, proofParams } from "../lib/appsecret";
+import { appsecretProof, businessSecret, proofParams } from "../lib/appsecret";
+import { businessAppSecret } from "../lib/metaConnect";
 import { ownChannelCaption } from "../lib/crosspost";
 
 const prisma = new PrismaClient();
@@ -35,6 +38,16 @@ function check(name: string, ok: boolean, extra = "") {
 
 const TAG = "vmeta";
 const SECRET = "test-app-secret";
+
+/** Every .ts/.tsx under a directory, so the scan can't miss a file. */
+function* walk(dir: string): Generator<string> {
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry === ".next") continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) yield* walk(full);
+    else yield full;
+  }
+}
 
 function sign(body: string): string {
   return "sha256=" + createHmac("sha256", SECRET).update(body, "utf8").digest("hex");
@@ -228,6 +241,76 @@ async function main() {
     "the proof never leaks the secret itself",
     !JSON.stringify(proofParams("t", "super-secret")).includes("super-secret")
   );
+
+  // ---- Which secret, and did anyone forget to sign ---------------------
+  // The HMAC checks above prove the primitive works on literal strings.
+  // They cannot catch the two failures that actually happen: resolving
+  // the WRONG app's secret, and a call site that never asks for a proof
+  // at all. Both shipped once. Hence these.
+  const savedBiz = process.env.META_BUSINESS_APP_SECRET;
+  const savedFb = process.env.FACEBOOK_CLIENT_SECRET;
+
+  process.env.META_BUSINESS_APP_SECRET = "business-secret";
+  process.env.FACEBOOK_CLIENT_SECRET = "login-app-secret";
+  check(
+    "the business secret wins over the login app's",
+    businessSecret() === "business-secret",
+    "signing a Page token with the consumer login app's key is a code-190 on every call"
+  );
+  check(
+    "inbound verification and outbound signing resolve identically",
+    businessAppSecret() === businessSecret(),
+    "these were two copies once; if they drift, webhooks 401 while publishing still works"
+  );
+
+  delete process.env.META_BUSINESS_APP_SECRET;
+  check(
+    "the login app's secret is still the documented dev fallback",
+    businessSecret() === "login-app-secret"
+  );
+  delete process.env.FACEBOOK_CLIENT_SECRET;
+  check("no secret configured resolves to empty, not undefined", businessSecret() === "");
+
+  if (savedBiz === undefined) delete process.env.META_BUSINESS_APP_SECRET;
+  else process.env.META_BUSINESS_APP_SECRET = savedBiz;
+  if (savedFb === undefined) delete process.env.FACEBOOK_CLIENT_SECRET;
+  else process.env.FACEBOOK_CLIENT_SECRET = savedFb;
+
+  // Hand-built token URLs are how a call escapes signing: the params
+  // never pass through proofParams, so nothing flags it. The only
+  // legitimate ones are OAuth's exchange legs, which already carry
+  // client_secret in the URL — strictly stronger than a proof.
+  const TOKEN_URL = /access_token=\$\{/;
+  const offenders: string[] = [];
+  for (const dir of ["lib", "app"]) {
+    for (const file of walk(join(process.cwd(), dir))) {
+      if (!file.endsWith(".ts") && !file.endsWith(".tsx")) continue;
+      const src = readFileSync(file, "utf8");
+      src.split("\n").forEach((line, i) => {
+        if (!TOKEN_URL.test(line)) return;
+        // Look at the surrounding statement, not just the line — these
+        // are prettier-wrapped across several lines.
+        const stmt = src.split("\n").slice(Math.max(0, i - 6), i + 3).join("\n");
+        if (!stmt.includes("client_secret")) {
+          offenders.push(`${file.replace(/.*designer-kicks-platform\//, "")}:${i + 1}`);
+        }
+      });
+    }
+  }
+  check(
+    "no Graph call hand-builds a token URL that skips the proof",
+    offenders.length === 0,
+    offenders.length ? offenders.join(", ") : "OAuth exchange legs carry client_secret, so they're exempt"
+  );
+
+  for (const f of ["social", "metaEngage", "metaPublish", "metaConnect", "threads", "chatbot"]) {
+    const src = readFileSync(join(process.cwd(), "lib", `${f}.ts`), "utf8");
+    check(
+      `lib/${f}.ts is wired to the signing helper`,
+      src.includes('from "./appsecret"'),
+      "a token-bearing module that can't reach proofParams cannot sign"
+    );
+  }
 
   // ---- Caption budget -------------------------------------------------
   const caption = ownChannelCaption({

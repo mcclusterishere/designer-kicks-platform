@@ -102,11 +102,17 @@ async function freshToken(acct: Account): Promise<string> {
   const base = (acct.provider === "threads" ? THREADS_API : IG_API).replace(/\/v[\d.]+$/, "");
   const grant = acct.provider === "threads" ? "th_refresh_token" : "ig_refresh_token";
   try {
+    // Signs like every other call: the refresh edge carries an access
+    // token, so Require App Secret rejects it unsigned — and because
+    // the catch below swallows a failed refresh and returns the stale
+    // token, an unsigned refresh would present as accounts quietly
+    // dying at the 60-day mark with status still ACTIVE.
     const json = await api(
       base,
       "refresh_access_token",
       { grant_type: grant, access_token: acct.accessToken },
-      "GET"
+      "GET",
+      acct.provider
     );
     const token = String(json.access_token ?? "");
     const seconds = Number(json.expires_in ?? 0);

@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { businessSecret, proofParams } from "./appsecret";
 import { geminiChat, geminiConfigured } from "./gemini";
 import {
   engageConfigured,
@@ -441,7 +442,13 @@ export async function installMessengerProfile(opts: {
     ];
   }
   try {
-    const res = await fetch(`${FB_API}/me/messenger_profile?access_token=${encodeURIComponent(token)}`, {
+    // Signed like every other Page call — this one edits the Page's
+    // Messenger front door, so Require App Secret refuses it unsigned.
+    const auth = new URLSearchParams({
+      access_token: token,
+      ...proofParams(token, businessSecret()),
+    });
+    const res = await fetch(`${FB_API}/me/messenger_profile?${auth}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
