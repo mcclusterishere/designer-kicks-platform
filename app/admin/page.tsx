@@ -544,7 +544,7 @@ export default async function AdminPage({
     desk: "business", saas: "business", market: "selling",
     games: "publishing", content: "publishing", team: "settings",
   };
-  const TAB_IDS = ["pulse", "roster", "selling", "publishing", "business", "settings"];
+  const TAB_IDS = ["pulse", "chatbot", "roster", "selling", "publishing", "business", "settings"];
   const requested = TAB_ALIAS[tabParam ?? ""] ?? tabParam ?? "";
   const tab = editArticle
     ? "publishing"
@@ -606,6 +606,7 @@ export default async function AdminPage({
         <nav aria-label="Admin sections" className="mt-6 flex flex-wrap gap-1.5 rounded-2xl border border-edge bg-surface p-2">
           {[
             { id: "pulse", label: "Pulse", icon: "📊", n: 0 },
+            { id: "chatbot", label: "Chat bot", icon: "💬", n: 0 },
             { id: "roster", label: "People", icon: "👟", n: rosterAttention },
             { id: "selling", label: "Selling", icon: "💰", n: 0 },
             { id: "publishing", label: "Publishing", icon: "📰", n: 0 },
@@ -2054,15 +2055,16 @@ export default async function AdminPage({
       </section>
       )}
 
-      {/* What people say back to us on Meta, answered from one desk. */}
-      {show("pulse") && (
+      {/* The conversation room: what people say back to us on Meta,
+          answered from one desk — and the machine that answers first. */}
+      {show("chatbot") && (
         <section className="mt-8">
           <EngagePanel />
         </section>
       )}
 
       {/* The comment-to-DM machine and its flow graph. */}
-      {show("pulse") && (
+      {show("chatbot") && (
         <section className="mt-8">
           <ChatbotPanel />
         </section>
