@@ -95,11 +95,19 @@ export function authorizeUrl(provider: ConnectProvider, state: string): string {
     });
     return `${THREADS_AUTH}/oauth/authorize?${qs}`;
   }
+  // Business apps authenticate via Facebook Login for Business, whose
+  // dialog prefers a saved "configuration" (config_id) over raw
+  // scopes. When Meta's dashboard hands you one, set META_FLB_CONFIG_ID
+  // and it's used; without it, the classic scope list still asks for
+  // exactly what page publishing needs.
+  const configId = process.env.META_FLB_CONFIG_ID;
   const qs = new URLSearchParams({
     client_id: businessAppId(),
     redirect_uri: redirect,
     response_type: "code",
-    scope: "pages_show_list,pages_manage_posts,pages_read_engagement",
+    ...(configId
+      ? { config_id: configId }
+      : { scope: "pages_show_list,pages_manage_posts,pages_read_engagement" }),
     state,
   });
   return `${FB_AUTH}/dialog/oauth?${qs}`;

@@ -13,20 +13,23 @@ pulled via their Developer Tools MCP. Three rules drive everything:
    Facebook Login" use case cannot share an app with ANY business use
    case.** Selecting it greys the rest out — that's by design, not a
    bug. It gets its own tiny app.
-2. **All the business use cases stack in ONE app** — Pages, Messenger,
-   Instagram, Threads, all three Marketing API use cases, oEmbed.
-   (Meta's doc explicitly blesses Threads + Pages in one app.)
+2. **The business use cases stack in ONE app** — Pages, Messenger,
+   Instagram, Threads, all three Marketing API use cases (Meta's doc
+   explicitly blesses Threads + Pages together). The one split inside
+   the business world: an app holds only ONE of the two Instagram API
+   setups, so editor IG connects get a small third app.
 3. **Use cases can be added to an app later, but NEVER removed.** Add
    generously — a use case you skip today is another dashboard visit
    tomorrow; a use case you add is permanent either way.
 
 Also: you can hold a role on at most **15 apps** unless they're
-connected to a verified business portfolio. Two is fine.
+connected to a verified business portfolio. Three is fine.
 
 | App | Type | Serves |
 |---|---|---|
-| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor channel connections, ads/leads/insights via Marketing API, Live Video, embeds |
+| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Live Video |
 | **App 2 — "The Heat Chart Login"** | Consumer | The "Sign in with Facebook" button for fans |
+| **App 3 — "The Heat Chart Creators"** | Business | Editor Instagram connects only — one app can hold only ONE of the two Instagram API setups, and the house needs the Facebook-Login setup while editors need the Instagram-Login one |
 
 ---
 
@@ -47,9 +50,11 @@ compatible; incompatible ones grey out and none of these should):
 3. **Manage messaging & content on Instagram** — IG DMs, comments,
    publishing: `instagram_basic`, `instagram_manage_messages`,
    `instagram_manage_comments`, `instagram_content_publish`, plus the
-   **Human Agent** feature (7-day human reply window). Also run the
-   "API setup with Instagram business login" here — it mints the
-   separate **Instagram App ID/Secret** editors connect with.
+   **Human Agent** feature (7-day human reply window). Inside the use
+   case, pick the **"API setup with Facebook Login"** flavor — the
+   house IG is Page-linked, and this flavor is also what Business
+   Discovery and hashtag search require. (The Instagram-Login flavor
+   lives in App 3; one app can't hold both.)
 4. **Access the Threads API** — mints the separate **Threads App
    ID/Secret** pair (below the Meta pair on Basic settings). Scopes:
    `threads_basic`, `threads_content_publish`,
@@ -60,14 +65,29 @@ compatible; incompatible ones grey out and none of these should):
 6. **Capture & manage ad leads with Marketing API** —
    `leads_retrieval` + the leadgen webhook.
 7. **Measure ad performance data with Marketing API** — reporting.
-8. **Embed Facebook, Instagram and Threads content in other
-   websites** — the oEmbed features, for embedding posts on the site.
+~~8. Embed content (oEmbed)~~ — **skip it**: since June 15, 2026
+   Meta's oEmbed endpoints are tokenless for public content — no app,
+   no review needed to embed posts on the site. Only worth adding
+   later for higher rate limits.
 
 Skip: "Create & manage app ads with Meta Ads Manager" (mobile-app
 install ads — explicitly does NOT include the Marketing API),
-"Fundraisers" (the `manage_fundraisers` permission has eligibility
-strings attached — revisit if a charity drop ever happens), Instant
-Games, Audience Network, WhatsApp (later, deliberately).
+"Fundraisers" (the API only creates person-for-CHARITY fundraisers —
+a for-profit cannot raise for itself, so it's only useful if we ever
+run a charity drop with a nonprofit beneficiary), Instant Games,
+Audience Network, WhatsApp (later, deliberately).
+
+Marketing API notes: managing YOUR OWN ad account needs NO App Review
+— Standard Access covers it. But the starting ("Limited") tier is a
+tiny quota: 60 points per ad account per 5 minutes (reads=1,
+writes=3, 5-minute lockout on breach) — fine for launch, and when
+real ad ops start, request the tier upgrade under App Review >
+Marketing API Access Tier. Lead webhooks need TWO subscriptions: the
+app-level `leadgen` field AND `POST /{page-id}/subscribed_apps?subscribed_fields=leadgen`
+with the Page token — miss the second and leads silently never
+arrive. Live Video to the Page uses `pages_manage_posts` (no extra
+permission), but Facebook requires the Page to have 100+ followers
+and a 60-day-old account to go live at all — ours clears both.
 
 **Business:** attach the McCluster Corp portfolio and start
 verification NOW — it gates Advanced Access on everything, it's the
@@ -163,9 +183,26 @@ pair — the site's sign-in button reads these).
 
 ---
 
-## After creating both
+## App 3 — the creators app
 
-**Re-authorize the Developer Tools MCP connector and grant BOTH apps
+**Create App** → use case **Manage messaging & content on Instagram**
+→ inside it, pick the **"API setup with Instagram business login"**
+flavor. This mints the **Instagram App ID/Secret** pair that editor
+IG connections use — creators sign in with their own Instagram, no
+Facebook Page required.
+
+- Redirect URI (on that setup screen):
+  `https://theheatchart.com/api/social/callback/instagram`
+- Add the editors' IG accounts as Instagram Testers here too.
+
+→ Railway: `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET` (App 3's
+Instagram pair).
+
+---
+
+## After creating all three
+
+**Re-authorize the Developer Tools MCP connector and grant ALL the apps
 on the consent screen.** From then on Claude can audit settings,
 subscribe webhooks, watch rate limits and read compliance/App Review
 status directly.
