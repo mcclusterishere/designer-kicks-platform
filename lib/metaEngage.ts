@@ -324,6 +324,78 @@ export async function fetchPostContext(
  * is the platform saying "you can't see this", which is an answer, not
  * an error — so the caller treats false as "leave it be".
  */
+/**
+ * The photo somebody attached to their OWN comment.
+ *
+ * Facebook only. An Instagram comment cannot carry an attachment at
+ * all: the IG Comment node has no attachment field, and its `media`
+ * field is the parent post, not something the commenter uploaded.
+ *
+ * The field is `attachment`, SINGULAR. The plural `attachments` is the
+ * POST edge, and asking a comment for it returns nothing. That
+ * conflation is a known bug class and this codebase has already been
+ * bitten once by assuming a post field works on another node.
+ *
+ * Returns a still-image URL or null. The URL is deliberately not
+ * returned for storage: fbcdn links carry an `oe=` expiry and are dead
+ * within hours, so the caller must download inside the same pass.
+ */
+export async function fetchCommentPhoto(
+  platform: string,
+  commentId: string
+): Promise<string | null> {
+  if (platform !== "facebook") return null;
+  const full =
+    "attachment{type,media_type,media{image{src}},subattachments{data{type,media_type,media{image{src}}}}}";
+  // The narrow list is the documented core; the wide one is assembled
+  // from verified field names but never seen as a documented example
+  // request, so a 400 on it is expected rather than exceptional.
+  const narrow = "attachment{media_type,media{image{src}}}";
+  let json: Record<string, unknown> | null = null;
+  for (const fields of [full, narrow]) {
+    try {
+      json = await graph(commentId, { fields });
+      break;
+    } catch (e) {
+      if (fields === narrow) {
+        console.error(`[metaEngage] comment attachment read failed for ${commentId}:`, e);
+        return null;
+      }
+    }
+  }
+  if (!json) return null;
+
+  type Att = {
+    type?: string;
+    media_type?: string;
+    media?: { image?: { src?: string } };
+    subattachments?: { data?: Att[] };
+  };
+  // An animated GIF comes back as type "animated_image_video" with
+  // media_type "video", and its image.src is only a frozen preview
+  // frame. Sending that to a vision model produces confident nonsense
+  // about a still that was never the point. Both discriminators are
+  // required: media_type is coarse, type is fine-grained, and anything
+  // unrecognised is a skip rather than an assumed photo.
+  const isStill = (a: Att | undefined): boolean => {
+    if (!a) return false;
+    const mt = String(a.media_type ?? "").toLowerCase();
+    const t = String(a.type ?? "").toLowerCase();
+    if (mt !== "photo" && mt !== "image") return false;
+    if (t.includes("video") || t.includes("animated")) return false;
+    return Boolean(a.media?.image?.src);
+  };
+
+  const att = json.attachment as Att | undefined;
+  if (isStill(att)) return att!.media!.image!.src!;
+  // A multi-photo comment hangs the real photos off subattachments.
+  // One is all we need and all we send.
+  for (const sub of att?.subattachments?.data ?? []) {
+    if (isStill(sub)) return sub.media!.image!.src!;
+  }
+  return null;
+}
+
 export async function likeObject(objectId: string): Promise<boolean> {
   try {
     await graph(`${objectId}/likes`, {}, "POST");

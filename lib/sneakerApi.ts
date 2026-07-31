@@ -268,15 +268,25 @@ async function fromGemini(query: string): Promise<SneakerHit> {
  * the first provider that answers, or null if every provider is unset,
  * throttled, or empty-handed.
  */
-export async function lookupSneaker(query: string): Promise<SneakerHit | null> {
+export async function lookupSneaker(
+  query: string,
+  opts: { allowGrounding?: boolean } = {}
+): Promise<SneakerHit | null> {
   const q = query.trim();
   if (!q) return null;
   const chain: Array<(s: string) => Promise<SneakerHit>> = [
     fromKicksDB,
     fromRapidStockX,
     fromApify,
-    fromGemini, // free tier — last so a real sneaker API answers first
   ];
+  // fromGemini is the only rung that uses Google Search grounding, and
+  // grounding is licensed only for an application the customer owns and
+  // operates, shown to the person who submitted the prompt, unmodified
+  // and uncached. A Facebook comment thread is none of those: Meta owns
+  // it, it is public, the whole point is wrapping the answer in banter,
+  // and we persist what comes back. So anything reached from a comment
+  // passes allowGrounding: false and stops at the real sneaker APIs.
+  if (opts.allowGrounding !== false) chain.push(fromGemini);
   for (const provider of chain) {
     try {
       return await provider(q);

@@ -501,6 +501,72 @@ async function main() {
       /don't name a shoe you weren't told the name of/.test(DEFAULT_COMMENT_STYLE)
   );
 
+  // ---- Somebody else's photo ---------------------------------------------
+  // The most sensitive thing this bot touches. Meta's Platform Terms
+  // only allow handing it to a third party that processes it solely at
+  // our direction, and Google's unpaid tier trains on what it is sent.
+  const visSrc = readFileSync(join(process.cwd(), "lib", "shoeVision.ts"), "utf8");
+  const metaSrc = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
+  const shopSrc = readFileSync(join(process.cwd(), "lib", "sneakerApi.ts"), "utf8");
+
+  check(
+    "a commenter's photo never reaches Gemini without the attestation",
+    /platformDataAllowed\(\)/.test(visSrc) &&
+      /if \(!geminiConfigured\(\) \|\| !platformDataAllowed\(\)\) return null;/.test(visSrc),
+    "the unpaid tier trains on what it is sent, which breaks the service-provider clause"
+  );
+  check(
+    "reading someone's photo never turns on search grounding",
+    (() => {
+      const fn = visSrc.slice(visSrc.indexOf("export async function readCommentPhoto"));
+      const body = fn.slice(0, fn.indexOf("\n}\n"));
+      return !/search:\s*true/.test(body);
+    })(),
+    "grounding is licensed for your own app shown to the asker, which a public comment is not"
+  );
+  check(
+    "the sneaker lookup can be told to skip the grounded rung",
+    /allowGrounding\?: boolean/.test(shopSrc) &&
+      /if \(opts\.allowGrounding !== false\) chain\.push\(fromGemini\);/.test(shopSrc),
+    "otherwise a comment could reach a grounded call whose answer gets persisted"
+  );
+  check(
+    "comment attachments are read with the SINGULAR field",
+    /attachment\{/.test(metaSrc) && !/fields.*attachments\{.*comment/i.test(metaSrc),
+    "the plural attachments is the POST edge and returns nothing on a comment"
+  );
+  check(
+    "an animated GIF is never mistaken for a photo of shoes",
+    /animated/.test(metaSrc) &&
+      /if \(t\.includes\("video"\) \|\| t\.includes\("animated"\)\) return false;/.test(metaSrc),
+    "its image.src is a frozen preview frame, so the model would describe the wrong thing"
+  );
+  check(
+    "an unrecognised attachment type is skipped, not assumed to be an image",
+    /if \(mt !== "photo" && mt !== "image"\) return false;/.test(metaSrc)
+  );
+  check(
+    "Instagram is excluded from the photo path at the door",
+    /if \(platform !== "facebook"\) return null;/.test(metaSrc),
+    "an IG comment has no attachment field at all, so there is nothing to fetch"
+  );
+  check(
+    "a photo-only comment is no longer dropped before it is looked at",
+    /const hasWords = Boolean\(e\.text/.test(botSrc) &&
+      /if \(!hasWords && !mightHavePhoto\) return;/.test(botSrc),
+    "the whole post-your-favourite-pair format is comments with no words"
+  );
+  check(
+    "a photo of something that isn't footwear gets no shoe compliment",
+    /if \(read\?\.isSneaker\)/.test(botSrc),
+    "complimenting someone's sneakers under a picture of their dog"
+  );
+  check(
+    "the photo read is not kept against the person who posted it",
+    !/commentPhoto.*create|photoRead.*prisma|prisma.*photoRead/i.test(botSrc),
+    "per-person collection profiles from Platform Data need consent we do not have"
+  );
+
   // ---- The model ladder --------------------------------------------------
   // Every reply on the page rides this. A shut-down model id in the
   // chain is not a warning, it is a guaranteed failed request.

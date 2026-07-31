@@ -1,4 +1,4 @@
-import { geminiConfigured, geminiJson, type GeminiPart } from "./gemini";
+import { geminiConfigured, geminiJson, platformDataAllowed, type GeminiPart } from "./gemini";
 import { fetchPostContext } from "./metaEngage";
 
 /**
@@ -173,6 +173,74 @@ export async function identifyPostShoes(
   postId: string | null
 ): Promise<string | null> {
   return (await describePost(platform, postId))?.lineup ?? null;
+}
+
+const PHOTO_SYSTEM =
+  'You look at a photo somebody posted in a comment on a sneaker page and identify the shoes, so the page can compliment them accurately. Answer ONLY with JSON: {"isSneaker": true, "name": "Air Jordan 4 Retro Bred", "confidence": "high", "details": ["heel tab has yellowed", "midsole paint is clean"]}\n\n' +
+  'isSneaker: false if the photo is not of footwear at all (a person, a pet, a meme, a screenshot, a receipt). When false, everything else can be null or empty.\n\n' +
+  'name: the common model plus colorway. Set it to null unless you are genuinely confident. A wrong name is far worse than no name here, because the page is about to say it out loud to the person who owns them.\n\n' +
+  'confidence: "high" only when you are sure of the exact model AND colorway. "medium" when you know the model but not the colorway. "low" when you are guessing at all, in which case name should be null.\n\n' +
+  'details: one to three short, concrete, TRUE observations about what you can actually see. Condition, colour blocking, the state of the midsole, how they are laced, what they are photographed on. No praise, no adjectives like amazing, just what is there. These become the specific compliment, so a generic detail is useless.';
+
+export type PhotoRead = {
+  isSneaker: boolean;
+  name: string | null;
+  confidence: "high" | "medium" | "low";
+  details: string[];
+};
+
+/**
+ * Identify the shoes in a commenter's own photo.
+ *
+ * NO search grounding, ever. Google licenses Search grounding only for
+ * an application the customer owns and operates, shown unmodified to
+ * the person who submitted the prompt, uncached and not used to build
+ * an index. A public Facebook comment fails every one of those, and
+ * the citation chips it requires cannot be rendered in a comment at
+ * all. So this identifies from the image alone and returns null rather
+ * than reaching for the web.
+ *
+ * Nothing here is retained against the person. The read answers one
+ * reply and is discarded: building a picture of what an individual
+ * owns, across comments, is profile-building on Platform Data without
+ * consent, which is a named Prohibited Practice.
+ */
+export async function readCommentPhoto(imageUrl: string): Promise<PhotoRead | null> {
+  if (!geminiConfigured() || !platformDataAllowed()) return null;
+  try {
+    const part = await fetchImagePart(imageUrl);
+    if (!part) return null;
+    const out = await geminiJson<{
+      isSneaker?: boolean;
+      name?: string | null;
+      confidence?: string;
+      details?: string[];
+    }>({
+      system: PHOTO_SYSTEM,
+      parts: [part, { text: "Identify the shoes in this photo." }],
+      temperature: 0.2,
+    });
+    if (!out) return null;
+    const confidence =
+      out.confidence === "high" || out.confidence === "medium" ? out.confidence : "low";
+    // A name we are not confident about is not a name. The reply prompt
+    // is built to compliment honestly without one.
+    const name =
+      confidence !== "low" && typeof out.name === "string" && out.name.trim()
+        ? out.name.trim().slice(0, 120)
+        : null;
+    return {
+      isSneaker: out.isSneaker !== false,
+      name,
+      confidence,
+      details: (out.details ?? [])
+        .filter((d): d is string => typeof d === "string" && d.trim().length > 0)
+        .slice(0, 3)
+        .map((d) => d.trim().slice(0, 120)),
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -16,6 +16,34 @@ export function geminiConfigured(): boolean {
 }
 
 /**
+ * May we hand Meta-sourced content to Google?
+ *
+ * Meta's Platform Terms define Platform Data to include anything
+ * "derived from" data we obtain from them, so a Gemini description of
+ * a commenter's photo is itself Platform Data. Sharing it with a third
+ * party is only permitted where that party acts as our Service
+ * Provider, processing it "solely for you and at your direction and
+ * for no other purpose, including for the Service Provider's own
+ * purposes". Google's UNPAID Gemini tier uses prompts and images to
+ * improve Google products, which is the provider's own purpose, and
+ * that is the clause this would break.
+ *
+ * Setting META_SERVICE_PROVIDER_ATTESTED is the owner stating that the
+ * key is on a paid tier with the data-processing terms in place. It
+ * verifies nothing on its own — it is a deliberate, human act of
+ * attestation, and this comment is here so nobody later mistakes it
+ * for a check.
+ *
+ * Only the commenter-photo path is hard-gated on this today. Somebody
+ * else's face or living room going to a third party is a different
+ * order of exposure than our own post caption, and it is new, so
+ * gating it breaks nothing that already worked.
+ */
+export function platformDataAllowed(): boolean {
+  return Boolean(process.env.META_SERVICE_PROVIDER_ATTESTED);
+}
+
+/**
  * The model ladder, newest and cheapest first.
  *
  * gemini-2.0-flash was in this list as the safety net until it was shut

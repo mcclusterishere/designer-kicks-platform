@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { businessSecret, proofParams } from "./appsecret";
-import { geminiChat, geminiConfigured, geminiJson } from "./gemini";
+import { geminiChat, geminiConfigured, geminiJson, platformDataAllowed } from "./gemini";
 import {
   engageConfigured,
   likeObject,
@@ -641,7 +641,13 @@ async function maybePublicAiReply(
   handled: Set<string>
 ): Promise<void> {
   if (!settings.publicReplies || !geminiConfigured()) return;
-  if (!e.text || e.text.trim().length < 2) return;
+  // A comment with no words used to be dropped here. That silently
+  // threw away the entire "post a picture of your favourite pair"
+  // format, where the photo IS the comment. Only bail when there is
+  // neither words nor a photo to look at.
+  const hasWords = Boolean(e.text && e.text.trim().length >= 2);
+  const mightHavePhoto = e.platform === "facebook" && platformDataAllowed();
+  if (!hasWords && !mightHavePhoto) return;
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -672,6 +678,35 @@ async function maybePublicAiReply(
   const brief = await describePost(e.platform, e.parentId ?? null);
   const thread = await threadBrief(e.parentId ?? null, e.objectId);
 
+  // Their own photo, when there is one. Read it when the post asked for
+  // photos, or when the comment has no words at all and would otherwise
+  // be unanswerable. On a text-heavy poll this costs nothing extra.
+  let photo: { identified: string | null } | null = null;
+  if (mightHavePhoto && (brief?.kind === "photo-prompt" || !hasWords)) {
+    const { fetchCommentPhoto } = await import("./metaEngage");
+    const { readCommentPhoto } = await import("./shoeVision");
+    const url = await fetchCommentPhoto(e.platform, e.objectId);
+    if (url) {
+      const read = await readCommentPhoto(url);
+      // A photo of something that isn't footwear gets no photo frame:
+      // complimenting someone's sneakers under a picture of their dog
+      // is the exact failure this avoids.
+      if (read?.isSneaker) {
+        photo = {
+          identified: read.name
+            ? read.details.length
+              ? `${read.name} (what we can see: ${read.details.join(", ")})`
+              : read.name
+            : read.details.length
+              ? `not named, but what we can see: ${read.details.join(", ")}`
+              : null,
+        };
+      }
+    }
+  }
+  // Nothing to say and nothing to look at.
+  if (!hasWords && !photo) return;
+
   const reply = await geminiChat({
     system: settings.commentStyle,
     history: [
@@ -682,7 +717,7 @@ async function maybePublicAiReply(
           brief,
           postText: ctx.text,
           thread,
-          photo: null,
+          photo,
           fromName: e.fromName,
           commentText: e.text,
         }),
