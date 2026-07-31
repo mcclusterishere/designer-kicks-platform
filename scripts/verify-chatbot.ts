@@ -501,6 +501,41 @@ async function main() {
       /don't name a shoe you weren't told the name of/.test(DEFAULT_COMMENT_STYLE)
   );
 
+  // ---- The model ladder --------------------------------------------------
+  // Every reply on the page rides this. A shut-down model id in the
+  // chain is not a warning, it is a guaranteed failed request.
+  const gemSrc = readFileSync(join(process.cwd(), "lib", "gemini.ts"), "utf8");
+  // Scan the ladder ARRAY, not the whole file: the comments above it
+  // name the dead model on purpose, to say why it was removed.
+  const ladder = gemSrc.match(/const MODEL_LADDER = \[([^\]]*)\]/)?.[1] ?? "";
+  check(
+    "the model that Google shut down in June is gone from the ladder",
+    ladder.length > 0 && !ladder.includes("gemini-2.0-flash"),
+    "it was the safety net, which made the net a guaranteed second failure"
+  );
+  check(
+    "a lite model leads the ladder and a known-good one backstops it",
+    ladder.includes("gemini-3.1-flash-lite") &&
+      ladder.includes("gemini-2.5-flash") &&
+      ladder.indexOf("gemini-3.1-flash-lite") < ladder.indexOf("gemini-2.5-flash"),
+    "being wrong about a new id costs one failed request, not an outage"
+  );
+  check(
+    "the ladder remembers which rung answered",
+    /workingModel = model;/.test(gemSrc) &&
+      /\[workingModel, \.\.\.MODEL_LADDER\.filter/.test(gemSrc),
+    "without this a dead id at the top taxes every call for the life of the process"
+  );
+  check(
+    "GEMINI_MODEL still pins one model and skips the ladder",
+    /if \(process\.env\.GEMINI_MODEL\) return \[process\.env\.GEMINI_MODEL\];/.test(gemSrc)
+  );
+  check(
+    "both the json and the chat path use the same ladder",
+    (gemSrc.match(/const models = modelLadder\(\);/g) ?? []).length === 2,
+    "the chat path is what answers comments, so it cannot keep its own stale list"
+  );
+
   check(
     "the public reply reads the post brief, not just the lineup",
     botSrc.includes("describePost") && botSrc.includes("situationBlock({"),

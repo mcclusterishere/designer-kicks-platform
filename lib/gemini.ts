@@ -15,6 +15,41 @@ export function geminiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+/**
+ * The model ladder, newest and cheapest first.
+ *
+ * gemini-2.0-flash was in this list as the safety net until it was shut
+ * down on 1 June 2026, which made the net a guaranteed second failure.
+ * gemini-2.5-flash is scheduled to shut down 16 October 2026, so it is
+ * a backstop now, not a default.
+ *
+ * The flash-lite tier does text AND vision at one input rate, so the
+ * sneaker-photo call rides the same cheap model as the comment replies
+ * and no two-model split is needed.
+ *
+ * HONESTY NOTE: the two lite ids could not be called from the machine
+ * this was written on, because the sandbox blocks every Google host.
+ * They are ordered ahead of the known-good model precisely so that
+ * being wrong costs one failed request rather than an outage: the
+ * caller falls through the ladder and 2.5-flash still answers. Pin
+ * GEMINI_MODEL to skip the ladder entirely.
+ */
+const MODEL_LADDER = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
+
+/**
+ * Whichever rung actually answered last. Without this, a dead id at the
+ * top of the ladder taxes EVERY call with a wasted round trip for the
+ * life of the process. One failure is a probe; a thousand is a latency
+ * bug.
+ */
+let workingModel: string | null = null;
+
+function modelLadder(): string[] {
+  if (process.env.GEMINI_MODEL) return [process.env.GEMINI_MODEL];
+  if (!workingModel) return MODEL_LADDER;
+  return [workingModel, ...MODEL_LADDER.filter((m) => m !== workingModel)];
+}
+
 function extractJson(text: string): unknown | null {
   const cleaned = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   const start = cleaned.indexOf("{");
@@ -43,11 +78,7 @@ export async function geminiJson<T = unknown>(opts: {
   if (!key) return null;
   const apiKey: string = key; // narrowed copy visible inside call()
 
-  // Newest capable model first; the older flash stays as a safety net
-  // for keys/regions that don't serve it yet. GEMINI_MODEL pins one.
-  const models = process.env.GEMINI_MODEL
-    ? [process.env.GEMINI_MODEL]
-    : ["gemini-2.5-flash", "gemini-2.0-flash"];
+  const models = modelLadder();
   const apiBase = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com";
   const body = {
     system_instruction: { parts: [{ text: opts.system }] },
@@ -74,11 +105,13 @@ export async function geminiJson<T = unknown>(opts: {
     for (const model of models) {
       try {
         data = await call(model, Boolean(opts.search));
+        workingModel = model;
         break;
       } catch (e1) {
         if (opts.search) {
           try {
             data = await call(model, false);
+            workingModel = model;
             break;
           } catch (e2) {
             lastErr = e2;
@@ -135,9 +168,7 @@ export async function geminiChat(opts: {
   if (!key) return null;
   const apiKey: string = key;
 
-  const models = process.env.GEMINI_MODEL
-    ? [process.env.GEMINI_MODEL]
-    : ["gemini-2.5-flash", "gemini-2.0-flash"];
+  const models = modelLadder();
   const apiBase = process.env.GEMINI_API_URL || "https://generativelanguage.googleapis.com";
   const body = {
     system_instruction: { parts: [{ text: opts.system }] },
@@ -163,6 +194,7 @@ export async function geminiChat(opts: {
     for (const model of models) {
       try {
         data = await call(model);
+        workingModel = model;
         break;
       } catch (e) {
         lastErr = e;
