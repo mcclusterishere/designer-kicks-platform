@@ -67,6 +67,7 @@ import BroadcastForm from "./BroadcastForm";
 import BattleBlast from "./BattleBlast";
 import { instantChannelStatus } from "@/lib/socialInstant";
 import { GroupForm, GroupLeadRow } from "./GroupScout";
+import GroupRun from "./GroupRun";
 import { HouseOutfitForm, OutfitBattleForm, OutreachRow } from "./OutfitStudioForms";
 import { ScoutForm, ManualStoreForm, StoreLeadRow } from "./StoreScout";
 import { placesConfigured } from "@/lib/stores";
@@ -1471,6 +1472,9 @@ export default async function AdminPage({
             ))}
           </div>
         )}
+
+        {/* The share assembly line: copy → open → paste → ✓. */}
+        <GroupRun />
       </section>
       )}
 

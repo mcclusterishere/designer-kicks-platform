@@ -6906,3 +6906,30 @@ export async function chatbotInstallAction(
   revalidatePath("/admin");
   return { ok: true, note: `${res.detail} ${flows.length} opener(s) installed.` };
 }
+
+/**
+ * Tick (or untick) "shared this post into that group". A toggle, not
+ * an append — fat-fingering a ✓ on the wrong group must be one tap to
+ * undo, or the run's memory stops being trusted and stops being used.
+ */
+export async function groupShareAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const groupLeadId = String(formData.get("groupId") ?? "");
+  const postUrl = String(formData.get("postUrl") ?? "");
+  const postTitle = String(formData.get("postTitle") ?? "");
+  if (!groupLeadId || !postUrl) return { ok: false, error: "Missing group or post." };
+
+  const existing = await prisma.groupShare.findUnique({
+    where: { groupLeadId_postUrl: { groupLeadId, postUrl } },
+  });
+  if (existing) {
+    await prisma.groupShare.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.groupShare.create({ data: { groupLeadId, postUrl, postTitle } });
+  }
+  revalidatePath("/admin");
+  return { ok: true, note: existing ? "Unticked." : "Marked shared." };
+}

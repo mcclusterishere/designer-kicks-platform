@@ -320,6 +320,8 @@ model GroupLead {
   notes     String?
   campaign  String   @unique // utm_campaign slug for the tagged link
   createdAt DateTime @default(now())
+
+  shares GroupShare[]
 }
 
 // BETA (admin-only): Store Scout. Local shoe stores prospected by zip
@@ -2175,4 +2177,24 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([contactId, createdAt])
+}
+
+/// One "I shared this post into that group" checkmark. The Groups API
+/// is gone (Meta removed it in 2024), so sharing into groups is a
+/// human act — this table is what turns it from a memory exercise into
+/// an assembly line: the Group Run panel shows every tracked group
+/// crossed with every recent post, and this row is the ✓.
+model GroupShare {
+  id          String    @id @default(cuid())
+  groupLeadId String
+  group       GroupLead @relation(fields: [groupLeadId], references: [id], onDelete: Cascade)
+
+  /// What was shared — the canonical site URL of the piece/post.
+  postUrl   String
+  postTitle String
+
+  sharedAt DateTime @default(now())
+
+  @@unique([groupLeadId, postUrl])
+  @@index([postUrl])
 }
