@@ -258,9 +258,32 @@ export async function hideComment(commentId: string, hide: boolean): Promise<voi
 }
 
 /**
- * Send into a conversation. messaging_type RESPONSE = answering within
- * the 24-hour window a person opens by messaging us. That constant is
- * the legal boundary, not a default to change.
+ * WHO is sending, which decides what Meta permits.
+ *
+ *   "automation"  the bot. Legal only inside the 24-hour window a
+ *                 person opens by messaging us. messaging_type RESPONSE.
+ *   "human_agent" a person sitting at the Engagement desk, typing.
+ *                 Carries the HUMAN_AGENT tag, which Meta grants "to
+ *                 provide human agent support in cases where a user's
+ *                 issue cannot be resolved in the standard messaging
+ *                 window" — e.g. someone messaged Saturday night and a
+ *                 human answers Monday.
+ *
+ * This is a POLICY line, not a technical one, and it is the reason this
+ * is an explicit argument rather than something inferred from elapsed
+ * time. Stamping HUMAN_AGENT on an automated reply tells Meta a human
+ * is answering when none is. That is a misrepresentation to the
+ * platform, and messaging access is exactly what it costs.
+ *
+ * So the tag is unreachable from the automation: every chatbot and
+ * rules-engine path takes the default, and only the admin desk — behind
+ * requireAdmin(), with a human's hands on the keyboard — passes
+ * "human_agent". Nothing in this file upgrades a sender on its own.
+ */
+export type ReplySender = "automation" | "human_agent";
+
+/**
+ * Send into a conversation.
  *
  * `quickReplies` renders as tap buttons under the message — Meta caps
  * them at 13 with 20-character labels, enforced here so a fat-fingered
@@ -269,7 +292,8 @@ export async function hideComment(commentId: string, hide: boolean): Promise<voi
 export async function sendDmReply(
   recipientId: string,
   text: string,
-  quickReplies?: Array<{ label: string; payload: string }>
+  quickReplies?: Array<{ label: string; payload: string }>,
+  sender: ReplySender = "automation"
 ): Promise<void> {
   const message: Record<string, unknown> = { text };
   if (quickReplies && quickReplies.length > 0) {
@@ -279,11 +303,13 @@ export async function sendDmReply(
       payload: q.payload,
     }));
   }
+  const byHuman = sender === "human_agent";
   await graph(
     "me/messages",
     {
       recipient: JSON.stringify({ id: recipientId }),
-      messaging_type: "RESPONSE",
+      messaging_type: byHuman ? "MESSAGE_TAG" : "RESPONSE",
+      ...(byHuman ? { tag: "HUMAN_AGENT" } : {}),
       message: JSON.stringify(message),
     },
     "POST"

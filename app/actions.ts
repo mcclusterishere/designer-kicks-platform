@@ -6636,7 +6636,9 @@ export async function engageReplyAction(
     if (event.kind === "comment") {
       await replyToComment(event.platform, event.objectId, text);
     } else if (event.kind === "message" && event.fromId) {
-      await sendDmReply(event.fromId, text);
+      // requireAdmin() above means a person typed this, so it goes out
+      // under the human-agent tag — the 7-day window, not the 24-hour one.
+      await sendDmReply(event.fromId, text, undefined, "human_agent");
     } else {
       return { ok: false, error: "This event type can't be replied to." };
     }
@@ -6685,15 +6687,17 @@ export async function inboxReplyAction(
   if (!senderId || !text) return { ok: false, error: "Write the reply first." };
   const { sendDmReply } = await import("@/lib/metaEngage");
   try {
-    await sendDmReply(senderId, text);
+    // A human is at the desk (requireAdmin above), so this carries the
+    // human-agent tag and reaches 7 days back instead of 24 hours.
+    await sendDmReply(senderId, text, undefined, "human_agent");
   } catch (e) {
-    // The most common refusal is the 24-hour window closing. Say what
-    // that means instead of relaying a Graph error code.
+    // The most common refusal is the window closing. Say what that
+    // means instead of relaying a Graph error code.
     const msg = e instanceof Error ? e.message : "";
     return {
       ok: false,
-      error: /window|24|time/i.test(msg)
-        ? "Meta closed the reply window — more than 24 hours since their last message. They have to message again first."
+      error: /window|24|time|tag/i.test(msg)
+        ? "Meta closed the reply window — it's been more than 7 days since they messaged. They have to message again first."
         : msg || "Meta refused the reply.",
     };
   }

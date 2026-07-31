@@ -312,6 +312,47 @@ async function main() {
     );
   }
 
+  // ---- The human-agent line -------------------------------------------
+  // HUMAN_AGENT tells Meta a person is answering. The bot must never be
+  // able to say that. This is a policy boundary with the Page's
+  // messaging access on the other side of it, so it gets a test rather
+  // than a comment asking nicely.
+  const HUMAN_TAG = /"human_agent"|HUMAN_AGENT/;
+  const AUTOMATION_FILES = ["lib/chatbot.ts", "lib/gemini.ts"];
+  for (const f of AUTOMATION_FILES) {
+    let src = "";
+    try {
+      src = readFileSync(join(process.cwd(), f), "utf8");
+    } catch {
+      continue; // file may not exist in every checkout
+    }
+    check(
+      `${f} cannot reach the human-agent tag`,
+      !HUMAN_TAG.test(src),
+      "an automated reply claiming to be a human agent is a misrepresentation to Meta"
+    );
+  }
+
+  const engageSrc = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
+  check(
+    "the tag rides on MESSAGE_TAG, never on RESPONSE",
+    /messaging_type:\s*byHuman\s*\?\s*"MESSAGE_TAG"\s*:\s*"RESPONSE"/.test(engageSrc),
+    "Meta refuses a tag sent with messaging_type RESPONSE"
+  );
+  check(
+    "automation is the default sender, so a forgotten argument fails safe",
+    /sender:\s*ReplySender\s*=\s*"automation"/.test(engageSrc),
+    "defaulting the other way would tag every bot reply as human"
+  );
+
+  const actionsSrc = readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8");
+  const humanCalls = actionsSrc.match(/"human_agent"/g) ?? [];
+  check(
+    "only the admin desk sends as a human, and both its paths do",
+    humanCalls.length === 2,
+    `${humanCalls.length} call sites — expected the two behind requireAdmin()`
+  );
+
   // ---- Caption budget -------------------------------------------------
   const caption = ownChannelCaption({
     title: "A Very Long Title For A Custom Shoe Indeed Yes",
