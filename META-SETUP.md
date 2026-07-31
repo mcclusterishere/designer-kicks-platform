@@ -18,23 +18,35 @@ pulled via their Developer Tools MCP. Three rules drive everything:
    explicitly blesses Threads + Pages together). The one split inside
    the business world: an app holds only ONE of the two Instagram API
    setups, so editor IG connects get a small third app.
-3. **Use cases can be added to an app later, but NEVER removed.** Add
-   generously — a use case you skip today is another dashboard visit
-   tomorrow; a use case you add is permanent either way.
+3. **Use cases can be added later but NEVER removed — and each one is
+   a permanent ANNUAL cost, not just a permanent line item.** Meta's
+   Data Access Renewal requires certifying every permission the app
+   holds, every year, on a 60-day clock with no extensions, and the
+   penalty for missing it is the app being DEACTIVATED. So the rule is
+   the opposite of "add generously": add what you will use, because
+   each addition is something you re-attest to forever. Permissions
+   INSIDE a use case are individually removable even though the use
+   case isn't — that's the release valve. Note also that removing a
+   permission later does not fully erase exposure: Meta says an app
+   "may still be evaluated for permissions and features it could
+   previously access," so not-adding is cleaner than add-then-remove.
 
 Also: you can hold a role on at most **15 apps** unless they're
 connected to a verified business portfolio. Three is fine.
 
 The dashboard groups the 20 use cases as Ads and monetization (7),
 Content management (5), Business messaging (3), Others (5). App 1
-takes twelve of them (confirmed live: creating the app with exactly
-this combination shows "12 use cases added" and a working Next
-button); the notes below say why each remaining one is either
-disabled by the dashboard itself or skipped on purpose.
+takes TEN of them. Twelve was selectable and confirmed working in
+the live wizard ("12 use cases added"), but an adversarial preflight
+pass found two worth dropping before creation — oEmbed (#11, buys
+nothing) and Lead Ads (#6, welds high-sensitivity PII on permanently
+for a feature not shipping yet). Both are addable later. The notes
+below say why each remaining one is either disabled by the dashboard
+itself or skipped on purpose.
 
 | App | Type | Serves |
 |---|---|---|
-| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Catalog, Live Video, oEmbed, **app-install ads for the iOS app** |
+| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Catalog, Live Video, **app-install ads for the iOS app** |
 | **App 2 — "The Heat Chart Login"** | Consumer | The "Sign in with Facebook" button for fans — nothing else |
 | **App 3 — "The Heat Chart Creators"** | Business | Editor Instagram connects only — one app can hold only ONE of the two Instagram API setups, and the house needs the Facebook-Login setup while editors need the Instagram-Login one |
 
@@ -55,12 +67,21 @@ compatible; incompatible ones grey out and none of these should):
    bot's inbox depends on it.
 3. **Manage messaging & content on Instagram** — IG DMs, comments,
    publishing: `instagram_basic`, `instagram_manage_messages`,
-   `instagram_manage_comments`, `instagram_content_publish`, plus the
-   **Human Agent** feature (7-day human reply window). Inside the use
-   case, pick the **"API setup with Facebook Login"** flavor — the
-   house IG is Page-linked, and this flavor is also what Business
-   Discovery and hashtag search require. (The Instagram-Login flavor
-   lives in App 3; one app can't hold both.)
+   `instagram_manage_comments`, `instagram_content_publish`, and
+   **`instagram_manage_insights`** — that last one is easy to miss and
+   Business Discovery does not work without it. Missing it returns
+   `(#10) Application does not have permission for this action`, which
+   reads like an App Review problem but is just an absent scope. Plus
+   the **Human Agent** feature (7-day human reply window), which is a
+   separate App Review application, not an automatic inclusion.
+
+   Inside the use case, pick the **"API setup with Facebook Login"**
+   flavor. THE ONE-WAY DOOR: only one setup per app, and Meta
+   documents no way to undo it. Do not click "Set up" on the "API
+   setup with Instagram business login" row even to look — that button
+   is what registers the setup. Business Discovery, hashtag search and
+   media deletion exist ONLY on the Facebook Login path. (The
+   Instagram-Login flavor lives in App 3.)
 4. **Access the Threads API** — mints the separate **Threads App
    ID/Secret** pair (below the Meta pair on Basic settings). Scopes:
    `threads_basic`, `threads_content_publish`,
@@ -69,7 +90,15 @@ compatible; incompatible ones grey out and none of these should):
 5. **Create & manage ads with Marketing API** — `ads_management`,
    `ads_read`, `business_management`.
 6. **Capture & manage ad leads with Marketing API** —
-   `leads_retrieval` + the leadgen webhook.
+   `leads_retrieval` + the leadgen webhook. COST: `leads_retrieval` is
+   a REQUIRED, non-removable permission on this use case, and it
+   returns lead-form PII (name, email, phone). It is the most
+   sensitive data class in the whole bundle and the likeliest thing to
+   pull the evidence-upload section (data-deletion procedure,
+   retention window, possibly a security certification) onto every
+   annual renewal. Only take it if lead ads are actually running;
+   otherwise add it the day the first lead campaign launches — #5 and
+   #7 cover all other ad work without it.
 7. **Measure ad performance data with Marketing API** — reporting.
 8. **Create & manage ads with ads MCP server** — "build AI agents
    that manage ads on behalf of advertisers." This is what lets
@@ -84,9 +113,16 @@ compatible; incompatible ones grey out and none of these should):
    needs no extra permission beyond `pages_manage_posts`, but
    Facebook requires the Page to have 100+ followers and a 60-day-old
    account to go live.
-11. **Embed content (oEmbed)** — tokenless since June 15, 2026, so
-   embedding public posts works without it; adding it costs nothing
-   and buys higher rate limits.
+11. ~~**Embed content (oEmbed)**~~ — **SKIP.** An earlier version of
+   this doc said it "buys higher rate limits." That was wrong: Meta's
+   announcement says higher limits come with token-based access
+   *through App Review*, which we are not doing for oEmbed. Since the
+   endpoints are tokenless for public content, the use case buys
+   literally nothing over calling
+   `graph.facebook.com/v25.0/instagram_oembed?url={url}` directly —
+   while permanently adding two features (Meta oEmbed Read, Threads
+   oEmbed Read) to certify at every annual renewal. Add it only if a
+   real rate limit is ever hit.
 12. **Create & manage app ads with Meta Ads Manager** — mobile-app
    INSTALL campaigns. CONFIRMED LIVE in the dashboard: this combines
    fine with the full business bundle above (Pages, Instagram,
@@ -217,9 +253,75 @@ account. App Review / Advanced Access only gates serving strangers.
 
 → Railway: `META_BUSINESS_APP_ID`, `META_BUSINESS_APP_SECRET` (App
 1's Meta pair), `FB_PAGE_ID`, `FB_PAGE_ACCESS_TOKEN`, `IG_USER_ID`,
-`INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `THREADS_APP_ID`,
-`THREADS_APP_SECRET`, `THREADS_USER_ID`, `THREADS_ACCESS_TOKEN`,
-`META_WEBHOOK_VERIFY_TOKEN`.
+`THREADS_APP_ID`, `THREADS_APP_SECRET`, `THREADS_USER_ID`,
+`THREADS_ACCESS_TOKEN`, `META_WEBHOOK_VERIFY_TOKEN`.
+
+NOT here: `INSTAGRAM_APP_ID` / `INSTAGRAM_APP_SECRET`. App 1 uses the
+Facebook-Login Instagram setup, which authenticates against the Meta
+app pair and never mints an Instagram App ID. Only App 3's
+Instagram-Login setup produces that pair, and in the code those two
+vars are read solely by the editor connect flow in `lib/metaConnect.ts`.
+
+---
+
+## App 1, immediately after Create — do not skip
+
+The wizard does NOT reliably attach every permission a use case
+implies. Scopes that were never explicitly added come back as
+"Invalid Scopes" at OAuth time, which looks exactly like a code bug
+and isn't. With this many use cases stacked at once it's likely, not
+hypothetical.
+
+1. **Walk every use case's "Permissions and features" tab one at a
+   time** and confirm each needed scope shows as added — BEFORE
+   generating any token. When an OAuth call later rejects a scope,
+   check this dashboard first; do not start editing auth code.
+2. **Pages use case:** only `business_management`, `pages_show_list`,
+   `public_profile` are auto-added (required, non-removable), plus
+   `pages_manage_engagement` as a removable default. Everything the
+   platform actually runs on is an optional add you must click:
+   `pages_manage_posts`, `pages_read_engagement`,
+   `pages_read_user_content`, `pages_manage_metadata`, `read_insights`.
+   (`pages_manage_metadata` is what lets the app subscribe the Page to
+   the messages/feed webhooks — without it the whole bot goes deaf.)
+3. **Instagram use case:** add `instagram_manage_insights` explicitly,
+   then re-mint the user token so the scope is actually in it. Verify
+   with `GET /me/permissions` before debugging anything.
+4. **Remove auto-added permissions you aren't using.** Permissions are
+   individually removable even though use cases aren't — this is what
+   keeps the annual renewal cheap.
+5. **Set the app contact email to a monitored inbox** and verify the
+   developer-account email. Data Access Renewal notice goes to app
+   admins and that contact address; a missed email deactivates the
+   app after 60 days with no extension. Put a monthly reminder to
+   check the Required Actions dashboard — do not rely on email.
+
+**One cheap experiment once the token exists** — Business Discovery
+against an account we don't own may need Advanced Access, or may not;
+the evidence is mixed. Run one call and find out rather than planning
+around a guess:
+
+```
+GET /{IG_USER_ID}?fields=business_discovery.username(SOMEONE_ELSE){followers_count,media_count}
+```
+
+Data back = creator lookups ship immediately. `(#10)` with the scope
+confirmed present = bundle Advanced Access for
+`instagram_manage_insights` into the same App Review submission as
+Instagram Public Content Access (which is what hashtag search needs,
+capped at 30 tags per 7 days with a 24-hour recency window — not a
+launch feature).
+
+**Architectural warning for later:** shared permissions
+(`public_profile`, `business_management`, `pages_show_list`,
+`pages_read_engagement`, `ads_management`) are required across many of
+these use cases at once. Raising any of them from Standard to Advanced
+Access propagates the change across every use case sharing it and can
+pull new review requirements onto use cases we never meant to submit.
+The editor Facebook-Page connect flow is the thing that will
+eventually need Advanced Access — strongly consider moving it onto App
+3 rather than App 1, so the big app stays entirely on Standard Access
+where no App Review is needed at all for managing our own assets.
 
 ---
 
