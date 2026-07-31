@@ -15,6 +15,7 @@ import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { PrismaClient } from "@prisma/client";
 import {
+  buildDmMessage,
   parseWebhookPayload,
   ruleMatches,
   storeEvents,
@@ -434,6 +435,100 @@ async function main() {
     `${caption.length + 2 + link.length} chars`
   );
   check("the caption speaks as the artist, not about them", !caption.includes(" by "));
+
+  // ---- Outbound button template ----------------------------------------
+  // Pure: no token, no network. The wire shape is the whole risk here,
+  // and it is the kind that fails silently as "Meta just refused it".
+  const BTN = { title: "Open The Heat Chart", url: "https://theheatchart.com" };
+  type Msg = {
+    text?: string;
+    attachment?: { type?: string; payload?: { template_type?: string; text?: string; buttons?: Array<Record<string, unknown>> } };
+    quick_replies?: unknown[];
+  };
+  const m = buildDmMessage("Fresh drops land on the site first.", undefined, BTN) as Msg;
+
+  check(
+    "a button reply is a button template",
+    m.attachment?.type === "template" && m.attachment?.payload?.template_type === "button"
+  );
+  check(
+    "the copy moves INTO payload.text and the top-level text is gone",
+    !("text" in m) && m.attachment?.payload?.text === "Fresh drops land on the site first.",
+    "message.text and message.attachment are mutually exclusive; sending both is malformed"
+  );
+  check(
+    "the button carries exactly the three keys that work on both surfaces",
+    JSON.stringify(Object.keys(m.attachment!.payload!.buttons![0]).sort()) ===
+      '["title","type","url"]',
+    "webview_height_ratio is unavailable on Instagram and messenger_extensions would drag in domain whitelisting"
+  );
+  check("it is a web_url button", m.attachment!.payload!.buttons![0].type === "web_url");
+  check("exactly one button, never an empty array", m.attachment!.payload!.buttons!.length === 1);
+
+  const longTitle = buildDmMessage("hi", undefined, { ...BTN, title: "x".repeat(40) }) as Msg;
+  check(
+    "a long button title is sliced to 20, same rule quick-reply titles follow",
+    String(longTitle.attachment!.payload!.buttons![0].title).length === 20
+  );
+  const longCopy = buildDmMessage("x".repeat(641), undefined, BTN) as Msg;
+  check(
+    "copy over the template ceiling drops the button rather than the sentence",
+    longCopy.text?.length === 641 && !("attachment" in longCopy),
+    "chatbot.ts slices replies to 1900, which is legal as text and 3x over the template limit"
+  );
+  check(
+    "copy exactly at the ceiling still gets its button",
+    "attachment" in (buildDmMessage("x".repeat(640), undefined, BTN) as Msg)
+  );
+
+  for (const [name, msg] of [
+    ["plain", buildDmMessage("hi")],
+    ["with a button", buildDmMessage("hi", undefined, BTN)],
+    ["long copy plus a button", buildDmMessage("x".repeat(700), [{ label: "a", payload: "b" }], BTN)],
+  ] as const) {
+    check(
+      `${name}: exactly one of text or attachment is set`,
+      ("text" in (msg as Msg)) !== ("attachment" in (msg as Msg))
+    );
+  }
+
+  check(
+    "quick replies survive alongside a button",
+    Array.isArray(
+      (buildDmMessage("hi", [{ label: "Yes", payload: "Y" }], BTN) as Msg).quick_replies
+    )
+  );
+
+  // The link can only ever be ours. A flow row edited in the admin must
+  // not be able to turn the Page's DMs into a link farm.
+  for (const bad of [
+    { title: "x", url: "http://theheatchart.com" },
+    { title: "x", url: "https://evil.example.com" },
+    { title: "x", url: "https://nottheheatchart.com" },
+    { title: "x", url: "not a url" },
+    { title: "   ", url: "https://theheatchart.com" },
+  ]) {
+    check(
+      `a button for ${bad.url} (${bad.title.trim() || "no title"}) is refused, and the reply still sends`,
+      !("attachment" in (buildDmMessage("hi", undefined, bad) as Msg))
+    );
+  }
+  check(
+    "a subdomain of our own site is allowed",
+    "attachment" in (buildDmMessage("hi", undefined, { title: "Go", url: "https://www.theheatchart.com/x" }) as Msg)
+  );
+
+  const engSrcBtn = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
+  check(
+    "a refused button degrades to plain text, and only when Meta actually answered",
+    /if \(!attached \|\| !\(e instanceof GraphError\)\) throw e;/.test(engSrcBtn),
+    "resending after a timeout would double-message somebody, since we never learned if it landed"
+  );
+  check(
+    "the desk never sends a templated message",
+    /sender === "human_agent" \? undefined : button/.test(engSrcBtn),
+    "a real person typing gets the strictest send there is"
+  );
 }
 
 async function cleanup() {

@@ -254,7 +254,13 @@ async function graph(
     error?: { message?: string };
     [k: string]: unknown;
   };
-  if (!res.ok || json.error) throw new Error(json.error?.message || `Graph ${res.status}`);
+  // Meta ANSWERED and said no. That is a different fact from a timeout
+  // or a DNS failure, where we have no idea whether the message landed,
+  // and the button degrade below is only safe on the first kind: a
+  // resend after a possible delivery double-messages a real person.
+  if (!res.ok || json.error) {
+    throw new GraphError(json.error?.message || `Graph ${res.status}`);
+  }
   return json;
 }
 
@@ -481,13 +487,79 @@ export type ReplySender = "automation" | "human_agent";
  * them at 13 with 20-character labels, enforced here so a fat-fingered
  * flow row degrades to a trimmed button instead of a failed send.
  */
-export async function sendDmReply(
-  recipientId: string,
+/** Meta answered and refused. Distinct from never having heard back. */
+export class GraphError extends Error {}
+
+/**
+ * A tappable link on an outbound reply.
+ *
+ * Three keys, deliberately. webview_height_ratio is documented as not
+ * available on Instagram, and messenger_extensions is only for the
+ * Extensions SDK, which would drag in domain whitelisting we otherwise
+ * do not need. Neither is ever emitted, so one shape is correct on both
+ * surfaces and the Instagram sender inherits that for free.
+ */
+export type ReplyButton = { title: string; url: string };
+
+/**
+ * The button template caps its own text far below a plain message.
+ * chatbot.ts slices AI replies to 1900, which is legal as text and about
+ * three times over this, so long copy has to give up the button rather
+ * than give up half the sentence.
+ */
+const TEMPLATE_TEXT_MAX = 640;
+/** Same 20-char rule quick-reply titles already follow. */
+const BUTTON_TITLE_MAX = 20;
+/**
+ * Our own site or nothing. Not a Meta limit, a self-imposed one: a flow
+ * row edited in the admin should never be able to turn the Page's
+ * outbound DMs into a link farm.
+ */
+const BUTTON_HOST = /(^|\.)theheatchart\.com$/i;
+
+function urlButton(b: ReplyButton): { type: "web_url"; url: string; title: string } | null {
+  let u: URL;
+  try {
+    u = new URL(b.url);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" || !BUTTON_HOST.test(u.hostname)) return null;
+  const title = b.title.trim().slice(0, BUTTON_TITLE_MAX);
+  if (!title) return null;
+  return { type: "web_url", url: u.toString(), title };
+}
+
+/**
+ * The one place an outbound DM's `message` field is shaped.
+ *
+ * text and attachment are MUTUALLY EXCLUSIVE on the Send API, so the
+ * copy moves INTO the template rather than sitting beside it. Written as
+ * a single ternary so that "both were set" is unrepresentable rather
+ * than merely untested, which is the failure a future edit would
+ * otherwise reintroduce by adding one more conditional assignment.
+ *
+ * Quick replies ride alongside either form; Meta documents them as
+ * working with template attachments as well as plain text.
+ *
+ * Exported so the verify suite can hold the wire format to account
+ * without a token or a network.
+ */
+export function buildDmMessage(
   text: string,
   quickReplies?: Array<{ label: string; payload: string }>,
-  sender: ReplySender = "automation"
-): Promise<void> {
-  const message: Record<string, unknown> = { text };
+  button?: ReplyButton
+): Record<string, unknown> {
+  const btn = button ? urlButton(button) : null;
+  const message: Record<string, unknown> =
+    btn && text.length <= TEMPLATE_TEXT_MAX
+      ? {
+          attachment: {
+            type: "template",
+            payload: { template_type: "button", text, buttons: [btn] },
+          },
+        }
+      : { text };
   if (quickReplies && quickReplies.length > 0) {
     message.quick_replies = quickReplies.slice(0, 13).map((q) => ({
       content_type: "text",
@@ -495,12 +567,40 @@ export async function sendDmReply(
       payload: q.payload,
     }));
   }
+  return message;
+}
+
+export async function sendDmReply(
+  recipientId: string,
+  text: string,
+  quickReplies?: Array<{ label: string; payload: string }>,
+  sender: ReplySender = "automation",
+  button?: ReplyButton
+): Promise<void> {
+  // The desk path is never templated: a real person typing gets the
+  // plainest, strictest send there is, and one less thing that can be
+  // refused between them and the customer.
+  const wanted = sender === "human_agent" ? undefined : button;
+  const message = buildDmMessage(text, quickReplies, wanted);
+  const attached = "attachment" in message;
   const body = {
     recipient: JSON.stringify({ id: recipientId }),
     message: JSON.stringify(message),
   };
   if (sender !== "human_agent") {
-    await graph("me/messages", { ...body, messaging_type: "RESPONSE" }, "POST");
+    try {
+      await graph("me/messages", { ...body, messaging_type: "RESPONSE" }, "POST");
+    } catch (e) {
+      // Only when Meta ANSWERED and refused, and only when a button was
+      // what we added. A timeout means we never learned whether it
+      // landed, and resending then double-messages a real person.
+      if (!attached || !(e instanceof GraphError)) throw e;
+      const plain = {
+        recipient: body.recipient,
+        message: JSON.stringify(buildDmMessage(text, quickReplies)),
+      };
+      await graph("me/messages", { ...plain, messaging_type: "RESPONSE" }, "POST");
+    }
     return;
   }
 
