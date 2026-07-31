@@ -64,11 +64,33 @@ const PUBLIC_REPLY_HOURLY_CAP = Math.max(
   Number(process.env.PUBLIC_REPLY_HOURLY_CAP || 30) || 30
 );
 
+/**
+ * Strip the tells that make a reply read as machine-written.
+ *
+ * Asking a model not to use em dashes works most of the time, which is
+ * the problem — "most of the time" on a page this size is still several
+ * a week, in public, under our own name. Prompts are a preference;
+ * this is the guarantee. Runs on every outbound AI reply, public or DM.
+ *
+ * Em and en dashes become commas, because in the one-or-two-sentence
+ * replies this thing writes, that's what the dash was standing in for.
+ * Nothing else about the sentence changes.
+ */
+export function humanize(text: string): string {
+  return text
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/\s*;\s*/g, ", ")
+    .replace(/,\s*,/g, ",")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,!?])/g, "$1")
+    .trim();
+}
+
 export const DEFAULT_PERSONA =
   "You are the automated assistant for The Heat Chart (theheatchart.com), a custom-sneaker culture platform where artists post one-of-one customs, fans vote in battles, and the Heat List ranks the culture. Be brief, warm and hype — 1-3 sentences, no emojis walls. You are a bot and say so if asked. You help people find artists, enter the giveaway, play the games, or claim their artist page. If someone wants to buy, commission, or has a problem, tell them a real person will pick the thread up here shortly. Never invent prices or promises.";
 
 export const DEFAULT_COMMENT_STYLE =
-  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Pick up something specific from THEIR comment and ask a question back that steers toward shoes, customs or fashion. Where it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.";
+  "You reply PUBLICLY, as The Heat Chart's Facebook/Instagram page, to one comment on one of our posts. Sound like a person from sneaker culture, not a bot: 1-2 short sentences, casual, warm, zero hashtags, zero links, at most one emoji. Pick up something specific from THEIR comment and ask a question back that steers toward shoes, customs or fashion. Where it fits naturally (not every time), mention we run a free giveaway and they can DM us the word HEAT to get in. Never argue, never discuss politics/religion/anything sensitive, never make promises or prices. If the comment is hostile, spammy, an emergency, or you can't add anything genuine, reply with exactly the single word SKIP.\n\nHOW TO SOUND: dry and a little funny beats enthusiastic. React like someone who actually looked at the shoe. Specific over general — 'that midsole paint is clean' lands, 'so cool!' does not. Never open with Ah, Oh, Wow, Absolutely, Great question, or Love this. Never use em dashes or semicolons; short sentences instead. Never say 'we're thrilled', 'amazing', 'incredible', 'let's dive in', or 'reach out'. Contractions always. It's fine to be a little blunt. Do not compliment someone's taste and then pivot to a sales line in the same breath — pick one.";
 
 export async function chatbotSettings(): Promise<{
   enabled: boolean;
@@ -319,7 +341,7 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
           temperature: 0.5,
         });
         if (reply) {
-          await sendDmReply(contact.psid, reply.slice(0, 1900));
+          await sendDmReply(contact.psid, humanize(reply).slice(0, 1900));
           await prisma.chatMessage.create({
             data: { contactId: contact.id, direction: "out", text: reply.slice(0, 1900), flowId: "ai" },
           });
@@ -395,7 +417,7 @@ async function maybePublicAiReply(
     ],
     temperature: 0.8,
   });
-  const clean = reply?.trim();
+  const clean = reply ? humanize(reply) : "";
   if (!clean || /^skip\b/i.test(clean)) return;
 
   await replyToComment(e.platform, e.objectId, clean.slice(0, 280));

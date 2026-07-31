@@ -10,6 +10,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 import {
+  DEFAULT_COMMENT_STYLE,
+  humanize,
   keywordHit,
   matchCommentFlow,
   matchMessageFlow,
@@ -119,6 +121,52 @@ async function main() {
     entry: [{ messaging: [{ sender: { id: "556" }, timestamp: 9, referral: { ref: "drafted" } }] }],
   });
   check("an m.me ?ref= arrives as ref:…", ref[0]?.payload === "ref:drafted");
+
+  // ---- The machine tells ----------------------------------------------
+  // Telling the model "no em dashes" works most of the time. Most of the
+  // time, on a page this size, is still several a week in public.
+  check(
+    "an em dash becomes a comma",
+    humanize("These are clean — where'd you get them?") ===
+      "These are clean, where'd you get them?",
+    humanize("These are clean — where'd you get them?")
+  );
+  check(
+    "an en dash goes too",
+    humanize("Nice pair – love the midsole") === "Nice pair, love the midsole"
+  );
+  check(
+    "a tight em dash with no spaces still goes",
+    humanize("Clean—very clean") === "Clean, very clean"
+  );
+  check(
+    "semicolons become commas",
+    humanize("Solid work; the fade is right") === "Solid work, the fade is right"
+  );
+  check(
+    "no doubled commas survive",
+    !humanize("one —, two").includes(",,"),
+    humanize("one —, two")
+  );
+  check(
+    "spacing before punctuation is cleaned up",
+    humanize("Nice  work — really .") === "Nice work, really."
+  );
+  check(
+    "ordinary text is left alone",
+    humanize("Those are clean. Where'd you cop them?") ===
+      "Those are clean. Where'd you cop them?"
+  );
+  check(
+    "hyphens in real words are untouched",
+    humanize("one-of-one heat") === "one-of-one heat",
+    "an em dash is not a hyphen and the difference matters"
+  );
+  check(
+    "the comment style tells the model the same rule the code enforces",
+    /em dash/i.test(DEFAULT_COMMENT_STYLE),
+    "belt and braces: prompt asks, code guarantees"
+  );
 }
 
 main()
