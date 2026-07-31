@@ -2040,6 +2040,39 @@ model SocialAccount {
 /// Stored rather than fetched live because webhook delivery is the only
 /// complete stream: polling every post for comments burns the rate
 /// budget and still misses edits between polls.
+/// One comment on one poll post = one vote, banked. This is the bridge
+/// between the Facebook audience and the site: the raw opinion is
+/// stored the moment it happens, and when that person eventually makes
+/// an account (the ticket DM carries a personal claim link), userId
+/// fills in and their whole Facebook voting history joins their taste
+/// profile. Page-scoped commenter ids can't be matched to site logins
+/// any other way without App Review, so the claim link IS the join.
+model SocialVote {
+  id       String @id @default(cuid())
+  platform String
+  /// The poll post this comment sat under.
+  postId   String
+  /// Meta's comment id — the natural dedup key for redelivered webhooks.
+  commentId String @unique
+  fromId   String?
+  fromName String?
+  rawText  String
+  /// Which option they picked ("1", "b"), when parseable. Null is fine:
+  /// an opinion without a pick is still taste data.
+  choiceLabel String?
+  /// The actual shoe, when the caption or the vision pass resolved it.
+  shoeName String?
+  /// Rides the ticket DM as a personal link; whoever signs up holding
+  /// it is this voter.
+  claimToken String  @unique @default(cuid())
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([postId])
+  @@index([fromId])
+  @@index([userId])
+}
+
 model MetaEvent {
   id String @id @default(cuid())
 

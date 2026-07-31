@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { businessSecret, proofParams } from "./appsecret";
-import { geminiChat, geminiConfigured } from "./gemini";
+import { geminiChat, geminiConfigured, geminiJson } from "./gemini";
 import {
   engageConfigured,
   likeObject,
@@ -295,6 +295,12 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
         continue;
       }
       if (e.kind === "comment") {
+        // EVERY comment on a poll is a vote worth banking, before any
+        // reply cap gets a say — the caps bound what we SEND, not what
+        // we learn. Dedup rides the commentId unique key, so Meta's
+        // webhook redeliveries can't double-count a vote.
+        const vote = await recordPollVote(e);
+
         const flow = matchCommentFlow(flows, e.text, e.parentId);
         if (!flow) {
           // No campaign claimed this comment — the conversational AI
@@ -306,9 +312,13 @@ export async function runChatbot(events: ParsedEvent[]): Promise<Set<string>> {
         // The one private reply this comment will ever get. Buttons on
         // it are the reply-bait: a tap IS the answer that opens the
         // 24-hour window and hands the conversation to the flow graph.
+        // The ticket text personalizes when the AI is up — thank them,
+        // quote a bit of what THEY said, name the shoe they picked —
+        // and falls back to the flow's own words when it isn't.
+        const base = (full as { privateReply: string | null }).privateReply || full.message;
         await sendPrivateReply(
           e.objectId,
-          (full as { privateReply: string | null }).privateReply || full.message,
+          await personalizeTicket(e, base, vote),
           parseQuickReplies(full.quickReplies)
         );
         await prisma.chatFlow.update({ where: { id: flow.id }, data: { fired: { increment: 1 } } });
@@ -466,11 +476,14 @@ async function maybePublicAiReply(
     if (already > 0) return;
   }
 
-  // What OUR post said is what turns "2" from noise into a vote. A
-  // failed fetch degrades to the old contextless behavior rather than
-  // costing the reply.
+  // What OUR post said is what turns "2" from noise into a vote, and
+  // the lineup — read off the caption or the photo itself — is what
+  // turns "2" into a shoe with a name. Every fetch degrades to the
+  // simpler prompt rather than costing the reply.
   const { fetchPostContext } = await import("./metaEngage");
-  const postText = await fetchPostContext(e.platform, e.parentId ?? null);
+  const { identifyPostShoes } = await import("./shoeVision");
+  const ctx = await fetchPostContext(e.platform, e.parentId ?? null);
+  const lineup = await identifyPostShoes(e.platform, e.parentId ?? null);
 
   const reply = await geminiChat({
     system: settings.commentStyle,
@@ -478,7 +491,8 @@ async function maybePublicAiReply(
       {
         role: "user",
         text: [
-          postText ? `Our ${e.platform} post says: "${postText.slice(0, 600)}"` : null,
+          ctx.text ? `Our ${e.platform} post says: "${ctx.text.slice(0, 600)}"` : null,
+          lineup ? `The shoes in the post are: ${lineup}` : null,
           `${e.fromName ? `${e.fromName} commented` : "A comment"}: "${e.text.slice(0, 500)}"`,
         ]
           .filter(Boolean)
@@ -504,6 +518,90 @@ async function maybePublicAiReply(
     })
     .catch(() => {});
   handled.add(e.objectId);
+}
+
+/**
+ * Bank the vote. Runs on every comment that hangs off a post, before
+ * any reply cap — what people said is the asset, whether or not we
+ * answer. The lineup (from caption or the vision pass) resolves "2"
+ * into an actual shoe when it can; a comment with no readable pick is
+ * stored anyway, because an opinion is still taste data.
+ */
+async function recordPollVote(
+  e: ParsedEvent
+): Promise<{ id: string; claimToken: string; label: string | null; shoe: string | null } | null> {
+  if (!e.parentId || !e.text) return null;
+  try {
+    const { identifyPostShoes, parseVoteChoice } = await import("./shoeVision");
+    const lineup = await identifyPostShoes(e.platform, e.parentId);
+    const { label, shoe } = parseVoteChoice(e.text, lineup);
+    const row = await prisma.socialVote.upsert({
+      where: { commentId: e.objectId },
+      update: {},
+      create: {
+        platform: e.platform,
+        postId: e.parentId,
+        commentId: e.objectId,
+        fromId: e.fromId,
+        fromName: e.fromName,
+        rawText: e.text.slice(0, 1000),
+        choiceLabel: label,
+        shoeName: shoe,
+      },
+      select: { id: true, claimToken: true, choiceLabel: true, shoeName: true },
+    });
+    return { id: row.id, claimToken: row.claimToken, label: row.choiceLabel, shoe: row.shoeName };
+  } catch {
+    return null; // a vote we couldn't bank must never block the reply
+  }
+}
+
+const TICKET_STYLE =
+  "You write the OPENING of a private message (a DM) from The Heat Chart to someone who just commented on our Facebook/Instagram post. 1-2 sentences ONLY: thank them for weighing in, QUOTE a short fragment of what they said (a few words, in quotes), and if you know which shoe they picked, name it like someone who has an opinion about it too. Warm, casual sneaker-culture voice, at most one emoji, no hashtags, no links, do NOT mention any ticket or entry — that part is appended after you. Never use em dashes or semicolons. Never open with Ah, Oh, Wow, or Love this. If their comment is hostile or there is nothing genuine to say, answer with exactly the single word SKIP.";
+
+/**
+ * The ticket DM, personalized: the model writes ONLY the greeting —
+ * their words quoted back, their pick named — and the code appends the
+ * flow's own message (the actual entry/CTA, links and all) verbatim.
+ * Structurally, the model cannot drop or mangle the ticket, because it
+ * never touches it. When the AI is down, unconfigured, or says SKIP,
+ * the flow's text goes out bare — exactly what shipped before this.
+ */
+async function personalizeTicket(
+  e: ParsedEvent,
+  base: string,
+  vote: { label: string | null; shoe: string | null; claimToken: string } | null
+): Promise<string> {
+  if (!geminiConfigured() || !e.text) return base;
+  try {
+    const { fetchPostContext } = await import("./metaEngage");
+    const ctx = await fetchPostContext(e.platform, e.parentId ?? null);
+    const out = await geminiJson<{ intro?: string }>({
+      system: TICKET_STYLE,
+      parts: [
+        {
+          text: [
+            ctx.text ? `Our post: "${ctx.text.slice(0, 400)}"` : null,
+            vote?.shoe
+              ? `They picked: ${vote.shoe}${vote.label ? ` (option ${vote.label})` : ""}`
+              : vote?.label
+                ? `They picked option ${vote.label}`
+                : null,
+            `Their comment: "${e.text.slice(0, 400)}"`,
+            'Answer as JSON: {"intro": "..."}',
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+        },
+      ],
+      temperature: 0.7,
+    });
+    const intro = out?.intro ? humanize(out.intro) : "";
+    if (!intro || /^skip\b/i.test(intro) || intro.length > 320) return base;
+    return `${intro}\n\n${base}`;
+  } catch {
+    return base;
+  }
 }
 
 const SHARE_NOTE = "auto-share-thanks";
@@ -567,7 +665,7 @@ async function maybeThankShare(
   // Their caption: sometimes on the webhook, otherwise fetched. Both
   // empty means we can't read their wall — so we don't talk on it.
   const { fetchPostContext } = await import("./metaEngage");
-  const caption = e.text || (await fetchPostContext("facebook", e.objectId));
+  const caption = e.text || (await fetchPostContext("facebook", e.objectId)).text;
   if (caption && geminiConfigured()) {
     const reply = await geminiChat({
       system: SHARE_THANKS_STYLE,

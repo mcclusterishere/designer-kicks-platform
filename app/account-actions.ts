@@ -178,6 +178,36 @@ export async function registerUser(
     // Account was created; worst case they sign in manually.
   }
 
+  // The Facebook bridge: if they arrived through a ticket link from
+  // the DM bot, a voteClaim cookie is waiting. Stamping the vote with
+  // their new userId joins their Facebook poll history to this account
+  // — the one join page-scoped Facebook ids allow without App Review.
+  // Every vote from the same commenter comes along, not just the one
+  // the ticket was minted for.
+  try {
+    const jar = await cookies();
+    const claim = jar.get("voteClaim")?.value;
+    if (claim) {
+      const me = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      const seed = await prisma.socialVote.findUnique({
+        where: { claimToken: claim },
+        select: { id: true, fromId: true },
+      });
+      if (me && seed) {
+        await prisma.socialVote.update({ where: { id: seed.id }, data: { userId: me.id } });
+        if (seed.fromId) {
+          await prisma.socialVote.updateMany({
+            where: { fromId: seed.fromId, userId: null },
+            data: { userId: me.id },
+          });
+        }
+      }
+      jar.delete("voteClaim");
+    }
+  } catch {
+    // A failed vote-link never costs the signup.
+  }
+
   if (existing?.artistProfile) {
     return {
       ok: true,

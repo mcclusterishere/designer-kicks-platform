@@ -269,35 +269,52 @@ async function graph(
  * Railway runs a single long-lived process, which is what makes a
  * module-level map an honest cache here.
  */
-const postCache = new Map<string, { text: string | null; at: number }>();
+export type PostContext = { text: string | null; imageUrl: string | null };
+const postCache = new Map<string, { ctx: PostContext; at: number }>();
 const POST_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const POST_CACHE_MAX = 500;
 
 export async function fetchPostContext(
   platform: string,
   parentId: string | null
-): Promise<string | null> {
-  if (!parentId) return null;
+): Promise<PostContext> {
+  if (!parentId) return { text: null, imageUrl: null };
   const hit = postCache.get(parentId);
-  if (hit && Date.now() - hit.at < POST_CACHE_TTL_MS) return hit.text;
-  let text: string | null = null;
+  if (hit && Date.now() - hit.at < POST_CACHE_TTL_MS) return hit.ctx;
+  const ctx: PostContext = { text: null, imageUrl: null };
   try {
-    // FB posts carry `message`; IG media carries `caption`. Asking for
-    // both costs nothing — Graph returns whichever exists.
-    const json = await graph(parentId, { fields: "message,caption" });
-    text = (json.message as string) ?? (json.caption as string) ?? null;
+    // The field lists are PER PLATFORM, not merged: an FB post carries
+    // message + attachments, IG media carries caption + media_url —
+    // and Graph errors on a field the node doesn't have, it doesn't
+    // ignore it. The first version of this asked both platforms for
+    // "message,caption" and every Instagram fetch silently nulled.
+    if (platform === "instagram") {
+      const json = await graph(parentId, { fields: "caption,media_url,media_type" });
+      ctx.text = (json.caption as string) ?? null;
+      const mt = String(json.media_type ?? "");
+      ctx.imageUrl = mt === "VIDEO" ? null : ((json.media_url as string) ?? null);
+    } else {
+      const json = await graph(parentId, {
+        fields: "message,attachments{media,subattachments.limit(1){media}}",
+      });
+      ctx.text = (json.message as string) ?? null;
+      const att = (json.attachments as { data?: Array<Record<string, unknown>> })?.data?.[0];
+      const media = (att?.media ?? (att?.subattachments as { data?: Array<Record<string, unknown>> })?.data?.[0]?.media) as
+        | { image?: { src?: string } }
+        | undefined;
+      ctx.imageUrl = media?.image?.src ?? null;
+    }
   } catch {
     // A deleted post or a permissions hiccup shouldn't kill the reply —
-    // the bot just answers without context, like it did before this
-    // existed. Cache the miss too, so a dead post isn't re-fetched per
-    // comment.
+    // the bot just answers without context. Cache the miss too, so a
+    // dead post isn't re-fetched per comment.
   }
   if (postCache.size >= POST_CACHE_MAX) {
     const oldest = postCache.keys().next().value;
     if (oldest !== undefined) postCache.delete(oldest);
   }
-  postCache.set(parentId, { text, at: Date.now() });
-  return text;
+  postCache.set(parentId, { ctx, at: Date.now() });
+  return ctx;
 }
 
 /**
