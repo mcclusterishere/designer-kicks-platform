@@ -15,7 +15,7 @@ import { readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { PrismaClient } from "@prisma/client";
 import { mmeLink, parseRef, refFor } from "../lib/mme";
-import { scheduleParams } from "../lib/social";
+import { scheduleParams, stripUrls } from "../lib/social";
 import { menuItems } from "../lib/chatbot";
 import {
   buildDmMessage,
@@ -404,9 +404,48 @@ async function main() {
     "appending the link to the photo caption was the old shape"
   );
   check(
-    "the house feed post never passes Facebook's link parameter",
-    !/\.\.\.\(opts\.link \? \{ link:/.test(socialSrc),
-    "the link param is what makes Facebook classify it as a link post"
+    "the PHOTO post never passes Facebook's link parameter",
+    (() => {
+      const fn = socialSrc.slice(socialSrc.indexOf("export async function postToFacebookPage"));
+      return !/link:/.test(fn.slice(0, fn.indexOf("\n}\n")));
+    })(),
+    "the link param on the photo post is what would turn it into a link post and cost it reach"
+  );
+
+  // The card post is the deliberate exception, and it is a SEPARATE
+  // post with its own function rather than a flag, so the rule above
+  // cannot be weakened by accident.
+  check(
+    "the card post exists and is its own thing",
+    /export async function postLinkCardToFacebookPage/.test(socialSrc)
+  );
+  check(
+    "the card's copy is stripped of raw URLs",
+    /message: stripUrls\(message\)/.test(socialSrc),
+    "the card already IS the link; a URL in the words as well reads as spam twice"
+  );
+  check(
+    "a bare url is removed from card copy",
+    stripUrls("Vote now at https://theheatchart.com/battles today") ===
+      "Vote now at today"
+  );
+  check(
+    "and so is a www-style one",
+    stripUrls("see www.theheatchart.com for more") === "see for more"
+  );
+  check(
+    "copy with no url is left alone",
+    stripUrls("Which one are you actually wearing?") === "Which one are you actually wearing?"
+  );
+  check(
+    "the follow-up card is scheduled, not published alongside",
+    /scheduledAt: new Date\(Date\.now\(\) \+ hours \* 3_600_000\)/.test(socialSrc),
+    "two identical-timed posts about one link is the duplicate-content shape"
+  );
+  check(
+    "a failed first post does not queue a card on top of it",
+    /Skipped — the first post didn't publish/.test(socialSrc),
+    "queueing on an unknown state just makes it harder to see what happened"
   );
   check(
     "the house link lands as a comment on the new post",

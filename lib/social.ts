@@ -99,6 +99,106 @@ export function scheduleParams(at: Date | null | undefined): Record<string, stri
   return { published: "false", scheduled_publish_time: String(secs) };
 }
 
+/**
+ * Strip any bare URL out of copy that is going to sit above a link
+ * card. The card already IS the link; a URL in the words as well is the
+ * shape the house rule exists to prevent, and it reads as spam twice.
+ */
+export function stripUrls(text: string): string {
+  return text
+    .replace(/\bhttps?:\/\/\S+/gi, "")
+    .replace(/\b(?:www\.)[^\s]+/gi, "")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .replace(/[^\S\n]+([.,!?])/g, "$1")
+    .trim();
+}
+
+/**
+ * The card post. No photo — the link IS the image.
+ *
+ * This is the API version of the trick of pasting a link into the
+ * composer, letting the card populate, then deleting the URL and typing
+ * a description over it. The API does it properly: `link` generates the
+ * card and `message` is the text above it, so the URL never has to
+ * appear in the words at all. Nothing to delete, because nothing was
+ * ever typed.
+ *
+ * Deliberately separate from postToFacebookPage rather than a flag on
+ * it. The house rule stands: our PHOTO post never carries a link in its
+ * text and puts the link in the first comment. This is a different post
+ * with a different job, published on its own.
+ */
+export async function postLinkCardToFacebookPage(
+  message: string,
+  link: string,
+  opts: { scheduledAt?: Date | null } = {}
+): Promise<SocialResult> {
+  if (!facebookConfigured()) return { ok: false, detail: "Facebook not connected" };
+  if (!link) return { ok: false, detail: "A card post needs a link" };
+  const sched = scheduleParams(opts.scheduledAt);
+  if (opts.scheduledAt && !sched) {
+    return {
+      ok: false,
+      detail: "Schedule a post between 10 minutes and 75 days out — Meta refuses anything else.",
+    };
+  }
+  try {
+    const pageId = process.env.FB_PAGE_ID!;
+    // The card is scraped from the destination's own OG tags. Overriding
+    // the card art per post is a different feature that needs an
+    // ownership precheck first, so this deliberately does not try.
+    await graphPost(`${pageId}/feed`, {
+      message: stripUrls(message),
+      link,
+      ...(sched ?? {}),
+    });
+    return {
+      ok: true,
+      detail: sched ? "Card post scheduled" : "Card post published",
+    };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : "Card post failed" };
+  }
+}
+
+/**
+ * Both posts, one call: the photo now, the card later.
+ *
+ * The photo post goes out immediately with the link as its own first
+ * comment, which is the shape that reaches the most people. Twelve
+ * hours later the same destination goes out again as a bare link card,
+ * which is a different-looking object in the feed and catches the half
+ * of the audience that was asleep the first time.
+ *
+ * Two posts, one destination, no duplicate-looking content.
+ */
+export async function postWithFollowUpCard(
+  message: string,
+  opts: {
+    imageUrl?: string | null;
+    link: string;
+    /** Copy for the card post. Falls back to the first post's words. */
+    cardMessage?: string | null;
+    hoursLater?: number;
+  }
+): Promise<{ first: SocialResult; card: SocialResult }> {
+  const first = await postToFacebookPage(message, {
+    imageUrl: opts.imageUrl,
+    link: opts.link,
+  });
+  // The card is a follow-up, not a consolation prize: if the first post
+  // failed we are in an unknown state and queueing a second one on top
+  // of that just makes it harder to see what happened.
+  if (!first.ok) {
+    return { first, card: { ok: false, detail: "Skipped — the first post didn't publish" } };
+  }
+  const hours = Math.min(Math.max(opts.hoursLater ?? 12, 1), 72);
+  const card = await postLinkCardToFacebookPage(opts.cardMessage || message, opts.link, {
+    scheduledAt: new Date(Date.now() + hours * 3_600_000),
+  });
+  return { first, card };
+}
+
 export async function postToFacebookPage(
   message: string,
   opts: { imageUrl?: string | null; link?: string | null; scheduledAt?: Date | null } = {}
