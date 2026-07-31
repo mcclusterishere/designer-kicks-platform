@@ -39,6 +39,21 @@ const THREADS_AUTH = process.env.THREADS_AUTH_URL || "https://threads.net";
 const FB_API = process.env.GRAPH_API_URL || "https://graph.facebook.com/v23.0";
 const FB_AUTH = process.env.FB_AUTH_URL || "https://www.facebook.com/v23.0";
 
+/**
+ * Two Meta apps, two credential pairs — because Meta's consumer
+ * Facebook Login use case (the site's fan sign-in) cannot share an app
+ * with any business use case. FACEBOOK_CLIENT_* stays the LOGIN app
+ * (auth.ts); the business app — Pages, Messenger, Instagram, Threads,
+ * Marketing — is META_BUSINESS_APP_*. The fallback keeps a
+ * single-app setup working in dev.
+ */
+function businessAppId(): string {
+  return process.env.META_BUSINESS_APP_ID || process.env.FACEBOOK_CLIENT_ID || "";
+}
+export function businessAppSecret(): string {
+  return process.env.META_BUSINESS_APP_SECRET || process.env.FACEBOOK_CLIENT_SECRET || "";
+}
+
 export function connectRedirectUri(provider: ConnectProvider): string {
   return `${siteUrl()}/api/social/callback/${provider}`;
 }
@@ -48,7 +63,7 @@ export function connectConfigured(): Record<ConnectProvider, boolean> {
   return {
     instagram: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET),
     threads: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET),
-    facebook_page: Boolean(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET),
+    facebook_page: Boolean(businessAppId() && businessAppSecret()),
   };
 }
 
@@ -81,7 +96,7 @@ export function authorizeUrl(provider: ConnectProvider, state: string): string {
     return `${THREADS_AUTH}/oauth/authorize?${qs}`;
   }
   const qs = new URLSearchParams({
-    client_id: process.env.FACEBOOK_CLIENT_ID ?? "",
+    client_id: businessAppId(),
     redirect_uri: redirect,
     response_type: "code",
     scope: "pages_show_list,pages_manage_posts,pages_read_engagement",
@@ -207,16 +222,16 @@ export async function exchangeCode(
   // Pages they admin, each with its own never-expiring Page token.
   const userTok = await getJson(
     `${FB_API}/oauth/access_token?client_id=${encodeURIComponent(
-      process.env.FACEBOOK_CLIENT_ID ?? ""
+      businessAppId()
     )}&client_secret=${encodeURIComponent(
-      process.env.FACEBOOK_CLIENT_SECRET ?? ""
+      businessAppSecret()
     )}&redirect_uri=${encodeURIComponent(redirect)}&code=${encodeURIComponent(code)}`
   );
   const longUser = await getJson(
     `${FB_API}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(
-      process.env.FACEBOOK_CLIENT_ID ?? ""
+      businessAppId()
     )}&client_secret=${encodeURIComponent(
-      process.env.FACEBOOK_CLIENT_SECRET ?? ""
+      businessAppSecret()
     )}&fb_exchange_token=${encodeURIComponent(String(userTok.access_token))}`
   );
   const pages = await getJson(

@@ -32,10 +32,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const raw = await req.text();
+  // Signed by the app that owns the webhook subscription — the
+  // BUSINESS app, not the consumer-login one.
+  const { businessAppSecret } = await import("@/lib/metaConnect");
   const ok = verifyWebhookSignature(
     raw,
     req.headers.get("x-hub-signature-256"),
-    process.env.FACEBOOK_CLIENT_SECRET ?? ""
+    businessAppSecret()
   );
   if (!ok) return NextResponse.json({ error: "bad signature" }, { status: 401 });
 
