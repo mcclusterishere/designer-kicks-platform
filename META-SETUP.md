@@ -27,13 +27,15 @@ connected to a verified business portfolio. Three is fine.
 
 The dashboard groups the 20 use cases as Ads and monetization (7),
 Content management (5), Business messaging (3), Others (5). App 1
-takes twelve of them; the skip list below says why each remaining one
-is skipped rather than leaving it unexplained.
+takes twelve of them (confirmed live: creating the app with exactly
+this combination shows "12 use cases added" and a working Next
+button); the notes below say why each remaining one is either
+disabled by the dashboard itself or skipped on purpose.
 
 | App | Type | Serves |
 |---|---|---|
-| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Live Video |
-| **App 2 — "The Heat Chart Login"** | Consumer | The "Sign in with Facebook" button for fans |
+| **App 1 — "The Heat Chart Business"** | Business | House Page + IG + Threads posting, the chat bot's inbox, comments, webhooks, editor Facebook-Page connects, ads/leads/insights via Marketing API, Catalog, Live Video, oEmbed, **app-install ads for the iOS app** |
+| **App 2 — "The Heat Chart Login"** | Consumer | The "Sign in with Facebook" button for fans — nothing else |
 | **App 3 — "The Heat Chart Creators"** | Business | Editor Instagram connects only — one app can hold only ONE of the two Instagram API setups, and the house needs the Facebook-Login setup while editors need the Instagram-Login one |
 
 ---
@@ -75,39 +77,53 @@ compatible; incompatible ones grey out and none of these should):
    handing over instructions. Highest-leverage box on the screen.
 9. **Manage products with Catalog API** — feeds the shoe catalog and
    marketplace into dynamic ads and Meta commerce surfaces.
-10. **Access the Live Video API** — a STANDALONE use case in the live
-   dashboard (Meta's docs describe it as a feature inside Pages; the
-   UI is the authority). Streaming to the Page needs no extra
-   permission beyond `pages_manage_posts`, but Facebook requires the
-   Page to have 100+ followers and a 60-day-old account to go live.
+10. **Access the Live Video API** — a STANDALONE use case (confirmed
+   live in the dashboard, in Content management — Meta's written docs
+   describe it as a feature buried inside Pages; the dashboard is the
+   real authority and it lists separately). Streaming to the Page
+   needs no extra permission beyond `pages_manage_posts`, but
+   Facebook requires the Page to have 100+ followers and a 60-day-old
+   account to go live.
 11. **Embed content (oEmbed)** — tokenless since June 15, 2026, so
    embedding public posts works without it; adding it costs nothing
    and buys higher rate limits.
-12. **Allow users to transfer their data to other apps** — ticking
-   this in the wizard is genuinely free: it just tags the app.
-   Actually becoming an export destination is a whole separate,
-   opt-in process the checkbox does NOT start — registering with the
-   third-party DTI Trust Registry, a verified Business Manager
-   account, real receiving API endpoints, a security review, and
-   hands-on testing with a Meta engineer (see
-   developers.facebook.com/docs/data-portability). None of that
-   fires just from having the use case. Take it now for free; build
-   the receiving side only if a real reason shows up (e.g. an artist
-   importing their IG photo history straight into their Heat Chart
-   portfolio during onboarding).
+12. **Create & manage app ads with Meta Ads Manager** — mobile-app
+   INSTALL campaigns. CONFIRMED LIVE in the dashboard: this combines
+   fine with the full business bundle above (Pages, Instagram,
+   Messenger, Threads, all three Marketing API cases, Catalog, Live
+   Video, oEmbed, ads MCP) — it was checkable and stayed checkable
+   through all of it. It does NOT need to wait for App 2 or the iOS
+   launch; add it now so the iOS app's install campaigns, when they
+   start, share the same app as the rest of the ad stack. (Earlier
+   version of this doc had it parked on App 2 — that was theorizing
+   from Meta's written docs before the dashboard was actually driven
+   with this exact combination; the live wizard overrides it.)
 
-SKIP LIST, each for its own reason:
+NOT ADDED — greyed out by the dashboard once the above was selected,
+confirmed live, not a judgment call:
 
-- **Create & manage app ads with Meta Ads Manager** — mobile-app
-  INSTALL campaigns; its home is App 2 (see below). Explicitly does
-  not include the Marketing API.
+- **Allow users to transfer their data to other apps** (Data
+  Portability) — went from selectable to disabled once enough of the
+  bundle above was checked. It's still true that the use case itself
+  is free and inert (see git history for the full reasoning) — this
+  just means THIS particular combination of use cases doesn't leave
+  room for it. Nothing to do about it; move on.
+- **Authenticate and request data from users with Facebook Login** —
+  disabled the moment any business use case is present, as expected.
+  Lives on App 2.
+- **Launch an Instant Game on Facebook and Messenger** — disabled,
+  unrelated to anything here.
+- **Join ThreatExchange** — disabled, and would have been skipped
+  anyway (see below).
+
+SKIP LIST — these stayed selectable and were left unchecked on
+purpose, each for its own reason:
+
 - **Advertise on your app with Meta Audience Network** — the
   opposite of the business model: it places OTHER advertisers' ads
   inside our product to monetise it. We sell subscriptions and
   marketplace sales; renting our users' attention to competitors
   works against both.
-- **Join ThreatExchange** — threat-intelligence sharing for security
-  teams about malware/CSAM/terrorism signals. Unrelated to us.
 - **Share or create fundraisers on Facebook and Instagram** — the
   API only creates person-for-CHARITY fundraisers; a for-profit
   cannot raise for itself. Only useful if a charity drop with a real
@@ -218,13 +234,9 @@ without review.
   `https://theheatchart.com/api/auth/callback/facebook`
 - Same Basic-settings URLs as App 1.
 
-This app is the CONSUMER-facing one, which makes it the future home
-of the iOS app: when the App Store build ships, add the "Create &
-manage app ads with Meta Ads Manager" use case HERE (it's the one use
-case compatible with consumer Login — that's the pairing the create
-screen shows), register the iOS platform + App Events on this app,
-and run install campaigns against it. Nothing needs deciding today;
-use cases add any time.
+App-install ads live on App 1 now (confirmed compatible with the full
+business bundle — see App 1's list), not here. This app stays exactly
+one use case, forever: the sign-in button.
 
 → Railway: `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET` (App 2's
 pair — the site's sign-in button reads these).
