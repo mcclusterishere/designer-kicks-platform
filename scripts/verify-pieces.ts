@@ -104,6 +104,62 @@ function main() {
     "the calendar only shows APPROVED pieces, so moderation moves them in and out of it"
   );
 
+  // ---- Three photos, no video --------------------------------------------
+  check(
+    "the minimum is three, stated once and not exported from a use-server file",
+    /\nconst MIN_PIECE_PHOTOS = 3;/.test(actions)
+  );
+  check(
+    "the upload counts the cover toward the minimum",
+    /if \(1 \+ extra\.length < MIN_PIECE_PHOTOS\)/.test(actions),
+    "cover plus two, not cover plus three"
+  );
+  check(
+    "and the refusal tells them what to shoot",
+    /Show the sides, the sole, the detail/.test(actions),
+    "a bare count is a rule; naming the angles is help"
+  );
+  check(
+    "a piece upload cannot carry a video",
+    (() => {
+      const fn = actions.slice(actions.indexOf("export async function createSubmission"));
+      const body = fn.slice(0, fn.indexOf("\n}\n"));
+      return !/formData\.get\("video"\)/.test(body) && !/MAX_VIDEO_BYTES/.test(body);
+    })(),
+    "a clip in the same slot as the photos turned uploads into a video with two stills bolted on"
+  );
+  const submitForm = readFileSync(join(process.cwd(), "app", "submit", "SubmitForm.tsx"), "utf8");
+  check(
+    "the form offers no video field at all",
+    !/name="video"/.test(submitForm) && !/accept="video/.test(submitForm),
+    "leaving the input up and rejecting it server-side wastes their upload"
+  );
+  check(
+    "the extra angles are required in the browser too",
+    /name="morePhotos"[\s\S]{0,160}required/.test(submitForm),
+    "so they find out before the upload, not after"
+  );
+  check(
+    "the form says what the minimum is",
+    /Three photos minimum/.test(submitForm)
+  );
+
+  // ---- The rename --------------------------------------------------------
+  const giveaway = readFileSync(join(process.cwd(), "app", "giveaway", "page.tsx"), "utf8");
+  check(
+    "the giveaway page names Halo, not the retired brand",
+    /Hitman Halo/.test(giveaway) && !/[Bb]enji/.test(giveaway)
+  );
+  const artistPage = readFileSync(
+    join(process.cwd(), "app", "artists", "[slug]", "page.tsx"),
+    "utf8"
+  );
+  check(
+    "but the old slug still redirects instead of 404ing",
+    /"hitman-benji": "hitman-halo"/.test(artistPage),
+    "that address is in old DMs and posts; deleting the redirect breaks them"
+  );
+
   const drops = readFileSync(join(process.cwd(), "app", "drops", "page.tsx"), "utf8");
   check(
     "the calendar reads pieces, not just announcements",

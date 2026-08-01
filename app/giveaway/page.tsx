@@ -17,7 +17,7 @@ export default async function GiveawayPage() {
   const session = await auth();
   const giveaway = await getActiveGiveaway();
   const pick = await getEditorsPick();
-  const benji = pick
+  const houseArtist = pick
     ? { name: pick.displayName, href: `/artists/${pick.slug}` }
     : { name: "Hitman Halo", href: "/artists" };
 
@@ -49,8 +49,8 @@ export default async function GiveawayPage() {
       <p className="mt-3 max-w-xl text-base font-medium text-smoke">
         No shoes, no gift cards — a one-of-one wearable-armor piece,
         hand-built by{" "}
-        <Link href={benji.href} className="font-bold text-heat underline">
-          {benji.name}
+        <Link href={houseArtist.href} className="font-bold text-heat underline">
+          {houseArtist.name}
         </Link>
         . His art, worn as armor. It never goes on sale.
       </p>
@@ -119,7 +119,7 @@ export default async function GiveawayPage() {
                 {pick.note || pick.bio}
               </p>
               <Link
-                href={benji.href}
+                href={houseArtist.href}
                 className="mt-3 inline-block tag font-bold text-heat underline"
               >
                 See his work →

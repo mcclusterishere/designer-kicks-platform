@@ -1771,13 +1771,21 @@ async function featureHouseDesigner() {
     // Looked up by the account's own address, not by a display name:
     // display names are free text that anybody can type into /profile, so
     // matching on one lets a stranger inherit whatever the match confers.
+    // Both addresses, for the same reason the profile lookup above takes
+    // both slugs: the account may predate the rename, and creating a
+    // second one beside it would split the house artist in two.
     let user = await prisma.user.findFirst({
-      where: { email: "hitman.benji@theheatchart.com" },
+      where: {
+        OR: [
+          { email: "hitman.halo@theheatchart.com" },
+          { email: "hitman.benji@theheatchart.com" },
+        ],
+      },
       select: { id: true },
     });
     if (!user) {
       user = await prisma.user.create({
-        data: { email: "hitman.benji@theheatchart.com", name: "Hitman Halo" },
+        data: { email: "hitman.halo@theheatchart.com", name: "Hitman Halo" },
         select: { id: true },
       });
     }
@@ -1857,7 +1865,7 @@ async function featureHouseDesigner() {
         title: "Red Cupid Vest",
         artistId: artist.id,
         artistName: data.displayName || artist.displayName,
-        email: owner?.email || "benji.chase@theheatchart.com",
+        email: owner?.email || "hitman.halo@theheatchart.com",
         baseShoe: "Tactical vest blank",
         category: "apparel",
         status: "APPROVED",

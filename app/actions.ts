@@ -233,30 +233,11 @@ export async function createSubmission(
     }
   }
 
-  // Optional 15-second clip. One per artist per day (UTC) — a scale
-  // guard while video hosting is small; photos stay unlimited.
-  const video = formData.get("video");
-  let videoUrl: string | null = null;
-  if (video instanceof File && video.size > 0) {
-    const vext = VIDEO_TYPES[video.type];
-    if (!vext) return { ok: false, error: "Video must be an MP4, MOV, or WebM." };
-    if (video.size > MAX_VIDEO_BYTES) {
-      return { ok: false, error: "Video must be under 40MB — 15 seconds is the sweet spot (it's also the limit)." };
-    }
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const todaysVideos = await prisma.submission.count({
-      where: { artistId: artist.id, createdAt: { gte: dayStart }, videoUrl: { not: null } },
-    });
-    if (todaysVideos >= 1) {
-      return { ok: false, error: "One video a day per artist while we scale up hosting — this piece can still go up with photos, or save the clip for tomorrow." };
-    }
-    videoUrl = await saveUpload(
-      Buffer.from(await video.arrayBuffer()),
-      `${randomUUID()}.${vext}`,
-      video.type
-    );
-  }
+  // No video on a piece. A custom is judged on the work, and a clip in
+  // the same slot as the photos made half the uploads a video with two
+  // stills bolted on. Video belongs in the artist's feed, which is its
+  // own feature; the column stays for the pieces that already have one.
+  const videoUrl: string | null = null;
 
   const fileName = `${randomUUID()}.${ext}`;
   const imageUrl = await saveUpload(
@@ -265,8 +246,18 @@ export async function createSubmission(
     image.type
   );
 
-  const extra = await saveImageList(formData.getAll("morePhotos"), 4);
+  const extra = await saveImageList(formData.getAll("morePhotos"), 5);
   if (!Array.isArray(extra)) return { ok: false, error: extra.error };
+  // Three angles minimum, cover included. One photo of a custom tells a
+  // buyer nothing about the parts of it that decide whether they want
+  // it, and it is the single biggest difference between a listing that
+  // reads as a real piece and one that reads as a repost.
+  if (1 + extra.length < MIN_PIECE_PHOTOS) {
+    return {
+      ok: false,
+      error: `Every piece needs at least ${MIN_PIECE_PHOTOS} photos — a cover plus ${MIN_PIECE_PHOTOS - 1} more. Show the sides, the sole, the detail somebody would ask about.`,
+    };
+  }
 
   // Who has it — asked once, here, because asked later it never gets
   // asked at all. WITH_ARTIST is the default and costs the uploader
@@ -361,6 +352,15 @@ async function clientIp(): Promise<string> {
 }
 
 /** Validate + store a batch of gallery photos; returns urls or an error. */
+/**
+ * Cover shot plus two. Enforced on the artist upload path, where the
+ * piece is the product; the editor staging path stays looser because a
+ * staffer working from somebody else's public photos often only has
+ * one, and a half-filled roster entry still beats no entry.
+ */
+// Not exported: a "use server" file may only export async functions.
+const MIN_PIECE_PHOTOS = 3;
+
 async function saveImageList(
   files: FormDataEntryValue[],
   max: number
