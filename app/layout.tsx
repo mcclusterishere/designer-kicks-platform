@@ -145,7 +145,15 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <header className="glass sticky top-0 z-50 border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+        {/* Same split as the tab bar: the blur sits on an inner layer so
+            the STICKY element itself carries no backdrop-filter. On iOS
+            that combination detaches during momentum scroll and repaints
+            at a stale offset. */}
+        <header
+          className="sticky top-0 z-50"
+          style={{ transform: "translateZ(0)", willChange: "transform" }}
+        >
+          <div className="glass border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
             <Link href="/" className="display shrink-0 text-xl text-white">
               The<span className="text-volt">Heat</span>
@@ -208,6 +216,7 @@ export default async function RootLayout({
                 )}
               </Link>
             </div>
+          </div>
           </div>
         </header>
 

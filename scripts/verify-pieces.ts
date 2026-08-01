@@ -144,6 +144,45 @@ function main() {
     /Three photos minimum/.test(submitForm)
   );
 
+  // ---- The bars stay where they belong on iOS ----------------------------
+  // backdrop-filter on a positioned element makes it establish its own
+  // containing block AND, on iOS Safari, detach during momentum scroll
+  // and repaint at a stale offset. That is the bug a user screenshotted:
+  // the tab bar floating mid-page with content running underneath it.
+  // The blur has to live on an inner layer, never on the positioned one.
+  const tabBar = readFileSync(join(process.cwd(), "components", "MobileTabBar.tsx"), "utf8");
+  const navTag = tabBar.slice(tabBar.indexOf("<nav"), tabBar.indexOf(">", tabBar.indexOf("<nav")));
+  check(
+    "the fixed tab bar carries no backdrop-filter itself",
+    !/glass/.test(navTag) && /fixed inset-x-0 bottom-0/.test(navTag),
+    "blur on the fixed element is what detaches it mid-scroll on iOS"
+  );
+  check("the blur moved to an inner layer", /className="glass border-t/.test(tabBar));
+  check(
+    "and the bar is promoted to its own compositing layer",
+    /translateZ\(0\)/.test(tabBar)
+  );
+  check(
+    "the safe-area padding rode along with the blur, not the position",
+    /className="glass border-t[\s\S]{0,140}safe-area-inset-bottom/.test(tabBar),
+    "otherwise the bar's backdrop stops short of the home indicator"
+  );
+  const layoutSrc = readFileSync(join(process.cwd(), "app", "layout.tsx"), "utf8");
+  const headerTag = layoutSrc.slice(
+    layoutSrc.indexOf("<header"),
+    layoutSrc.indexOf(">", layoutSrc.indexOf("<header"))
+  );
+  check(
+    "the sticky header has the same split",
+    !/glass/.test(headerTag) && /sticky top-0/.test(headerTag),
+    "same iOS failure, same fix"
+  );
+  check(
+    "content still clears the fixed bar on phones",
+    /pb-24 md:pb-0/.test(layoutSrc),
+    "without it the last card sits permanently under the tab bar"
+  );
+
   // ---- The rename --------------------------------------------------------
   const giveaway = readFileSync(join(process.cwd(), "app", "giveaway", "page.tsx"), "utf8");
   check(

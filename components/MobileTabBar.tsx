@@ -109,11 +109,26 @@ export default function MobileTabBar() {
   if (pathname.startsWith("/admin")) return null;
 
   return (
+    // The blur is on the INNER div, not on this one, and that split is
+    // the whole point. backdrop-filter on a positioned element makes it
+    // establish its own containing block and, on iOS Safari, detach
+    // during momentum scroll and repaint mid-screen. That is the bug a
+    // user in Jamaica screenshotted: the tab bar floating in the middle
+    // of the page with content still running underneath it.
+    //
+    // translateZ(0) promotes the bar to its own compositing layer so
+    // Safari stops repainting it against a stale scroll offset. It is
+    // safe on the element itself: transform only creates a containing
+    // block for DESCENDANTS, and nothing inside here is fixed.
     <nav
       aria-label="Primary"
-      className="glass fixed inset-x-0 bottom-0 z-50 border-t border-white/5 md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-50 md:hidden"
+      style={{ transform: "translateZ(0)", willChange: "transform" }}
     >
+      <div
+        className="glass border-t border-white/5"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
       <div className="mx-auto flex max-w-lg items-end justify-around px-2">
         {TABS.map((tab) => {
           const active = isActive(pathname, tab);
@@ -162,6 +177,7 @@ export default function MobileTabBar() {
             </Link>
           );
         })}
+      </div>
       </div>
     </nav>
   );
