@@ -143,24 +143,55 @@ async function main() {
   const layout = readFileSync(join(process.cwd(), "app", "layout.tsx"), "utf8");
   check(
     "the day is counted from the layout, not an auth sign-in event",
-    /touchStreak\(/.test(layout),
+    /streakNow\(/.test(layout) && !/events:[\s\S]{0,400}streak/i.test(
+      readFileSync(join(process.cwd(), "auth.ts"), "utf8")
+    ),
     "sessions are JWTs, so signIn fires once and a streak would freeze at 1 forever"
   );
   check(
-    "the layout compares the day key before doing any writing",
-    /lastSeenDay !== todayStr\(\)/.test(layout),
-    "this runs on every render; without the guard it is a write per page view"
+    "an already-counted render does no writing",
+    /if \(user\.lastSeenDay === today\) \{/.test(src),
+    "the layout runs on every page view; the fast path is what keeps that one indexed read"
   );
 
   const nudges = readFileSync(join(process.cwd(), "lib", "nudges.ts"), "utf8");
   check(
     "the home page nudges the streak so it is not invisible until you visit the giveaway",
-    /streakFor\(userId\)/.test(nudges)
+    /streakNow\(userId\)/.test(nudges)
   );
   check(
     "but not on day one",
     /streak\.current >= 2/.test(nudges),
     "telling somebody they are on a 1-day streak reminds them they have nothing yet"
+  );
+
+  // ---- The layout and the page render CONCURRENTLY ------------------------
+  // Not one after the other. A page with its own streak query raced the
+  // layout's write and lost, so on the first visit of every day the
+  // member saw yesterday's numbers and the giveaway page said "0 entries"
+  // while today's entry was being written.
+  check(
+    "there is one per-request accessor that counts before it reads",
+    /export const streakNow = cache\(/.test(src),
+    "React.cache dedupes by argument, so every caller shares one touch"
+  );
+  check(
+    "the layout counts through it",
+    /streakNow\(session\.user\.id\)/.test(layout) && !/touchStreak\(session/.test(layout)
+  );
+  for (const [name, file] of [
+    ["the giveaway page", join(process.cwd(), "app", "giveaway", "page.tsx")],
+    ["the profile page", join(process.cwd(), "app", "profile", "page.tsx")],
+    ["the home nudges", join(process.cwd(), "lib", "nudges.ts")],
+  ] as const) {
+    const f = readFileSync(file, "utf8");
+    check(`${name} reads the same accessor`, /streakNow\(/.test(f) && !/streakFor\(/.test(f));
+  }
+  const gvSrc = readFileSync(join(process.cwd(), "app", "giveaway", "page.tsx"), "utf8");
+  check(
+    "and the giveaway page counts the day BEFORE counting the entries",
+    gvSrc.indexOf("streakNow(") < gvSrc.indexOf("giveawayEntry.count"),
+    "the other order shows a stale count even once the streak itself is right"
   );
 
   // ---- Behaviour, against the real database ------------------------------

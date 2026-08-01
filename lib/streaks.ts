@@ -18,6 +18,7 @@
  * strikes can never buy odds (quiz-actions.ts refuses a paid run), and
  * nothing here can be bought either.
  */
+import { cache } from "react";
 import { prisma } from "./db";
 import { activeGiveawaySelector, todayStr } from "./quiz";
 
@@ -139,7 +140,37 @@ export async function touchStreak(userId: string): Promise<StreakState | null> {
   }
 }
 
-/** Read-only, for the profile and giveaway pages. */
+/**
+ * The streak as of THIS request, counted first.
+ *
+ * The layout and the page render CONCURRENTLY in the App Router, not one
+ * after the other. So a page that read the streak with its own query
+ * raced the layout's write and lost: on the first visit of every day a
+ * member saw yesterday's streak, the day-two nudge never appeared on day
+ * two, and the giveaway page said "You have 0 entries" in the same
+ * moment their free daily entry was being created. On a sweepstakes page
+ * that is not a cosmetic bug.
+ *
+ * React.cache dedupes by argument for the life of one request, so every
+ * caller here shares ONE touch: whoever asks first starts it and
+ * everybody else awaits the same promise. That makes the write happen
+ * before any of them read, which is the whole point, and it costs one
+ * touchStreak per request rather than one per caller.
+ */
+export const streakNow = cache(
+  async (userId: string): Promise<{ current: number; longest: number; countedToday: boolean }> => {
+    const touched = await touchStreak(userId);
+    if (touched) {
+      return { current: touched.current, longest: touched.longest, countedToday: true };
+    }
+    // touchStreak only returns null when it genuinely could not write.
+    // Fall back to reading, so a database hiccup shows a stale streak
+    // rather than no page.
+    return streakFor(userId);
+  }
+);
+
+/** Read-only. Prefer streakNow anywhere a render could race the touch. */
 export async function streakFor(
   userId: string
 ): Promise<{ current: number; longest: number; countedToday: boolean }> {

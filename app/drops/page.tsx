@@ -228,7 +228,16 @@ export default async function DropsPage({
                         : "border-edge text-smoke hover:border-volt hover:text-white"
                     }`}
                   >
-                    {monthLabel(Number(y), Number(mm) - 1).replace(" ", " ’").slice(0, 9)}
+                    {/* A flat 9-char slice cut eleven of twelve months
+                        mid-word: "July '202", "August '2", "September"
+                        with the year gone. Short month plus a two-digit
+                        year fits every month at the same width. */}
+                    {new Date(Date.UTC(Number(y), Number(mm) - 1, 1)).toLocaleDateString("en-US", {
+                      month: "short",
+                      timeZone: "UTC",
+                    })}
+                    {" ’"}
+                    {String(y).slice(2)}
                     <span className="ml-1 opacity-60">{mo.count}</span>
                   </Link>
                 </li>

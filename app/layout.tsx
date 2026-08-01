@@ -90,7 +90,7 @@ export default async function RootLayout({
     const member = await prisma.user
       .findUnique({
         where: { id: session.user.id },
-        select: { pmaAcceptedAt: true, lastSeenDay: true },
+        select: { pmaAcceptedAt: true },
       })
       .catch(() => null);
     needsPma = Boolean(member && !member.pmaAcceptedAt);
@@ -100,11 +100,13 @@ export default async function RootLayout({
     // This runs on every render, which is why the day-key is compared
     // first and the write only happens on the first visit of a new day.
     if (member) {
-      const { todayStr } = await import("@/lib/quiz");
-      if (member.lastSeenDay !== todayStr()) {
-        const { touchStreak } = await import("@/lib/streaks");
-        await touchStreak(session.user.id).catch(() => null);
-      }
+      // Counted through the shared per-request accessor, so the pages
+      // rendering alongside this layout read AFTER the write rather than
+      // racing it. touchStreak carries its own already-counted fast path,
+      // so this costs one indexed lookup on every render but the first
+      // of the day.
+      const { streakNow } = await import("@/lib/streaks");
+      await streakNow(session.user.id).catch(() => null);
     }
   }
   const { unreadCount } = await import("@/lib/messages");

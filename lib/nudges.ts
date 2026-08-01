@@ -94,8 +94,8 @@ export async function getMemberNudges(userId: string): Promise<Nudge[]> {
   // Deliberately only shown from day two: telling somebody they are on
   // a one-day streak is not a reason to come back, it is a reminder
   // that they have nothing yet.
-  const { streakFor, STREAK_MILESTONES } = await import("./streaks");
-  const streak = await streakFor(userId);
+  const { streakNow, STREAK_MILESTONES } = await import("./streaks");
+  const streak = await streakNow(userId);
   if (streak.current >= 2) {
     const next = STREAK_MILESTONES.find((m) => m.days > streak.current);
     nudges.push({

@@ -5,7 +5,7 @@ import CreditStatement from "@/components/CreditStatement";
 import DeskRank from "@/components/DeskRank";
 import DeskPartner, { partnerUrl } from "@/components/DeskPartner";
 import { unreadCount } from "@/lib/messages";
-import { streakFor } from "@/lib/streaks";
+import { streakNow } from "@/lib/streaks";
 import { pushConfigured } from "@/lib/push";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -86,7 +86,7 @@ export default async function ProfilePage() {
   const correct = quizAgg._sum.correctCount ?? 0;
   const answered = correct + (quizAgg._sum.wrongCount ?? 0);
   const badges = computeBadges({ answered, correct });
-  const streak = await streakFor(user.id);
+  const streak = await streakNow(user.id);
 
   // Culture IQ + the misses that can be cleared with credits.
   const [iqData, missRows, creditUser] = await Promise.all([

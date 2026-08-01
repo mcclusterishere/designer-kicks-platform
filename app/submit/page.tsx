@@ -39,17 +39,15 @@ export default async function SubmitPage() {
       </p>
 
       <ul className="mt-6 space-y-1 rounded-xl border border-edge bg-surface p-4 text-sm text-smoke">
-        <li>📸 One clean photo, good light, your work is the star (JPG/PNG/WebP, max 6MB)</li>
+        <li>📸 Three photos minimum: a cover plus two angles. Show the sides, the sole, and the detail somebody would ask about (JPG/PNG/WebP, max 6MB each)</li>
         <li>Your own work only — no stock photos, no reposts</li>
         <li>We review every submission before it enters a battle</li>
-        {/* Said up front because it was being discovered the hard way:
-            after filling the form and pushing a 40MB clip. Also kills a
-            misconception worth killing — artists were reading the video
-            cap as a cap on pieces. Post as many pieces as you like. */}
+        {/* The video line lived here until video came off the piece
+            upload entirely. Kept the half that was doing real work:
+            artists were reading the old video cap as a cap on pieces. */}
         <li>
-          Post as many pieces as you want. The only cap is{" "}
-          <span className="text-white">one video a day</span> while we scale
-          hosting — photos are unlimited.
+          Post as many pieces as you want. There is no cap, and photos are
+          unlimited.
         </li>
       </ul>
 

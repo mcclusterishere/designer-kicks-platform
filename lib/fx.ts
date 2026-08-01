@@ -54,7 +54,18 @@ const FALLBACK: Record<string, number> = {
 
 export type FxTable = { base: "USD"; rates: Record<string, number>; live: boolean; source: string };
 
-let cache: (FxTable & { at: number }) | null = null;
+/**
+ * Seeded, not empty. `at: 0` means "infinitely stale", so the very first
+ * getRates() still kicks off a live refresh — it just does not make
+ * anybody wait for it.
+ */
+let cache: FxTable & { at: number } = {
+  at: 0,
+  base: "USD",
+  rates: FALLBACK,
+  live: false,
+  source: "static table",
+};
 
 /**
  * The wide source: open.er-api.com is free, keyless, and covers roughly
@@ -89,23 +100,67 @@ async function fetchEcb(): Promise<Record<string, number> | null> {
   }
 }
 
-export async function getRates(): Promise<FxTable> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache;
+/**
+ * A failed lookup is not worth twelve hours of silence, but it is worth
+ * a minute — otherwise every render of every page retries a dead
+ * provider.
+ */
+const FAILURE_TTL_MS = 60 * 1000;
 
+/** One refresh in flight at a time, however many visitors arrive at once. */
+let inFlight: Promise<void> | null = null;
+
+async function refresh(): Promise<void> {
   const wide = await fetchWide();
   if (wide) {
     cache = { at: Date.now(), base: "USD", rates: { ...FALLBACK, ...wide }, live: true, source: "open.er-api.com" };
-    return cache;
+    return;
   }
   const ecb = await fetchEcb();
   if (ecb) {
     // Honest about the gap: the ECB set is live for what it covers, and
     // everything else in this table is still the static approximation.
     cache = { at: Date.now(), base: "USD", rates: { ...FALLBACK, ...ecb }, live: true, source: "frankfurter (ECB subset)" };
-    return cache;
+    return;
   }
-  cache = { at: Date.now(), base: "USD", rates: FALLBACK, live: false, source: "static table" };
-  return cache;
+  // Stamp the failure far enough in the past that it expires in a minute
+  // rather than sticking for the full twelve hours.
+  cache = {
+    at: Date.now() - (TTL_MS - FAILURE_TTL_MS),
+    base: "USD",
+    rates: FALLBACK,
+    live: false,
+    source: "static table",
+  };
+}
+
+/**
+ * Rates, without ever making a visitor wait on somebody else's server.
+ *
+ * This is read by the ROOT LAYOUT, which means it sits in front of the
+ * first byte of HTML for every page on the site. It used to await a live
+ * lookup with an eleven second budget across two providers, so a hanging
+ * provider — not a failing one, a hanging one — showed every arriving
+ * visitor a blank page for eleven seconds. Under paid traffic that is
+ * the whole ad spend landing on nothing.
+ *
+ * Now the static table answers instantly and the live refresh happens
+ * behind it. The first render after a restart is approximate, which is
+ * exactly what this module was built for: every figure it produces is
+ * already marked with "≈" and flagged when the table is not live.
+ */
+export async function getRates(): Promise<FxTable> {
+  const fresh = cache && Date.now() - cache.at < TTL_MS;
+  if (!fresh && !inFlight) {
+    inFlight = refresh().finally(() => {
+      inFlight = null;
+    });
+    // Deliberately unhandled here: refresh() cannot reject, and nothing
+    // upstream should ever wait on it.
+    void inFlight;
+  }
+  // Seeded at module load, so this is never null and never blocks.
+  return cache!;
 }
 
 /** Rate for one currency, or null when we genuinely have no number for it. */

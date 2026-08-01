@@ -183,6 +183,43 @@ function main() {
     "without it the last card sits permanently under the tab bar"
   );
 
+  // ---- Copy and layout a paid click actually lands on --------------------
+  const dropsSrc = readFileSync(join(process.cwd(), "app", "drops", "page.tsx"), "utf8");
+  check(
+    "the month buttons are not sliced mid-word",
+    !/monthLabel\([\s\S]{0,80}\.slice\(0, 9\)/.test(dropsSrc),
+    "a flat nine-character slice rendered eleven of twelve months broken"
+  );
+  check(
+    "months render as a short name plus a two-digit year",
+    /month: "short"/.test(dropsSrc) && /String\(y\)\.slice\(2\)/.test(dropsSrc)
+  );
+  const submitPage = readFileSync(join(process.cwd(), "app", "submit", "page.tsx"), "utf8");
+  check(
+    "the pitch above the sign-in gate states the real photo rule",
+    /Three photos minimum/.test(submitPage) && !/One clean photo/.test(submitPage),
+    "a stranger off an ad reads this before registering, so it cannot promise the old rule"
+  );
+  check(
+    "and no longer advertises a video feature that was removed",
+    !/one video a day/i.test(submitPage)
+  );
+  const fx = readFileSync(join(process.cwd(), "lib", "fx.ts"), "utf8");
+  const getRatesBody = fx.slice(fx.indexOf("export async function getRates"));
+  check(
+    "the root layout's currency lookup never awaits a live call",
+    !/await fetchWide|await fetchEcb/.test(getRatesBody.slice(0, getRatesBody.indexOf("\n}"))),
+    "it sat in front of the first byte of HTML with an eleven second budget"
+  );
+  check(
+    "one refresh runs at a time however many visitors arrive together",
+    /let inFlight: Promise<void> \| null = null;/.test(fx)
+  );
+  check(
+    "a failed lookup retries in a minute, not in twelve hours",
+    /FAILURE_TTL_MS/.test(fx)
+  );
+
   // ---- The rename --------------------------------------------------------
   const giveaway = readFileSync(join(process.cwd(), "app", "giveaway", "page.tsx"), "utf8");
   check(

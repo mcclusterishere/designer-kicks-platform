@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getActiveGiveaway } from "@/lib/quiz";
 import { getEditorsPick } from "@/lib/editorsPick";
-import { streakFor, streakRuleLines } from "@/lib/streaks";
+import { streakNow, streakRuleLines } from "@/lib/streaks";
 import Countdown from "@/components/Countdown";
 
 export const metadata = {
@@ -21,17 +21,18 @@ export default async function GiveawayPage() {
     ? { name: pick.displayName, href: `/artists/${pick.slug}` }
     : { name: "Hitman Halo", href: "/artists" };
 
+  // Counted BEFORE the entries are counted, and that order is the whole
+  // fix. The layout and this page render concurrently, so reading the
+  // entry count first meant showing "You have 0 entries" in the same
+  // moment today's free entry was being written.
+  const streak = session?.user?.id ? await streakNow(session.user.id) : null;
+
   const yourEntries =
     session?.user?.id && giveaway
       ? await prisma.giveawayEntry.count({
           where: { giveawayId: giveaway.id, userId: session.user.id },
         })
       : 0;
-
-  // By the time this renders the root layout has already counted today,
-  // so a member arriving here sees the day they are standing in, not the
-  // one before it.
-  const streak = session?.user?.id ? await streakFor(session.user.id) : null;
 
   const pastWinners = await prisma.giveaway.findMany({
     where: { status: "DRAWN" },
