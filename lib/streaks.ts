@@ -19,7 +19,7 @@
  * nothing here can be bought either.
  */
 import { prisma } from "./db";
-import { todayStr } from "./quiz";
+import { activeGiveawaySelector, todayStr } from "./quiz";
 
 /** An entry for turning up at all. */
 export const STREAK_ENTRIES_PER_DAY = 1;
@@ -100,9 +100,13 @@ export async function touchStreak(userId: string): Promise<StreakState | null> {
       // Entries only exist while a giveaway is actually running. The
       // streak still advances without one, so a gap between giveaways
       // does not punish somebody's twenty-day run.
+      // The SAME selector the quiz and the league use. This picked the
+      // most recently created giveaway once, which is a different one
+      // the moment two are live at the same time: entries would land in
+      // the new giveaway while /giveaway counted the old one, and the
+      // member would see a number that did not match what they earned.
       const giveaway = await tx.giveaway.findFirst({
-        where: { status: "ACTIVE", endsAt: { gt: new Date() } },
-        orderBy: { createdAt: "desc" },
+        ...activeGiveawaySelector(),
         select: { id: true },
       });
       let n = 0;

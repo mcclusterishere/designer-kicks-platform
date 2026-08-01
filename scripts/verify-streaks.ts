@@ -76,6 +76,17 @@ async function main() {
     "entries that money can influence would break the no-purchase-necessary promise"
   );
   check(
+    "the streak mints into the SAME giveaway the quiz and the league use",
+    /activeGiveawaySelector\(\)/.test(src) && !/orderBy: \{ createdAt: "desc" \}/.test(src),
+    "two live giveaways and three different selectors means entries land in one while the page counts another"
+  );
+  const quizSrc = readFileSync(join(process.cwd(), "lib", "quiz.ts"), "utf8");
+  check(
+    "and that selector is defined exactly once",
+    /export function activeGiveawaySelector/.test(quizSrc) &&
+      (quizSrc.match(/status: "ACTIVE", endsAt: \{ gt: new Date\(\) \}/g) ?? []).length === 1
+  );
+  check(
     "streak entries are labelled as their own source",
     /source: "streak"/.test(src),
     "the draw has to be auditable by where each entry came from"

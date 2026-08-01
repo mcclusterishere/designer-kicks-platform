@@ -170,10 +170,26 @@ export async function grantCredits(
   if (!res.ok) throw new Error(`grantCredits failed: ${res.detail}`);
 }
 
+/**
+ * The ONE definition of "the giveaway that is running right now".
+ *
+ * It lives here because more than one thing mints entries: the quiz,
+ * the weekly league podium, and the daily login streak. When those
+ * disagree about which giveaway is live, entries land in one giveaway
+ * while the site shows the count from another, and the member sees a
+ * number that does not match what they earned. Soonest-ending wins, so
+ * a giveaway about to close is the one being filled.
+ */
+export function activeGiveawaySelector() {
+  return {
+    where: { status: "ACTIVE", endsAt: { gt: new Date() } },
+    orderBy: { endsAt: "asc" as const },
+  };
+}
+
 export async function getActiveGiveaway() {
   return prisma.giveaway.findFirst({
-    where: { status: "ACTIVE", endsAt: { gt: new Date() } },
-    orderBy: { endsAt: "asc" },
+    ...activeGiveawaySelector(),
     include: { _count: { select: { entries: true } } },
   });
 }
