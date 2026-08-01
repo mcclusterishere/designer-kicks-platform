@@ -60,7 +60,8 @@ export default function RulesPage() {
           <p className="mt-2">
             <strong className="text-white">Show up.</strong> Visit the site
             while signed in and that day earns you{" "}
-            {STREAK_ENTRIES_PER_DAY} ({STREAK_ENTRIES_PER_DAY}) entry, once per
+            {STREAK_ENTRIES_PER_DAY}{" "}
+            {STREAK_ENTRIES_PER_DAY === 1 ? "entry" : "entries"}, once per
             calendar day (UTC). Consecutive days build a streak:{" "}
             {STREAK_MILESTONES.map((m, i) => (
               <span key={m.days}>

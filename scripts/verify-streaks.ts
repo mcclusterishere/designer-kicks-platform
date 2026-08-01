@@ -110,6 +110,15 @@ async function main() {
     /Show up/.test(rules) && /once per\s*\n?\s*calendar day/.test(rules)
   );
   check(
+    "the rules don't print the entry count twice",
+    !/\{STREAK_ENTRIES_PER_DAY\} \(\{STREAK_ENTRIES_PER_DAY\}\)/.test(rules),
+    "the legal 'one (1)' convention around a numeric constant renders as '1 (1)'"
+  );
+  check(
+    "and the entry noun agrees with the number",
+    /STREAK_ENTRIES_PER_DAY === 1 \? "entry" : "entries"/.test(rules)
+  );
+  check(
     "the rules read the award numbers from the code, not from memory",
     /STREAK_ENTRIES_PER_DAY/.test(rules) && /STREAK_MILESTONES/.test(rules),
     "hardcoded numbers in published terms drift the moment somebody tunes the game"
