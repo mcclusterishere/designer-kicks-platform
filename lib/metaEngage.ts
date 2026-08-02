@@ -232,7 +232,13 @@ export async function storeEvents(events: ParsedEvent[]): Promise<ParsedEvent[]>
 /* Outbound replies (all reactive)                                     */
 /* ------------------------------------------------------------------ */
 
-async function graph(
+/**
+ * Exported so the comment harvest shares this exact call path rather
+ * than growing a second one. The appsecret proof, the timeout and the
+ * answered-vs-unreachable distinction below are all load-bearing, and a
+ * copy of them somewhere else would drift.
+ */
+export async function graph(
   path: string,
   params: Record<string, string>,
   method: "GET" | "POST" = "GET"

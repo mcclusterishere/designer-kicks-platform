@@ -4,11 +4,12 @@ import { useActionState } from "react";
 import {
   engageModerateAction,
   engageReplyAction,
+  harvestCommentsAction,
   igLookupAction,
   inboxReplyAction,
   socialRuleAction,
 } from "@/app/actions";
-import type { ActionResult } from "@/app/actions";
+import type { ActionResult, HarvestActionResult } from "@/app/actions";
 
 /**
  * The client half of the Engagement desk: small forms, each wrapping
@@ -153,5 +154,69 @@ export function IgLookupForm() {
       </form>
       <Feedback state={state} />
     </div>
+  );
+}
+
+/**
+ * Pull a whole comment thread off a post we already published.
+ *
+ * The webhook only reports comments left after we subscribed, so every
+ * thread older than that was invisible to the site. This reads them.
+ * The field is deliberately forgiving about what gets pasted — nobody
+ * has a post ID to hand, they have the URL in their address bar.
+ */
+export function HarvestForm({ suggestions }: { suggestions: { id: string; label: string; count: number | null }[] }) {
+  const [state, action, pending] = useActionState<HarvestActionResult | null, FormData>(
+    harvestCommentsAction,
+    null
+  );
+  return (
+    <form action={action} className="mt-2">
+      <div className="flex gap-2">
+        <input
+          name="post"
+          placeholder="Paste the post's link, or its ID"
+          className={input}
+          required
+          maxLength={500}
+        />
+        <button disabled={pending} className={btn}>
+          {pending ? "Reading…" : "Read the comments"}
+        </button>
+      </div>
+      {suggestions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {suggestions.map((s) => (
+            <button
+              key={s.id}
+              type="submit"
+              name="post"
+              value={s.id}
+              disabled={pending}
+              className={ghost}
+              title={s.label}
+            >
+              {s.label.slice(0, 42)}
+              {s.label.length > 42 ? "…" : ""}
+              {typeof s.count === "number" && ` · ${s.count}`}
+            </button>
+          ))}
+        </div>
+      )}
+      <Feedback state={state} />
+      {state?.ok && state.thin && (
+        <p className="mt-1 text-xs text-smoke">
+          Facebook refused some of the fields asked for, so this harvest carries the text
+          and the names but not the per-comment links.
+        </p>
+      )}
+      {state?.ok && state.fetched === 0 && (
+        <p className="mt-1 text-xs text-smoke">
+          Nothing came back. If that post definitely has comments, the Page connection
+          predates the pages_read_user_content permission — reconnect it in Social HQ and
+          run this again.
+        </p>
+      )}
+    </form>
   );
 }

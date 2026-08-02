@@ -6793,6 +6793,66 @@ export async function igLookupAction(
 }
 
 /* ------------------------------------------------------------------ */
+/* Comment harvest — reading the threads the webhook never saw         */
+/* ------------------------------------------------------------------ */
+
+export type HarvestActionResult = ActionResult & {
+  postId?: string;
+  fetched?: number;
+  banked?: number;
+  alreadyHad?: number;
+  facebookSays?: number | null;
+  thin?: boolean;
+};
+
+/**
+ * Pull a whole comment thread off one of our own Page posts.
+ *
+ * Read-only: it fetches comments and writes them to our database. It
+ * replies to nobody and touches no Page but ours.
+ */
+export async function harvestCommentsAction(
+  _prev: HarvestActionResult | null,
+  formData: FormData
+): Promise<HarvestActionResult> {
+  await requireAdmin();
+  const raw = String(formData.get("post") ?? "").slice(0, 500);
+  const { parsePostRef, harvestComments } = await import("@/lib/commentHarvest");
+  const ref = parsePostRef(raw, process.env.FB_PAGE_ID);
+  if ("error" in ref) return { ok: false, error: ref.error };
+
+  const res = await harvestComments(ref.id);
+  if (!res.ok) return { ok: false, error: res.error ?? "Harvest failed." };
+  revalidatePath("/admin");
+
+  const bits = [
+    `${res.fetched} comment${res.fetched === 1 ? "" : "s"} read`,
+    `${res.banked} new`,
+  ];
+  if (res.alreadyHad > 0) bits.push(`${res.alreadyHad} already banked`);
+  if (typeof res.facebookSays === "number" && res.facebookSays !== res.fetched) {
+    // Facebook's own count includes comments it will not hand over —
+    // deleted, or hidden by privacy — so a gap here is normal and saying
+    // so is better than letting it read as a failed harvest.
+    bits.push(`Facebook counts ${res.facebookSays} (its number includes ones it won't return)`);
+  }
+  if (res.stoppedEarly) bits.push(res.stoppedEarly);
+
+  return {
+    ok: true,
+    note: bits.join(" · ") + ".",
+    postId: res.postId,
+    fetched: res.fetched,
+    banked: res.banked,
+    alreadyHad: res.alreadyHad,
+    facebookSays: res.facebookSays,
+    // The field ladder dropped to a shorter rung, so the harvest is
+    // real but thinner than intended and should say so out loud.
+    thin: res.fieldsUsed !== null && !res.fieldsUsed.includes("permalink_url"),
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* The chat bot                                                        */
 /* ------------------------------------------------------------------ */
 

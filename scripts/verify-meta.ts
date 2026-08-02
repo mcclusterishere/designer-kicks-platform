@@ -670,6 +670,108 @@ async function main() {
     Number(sched!.scheduled_publish_time) < 1e11
   );
 
+  // ---- Comment harvest ---------------------------------------------------
+  // Reading a thread we already posted is a READ, which makes it the
+  // least dangerous thing in this file — and exactly why the checks
+  // here are about staying that way: our Page only, no sends, and the
+  // documented parameter values rather than plausible-looking ones.
+  const harvestSrc = readFileSync(join(process.cwd(), "lib", "commentHarvest.ts"), "utf8");
+  check(
+    "the harvest never sends anything",
+    !/replyToComment|sendDmReply|sendMessage|method: "POST"|"POST"\)/.test(harvestSrc),
+    "it exists to read a thread; the moment it can write, it is outbound automation with a different rulebook"
+  );
+  check(
+    "it reads only the Page we hold a token for",
+    /process\.env\.FB_PAGE_ID/.test(harvestSrc) && !/business_discovery|\/search\?/.test(harvestSrc),
+    "reading another Page's comments is a different permission and a different promise"
+  );
+  check(
+    "comments are pulled with filter=stream",
+    /filter: "stream"/.test(harvestSrc),
+    "toplevel is the documented default and drops every reply, which is where half the argument lives"
+  );
+  check(
+    "and with the documented summary flag",
+    /summary: "true"/.test(harvestSrc)
+  );
+  check(
+    "Facebook's own count is reported as its number, never as a target we missed",
+    /facebookSays/.test(harvestSrc) && /won't return|will not hand over/.test(
+      readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8")
+    ),
+    "the doc says total_count can exceed what the API returns, because of privacy and deletions"
+  );
+  check(
+    "paging follows the cursor and stops when there is no next page",
+    /paging\?\.next/.test(harvestSrc) && /cursors\?\.after/.test(harvestSrc)
+  );
+  check(
+    "and it cannot walk a viral thread forever",
+    /MAX_PAGES/.test(harvestSrc) && /BUDGET_MS/.test(harvestSrc),
+    "a self-imposed floor, since the doc only warns that paging tens of thousands of comments hits limits"
+  );
+  check(
+    "the page size respects the documented ceiling of 100",
+    /const PAGE_SIZE = 100;/.test(harvestSrc)
+  );
+  check(
+    "a rejected field list degrades instead of killing the harvest",
+    /FIELD_LADDER/.test(harvestSrc) && /fieldIdx < FIELD_LADDER\.length - 1/.test(harvestSrc),
+    "only id, message and can_comment are named in the edge docs; the rest are attempted, and one renamed field must not take the feature down"
+  );
+  check(
+    "the ladder only shortens on the first page",
+    /&& page === 0/.test(harvestSrc),
+    "dropping fields halfway would leave half the harvest richer than the other half with no way to tell which"
+  );
+  check(
+    "a thinner harvest announces itself",
+    /thin\?: boolean/.test(readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8")),
+    "silently returning less than asked for is how a partial answer gets read as a complete one"
+  );
+  check(
+    "re-running the harvest is free",
+    /skipDuplicates: true/.test(harvestSrc),
+    "commentId is unique, so a comment the webhook already delivered is never doubled"
+  );
+  check(
+    "a harvested comment is not counted as a poll vote",
+    /choiceLabel/.test(harvestSrc) && !/choiceLabel:/.test(harvestSrc),
+    "inventing a pick for a conversation would poison the counts the poll posts depend on"
+  );
+  check(
+    "a share link is refused with an explanation rather than sent to Graph",
+    /share link, which carries no post ID/.test(harvestSrc),
+    "there is no documented endpoint that resolves one, so guessing would fail with a message nobody can act on"
+  );
+  check(
+    "and so is a pfbid link, which is what Facebook hands out now",
+    /pfbid\[A-Za-z0-9\]\+/.test(harvestSrc) && /hides the post ID/.test(harvestSrc),
+    "nothing documented resolves a pfbid, so the picker is the honest route and the message says so"
+  );
+  check(
+    "which is why the desk offers a picker at all",
+    /listRecentPosts/.test(readFileSync(join(process.cwd(), "app", "admin", "EngagePanel.tsx"), "utf8")),
+    "asking for a post ID that the platform no longer shows anybody is not a workflow"
+  );
+  const connectSrc = readFileSync(join(process.cwd(), "lib", "metaConnect.ts"), "utf8");
+  check(
+    "the Page connection asks for pages_read_user_content",
+    /pages_read_user_content/.test(connectSrc),
+    "Meta documents /{page-id}/feed as needing it alongside pages_read_engagement, and the comments edge answers error 283 naming the same pair"
+  );
+  check(
+    "the scope list is stated once",
+    (connectSrc.match(/pages_show_list,pages_manage_posts/g) ?? []).length === 1,
+    "the auth dialog and the stored record must ask for and claim the same thing"
+  );
+  check(
+    "a permissions refusal tells the reader to reconnect",
+    /reconnect the Page in Social HQ/.test(harvestSrc),
+    "error 283 is the one failure here that a human can actually fix"
+  );
+
   const engSrcBtn = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
   check(
     "a refused button degrades to plain text, and only when Meta actually answered",

@@ -2,12 +2,15 @@ import { prisma } from "@/lib/db";
 import { engageConfigured, listConversations } from "@/lib/metaEngage";
 import {
   EventReplyForm,
+  HarvestForm,
   IgLookupForm,
   InboxReplyForm,
   ModerateButtons,
   RuleButtons,
   RuleForm,
 } from "./EngageForms";
+import { listRecentPosts, rarityMentions } from "@/lib/commentHarvest";
+import { TIER_LABEL, multipleLabel, type RarityTier } from "@/lib/rarity";
 
 /**
  * The Engagement desk: everything people say TO us on Meta, in one
@@ -23,7 +26,7 @@ export default async function EngagePanel() {
   const on = engageConfigured();
   const webhooksOn = Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN);
 
-  const [conversations, events, rules] = await Promise.all([
+  const [conversations, events, rules, recentPosts, mentions, harvested] = await Promise.all([
     on ? listConversations().catch(() => []) : Promise.resolve([]),
     prisma.metaEvent.findMany({
       where: { status: "NEW" },
@@ -31,6 +34,12 @@ export default async function EngagePanel() {
       take: 25,
     }),
     prisma.socialRule.findMany({ orderBy: { createdAt: "asc" } }),
+    // A picker beats asking for an ID. If the Page connection predates
+    // pages_read_user_content this comes back empty rather than
+    // throwing, and the paste field still works.
+    on ? listRecentPosts(8).catch(() => []) : Promise.resolve([]),
+    rarityMentions(undefined, 12).catch(() => []),
+    prisma.socialVote.count(),
   ]);
 
   return (
@@ -117,6 +126,81 @@ export default async function EngagePanel() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* ---- Comment harvest -------------------------------------- */}
+      <div className="mt-6">
+        <p className="tag text-volt">Read a thread we already posted</p>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-smoke">
+          The webhook above only reports comments left <span className="text-white">after</span>{" "}
+          we subscribed, so every argument older than that never reached the site. This reads
+          the whole thread off a post and banks it — the same table the webhook writes to, so
+          a comment from March counts for exactly what one from this morning counts for.
+          It reads only; it replies to nobody.
+        </p>
+        <p className="mt-1 max-w-2xl text-xs text-smoke/80">
+          Pick a post below — Facebook&apos;s new links hide the post ID, so the buttons are
+          the reliable way in. The number after each one is Facebook&apos;s own comment count.
+        </p>
+        <HarvestForm
+          suggestions={recentPosts.map((p) => ({
+            id: p.id,
+            label: (p.message ?? "Post").replace(/\s+/g, " ").trim() || "Post",
+            count: p.commentCount,
+          }))}
+        />
+        {harvested > 0 && (
+          <p className="mt-2 tag text-smoke">{harvested.toLocaleString()} comments banked so far</p>
+        )}
+
+        {mentions.length > 0 && (
+          <div className="mt-3">
+            <p className="tag text-smoke">What the room actually named</p>
+            <div className="mt-2 space-y-1.5">
+              {mentions.map((m) => {
+                const tier = m.rarest?.rarityTier as RarityTier | null | undefined;
+                const mult = multipleLabel(m.rarest?.rarityMultiple);
+                return (
+                  <div
+                    key={m.shoeName}
+                    className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-edge bg-panel px-3 py-2"
+                  >
+                    <span className="text-sm text-white">
+                      {m.shoeName}
+                      <span className="ml-2 tag text-smoke">
+                        {m.mentions} mention{m.mentions === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                    {m.rarest && (
+                      <span className="tag text-smoke">
+                        rarest we track: {m.rarest.sku}
+                        {tier && mult && tier !== "unknown" && (
+                          <span className="ml-1 text-volt">
+                            {TIER_LABEL[tier]} · {mult}
+                          </span>
+                        )}
+                        {m.rarest.ebayItemUrl && (
+                          <a
+                            href={m.rarest.ebayItemUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 text-volt underline"
+                          >
+                            eBay
+                          </a>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-xs text-smoke/80">
+              Ranked by how many people said it. The eBay link is the affiliate-tagged
+              listing the price sync already captured for that pair.
+            </p>
           </div>
         )}
       </div>

@@ -41,6 +41,21 @@ const FB_API = process.env.GRAPH_API_URL || "https://graph.facebook.com/v23.0";
 const FB_AUTH = process.env.FB_AUTH_URL || "https://www.facebook.com/v23.0";
 
 /**
+ * What the Page connection asks for.
+ *
+ * pages_read_user_content is the one that reads OTHER people's comments
+ * on our posts — Meta documents /{page-id}/feed as requiring
+ * pages_read_engagement AND pages_read_user_content, and the comments
+ * edge answers error 283 naming the same pair. Without it the Page can
+ * publish and read its own content but the comment harvest comes back
+ * empty, which is indistinguishable from a quiet post.
+ *
+ * Adding a scope means the existing connection does NOT have it: the
+ * Page has to be reconnected once for the new consent to be granted.
+ */
+const PAGE_SCOPES = "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content";
+
+/**
  * Two Meta apps, two credential pairs — because Meta's consumer
  * Facebook Login use case (the site's fan sign-in) cannot share an app
  * with any business use case. FACEBOOK_CLIENT_* stays the LOGIN app
@@ -123,7 +138,7 @@ export function authorizeUrl(provider: ConnectProvider, state: string): string {
     response_type: "code",
     ...(configId
       ? { config_id: configId }
-      : { scope: "pages_show_list,pages_manage_posts,pages_read_engagement" }),
+      : { scope: PAGE_SCOPES }),
     state,
   });
   return `${FB_AUTH}/dialog/oauth?${qs}`;
@@ -281,7 +296,7 @@ export async function exchangeCode(
       // Page tokens minted from a long-lived user token don't expire.
       accessToken: String(p.access_token),
       tokenExpiresAt: null,
-      scopes: "pages_show_list,pages_manage_posts,pages_read_engagement",
+      scopes: PAGE_SCOPES,
     }));
 }
 
