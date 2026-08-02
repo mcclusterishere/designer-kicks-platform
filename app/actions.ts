@@ -6853,6 +6853,62 @@ export async function harvestCommentsAction(
 }
 
 /* ------------------------------------------------------------------ */
+/* Page insights — what the Page is doing, and what to do about it     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ask Meta which metrics it still answers to, then read them.
+ *
+ * The probe is separate from the read on purpose: the metric list has
+ * been cut four times in two years and a single dead name fails a whole
+ * batch, so knowing which names are live is its own job with its own
+ * answer worth keeping.
+ */
+export async function insightsRefreshAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const op = String(formData.get("op") ?? "refresh");
+  const { probeMetrics, snapshotPageInsights, refreshPostStats } = await import("@/lib/pageInsights");
+
+  if (op === "probe") {
+    // A post-scope metric needs a real post to ask about.
+    const specimen = await prisma.postStat.findFirst({
+      orderBy: { publishedAt: "desc" },
+      select: { postId: true },
+    });
+    const res = await probeMetrics(specimen?.postId ?? null);
+    if (!res.ok) return { ok: false, error: res.error ?? "Probe failed." };
+    revalidatePath("/admin");
+    const bits = [`${res.alive.length} metric${res.alive.length === 1 ? "" : "s"} still answer`];
+    if (res.dead.length > 0) bits.push(`${res.dead.length} refused by Meta`);
+    if (res.skipped > 0) bits.push(`${res.skipped} couldn't be asked`);
+    return { ok: true, note: bits.join(" · ") + "." };
+  }
+
+  // The post read first: it needs no read_insights and no 100-like
+  // floor, so it is the half that works on a small Page, and doing it
+  // first means the desk has something to say even if Insights is dark.
+  const stats = await refreshPostStats(50);
+  if (!stats.ok) return { ok: false, error: stats.error ?? "Couldn't read the Page's posts." };
+
+  const snap = await snapshotPageInsights();
+  revalidatePath("/admin");
+
+  const bits = [`${stats.posts} post${stats.posts === 1 ? "" : "s"} read`];
+  if (snap.ok && snap.pointsBanked > 0) {
+    bits.push(`${snap.pointsBanked} new Page datapoints`);
+  } else if (snap.ok && snap.emptyButFine) {
+    // Documented: Insights is only available on Pages with 100+ likes.
+    bits.push("Page Insights answered with nothing — that's the under-100-likes state, not a fault");
+  } else if (!snap.ok && snap.error) {
+    bits.push(`Page Insights: ${snap.error}`);
+  }
+  return { ok: true, note: bits.join(" · ") + "." };
+}
+
+/* ------------------------------------------------------------------ */
 /* The chat bot                                                        */
 /* ------------------------------------------------------------------ */
 

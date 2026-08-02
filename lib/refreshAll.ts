@@ -218,7 +218,47 @@ export async function refreshEverything(mode: RefreshMode = "nightly"): Promise<
     })
   );
 
-  // 13. Fingerprint the market so the index has real history to chart.
+  // 13. Read the Page back: what its posts did, and — where Meta will
+  //     serve it — how far they reached. Post stats come first inside
+  //     the step because they need no read_insights and no 100-like
+  //     Page, so the decision engine keeps working when Insights is
+  //     dark. Dormant without a Page token.
+  steps.push(
+    await run("page-insights", async () => {
+      const { refreshPostStats, snapshotPageInsights, liveMetrics, probeMetrics } =
+        await import("./pageInsights");
+      const { prisma } = await import("./db");
+      const posts = await refreshPostStats(deep ? 100 : 50);
+      if (!posts.ok) return { configured: false, detail: posts.error };
+
+      // The metric list has been cut four times in two years, so it is
+      // re-probed weekly rather than trusted. A deep run always probes.
+      const live = await liveMetrics("page");
+      const last = await prisma.metricProbe.findFirst({
+        orderBy: { checkedAt: "desc" },
+        select: { checkedAt: true },
+      });
+      if (deep || live.length === 0 || !last || Date.now() - last.checkedAt.getTime() > 7 * 86_400_000) {
+        const specimen = await prisma.postStat.findFirst({
+          orderBy: { publishedAt: "desc" },
+          select: { postId: true },
+        });
+        await probeMetrics(specimen?.postId ?? null).catch(() => null);
+      }
+
+      const snap = await snapshotPageInsights();
+      return {
+        posts: posts.posts,
+        points: snap.pointsBanked,
+        // Documented: Insights serves nothing to a Page under 100 likes.
+        detail: snap.emptyButFine
+          ? `${posts.posts} posts read; Page Insights is empty, which is the under-100-likes state`
+          : `${posts.posts} posts read, ${snap.pointsBanked} datapoints banked`,
+      };
+    })
+  );
+
+  // 14. Fingerprint the market so the index has real history to chart.
   //     Last, so it measures the state everything above just produced.
   steps.push(
     await run("index-snapshot", async () => {

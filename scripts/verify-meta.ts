@@ -772,6 +772,136 @@ async function main() {
     "error 283 is the one failure here that a human can actually fix"
   );
 
+  // ---- Page Insights, and the metric graveyard ---------------------------
+  // This repo has been burned by exactly one thing more than any other:
+  // a Page Insights metric name that used to work. Meta has cut the list
+  // four times in two years, the endpoint takes a comma-separated batch,
+  // and ONE dead name fails the whole call. So the contract is that no
+  // metric name is ever trusted — not from the docs, and never from
+  // memory. These checks hold that line.
+  const {
+    DEAD_METRICS, METRIC_CANDIDATES, candidatesAreClean, isDeadMetric,
+  } = await import("../lib/pageInsights");
+  const insightsSrc = readFileSync(join(process.cwd(), "lib", "pageInsights.ts"), "utf8");
+
+  check(
+    "no candidate metric is one Meta already refuses",
+    candidatesAreClean().length === 0,
+    candidatesAreClean().join(", ") || "the graveyard and the wish list do not overlap"
+  );
+  check(
+    "the graveyard carries the whole documented kill list",
+    DEAD_METRICS.length >= 60,
+    "three deprecation waves transcribed from Meta's deprecated-metrics page"
+  );
+  check(
+    "every impressions metric is known dead",
+    ["page_impressions", "page_impressions_unique", "post_impressions", "post_impressions_unique",
+     "page_posts_impressions", "post_impressions_organic"].every(isDeadMetric),
+    "the whole impressions family was retired in favour of the media_view family"
+  );
+  check(
+    "page_fans is known dead and page_follows is what we ask for instead",
+    isDeadMetric("page_fans") && METRIC_CANDIDATES.some((c) => c.metric === "page_follows"),
+    "Meta's own named alternative, deprecated 15 November 2025"
+  );
+  check(
+    "the replacement for impressions is what we actually ask for",
+    METRIC_CANDIDATES.some((c) => c.metric === "page_media_view" && c.replaces === "page_impressions"),
+    "and the field records what it replaced, so the next reader knows why"
+  );
+  check(
+    "no candidate is a follower-count metric under another name",
+    !METRIC_CANDIDATES.some((c) => /page_fan/.test(c.metric)),
+    "every page_fans variant is retired; reaching for one is the classic relapse"
+  );
+  check(
+    "metrics are probed one at a time, not in a hopeful batch",
+    /for \(const c of METRIC_CANDIDATES\)[\s\S]{0,600}metric: c\.metric/.test(insightsSrc),
+    "batched, a single dead name fails the lot and tells you nothing about the rest"
+  );
+  check(
+    "only metrics Meta actually answered to are ever batched",
+    /liveMetrics\("page"\)/.test(insightsSrc) && /status: "ALIVE"/.test(insightsSrc),
+    "the database, not the source file, is what the reader trusts"
+  );
+  check(
+    "a refusal and a timeout are recorded differently",
+    /status = "DEAD"/.test(insightsSrc) && /status = "UNKNOWN"/.test(insightsSrc),
+    "never having asked is not the same fact as having been refused"
+  );
+  check(
+    "a metric that dies mid-batch gets flagged by name",
+    /markSuspect/.test(insightsSrc),
+    "so the next probe confirms it instead of the dashboard going quietly blank"
+  );
+  check(
+    "the 100-like floor is treated as a state, not an error",
+    /emptyButFine/.test(insightsSrc) &&
+      /under-100-likes state/.test(readFileSync(join(process.cwd(), "app", "actions.ts"), "utf8")),
+    "Meta documents that Insights serves nothing below it; showing zeroes would be a lie"
+  );
+  check(
+    "the decision engine runs on post stats, not on Insights",
+    /prisma\.postStat\.findMany/.test(insightsSrc) &&
+      !/insightPoint[\s\S]{0,200}decisions/.test(insightsSrc),
+    "post stats need no read_insights and no 100-like Page, so the advice survives a small Page"
+  );
+  check(
+    "a share counts for more than a reaction",
+    /p\.comments \* 3 \+ p\.shares \* 5 \+ p\.reactions/.test(insightsSrc),
+    "a share is the only one that puts the post in front of somebody who doesn't follow us"
+  );
+  check(
+    "a finding drawn from too little data says so",
+    /confident: boolean/.test(insightsSrc) && /not enough data/.test(insightsSrc),
+    "a dashboard that says the same thing at three posts as at three hundred is worthless"
+  );
+  check(
+    "an hour is never compared off a single post",
+    /filter\(\(\[, v\]\) => v\.n >= 2\)/.test(insightsSrc),
+    "one post in an hour is not a trend, it is a post"
+  );
+  check(
+    "the posting clock is the audience's, not the server's",
+    /America\/New_York/.test(insightsSrc),
+    "\"post at 9\" is useless if the 9 is UTC"
+  );
+  check(
+    "the Page connection asks for read_insights",
+    /read_insights/.test(readFileSync(join(process.cwd(), "lib", "metaConnect.ts"), "utf8")),
+    "documented alongside pages_read_engagement, with an ANALYZE task on the Page"
+  );
+  check(
+    "the nightly refresh reads the Page",
+    /page-insights/.test(readFileSync(join(process.cwd(), "lib", "refreshAll.ts"), "utf8")),
+    "Meta updates most metrics once every 24 hours and keeps two years; a daily snapshot outlives that"
+  );
+  // The bug this caught in testing: Postgres does not treat NULL as
+  // equal to NULL in a unique index, so a nullable breakdown column
+  // defeated skipDuplicates and let every nightly run re-insert the
+  // same day. Silent, and it corrupts every trend built on top.
+  const schemaSrc = readFileSync(join(process.cwd(), "prisma", "schema.prisma"), "utf8");
+  check(
+    "the insight breakdown column can never be null",
+    /breakdown String\s+@default\(""\)/.test(schemaSrc),
+    "a null there defeats the unique index and the nightly cron doubles the history"
+  );
+  check(
+    "and nothing writes a null into it",
+    !/breakdown: null/.test(insightsSrc),
+    "one null write is all it takes to start duplicating days"
+  );
+  check(
+    "the day is the dedup key, so re-reading it banks nothing twice",
+    /@@unique\(\[objectId, metric, period, endTime, breakdown\]\)/.test(schemaSrc)
+  );
+  check(
+    "the probe is not re-run every single night",
+    /7 \* 86_400_000/.test(readFileSync(join(process.cwd(), "lib", "refreshAll.ts"), "utf8")),
+    "fourteen questions a night to hear the same answer is a wasted rate limit"
+  );
+
   const engSrcBtn = readFileSync(join(process.cwd(), "lib", "metaEngage.ts"), "utf8");
   check(
     "a refused button degrades to plain text, and only when Meta actually answered",

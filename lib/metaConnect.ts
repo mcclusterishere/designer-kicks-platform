@@ -50,10 +50,17 @@ const FB_AUTH = process.env.FB_AUTH_URL || "https://www.facebook.com/v23.0";
  * publish and read its own content but the comment harvest comes back
  * empty, which is indistinguishable from a quiet post.
  *
+ * read_insights is the other one. Meta documents Page Insights as
+ * requiring read_insights AND pages_read_engagement, with a token from
+ * somebody who can perform the ANALYZE task on the Page — and separately
+ * warns that Insights returns nothing at all on a Page with fewer than
+ * 100 likes, which is a real state rather than a failure.
+ *
  * Adding a scope means the existing connection does NOT have it: the
  * Page has to be reconnected once for the new consent to be granted.
  */
-const PAGE_SCOPES = "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content";
+const PAGE_SCOPES =
+  "pages_show_list,pages_manage_posts,pages_read_engagement,pages_read_user_content,read_insights";
 
 /**
  * Two Meta apps, two credential pairs — because Meta's consumer

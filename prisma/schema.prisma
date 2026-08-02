@@ -2294,3 +2294,90 @@ model GroupShare {
   @@unique([groupLeadId, postUrl])
   @@index([postUrl])
 }
+
+/// One metric name, and whether Meta still answers to it.
+///
+/// The Page Insights metric list has been cut four times in two years —
+/// March 2024, June 2025, November 2025, and a wave dated June 2026 —
+/// and every cut turns a working call into an "invalid metric" error
+/// that takes the whole batch down with it. A hardcoded list is
+/// therefore a list of future outages. This table is what the code
+/// actually trusts: each candidate is asked for ON ITS OWN, and the
+/// answer Meta gave is written down here.
+model MetricProbe {
+  id String @id @default(cuid())
+
+  /// The metric as sent to Graph, e.g. page_media_view.
+  metric String @unique
+  /// page | post — which object this metric is asked of.
+  scope  String
+
+  /// ALIVE | DEAD | UNKNOWN. DEAD means Meta answered and refused it,
+  /// which is a different fact from never having asked.
+  status String  @default("UNKNOWN")
+  /// Meta's own words when it refused, kept so a rename is readable
+  /// months later instead of being reduced to a boolean.
+  note   String?
+
+  checkedAt DateTime @default(now())
+
+  @@index([scope, status])
+}
+
+/// A number Meta gave us on a day, kept so trends outlive the API's
+/// two-year retention and survive the next metric rename.
+model InsightPoint {
+  id String @id @default(cuid())
+
+  /// The Page id, or a post id for per-post metrics.
+  objectId  String
+  /// page | post
+  scope     String
+  metric    String
+  /// day | week | days_28 | lifetime
+  period    String
+  /// The end_time Meta stamped the value with — the day it belongs to.
+  endTime   DateTime
+  value     Float
+  /// is_from_ads / is_from_followers etc., when the metric is broken
+  /// down. Empty string, never null, when it is not: Postgres treats
+  /// NULL as distinct from NULL in a unique index, so a nullable column
+  /// here would silently let every nightly run re-insert the same day
+  /// and multiply the history behind every chart.
+  breakdown String   @default("")
+
+  capturedAt DateTime @default(now())
+
+  @@unique([objectId, metric, period, endTime, breakdown])
+  @@index([scope, metric, endTime])
+  @@index([objectId, endTime])
+}
+
+/// What a post did, captured from the post node itself rather than from
+/// Insights — comments, reactions and shares are readable with the
+/// permissions the Page already has and, unlike Insights, they do not
+/// require the Page to have 100 likes. This is what the decision engine
+/// runs on, so it keeps working on a small Page.
+model PostStat {
+  id String @id @default(cuid())
+
+  postId      String   @unique
+  message     String?
+  permalink   String?
+  publishedAt DateTime
+  /// photo | video | link | status | share — read off the attachment.
+  postType    String?
+
+  comments  Int @default(0)
+  reactions Int @default(0)
+  shares    Int @default(0)
+
+  /// Reach, when Page Insights is available. Null on a Page under the
+  /// 100-like floor, which is a real state and not an error.
+  mediaView Int?
+
+  capturedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([publishedAt])
+}

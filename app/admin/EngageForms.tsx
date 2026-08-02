@@ -7,6 +7,7 @@ import {
   harvestCommentsAction,
   igLookupAction,
   inboxReplyAction,
+  insightsRefreshAction,
   socialRuleAction,
 } from "@/app/actions";
 import type { ActionResult, HarvestActionResult } from "@/app/actions";
@@ -217,6 +218,32 @@ export function HarvestForm({ suggestions }: { suggestions: { id: string; label:
           run this again.
         </p>
       )}
+    </form>
+  );
+}
+
+/**
+ * The two insight buttons. Probing and reading are separate because
+ * they answer different questions: "which metric names does Meta still
+ * accept" and "what were the numbers". The first only needs running
+ * when something breaks or a deprecation lands.
+ */
+export function InsightsButtons({ probed }: { probed: boolean }) {
+  const [state, action, pending] = useActionState<ActionResult | null, FormData>(
+    insightsRefreshAction,
+    null
+  );
+  return (
+    <form action={action} className="mt-2">
+      <div className="flex flex-wrap gap-2">
+        <button name="op" value="refresh" disabled={pending} className={btn}>
+          {pending ? "Reading…" : "Read the Page"}
+        </button>
+        <button name="op" value="probe" disabled={pending} className={ghost}>
+          {probed ? "Re-check which metrics still work" : "Check which metrics still work"}
+        </button>
+      </div>
+      <Feedback state={state} />
     </form>
   );
 }

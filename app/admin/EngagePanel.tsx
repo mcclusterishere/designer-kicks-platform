@@ -4,12 +4,14 @@ import {
   EventReplyForm,
   HarvestForm,
   IgLookupForm,
+  InsightsButtons,
   InboxReplyForm,
   ModerateButtons,
   RuleButtons,
   RuleForm,
 } from "./EngageForms";
 import { listRecentPosts, rarityMentions } from "@/lib/commentHarvest";
+import { decisions, insightsHealth } from "@/lib/pageInsights";
 import { TIER_LABEL, multipleLabel, type RarityTier } from "@/lib/rarity";
 
 /**
@@ -26,7 +28,8 @@ export default async function EngagePanel() {
   const on = engageConfigured();
   const webhooksOn = Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN);
 
-  const [conversations, events, rules, recentPosts, mentions, harvested] = await Promise.all([
+  const [conversations, events, rules, recentPosts, mentions, harvested, health, calls] =
+    await Promise.all([
     on ? listConversations().catch(() => []) : Promise.resolve([]),
     prisma.metaEvent.findMany({
       where: { status: "NEW" },
@@ -40,6 +43,8 @@ export default async function EngagePanel() {
     on ? listRecentPosts(8).catch(() => []) : Promise.resolve([]),
     rarityMentions(undefined, 12).catch(() => []),
     prisma.socialVote.count(),
+    insightsHealth().catch(() => null),
+    decisions().catch(() => ({ decisions: [], posts: 0 })),
   ]);
 
   return (
@@ -202,6 +207,82 @@ export default async function EngagePanel() {
               listing the price sync already captured for that pair.
             </p>
           </div>
+        )}
+      </div>
+
+      {/* ---- What the Page is doing, and what to do about it ------- */}
+      <div className="mt-6">
+        <p className="tag text-volt">The Page, read back to you</p>
+        <p className="mt-1 max-w-2xl text-xs leading-relaxed text-smoke">
+          Two halves. Post performance — comments, reactions, shares — comes off the posts
+          themselves and works on any Page. Page Insights adds reach on top, and Meta only
+          serves it to Pages with{" "}
+          <span className="text-white">100 or more likes</span>; under that it answers with
+          nothing, which is the documented behaviour and not a fault.
+        </p>
+        <InsightsButtons probed={Boolean(health?.probed)} />
+
+        {calls.decisions.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {calls.decisions.map((d) => (
+              <div
+                key={d.headline}
+                className={`rounded-lg border px-3 py-2 ${
+                  d.confident ? "border-volt/40 bg-volt/5" : "border-edge bg-panel"
+                }`}
+              >
+                <p className="text-sm font-bold text-white">
+                  {d.headline}
+                  {!d.confident && <span className="ml-2 tag font-normal text-smoke">thin</span>}
+                </p>
+                <p className="mt-0.5 text-sm text-smoke">{d.detail}</p>
+                <p className="mt-0.5 text-xs text-smoke/70">{d.basis}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {calls.posts === 0 && (
+          <p className="mt-2 text-sm text-smoke">
+            No posts read yet. Hit “Read the Page” and this fills with what your own posting
+            history says about when and what to post.
+          </p>
+        )}
+
+        {/* Which metric names Meta still accepts. Worth showing because
+            the list keeps shrinking and a silent gap reads as a bug. */}
+        {health && (health.alive.length > 0 || health.dead.length > 0) && (
+          <details className="mt-3 rounded-lg border border-edge bg-panel px-3 py-2">
+            <summary className="cursor-pointer tag text-smoke">
+              Metrics Meta still answers to — {health.alive.length} live
+              {health.dead.length > 0 && `, ${health.dead.length} retired`}
+            </summary>
+            {health.alive.length > 0 && (
+              <ul className="mt-2 space-y-0.5">
+                {health.alive.map((m) => (
+                  <li key={m.metric} className="text-xs text-smoke">
+                    <span className="font-mono text-volt">{m.metric}</span> — {m.label}
+                    {m.replaces && (
+                      <span className="text-smoke/70"> (replaced {m.replaces})</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {health.dead.length > 0 && (
+              <ul className="mt-2 space-y-0.5 border-t border-edge pt-2">
+                {health.dead.map((m) => (
+                  <li key={m.metric} className="text-xs text-smoke/70">
+                    <span className="font-mono line-through">{m.metric}</span>
+                    {m.note && <span className="ml-1">— {m.note.slice(0, 90)}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-smoke/70">
+              Meta has cut this list four times in two years. Nothing here is assumed —
+              each name was asked for on its own and this is the answer that came back.
+            </p>
+          </details>
         )}
       </div>
 
