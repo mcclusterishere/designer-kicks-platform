@@ -2,6 +2,16 @@ import Link from "next/link";
 import Money from "@/components/Money";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import {
+  GRAIL_MULTIPLE,
+  HEAT_MULTIPLE,
+  TIER_LABEL,
+  asRarityView,
+  multipleLabel,
+  rarityWhere,
+  type RarityTier,
+  type RarityView,
+} from "@/lib/rarity";
 
 /**
  * The browsing view of the exchange.
@@ -50,20 +60,35 @@ function weave<T>(laneRows: T[], wildRows: T[]): T[] {
   return out;
 }
 
+/**
+ * Scarcity views. "Everything" is still here on purpose — the whole base
+ * is what makes a SKU resolve — but the rare cuts are what the site is
+ * for, so they sit first and read in plain multiples rather than tier
+ * names nobody asked to learn.
+ */
+const RARITY_VIEWS: { key: RarityView; label: string; blurb: string }[] = [
+  { key: "rare", label: `Rare · ${HEAT_MULTIPLE}×+`, blurb: "Trading at double retail or better — the pairs you can't just go buy." },
+  { key: "grail", label: `Grails · ${GRAIL_MULTIPLE}×+`, blurb: "Triple retail and up. The short list." },
+  { key: "all", label: "Everything", blurb: "Every release we track, rare or not." },
+];
+
 export default async function CatalogBoard({
   q: rawQ = "",
   brand: rawBrand = "",
   page: rawPage = "1",
   g: gRaw = "",
+  rarity: rarityRaw = "",
 }: {
   q?: string;
   brand?: string;
   page?: string;
   g?: string;
+  rarity?: string;
 }) {
   const q = rawQ.trim().slice(0, 80);
   const brand = rawBrand.trim().slice(0, 40);
   const page = Math.max(1, Number(rawPage) || 1);
+  const rarity = asRarityView(rarityRaw);
 
   // Mode resolution: an explicit ?g= tap wins; otherwise a signed-in
   // account with a lane preference lands on For You; everyone else sees all.
@@ -87,6 +112,7 @@ export default async function CatalogBoard({
 
   const baseWhere = {
     imageUrl: { not: null },
+    ...rarityWhere(rarity),
     ...(brand ? { brand: { equals: brand, mode: "insensitive" as const } } : {}),
     ...(q
       ? {
@@ -98,22 +124,32 @@ export default async function CatalogBoard({
         }
       : {}),
   };
-  const orderBy = [
-    { releaseDate: { sort: "desc" as const, nulls: "last" as const } },
-    { updatedAt: "desc" as const },
-  ];
+  // Under a rarity cut the sort is the point: rarest first, not newest
+  // first. Everything mode keeps the release-date order it always had.
+  const orderBy =
+    rarity === "all"
+      ? [
+          { releaseDate: { sort: "desc" as const, nulls: "last" as const } },
+          { updatedAt: "desc" as const },
+        ]
+      : [
+          { rarityMultiple: { sort: "desc" as const, nulls: "last" as const } },
+          { releaseDate: { sort: "desc" as const, nulls: "last" as const } },
+        ];
   const tileSelect = {
     id: true, sku: true, name: true, brand: true,
     imageUrl: true, retailPriceCents: true, marketPriceCents: true, releaseDate: true,
+    rarityTier: true, rarityMultiple: true,
   };
   const brandRailWhere =
     mode === "foryou" || mode === "all"
-      ? { imageUrl: { not: null }, brand: { not: null } }
-      : { imageUrl: { not: null }, brand: { not: null }, gender: mode };
+      ? { imageUrl: { not: null }, brand: { not: null }, ...rarityWhere(rarity) }
+      : { imageUrl: { not: null }, brand: { not: null }, gender: mode, ...rarityWhere(rarity) };
 
   let shoes: {
     id: string; sku: string; name: string; brand: string | null; imageUrl: string | null;
     retailPriceCents: number | null; marketPriceCents: number | null; releaseDate: Date | null;
+    rarityTier: string | null; rarityMultiple: number | null;
   }[];
   let total: number;
   let pages: number;
@@ -168,13 +204,17 @@ export default async function CatalogBoard({
 
   // One href builder so the board, mode, brand, search and page always
   // travel together — and always stay on /market.
-  const catHref = (over: { g?: Mode; brand?: string | null; page?: number } = {}) => {
+  const catHref = (
+    over: { g?: Mode; brand?: string | null; page?: number; rarity?: RarityView } = {}
+  ) => {
     const g = over.g ?? mode;
     const b = over.brand === undefined ? brand : over.brand ?? "";
     const p = over.page ?? 1;
+    const r = over.rarity ?? rarity;
     return `/market?${new URLSearchParams({
       board: "catalog",
       ...(g !== "all" ? { g } : {}),
+      ...(r !== "all" ? { rarity: r } : {}),
       ...(q ? { q } : {}),
       ...(b ? { brand: b } : {}),
       ...(p > 1 ? { page: String(p) } : {}),
@@ -190,6 +230,29 @@ export default async function CatalogBoard({
         The culture rates them in{" "}
         <Link href="/rate" className="text-volt underline">the Rate game</Link>; the
         flames land here. Same pairs as the book, laid out to browse.
+      </p>
+
+      {/* Scarcity first. The multiple is the market's own read — what a pair
+          trades for over what it cost — so nothing here is our opinion. */}
+      <div className="mt-5 flex flex-wrap items-center gap-1.5">
+        {RARITY_VIEWS.map((v) => (
+          <Link
+            key={v.key}
+            href={catHref({ rarity: v.key })}
+            title={v.blurb}
+            className={`tag rounded-full border px-4 py-2 font-bold transition ${
+              rarity === v.key
+                ? "border-volt bg-volt/10 text-volt"
+                : "border-edge text-smoke hover:border-volt/50 hover:text-white"
+            }`}
+          >
+            {v.label}
+          </Link>
+        ))}
+      </div>
+      <p className="mt-2 max-w-2xl text-xs text-smoke/80">
+        {RARITY_VIEWS.find((v) => v.key === rarity)!.blurb}
+        {rarity !== "all" && " Sorted by how far over retail it trades."}
       </p>
 
       {/* Who you're shopping for — For You weights toward your lane */}
@@ -254,6 +317,7 @@ export default async function CatalogBoard({
           className="w-full rounded-lg border border-edge bg-surface px-4 py-2.5 text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none"
         />
         {mode !== "all" && <input type="hidden" name="g" value={mode} />}
+        {rarity !== "all" && <input type="hidden" name="rarity" value={rarity} />}
         {brand && <input type="hidden" name="brand" value={brand} />}
         <button className="btn-hard rounded-lg px-5 tag font-bold">Search</button>
       </form>
@@ -285,21 +349,34 @@ export default async function CatalogBoard({
         <div className="mt-10 rounded-2xl border border-dashed border-edge bg-surface p-10 text-center">
           <p className="display text-2xl text-white">Nothing here yet</p>
           <p className="mx-auto mt-2 max-w-md text-smoke">
-            {q || brand
-              ? "No matches — try a different search or clear the brand filter."
-              : "The catalog is stocking up. Check the drop calendar meanwhile."}
+            {rarity !== "all"
+              ? "Nothing in the base clears that bar yet — pricing lands as the market sync runs. Try Everything."
+              : q || brand
+                ? "No matches — try a different search or clear the brand filter."
+                : "The catalog is stocking up. Check the drop calendar meanwhile."}
           </p>
+          {rarity !== "all" && (
+            <Link href={catHref({ rarity: "all" })} className="btn-hard mt-4 inline-block rounded-lg px-5 py-2.5 tag font-bold">
+              Show everything
+            </Link>
+          )}
         </div>
       ) : (
         <>
           <p className="mt-6 tag text-smoke">
-            {total.toLocaleString()} shoes{mode !== "all" && ` · ${modeLabel}`}{brand && ` · ${brand}`}{q && ` · “${q}”`}
+            {total.toLocaleString()} shoes
+            {rarity !== "all" && ` · ${RARITY_VIEWS.find((v) => v.key === rarity)!.label}`}
+            {mode !== "all" && ` · ${modeLabel}`}{brand && ` · ${brand}`}{q && ` · “${q}”`}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {shoes.map((s) => {
               const f = flameMap.get(s.id);
               // Whichever number we have, rendered in the reader's money.
               const priceCents = s.marketPriceCents || s.retailPriceCents || null;
+              // Read straight off the cached column so the badge and the
+              // filter can never disagree about what this pair is.
+              const tier = s.rarityTier as RarityTier | null;
+              const mult = tier === "grail" || tier === "heat" ? multipleLabel(s.rarityMultiple) : null;
               return (
                 <Link
                   key={s.id}
@@ -307,7 +384,7 @@ export default async function CatalogBoard({
                   className="card-lift group overflow-hidden rounded-xl border border-edge bg-surface"
                 >
                   {/* Product PNGs sit whole on a light plate — never square-cropped */}
-                  <div className="overflow-hidden bg-[#f2f1ee] p-4">
+                  <div className="relative overflow-hidden bg-[#f2f1ee] p-4">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={s.imageUrl!}
@@ -315,6 +392,15 @@ export default async function CatalogBoard({
                       loading="lazy"
                       className="aspect-square w-full object-contain transition-transform duration-500 group-hover:scale-[1.04]"
                     />
+                    {mult && (
+                      <span
+                        className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          tier === "grail" ? "bg-heat text-white" : "bg-black/80 text-volt"
+                        }`}
+                      >
+                        {TIER_LABEL[tier!]} · {mult}
+                      </span>
+                    )}
                   </div>
                   <div className="p-3">
                     {s.brand && <p className="tag text-smoke">{s.brand}</p>}

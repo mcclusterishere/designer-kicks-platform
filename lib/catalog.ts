@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { GRAIL_MULTIPLE, HEAT_MULTIPLE, SHELF_MULTIPLE, rarityFor } from "./rarity";
 
 /**
  * The shoe knowledge base — bulk import real retail sneakers so customs
@@ -127,6 +128,8 @@ export type ImportResult = {
   /** Rows that landed with a live market price — if this stays 0 while
    *  seen climbs, the provider's price fields changed shape on us. */
   priced: number;
+  /** Rows dropped for being commoners: trading at or under sticker. */
+  skipped: number;
   /** Rows that landed with a retail price — the other leg of the spread.
    *  seen climbing while this stays 0 = the provider's slim list payload
    *  is holding retail back and the display hints aren't being honored. */
@@ -139,12 +142,19 @@ export type ImportResult = {
  * response-shape drift: rows can live at data/products/results/root and
  * fields under several names. Upserts by SKU so re-imports refresh.
  */
-export async function importFromKicksDB(query: string, pages = 1): Promise<ImportResult> {
+export async function importFromKicksDB(
+  query: string,
+  pages = 1,
+  opts: { rareOnly?: boolean } = {}
+): Promise<ImportResult> {
+  // Default ON. The whole point of the filter is that somebody has to
+  // deliberately ask for the commoners, not deliberately exclude them.
+  const rareOnly = opts.rareOnly !== false;
   const key = process.env.KICKSDB_KEY;
-  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, priced: 0, retailPriced: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
+  if (!key) return { ok: false, imported: 0, updated: 0, seen: 0, priced: 0, retailPriced: 0, skipped: 0, error: "Add KICKSDB_KEY first — the catalog imports through KicksDB." };
   const base = process.env.KICKSDB_API_URL || "https://api.kicks.dev";
 
-  let imported = 0, updated = 0, seen = 0, priced = 0, retailPriced = 0;
+  let imported = 0, updated = 0, seen = 0, priced = 0, retailPriced = 0, skipped = 0;
   for (let page = 1; page <= Math.min(pages, 10); page++) {
     let json: unknown;
     try {
@@ -156,11 +166,11 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
           `&display[traits]=true&display[variants]=true`,
         { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) }
       );
-      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
-      if (!res.ok) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: `KicksDB answered ${res.status} — check the key/plan.` };
+      if (res.status === 429) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, skipped, error: "Rate-limited by KicksDB — try again in a minute (what landed so far was saved)." };
+      if (!res.ok) return { ok: seen > 0, imported, updated, seen, priced, retailPriced, skipped, error: `KicksDB answered ${res.status} — check the key/plan.` };
       json = await res.json();
     } catch {
-      return { ok: seen > 0, imported, updated, seen, priced, retailPriced, error: "Couldn't reach KicksDB — network hiccup, run it again." };
+      return { ok: seen > 0, imported, updated, seen, priced, retailPriced, skipped, error: "Couldn't reach KicksDB — network hiccup, run it again." };
     }
 
     const o = (json ?? {}) as Row;
@@ -197,7 +207,17 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
       };
       if (marketPriceCents) priced++;
       if (data.retailPriceCents) retailPriced++;
-      const existing = await prisma.catalogShoe.findUnique({ where: { sku }, select: { id: true } });
+
+      const existing = await prisma.catalogShoe.findUnique({
+        where: { sku },
+        select: {
+          id: true,
+          retailPriceCents: true,
+          marketPriceCents: true,
+          ebayNewCents: true,
+          ebayUsedCents: true,
+        },
+      });
       // A re-import may ADD knowledge, never erase it: a slim provider
       // response (null price/colorway/image) must not clobber a value a
       // richer earlier import already landed. Nulls drop out of the
@@ -205,12 +225,41 @@ export async function importFromKicksDB(query: string, pages = 1): Promise<Impor
       const gained = Object.fromEntries(
         Object.entries(data).filter(([, v]) => v !== null && v !== undefined)
       ) as Partial<typeof data>;
-      await prisma.catalogShoe.upsert({ where: { sku }, update: gained, create: { sku, ...data } });
+
+      // Rarity is read off the row as it will EXIST after this write, not
+      // off the payload in hand. A slim response carrying a market price
+      // but no retail is still a grail if we already knew the retail —
+      // judging the payload alone would file it as "unknown" and, under
+      // rareOnly, throw it away for arriving incomplete.
+      const rarity = rarityFor({ ...(existing ?? {}), ...gained });
+
+      // Commoners do not get a seat. The site is about shoes that are
+      // hard to get, and a general release trading at or under its
+      // sticker is the exact opposite of that — importing thousands of
+      // them is what made the catalogue look like everybody else's.
+      //
+      // Two deliberate narrowings. Only shoes we can CONFIRM are common
+      // get refused: a row with no price yet is unproven, not innocent,
+      // since pricing arrives later on the eBay refresh and discarding it
+      // now means never finding out. And a pair already in the base is
+      // always refreshed — the gate decides what the catalogue ADMITS,
+      // never what it is allowed to know, and a shoe frozen at last
+      // year's price can never be seen to have spiked.
+      if (rareOnly && !existing && (rarity.tier === "shelf" || rarity.tier === "retail")) {
+        skipped++;
+        continue;
+      }
+      const rarityData = { rarityTier: rarity.tier, rarityMultiple: rarity.multiple };
+      await prisma.catalogShoe.upsert({
+        where: { sku },
+        update: { ...gained, ...rarityData },
+        create: { sku, ...data, ...rarityData },
+      });
       existing ? updated++ : imported++;
     }
     if (rows.length < 50) break; // last page
   }
-  return { ok: true, imported, updated, seen, priced, retailPriced };
+  return { ok: true, imported, updated, seen, priced, retailPriced, skipped };
 }
 
 export type CatalogMatch = {
@@ -257,7 +306,7 @@ export async function matchDonorShoe(input: {
 
 export type RefreshSummary = {
   ok: boolean;
-  brands: { brand: string; imported: number; updated: number; seen: number; priced: number; error?: string }[];
+  brands: { brand: string; imported: number; updated: number; seen: number; priced: number; skipped: number; error?: string }[];
   error?: string;
 };
 
@@ -280,9 +329,12 @@ export async function refreshCatalogPricing(brandsPerRun = 3, pages = 2): Promis
   const brands: RefreshSummary["brands"] = [];
   for (const brand of picks) {
     const r = await importFromKicksDB(brand, pages);
-    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, error: r.error });
+    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, skipped: r.skipped, error: r.error });
     if (!r.ok) break; // rate-limited or provider down — let tomorrow's run continue
   }
+  // Prices just moved, so the cached tiers are stale for every row this
+  // run touched — and for any row an older import left without one.
+  await recomputeRarity().catch(() => 0);
   return { ok: true, brands };
 }
 
@@ -320,13 +372,61 @@ export async function sweepAllBrands(
       break;
     }
     const r = await importFromKicksDB(brand, pages);
-    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, error: r.error });
+    brands.push({ brand, imported: r.imported, updated: r.updated, seen: r.seen, priced: r.priced, skipped: r.skipped, error: r.error });
     if (!r.ok) {
       stoppedEarly = r.error ?? "provider error";
       break;
     }
   }
+  await recomputeRarity().catch(() => 0);
   return { ok: true, brands, covered: brands.length, ofBrands: all.length, stoppedEarly };
+}
+
+/**
+ * Recompute the cached scarcity columns across the whole base.
+ *
+ * The importer and the eBay sync each write these on the rows they touch,
+ * which covers everything going forward and nothing that landed before
+ * the columns existed. This is the backfill, and it is also the repair
+ * for the day somebody moves a threshold: the tiers are a cache, so the
+ * only honest thing to do when the definition changes is rebuild it.
+ *
+ * One statement rather than a read-modify-write per row, because the base
+ * runs to five figures and the arithmetic is something Postgres can do
+ * without ever sending a row to Node. It is `Unsafe` only in the sense
+ * that the SQL is assembled as a string — every value interpolated is a
+ * module constant coerced through Number(), so there is no input here for
+ * anything to be injected through.
+ *
+ * The WHERE clause is what keeps this cheap to call on a schedule: rows
+ * whose tier and multiple already agree with the arithmetic are left
+ * alone, so a second run in the same hour rewrites nothing.
+ */
+export async function recomputeRarity(): Promise<number> {
+  // GREATEST(x, 0) then NULLIF mirrors rarityFor()'s "> 0" tests: a zero
+  // or negative price is absence, not a data point.
+  const pos = (col: string) => `NULLIF(GREATEST("${col}", 0), 0)`;
+  const live = `COALESCE(${pos("marketPriceCents")}, ${pos("ebayNewCents")}, ${pos("ebayUsedCents")})`;
+  const mult = `(${live}::float8 / ${pos("retailPriceCents")})`;
+  // Thresholds come from lib/rarity.ts so SQL and TypeScript cannot drift
+  // into two different definitions of "grail".
+  const g = Number(GRAIL_MULTIPLE);
+  const h = Number(HEAT_MULTIPLE);
+  const s = Number(SHELF_MULTIPLE);
+  const tier = `CASE
+      WHEN ${mult} IS NULL THEN 'unknown'
+      WHEN ${mult} >= ${g} THEN 'grail'
+      WHEN ${mult} >= ${h} THEN 'heat'
+      WHEN ${mult} <  ${s} THEN 'shelf'
+      ELSE 'retail'
+    END`;
+  return prisma.$executeRawUnsafe(
+    `UPDATE "CatalogShoe"
+        SET "rarityMultiple" = ${mult},
+            "rarityTier" = ${tier}
+      WHERE "rarityMultiple" IS DISTINCT FROM ${mult}
+         OR "rarityTier" IS DISTINCT FROM ${tier}`
+  );
 }
 
 /** Panel numbers: how big the base is and how well customs resolve to it. */

@@ -132,6 +132,12 @@ jobs:
       - name: Piece history dates and the drop calendar
         run: npm run verify:pieces
 
+      # The scarcity bar exists twice — TypeScript for the writes, SQL for
+      # the backfill — so this compares the two row by row against real
+      # Postgres. It also holds the import filter's default ON.
+      - name: Rarity filter
+        run: npm run verify:rarity
+
       - name: League payouts
         run: npm run verify:league
 

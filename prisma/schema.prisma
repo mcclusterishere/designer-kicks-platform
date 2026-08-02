@@ -1472,6 +1472,12 @@ model CatalogShoe {
   // Affiliate-tagged eBay listing URL captured with the price sync, so a
   // buy click off the exchange is credited to our EPN campaign.
   ebayItemUrl      String?
+  // Scarcity, cached so the board can filter and sort on it in SQL.
+  // Both are a pure function of retail vs the best live price — see
+  // lib/rarity.ts, which owns the thresholds — and are rewritten on
+  // every price write. Nothing else may set them; they are never typed.
+  rarityTier       String? // grail | heat | retail | shelf | unknown
+  rarityMultiple   Float?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.
@@ -1491,6 +1497,7 @@ model CatalogShoe {
   @@index([brand])
   @@index([silhouette])
   @@index([name])
+  @@index([rarityTier, rarityMultiple])
 }
 
 // Rate-game scores on REAL retail shoes from the catalog. Culture fans

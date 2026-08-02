@@ -136,9 +136,18 @@ export async function syncEbayPrices(limit = 40): Promise<{
     where: { OR: [{ ebayCheckedAt: null }, { ebayCheckedAt: { lt: weekAgo } }] },
     orderBy: [{ ebayCheckedAt: { sort: "asc", nulls: "first" } }],
     take: limit,
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+      // The other half of the scarcity read — eBay moving the live price
+      // is what changes the tier, so this write has to recompute it or
+      // the board keeps sorting on last week's number.
+      retailPriceCents: true,
+      marketPriceCents: true,
+    },
   });
 
+  const { rarityFields } = await import("./rarity");
   let matched = 0;
   for (const shoe of shoes) {
     try {
@@ -149,6 +158,12 @@ export async function syncEbayPrices(limit = 40): Promise<{
           ebayNewCents: prices.newCents,
           ebayUsedCents: prices.usedCents,
           ebayCheckedAt: new Date(),
+          ...rarityFields({
+            retailPriceCents: shoe.retailPriceCents,
+            marketPriceCents: shoe.marketPriceCents,
+            ebayNewCents: prices.newCents,
+            ebayUsedCents: prices.usedCents,
+          }),
           // Affiliate-tagged when EPN is configured — this is the link the
           // exchange sends buyers to, so the click is credited to us.
           ...(prices.sampleUrl ? { ebayItemUrl: prices.sampleUrl } : {}),

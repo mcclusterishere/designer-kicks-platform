@@ -305,11 +305,11 @@ function CustomTile({
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string; sym?: string }>;
+  searchParams: Promise<{ board?: string; category?: string; q?: string; sort?: string; brand?: string; page?: string; g?: string; rarity?: string; sym?: string }>;
 }) {
   await finalizeExpiredBattles();
   const sp = await searchParams;
-  const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "" } = sp;
+  const { category = "all", q = "", sort = "hot", brand = "all", page = "1", g = "", rarity = "" } = sp;
   const sym = (sp.sym ?? "").trim();
 
   // The customs floor is the front door — one-of-ones are the thing this
@@ -455,7 +455,7 @@ export default async function MarketPage({
             <p className="mt-1 text-sm text-smoke">
               Every pair on the board, laid out to scroll.
             </p>
-            <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} />
+            <CatalogBoard q={q} brand={brand === "all" ? "" : brand} page={page} g={g} rarity={rarity} />
           </div>
         </>
       ) : customsBoard ? (

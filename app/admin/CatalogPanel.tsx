@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { importCatalog, type CatalogImportResult } from "@/app/actions";
+import { HEAT_MULTIPLE } from "@/lib/rarity";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-white placeholder:text-smoke/50 focus:border-volt focus:outline-none";
@@ -20,7 +21,8 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
           this imports for real. Same key the drop-date sync uses.
         </p>
       )}
-      <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <form action={formAction} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <label className="tag text-smoke" htmlFor="cat-q">Import by query (brand or model)</label>
           <input id="cat-q" name="query" maxLength={80} placeholder='"Jordan", "Air Force 1", "Dunk"…' className={inputClass} />
@@ -35,6 +37,20 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
           className="rounded-lg btn-hard px-5 py-2.5 tag font-bold disabled:opacity-50">
           {pending ? "Importing…" : "Import shoes"}
         </button>
+        </div>
+        {/* The filter is on unless somebody deliberately turns it off. A
+            general release trading at or under its sticker is the opposite
+            of what this site is about, and importing thousands of them is
+            what made the base look like everybody else's. Pairs already in
+            the catalog always refresh — this only decides what gets in. */}
+        <label className="flex items-start gap-2 text-xs text-smoke">
+          <input id="cat-common" type="checkbox" name="includeCommon" className="mt-0.5 accent-heat" />
+          <span>
+            Include commoners — import general releases trading at or under retail too.
+            Off by default: only pairs at {HEAT_MULTIPLE}× retail or better, plus anything
+            not priced yet, get a seat.
+          </span>
+        </label>
       </form>
       {state && !state.ok && <p className="mt-2 text-sm text-heat">{state.error}</p>}
       {state?.ok && (
@@ -42,8 +58,21 @@ export default function CatalogPanel({ configured }: { configured: boolean }) {
           +{state.imported} new, {state.updated} refreshed ({state.seen} scanned
           {typeof state.priced === "number" && `, ${state.priced} with live pricing`}
           {typeof state.retailPriced === "number" && `, ${state.retailPriced} with retail`}).
+          {typeof state.skipped === "number" && state.skipped > 0 && (
+            <span className="text-smoke">
+              {" "}
+              {state.skipped} commoner{state.skipped === 1 ? "" : "s"} turned away — priced at or
+              under retail.
+            </span>
+          )}
           {state.note && <span className="text-heat"> {state.note}</span>}{" "}
           Run more queries brand-by-brand to grow the base.
+        </p>
+      )}
+      {state?.ok && state.imported === 0 && (state.skipped ?? 0) > 0 && (
+        <p className="mt-1 text-xs text-smoke">
+          Every new pair that query found was a general release. That is the filter
+          working, not a failure — tick “include commoners” if you want them anyway.
         </p>
       )}
       {state?.ok && state.priced === 0 && (state.seen ?? 0) > 0 && (

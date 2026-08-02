@@ -3628,7 +3628,7 @@ export async function createResearchedProfile(
 
 // ---------- Shoe catalog (knowledge base for affiliate matching) ----------
 
-export type CatalogImportResult = ActionResult & { imported?: number; updated?: number; seen?: number; priced?: number; retailPriced?: number };
+export type CatalogImportResult = ActionResult & { imported?: number; updated?: number; seen?: number; priced?: number; retailPriced?: number; skipped?: number };
 
 /** Bulk-import real sneakers into the catalog by search query (admin). */
 export async function importCatalog(
@@ -3639,9 +3639,14 @@ export async function importCatalog(
   const query = String(formData.get("query") ?? "").trim().slice(0, 80);
   const pages = Math.min(10, Math.max(1, Number(formData.get("pages")) || 1));
   if (!query) return { ok: false, error: "Give it a query — a brand or model like \"Jordan\" or \"Air Force 1\"." };
-  const res = await importFromKicksDB(query, pages);
+  // Rare-only is the default and the checkbox is the way OUT of it, so an
+  // unchecked box (which is simply absent from the POST) keeps the filter
+  // on rather than quietly turning it off.
+  const includeCommon = String(formData.get("includeCommon") ?? "") === "on";
+  const res = await importFromKicksDB(query, pages, { rareOnly: !includeCommon });
   if (!res.ok) return { ok: false, error: res.error ?? "Import failed." };
   revalidatePath("/admin");
+  revalidatePath("/market");
   return {
     ok: true,
     imported: res.imported,
@@ -3649,6 +3654,7 @@ export async function importCatalog(
     seen: res.seen,
     priced: res.priced,
     retailPriced: res.retailPriced,
+    skipped: res.skipped,
     note: res.error, // partial-success warnings ride along
   };
 }

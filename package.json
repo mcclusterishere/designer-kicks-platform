@@ -2,7 +2,7 @@
   "name": "the-heat-chart",
   "version": "0.1.0",
   "private": true,
-  "description": "The Heat Chart — a custom-sneaker culture platform for artists and fans, built by McCluster Corp's Equity Uprise program.",
+  "description": "The Heat Chart \u2014 a custom-sneaker culture platform for artists and fans, built by McCluster Corp's Equity Uprise program.",
   "homepage": "https://theheatchart.com",
   "author": "McCluster Corp",
   "scripts": {
@@ -35,7 +35,8 @@
     "verify:dupes": "rm -rf node_modules/.verifydup && tsc scripts/verify-dupes.ts --outDir node_modules/.verifydup --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifydup/scripts/verify-dupes.js",
     "verify:purge": "rm -rf node_modules/.verifypurge && tsc scripts/verify-purge.ts --outDir node_modules/.verifypurge --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifypurge/scripts/verify-purge.js",
     "verify:meta": "rm -rf node_modules/.verifymeta && tsc scripts/verify-meta.ts --outDir node_modules/.verifymeta --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifymeta/scripts/verify-meta.js",
-    "verify:chatbot": "rm -rf node_modules/.verifybot && tsc scripts/verify-chatbot.ts --outDir node_modules/.verifybot --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifybot/scripts/verify-chatbot.js"
+    "verify:chatbot": "rm -rf node_modules/.verifybot && tsc scripts/verify-chatbot.ts --outDir node_modules/.verifybot --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifybot/scripts/verify-chatbot.js",
+    "verify:rarity": "rm -rf node_modules/.verifyrar && tsc scripts/verify-rarity.ts --outDir node_modules/.verifyrar --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyrar/scripts/verify-rarity.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
