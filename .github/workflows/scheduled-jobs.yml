@@ -1,0 +1,137 @@
+# The scheduler.
+#
+# This exists because there wasn't one. The app ships six cron endpoints
+# — catalog pricing, eBay medians, drop dates, Drop Radar drafts, the
+# weekly recap, the nightly everything-run — and CRON_SECRET was set in
+# Railway, so they looked configured. Nothing was calling them. Railway's
+# service config carries no cronSchedule, and a sweep of the HTTP logs
+# found zero requests to /api/cron/* at any hour.
+#
+# The visible symptom was nothing: the site serves fine, so the dormancy
+# reads as "no new data today" rather than as a fault. Market prices,
+# eBay spreads, drop dates and the Page insights snapshot were all simply
+# never refreshed after the initial seed.
+#
+# GitHub Actions rather than a Railway cron service, because a Railway
+# cron restarts a container on a schedule — wrong shape for a web service
+# that must stay up — and this costs nothing, lives in the repo, and
+# leaves a run history somebody can actually read.
+#
+# ONE SECRET IS REQUIRED. Add CRON_SECRET to the repository secrets
+# (Settings → Secrets and variables → Actions → New repository secret)
+# with the exact value already set in Railway. Without it every run
+# fails loudly on the guard below rather than quietly 401ing forever.
+name: Scheduled jobs
+
+on:
+  schedule:
+    # Battles close on their own clock, so this is the one that cannot
+    # wait for the nightly pass. Every 15 minutes.
+    - cron: "*/15 * * * *"
+    # The nightly everything-run: catalog, eBay, drop dates, radar,
+    # ledger audit, index snapshot, and the Page insights read.
+    # 07:10 UTC is 3:10am Eastern — off-peak for us and for the
+    # providers we call.
+    - cron: "10 7 * * *"
+    # The weekly recap, Mondays at 14:00 UTC (10am Eastern).
+    - cron: "0 14 * * 1"
+  # So a human can force any of them without waiting for the clock.
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run"
+        required: true
+        default: nightly
+        type: choice
+        options: [finalize, nightly, weekly, deep]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A slow nightly run must never have a second one started on top of it.
+  group: scheduled-${{ github.event.schedule || github.event.inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  call:
+    name: Hit the scheduled endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the secret is present
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::CRON_SECRET is not set in this repository's Actions secrets."
+            echo "Add it under Settings -> Secrets and variables -> Actions,"
+            echo "using the same value as the CRON_SECRET variable in Railway."
+            exit 1
+          fi
+
+      # One step decides which endpoint this firing is for. Keeping the
+      # mapping here rather than in three near-identical jobs means the
+      # base URL and the auth are written once.
+      - name: Work out which endpoint
+        id: pick
+        run: |
+          case "${{ github.event.schedule }}" in
+            "*/15 * * * *") echo "path=/api/cron/finalize"        >> "$GITHUB_OUTPUT" ;;
+            "10 7 * * *")   echo "path=/api/cron/all"             >> "$GITHUB_OUTPUT" ;;
+            "0 14 * * 1")   echo "path=/api/cron/weekly-recap"    >> "$GITHUB_OUTPUT" ;;
+            *)
+              case "${{ github.event.inputs.job }}" in
+                finalize) echo "path=/api/cron/finalize"     >> "$GITHUB_OUTPUT" ;;
+                weekly)   echo "path=/api/cron/weekly-recap" >> "$GITHUB_OUTPUT" ;;
+                deep)     echo "path=/api/cron/all?mode=deep" >> "$GITHUB_OUTPUT" ;;
+                *)        echo "path=/api/cron/all"          >> "$GITHUB_OUTPUT" ;;
+              esac
+              ;;
+          esac
+
+      - name: Call it
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          # Overridable so a fork or a staging domain can point elsewhere
+          # without editing this file.
+          BASE_URL: ${{ vars.SITE_URL || 'https://theheatchart.com' }}
+        run: |
+          set -euo pipefail
+          URL="${BASE_URL}${{ steps.pick.outputs.path }}"
+          echo "Calling ${{ steps.pick.outputs.path }}"
+
+          # The nightly run does real work across several providers and
+          # the route itself allows up to 300s, so the client budget has
+          # to be longer than the server's or we would time out on a run
+          # that actually succeeded.
+          #
+          # Bearer, not ?key=, so the secret never lands in an access log.
+          # Retries are for network flakiness only: the endpoints are
+          # idempotent by design (upserts and skipDuplicates), so a
+          # repeated call re-reads rather than double-writes.
+          for attempt in 1 2 3; do
+            CODE=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+              --max-time 330 \
+              -H "Authorization: Bearer ${CRON_SECRET}" \
+              "$URL") && rc=0 || rc=$?
+
+            if [ "${rc:-0}" -eq 0 ] && [ "$CODE" = "200" ]; then
+              echo "OK ($CODE)"
+              head -c 4000 /tmp/out.json || true
+              exit 0
+            fi
+
+            # A 401 is a wrong secret, not a blip. Retrying it three
+            # times just makes the real problem take longer to see.
+            if [ "$CODE" = "401" ]; then
+              echo "::error::401 from $URL — CRON_SECRET here does not match the one in Railway."
+              exit 1
+            fi
+
+            echo "attempt $attempt failed (curl rc=${rc:-0}, http=$CODE)"
+            head -c 1000 /tmp/out.json || true
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 10))
+          done
+
+          echo "::error::$URL did not return 200 after 3 attempts."
+          exit 1
