@@ -1630,6 +1630,13 @@ export async function placeOffer(
   _prev: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
+  // The site does not broker sales of custom work. Checked server-side
+  // and first, because hiding the form is presentation and this is the
+  // actual rule — a posted form or a stale tab must not get through.
+  {
+    const { customsSellingOn, SELLING_OFF_MESSAGE } = await import("@/lib/commerce");
+    if (!(await customsSellingOn())) return { ok: false, error: SELLING_OFF_MESSAGE };
+  }
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "Sign in to make an offer." };
 
@@ -1719,6 +1726,12 @@ export async function withdrawOffer(offerId: string): Promise<void> {
 }
 
 export async function respondOffer(offerId: string, accept: boolean): Promise<void> {
+  // Accepting is the transaction. Declining and withdrawing stay open so
+  // anything already in flight can be cleared down rather than stranded.
+  if (accept) {
+    const { customsSellingOn } = await import("@/lib/commerce");
+    if (!(await customsSellingOn())) return;
+  }
   const session = await auth();
   const offer = await prisma.offer.findUnique({
     where: { id: offerId },
@@ -7157,5 +7170,26 @@ export async function curateCatalogAction(
       res.hidden === 0
         ? "Nothing matched — no pair in the base is confirmed common right now."
         : `${res.hidden} commoner(s) taken off the site. Undo is one click.`,
+  };
+}
+
+/** Flip whether the site brokers custom sales (admin). */
+export async function customsSellingAction(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  await requireAdmin();
+  const { customsSellingOn, setCustomsSelling } = await import("@/lib/commerce");
+  const now = await customsSellingOn();
+  const want = String(formData.get("op") ?? "") === "on";
+  if (want === now) return { ok: true, note: `Already ${now ? "on" : "off"}.` };
+  await setCustomsSelling(want);
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  return {
+    ok: true,
+    note: want
+      ? "Offers are open again. Get the legal position in writing before you leave this on."
+      : "Offers closed. Pieces and makers stay up; the site no longer takes part in the sale.",
   };
 }

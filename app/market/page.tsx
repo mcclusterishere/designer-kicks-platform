@@ -14,6 +14,7 @@ import CatalogBoard from "@/components/CatalogBoard";
 import PairChart from "@/components/PairChart";
 import TradePanel from "@/components/TradePanel";
 import OfferForm from "@/components/OfferForm";
+import { customsSellingOn } from "@/lib/commerce";
 import { categoryLabel } from "@/lib/categories";
 import { RESALE_ARTIST_ROYALTY_PCT } from "@/lib/resale";
 
@@ -127,11 +128,13 @@ function CustomTile({
   rank,
   signedIn,
   fitsYou,
+  sellingOn,
 }: {
   item: MarketItem;
   rank: number | undefined;
   signedIn: boolean;
   fitsYou: boolean;
+  sellingOn: boolean;
 }) {
   const salePct =
     item.lastSaleCents && item.prevSaleCents
@@ -286,14 +289,22 @@ function CustomTile({
         >
           ◈ Chart &amp; call
         </Link>
-        <div className="mt-2">
-          <OfferForm
-            submissionId={item.id}
-            signedIn={signedIn}
-            highBidCents={item.topOfferCents}
-            floorCents={item.consignment?.floorCents ?? null}
-          />
-        </div>
+        {sellingOn ? (
+          <div className="mt-2">
+            <OfferForm
+              submissionId={item.id}
+              signedIn={signedIn}
+              highBidCents={item.topOfferCents}
+              floorCents={item.consignment?.floorCents ?? null}
+            />
+          </div>
+        ) : (
+          // Editorial only. The maker is still reachable — the site just
+          // is not the one taking the money.
+          <p className="mt-2 rounded-lg border border-edge bg-panel px-3 py-2 text-xs text-smoke">
+            Not for sale here. Reach the maker through their profile.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -330,12 +341,15 @@ export default async function MarketPage({
   const og = board === "exchange";
   const needle = q.trim().toLowerCase();
 
-  const [session, customsBoard, ogBoard, heat, hotBases] = await Promise.all([
+  const [session, customsBoard, ogBoard, heat, hotBases, sellingOn] = await Promise.all([
     auth(),
     board === "customs" ? getMarketBoard() : null,
     og ? getExchangeBoard({ q, brand: brand === "all" ? undefined : brand, sort: (["last","change","spread","volume","name","recent"].includes(sort) ? sort : "last") as SortKey, page: Number(page) || 1 }) : null,
     board === "customs" ? getHeatList() : Promise.resolve([]),
     og ? getHotBases() : Promise.resolve([]),
+    // Editorial-only posture: the board still shows every piece, it just
+    // stops being the place the sale happens.
+    customsSellingOn(),
   ]);
   const heatRank = new Map(heat.map((h, i) => [h.id, i + 1]));
 
@@ -460,6 +474,7 @@ export default async function MarketPage({
         </>
       ) : customsBoard ? (
         <CustomsBoardView
+          sellingOn={sellingOn}
           board={customsBoard}
           heatRank={heatRank}
           signedIn={Boolean(session?.user)}
@@ -491,10 +506,12 @@ function CustomsBoardView({
   needle,
   sort,
   memberSize,
+  sellingOn,
 }: {
   board: Awaited<ReturnType<typeof getMarketBoard>>;
   heatRank: Map<string, number>;
   signedIn: boolean;
+  sellingOn: boolean;
   category: string;
   q: string;
   needle: string;
@@ -628,7 +645,9 @@ function CustomsBoardView({
           <p className="mx-auto mt-2 max-w-md text-sm text-smoke">
             {category === "collabs"
               ? "When two artists build one piece and tag each other at upload, it lands here with both names on it."
-              : "Artists set asks at upload, owners record sales, buyers put up offers — all of it lands here automatically."}
+              : sellingOn
+                ? "Artists set asks at upload, owners record sales, buyers put up offers — all of it lands here automatically."
+                : "Every approved piece lands here. The Heat Chart shows the work and writes about it — sales happen between you and the maker."}
           </p>
         </div>
       ) : (
@@ -640,6 +659,7 @@ function CustomsBoardView({
               rank={heatRank.get(item.id)}
               signedIn={signedIn}
               fitsYou={fitsMember(item.size, memberSize)}
+              sellingOn={sellingOn}
             />
           ))}
         </div>
