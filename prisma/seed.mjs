@@ -2010,6 +2010,10 @@ async function seedOgCatalog() {
     ["162050C", "Converse Chuck 70 High Black", "Converse", "Chuck 70", "Black", 8500, null, null],
     ["L41086600", "Salomon XT-6 Black Phantom", "Salomon", "XT-6", "Black/Phantom", 20000, null, null],
     ["1201A019", "ASICS Gel-Kayano 14 Cream Black", "ASICS", "Gel-Kayano 14", "Cream/Black", 16000, 17000, null],
+    // Unreleased at seed time, so retail only and no market price. That
+    // is the honest state: the rarity read stays "unknown" until the
+    // pair actually trades, which is exactly what it should say.
+    ["IV3238-600", "Victor Victor x Nike Air Force 1 '01 University Red", "Nike", "Air Force 1", "University Red/Black/White", 15000, null, d("2026-08-06")],
   ];
 
   let created = 0;

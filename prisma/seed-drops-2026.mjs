@@ -21,6 +21,11 @@ function d({ slug, name, date, dateLabel, price, sku, colorway, where, raffleUrl
     coverImage: COVERS[n % COVERS.length],
     daysAgo: n % 4,
     dropAt: new Date(`${date}T12:00:00Z`),
+    // The style code belongs on the row, not only in the markdown
+    // table. It is what links a drop story to its catalogue entry, and
+    // therefore to pricing and buy links — without it every one of
+    // these articles was a dead end for a reader who wanted the pair.
+    sku,
     raffleUrl: raffleUrl ?? null,
     question: q ? { q, options, answer, explain } : undefined,
     content: [
@@ -51,6 +56,42 @@ function d({ slug, name, date, dateLabel, price, sku, colorway, where, raffleUrl
 
 export const drops2026 = [
   // ---------------- AUGUST ----------------
+  d({
+    slug: "victor-victor-nike-air-force-1-university-red-release-date",
+    name: "Victor Victor x Nike Air Force 1 '01 'University Red'",
+    date: "2026-08-06",
+    dateLabel: "August 6, 2026",
+    price: "$150",
+    sku: "IV3238-600",
+    colorway: "University Red / Black / White",
+    where: "SNKRS + select Nike Sportswear retailers",
+    raffleUrl: NIKE,
+    // Every outlet covering this pair has it as "Fall 2026" with no
+    // brand-confirmed day. The August 6 date came in ahead of that, so
+    // it renders as reported until Nike posts it — flip this in the
+    // Newsroom the moment SNKRS lists it.
+    rumored: true,
+    tags: "Nike, Air Force 1, Release Dates, Collabs",
+    excerpt:
+      "The Victor Victor x Nike Air Force 1 '01 'University Red' (IV3238-600) lands at $150 — all-red leather, white Swoosh, and a NIGO-drawn Tosa stitched on the heel.",
+    story: [
+      "Victor Victor Worldwide is Steven Victor's label and media company — the executive behind Pusha T's run and a fixture in the Kanye/G.O.O.D. Music orbit. His Nike relationship started as friends-and-family only: the original Victor Victor Air Force 1 carried a tongue tab reading 'I know NIGO too!' and never reached a shelf. This is that relationship going retail.",
+      "The build is the Air Force 1 '01 — the resurgent 2001 shape, fuller and rounder through the toe than the modern cut, which is why this reads vintage before you notice anything else. University Red leather covers the whole upper, the Swoosh and midsole stay white, and the outsole runs black with flecks of colour breaking through at the edge.",
+      "The branding is the point, and it is restrained. On the lateral heel sits an embroidered Tosa — the large Japanese breed originally raised for fighting and now more often kept as a guard dog — drawn by NIGO as the Victor Victor crest. Inside, the dog takes the place of the usual AF1 insole decal, with VICTOR VICTOR set around it. No logo on the toe, no loud co-branding. You either know the dog or you don't.",
+      "This is one colourway of several. A Court Purple pair (IV3238-500) has already surfaced, Gervonta Davis revealed a green one in July, and the run is expected to keep rolling through the rest of 2026 — so the red is a first look at a family, not a one-off.",
+    ],
+    deep: [
+      "Style code IV3238-600 sits in the same IV3238 family as the Court Purple pair (IV3238-500), which is how you can tell the colourways are one program rather than separate projects.",
+      "The dog is a Tosa, not a Rottweiler or a Cane Corso — a Japanese breed bred for the fighting ring and now widely kept as a guard dog. NIGO drew it, which ties the crest back to the friends-and-family pair stamped 'I know NIGO too!'",
+      "The insole swap is the tell for a real collab AF1: Nike only gives up that decal space when the partner has a mark worth the trade.",
+      "The '01 tooling is the same shape Nike leaned on for the 2001-era AF1 revival, which is why the proportions look off if you are used to the current standard Low.",
+    ],
+    q: "The dog embroidered on the Victor Victor Air Force 1's heel is which breed?",
+    options: ["Rottweiler", "Tosa", "Cane Corso", "Dogo Argentino"],
+    answer: 1,
+    explain:
+      "It's a Tosa — a large Japanese breed originally bred for fighting, now often a guard dog — drawn by NIGO as the Victor Victor Worldwide crest.",
+  }),
   d({
     slug: "kobe-air-force-1-lord-of-the-rings-release-date",
     name: "Kobe x Nike Air Force 1 Low 'Lord of the Rings'",
