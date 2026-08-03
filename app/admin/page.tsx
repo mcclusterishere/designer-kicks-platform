@@ -56,6 +56,8 @@ import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import { threadsReady } from "@/lib/threads";
+import ChannelRow from "@/components/ChannelRow";
+import { connectConfigured } from "@/lib/metaConnect";
 import { oauthProviders } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import UtmBuilder from "./UtmBuilder";
@@ -186,6 +188,28 @@ export default async function AdminPage({
   // connection stored in the database, so answering "is it on" needs a
   // query rather than an env read.
   const threadsHouseOn = await threadsReady();
+
+  // Every channel this account has actually granted, so Social HQ can
+  // show a real Connect button instead of only naming env vars. The
+  // scopes string is what tells us a token predates a permission we
+  // have since started asking for.
+  const houseChannels = await prisma.socialAccount.findMany({
+    orderBy: { connectedAt: "desc" },
+    select: {
+      id: true, provider: true, handle: true, name: true, autoPromote: true,
+      status: true, lastPostedAt: true, lastError: true, scopes: true,
+    },
+  });
+  const connectReady = connectConfigured();
+  const pageAccount = houseChannels.find((c) => c.provider === "facebook_page");
+  // read_insights and pages_read_user_content were added to the scope
+  // list after this Page was first connected. A token does not gain
+  // scopes retroactively, so the grant has to be redone — and until it
+  // is, Insights and the comment harvest return nothing at all, which
+  // is indistinguishable from a quiet Page.
+  const pageScopesStale =
+    Boolean(pageAccount) &&
+    !(pageAccount!.scopes ?? "").includes("read_insights");
 
   const [pending, approved, battles, products, editProduct, articles, editArticleRow, ogShoes] = await Promise.all([
     prisma.submission.findMany({
@@ -1993,8 +2017,64 @@ export default async function AdminPage({
           campaign forever.
         </p>
 
+        {/* The actual connect buttons. These used to exist only as a
+            component nobody rendered, so every instruction to "connect
+            it in Social HQ" pointed at a button that was not on any
+            screen. */}
+        <div className="mt-4 space-y-2">
+          <p className="tag text-volt">Channels</p>
+          <p className="text-xs text-smoke/80">
+            Connecting sends you to Meta and attaches the grant to a member account, so you
+            need to be signed in to the site as well as into this panel — otherwise the
+            button bounces you to the sign-in page first.
+          </p>
+          {pageScopesStale && (
+            <p className="rounded-lg border border-heat/40 bg-heat/10 px-3 py-2 text-sm text-heat">
+              Your Page was connected before this app asked for{" "}
+              <span className="font-mono">read_insights</span> and{" "}
+              <span className="font-mono">pages_read_user_content</span>. A token never
+              gains permissions after the fact, so Page Insights and the comment harvest
+              return nothing until you reconnect below. Everything else keeps working.
+            </p>
+          )}
+          {(
+            [
+              { provider: "facebook_page", label: "Facebook Page", need: "Posting, comments, insights — the main one." },
+              { provider: "instagram", label: "Instagram", need: "For editors and artists connecting their own account." },
+              { provider: "threads", label: "Threads", need: "The house Threads account for the daily post." },
+            ] as const
+          ).map((ch) => (
+            <div key={ch.provider}>
+              {connectReady[ch.provider] ? (
+                <ChannelRow
+                  provider={ch.provider}
+                  label={ch.label}
+                  need={ch.need}
+                  accounts={houseChannels
+                    .filter((c) => c.provider === ch.provider)
+                    .map((c) => ({
+                      id: c.id, handle: c.handle, name: c.name,
+                      autoPromote: c.autoPromote, status: c.status,
+                      lastPostedAt: c.lastPostedAt, lastError: c.lastError,
+                    }))}
+                />
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-edge bg-panel p-3 opacity-70">
+                  <span className="min-w-0">
+                    <span className="block text-sm text-white">{ch.label}</span>
+                    <span className="block text-xs text-smoke">
+                      Waiting on this channel&apos;s app credentials before it can be connected.
+                    </span>
+                  </span>
+                  <span className="tag shrink-0 text-smoke">Not configured</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
         {/* Connections */}
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="mt-6 grid gap-2 sm:grid-cols-2">
           {[
             { name: "Facebook Page posting", on: facebookConfigured(), fix: "FB_PAGE_ID + FB_PAGE_ACCESS_TOKEN" },
             { name: "Instagram posting", on: instagramConfigured(), fix: "IG_USER_ID + FB_PAGE_ACCESS_TOKEN" },
