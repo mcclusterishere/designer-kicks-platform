@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
   const q = p.get("q");
 
   const where = {
+    // Curated-out pairs are not public, including through the API.
+    hidden: false,
     ...(brand ? { brand: { equals: brand, mode: "insensitive" as const } } : {}),
     ...(q
       ? { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { sku: { contains: q, mode: "insensitive" as const } }] }

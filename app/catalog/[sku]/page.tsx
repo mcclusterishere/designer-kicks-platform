@@ -11,7 +11,10 @@ import { buyLinks } from "@/lib/affiliates";
 export const dynamic = "force-dynamic";
 
 async function getShoe(sku: string) {
-  return prisma.catalogShoe.findUnique({ where: { sku } });
+  // A hidden pair 404s rather than staying reachable by direct link —
+  // "off the site" has to mean off it, not just off the grid.
+  const shoe = await prisma.catalogShoe.findUnique({ where: { sku } });
+  return shoe && !shoe.hidden ? shoe : null;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ sku: string }> }) {

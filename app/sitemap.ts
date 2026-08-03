@@ -17,7 +17,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     prisma.artistProfile.findMany({ select: { slug: true, createdAt: true } }),
     // The SEO asset: every cataloged shoe is its own indexable page.
     prisma.catalogShoe.findMany({
-      where: { imageUrl: { not: null } },
+      // A hidden pair must leave the sitemap too, or Google keeps
+      // sending traffic to a page that now 404s.
+      where: { imageUrl: { not: null }, hidden: false },
       orderBy: { updatedAt: "desc" },
       take: 2000,
       select: { sku: true, updatedAt: true },

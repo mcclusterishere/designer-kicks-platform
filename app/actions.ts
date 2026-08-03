@@ -7111,3 +7111,51 @@ export async function groupShareAction(
   revalidatePath("/admin");
   return { ok: true, note: existing ? "Unticked." : "Marked shared." };
 }
+
+/* ------------------------------------------------------------------ */
+/* Catalogue curation — collabs and rare only                          */
+/* ------------------------------------------------------------------ */
+
+export type CurationActionResult = ActionResult & { hidden?: number };
+
+/**
+ * Apply (or undo) the "collabs and rare only" line.
+ *
+ * Hides rather than deletes. CatalogRating, PriceSnapshot and Prediction
+ * all cascade off CatalogShoe, so a hard delete would destroy the
+ * culture's flame ratings, every price chart and members' predictions
+ * along with the row — other people's data, for an editorial decision
+ * that should be reversible.
+ */
+export async function curateCatalogAction(
+  _prev: CurationActionResult | null,
+  formData: FormData
+): Promise<CurationActionResult> {
+  await requireAdmin();
+  const op = String(formData.get("op") ?? "");
+  const { hideCommoners, unhideAll } = await import("@/lib/curation");
+
+  if (op === "undo") {
+    const res = await unhideAll();
+    revalidatePath("/admin");
+    revalidatePath("/market");
+    return { ok: true, hidden: res.hidden, note: `${res.hidden} pair(s) put back on the site.` };
+  }
+  if (op !== "hide") return { ok: false, error: "Unknown operation." };
+
+  // Typed confirmation, because this changes what the public site is.
+  if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "HIDE") {
+    return { ok: false, error: 'Type HIDE in the box to confirm.' };
+  }
+  const res = await hideCommoners();
+  revalidatePath("/admin");
+  revalidatePath("/market");
+  return {
+    ok: true,
+    hidden: res.hidden,
+    note:
+      res.hidden === 0
+        ? "Nothing matched — no pair in the base is confirmed common right now."
+        : `${res.hidden} commoner(s) taken off the site. Undo is one click.`,
+  };
+}

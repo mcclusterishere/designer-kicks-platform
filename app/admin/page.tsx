@@ -57,6 +57,8 @@ import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
 import { threadsReady } from "@/lib/threads";
 import ChannelRow from "@/components/ChannelRow";
+import CurationPanel from "./CurationPanel";
+import { previewCuration } from "@/lib/curation";
 import { connectConfigured } from "@/lib/metaConnect";
 import { oauthProviders } from "@/auth";
 import { siteUrl } from "@/lib/articles";
@@ -201,6 +203,10 @@ export default async function AdminPage({
     },
   });
   const connectReady = connectConfigured();
+
+  // Read-only: what the "collabs and rare only" line would do to the
+  // catalogue as it stands. Changes nothing by itself.
+  const curation = await previewCuration().catch(() => null);
   const pageAccount = houseChannels.find((c) => c.provider === "facebook_page");
   // read_insights and pages_read_user_content were added to the scope
   // list after this Page was first connected. A token does not gain
@@ -2016,6 +2022,12 @@ export default async function AdminPage({
           link you post — tagged visitors who sign up are credited to the
           campaign forever.
         </p>
+
+        {curation && (
+          <div className="mt-6">
+            <CurationPanel preview={curation} />
+          </div>
+        )}
 
         {/* The actual connect buttons. These used to exist only as a
             component nobody rendered, so every instruction to "connect

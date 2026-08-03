@@ -1478,6 +1478,17 @@ model CatalogShoe {
   // every price write. Nothing else may set them; they are never typed.
   rarityTier       String? // grail | heat | retail | shelf | unknown
   rarityMultiple   Float?
+  /// Off the site without being off the database.
+  ///
+  /// "Delete the commoners" is an editorial decision that should be
+  /// reversible, and a hard delete here is not: CatalogRating and
+  /// PriceSnapshot and Prediction all cascade, so removing a row
+  /// destroys the culture's flame ratings, the price chart, and members'
+  /// predictions along with it, and leaves battles pointing at nothing.
+  /// Hiding reaches the same visible outcome and can be undone.
+  hidden           Boolean   @default(false)
+  hiddenReason     String?
+  hiddenAt         DateTime?
   releaseDate      DateTime?
   // Shopping lane: mens | womens | kids. From the provider when given,
   // else parsed from the name (WMNS/(W)/GS/PS/TD…). Defaults mens.
@@ -1498,6 +1509,7 @@ model CatalogShoe {
   @@index([silhouette])
   @@index([name])
   @@index([rarityTier, rarityMultiple])
+  @@index([hidden])
 }
 
 // Rate-game scores on REAL retail shoes from the catalog. Culture fans

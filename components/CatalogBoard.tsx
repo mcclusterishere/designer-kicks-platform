@@ -2,6 +2,7 @@ import Link from "next/link";
 import Money from "@/components/Money";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { VISIBLE } from "@/lib/curation";
 import {
   GRAIL_MULTIPLE,
   HEAT_MULTIPLE,
@@ -112,6 +113,8 @@ export default async function CatalogBoard({
 
   const baseWhere = {
     imageUrl: { not: null },
+    // Commoners taken off the site stay off it everywhere.
+    ...VISIBLE,
     ...rarityWhere(rarity),
     ...(brand ? { brand: { equals: brand, mode: "insensitive" as const } } : {}),
     ...(q
@@ -143,8 +146,8 @@ export default async function CatalogBoard({
   };
   const brandRailWhere =
     mode === "foryou" || mode === "all"
-      ? { imageUrl: { not: null }, brand: { not: null }, ...rarityWhere(rarity) }
-      : { imageUrl: { not: null }, brand: { not: null }, gender: mode, ...rarityWhere(rarity) };
+      ? { imageUrl: { not: null }, brand: { not: null }, ...VISIBLE, ...rarityWhere(rarity) }
+      : { imageUrl: { not: null }, brand: { not: null }, gender: mode, ...VISIBLE, ...rarityWhere(rarity) };
 
   let shoes: {
     id: string; sku: string; name: string; brand: string | null; imageUrl: string | null;
