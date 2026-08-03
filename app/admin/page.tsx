@@ -55,7 +55,7 @@ import PieceManager from "./PieceManager";
 import { existingBlobNames } from "@/lib/blobStore";
 import { catalogConfigured, catalogStats } from "@/lib/catalog";
 import { facebookConfigured, instagramConfigured } from "@/lib/social";
-import { threadsConfigured } from "@/lib/threads";
+import { threadsReady } from "@/lib/threads";
 import { oauthProviders } from "@/auth";
 import { siteUrl } from "@/lib/articles";
 import UtmBuilder from "./UtmBuilder";
@@ -181,6 +181,11 @@ export default async function AdminPage({
   await finalizeExpiredBattles();
   await finalizeExpiredOutfitBattles();
   const { edit, editArticle } = await searchParams;
+
+  // The house Threads channel can be a pasted token OR an OAuth
+  // connection stored in the database, so answering "is it on" needs a
+  // query rather than an env read.
+  const threadsHouseOn = await threadsReady();
 
   const [pending, approved, battles, products, editProduct, articles, editArticleRow, ogShoes] = await Promise.all([
     prisma.submission.findMany({
@@ -1993,7 +1998,7 @@ export default async function AdminPage({
           {[
             { name: "Facebook Page posting", on: facebookConfigured(), fix: "FB_PAGE_ID + FB_PAGE_ACCESS_TOKEN" },
             { name: "Instagram posting", on: instagramConfigured(), fix: "IG_USER_ID + FB_PAGE_ACCESS_TOKEN" },
-            { name: "Threads posting (house)", on: threadsConfigured(), fix: "THREADS_USER_ID + THREADS_ACCESS_TOKEN" },
+            { name: "Threads posting (house)", on: threadsHouseOn, fix: "connect Threads in Social HQ, or set THREADS_USER_ID + THREADS_ACCESS_TOKEN" },
             { name: "Editor channel connect — Instagram", on: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET), fix: "INSTAGRAM_APP_ID + INSTAGRAM_APP_SECRET" },
             { name: "Editor channel connect — Threads", on: Boolean(process.env.THREADS_APP_ID && process.env.THREADS_APP_SECRET), fix: "THREADS_APP_ID + THREADS_APP_SECRET" },
             { name: "Meta webhooks (comments/DMs stream)", on: Boolean(process.env.META_WEBHOOK_VERIFY_TOKEN), fix: "META_WEBHOOK_VERIFY_TOKEN + subscribe in the app dashboard" },

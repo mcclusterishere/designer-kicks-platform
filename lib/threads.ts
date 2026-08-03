@@ -27,8 +27,75 @@ function threadsProof(token: string): Record<string, string> {
 // proof — it says "this program is alive" without saying it.
 const PROGRAM_START = Date.UTC(2026, 6, 21); // July 21, 2026
 
+/**
+ * Env-only, kept synchronous because it is what the pasted-token setup
+ * looks like and several call sites read it inline.
+ */
 export function threadsConfigured(): boolean {
   return Boolean(process.env.THREADS_USER_ID && process.env.THREADS_ACCESS_TOKEN);
+}
+
+export type ThreadsCreds = { userId: string; token: string; source: "env" | "connection" };
+
+/**
+ * Where the house Threads credentials actually come from.
+ *
+ * Two routes exist and only one of them used to be read here. Pasting
+ * THREADS_USER_ID and THREADS_ACCESS_TOKEN into Railway worked;
+ * clicking "Connect Threads" in the admin — which runs the real OAuth
+ * and stores the token on SocialAccount — did not, because this module
+ * only ever looked at the environment. The symptom is the worst kind:
+ * the connection succeeds, the admin shows the channel connected, and
+ * the daily poster still reports itself dormant.
+ *
+ * Env wins when present, so a deliberately pasted token still overrides
+ * everything. Otherwise the stored connection answers.
+ *
+ * The stored route is also the durable one. A hand-pasted Threads token
+ * lasts ~60 days and, once lapsed, cannot be refreshed at all — it has
+ * to be minted again by hand. The connection carries its expiry and is
+ * refreshed lazily at publish time, so it heals itself.
+ */
+export async function threadsCredentials(): Promise<ThreadsCreds | null> {
+  const envUser = process.env.THREADS_USER_ID;
+  const envToken = process.env.THREADS_ACCESS_TOKEN;
+  if (envUser && envToken) return { userId: envUser, token: envToken, source: "env" };
+
+  try {
+    const { prisma } = await import("./db");
+    // The house account is whichever Threads channel the OWNER
+    // connected. A fan's or an editor's connection must never be posted
+    // from — this is the account that speaks as the brand.
+    //
+    // Identity comes from lib/admin's allowlist rather than from a role
+    // column, because there is no admin role: User.role is MEMBER or
+    // EDITOR, and admin is the password gate plus an owner email. A
+    // role check here would have compiled, run, matched nothing, and
+    // left the fallback quietly dead.
+    const { adminAllowlist } = await import("./admin");
+    const owners = adminAllowlist();
+    if (owners.length === 0) return null;
+
+    const row = await prisma.socialAccount.findFirst({
+      where: {
+        provider: "threads",
+        status: "ACTIVE",
+        user: { email: { in: owners, mode: "insensitive" } },
+      },
+      orderBy: { connectedAt: "desc" },
+      select: { accountId: true, accessToken: true },
+    });
+    if (!row?.accountId || !row.accessToken) return null;
+    return { userId: row.accountId, token: row.accessToken, source: "connection" };
+  } catch {
+    // A database hiccup must not be reported as "not connected".
+    return null;
+  }
+}
+
+/** Is the house Threads channel usable at all, by either route? */
+export async function threadsReady(): Promise<boolean> {
+  return (await threadsCredentials()) !== null;
 }
 
 export function programDay(now: Date = new Date()): number {
@@ -68,10 +135,10 @@ export type ThreadsResult = { ok: boolean; detail: string };
  * captions short.
  */
 export async function postImageToThreads(text: string, imageUrl: string): Promise<ThreadsResult> {
-  if (!threadsConfigured()) return { ok: false, detail: "Threads not connected" };
+  const creds = await threadsCredentials();
+  if (!creds) return { ok: false, detail: "Threads not connected" };
   try {
-    const userId = process.env.THREADS_USER_ID!;
-    const token = process.env.THREADS_ACCESS_TOKEN!;
+    const { userId, token } = creds;
 
     const createRes = await fetch(`${THREADS_API}/${userId}/threads`, {
       method: "POST",
@@ -120,10 +187,10 @@ export async function postImageToThreads(text: string, imageUrl: string): Promis
 
 /** Two-step publish: create the text container, then publish it. */
 export async function postToThreads(text: string): Promise<ThreadsResult> {
-  if (!threadsConfigured()) return { ok: false, detail: "Threads not connected" };
+  const creds = await threadsCredentials();
+  if (!creds) return { ok: false, detail: "Threads not connected" };
   try {
-    const userId = process.env.THREADS_USER_ID!;
-    const token = process.env.THREADS_ACCESS_TOKEN!;
+    const { userId, token } = creds;
 
     const createRes = await fetch(`${THREADS_API}/${userId}/threads`, {
       method: "POST",

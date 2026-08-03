@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cronAuthorized } from "@/lib/cronAuth";
-import { postToThreads, todaysPost, threadsConfigured, programDay } from "@/lib/threads";
+import { postToThreads, todaysPost, threadsReady, programDay } from "@/lib/threads";
 
 /**
  * The daily Threads recruitment post. Schedule ONCE per day on
@@ -15,8 +15,12 @@ export async function GET(req: NextRequest) {
   if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!threadsConfigured()) {
-    return NextResponse.json({ ok: false, detail: "Dormant — set THREADS_USER_ID + THREADS_ACCESS_TOKEN." });
+  if (!(await threadsReady())) {
+    return NextResponse.json({
+      ok: false,
+      detail:
+        "Dormant — either connect Threads in Social HQ, or set THREADS_USER_ID + THREADS_ACCESS_TOKEN.",
+    });
   }
   const text = todaysPost();
   const result = await postToThreads(text);

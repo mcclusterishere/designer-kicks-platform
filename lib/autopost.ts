@@ -9,7 +9,7 @@ import {
   postToInstagram,
   postToInstagramReel,
 } from "./social";
-import { postImageToThreads, threadsConfigured } from "./threads";
+import { postImageToThreads, threadsReady } from "./threads";
 import { fanOutToArtistChannels } from "./crosspost";
 
 /**
@@ -91,7 +91,10 @@ export async function autopostSubmission(submissionId: string): Promise<void> {
       : Promise.resolve(null),
     // House Threads gets the photo post — Threads video needs its own
     // ingestion dance and the photo travels further there anyway.
-    threadsConfigured()
+    // Resolved before the fan-out because the house channel may be a
+    // stored connection rather than a pasted token, and that answer
+    // needs a database round trip.
+    (await threadsReady())
       ? postImageToThreads(`${body}\n\n${threadsLink}`, photo)
       : Promise.resolve(null),
   ]);
