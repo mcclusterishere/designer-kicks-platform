@@ -157,10 +157,19 @@ export default async function RootLayout({
         >
           <div className="glass border-b border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
-            <Link href="/" className="display shrink-0 text-xl text-white">
-              The<span className="text-volt">Heat</span>
-              Chart
-            </Link>
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/" className="display shrink-0 text-xl text-white">
+                The<span className="text-volt">Heat</span>
+                Chart
+              </Link>
+              <a
+                href="https://matthew.mccluster.org/mnet.html?group=heat-chart"
+                className="tag hidden rounded-full border border-white/15 px-2.5 py-1 text-[10px] text-white/70 transition hover:border-volt/50 hover:text-volt sm:inline-flex"
+                aria-label="Open The Heat Chart community on McCluster"
+              >
+                McCluster community ↗
+              </a>
+            </div>
             <HeaderNav
               account={{
                 href: session?.user ? "/profile" : "/signin",
@@ -254,6 +263,12 @@ export default async function RootLayout({
                 <Link href="/story" className="hover:text-white">Our Story</Link>
                 <Link href="/sell" className="hover:text-white">Sell Your Customs</Link>
                 <Link href="/careers" className="hover:text-white">Careers</Link>
+                <a
+                  href="https://matthew.mccluster.org/mnet.html?group=heat-chart"
+                  className="hover:text-volt"
+                >
+                  McCluster Community ↗
+                </a>
               </div>
             </div>
             {/* Official channels — set NEXT_PUBLIC_INSTAGRAM_URL /
