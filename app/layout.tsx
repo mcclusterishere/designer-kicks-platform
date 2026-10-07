@@ -163,7 +163,7 @@ export default async function RootLayout({
                 Chart
               </Link>
               <a
-                href="https://matthew.mccluster.org/mnet.html?group=heat-chart"
+                href="https://matthew.mccluster.org/mnet.html?group=heat-chart&src=heat-chart"
                 className="tag hidden rounded-full border border-white/15 px-2.5 py-1 text-[10px] text-white/70 transition hover:border-volt/50 hover:text-volt sm:inline-flex"
                 aria-label="Open The Heat Chart community on McCluster"
               >
@@ -264,7 +264,7 @@ export default async function RootLayout({
                 <Link href="/sell" className="hover:text-white">Sell Your Customs</Link>
                 <Link href="/careers" className="hover:text-white">Careers</Link>
                 <a
-                  href="https://matthew.mccluster.org/mnet.html?group=heat-chart"
+                  href="https://matthew.mccluster.org/mnet.html?group=heat-chart&src=heat-chart"
                   className="hover:text-volt"
                 >
                   McCluster Community ↗
