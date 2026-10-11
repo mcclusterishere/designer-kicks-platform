@@ -17,7 +17,7 @@
     "verify:ledger": "rm -rf node_modules/.verify && tsc scripts/verify-ledger.ts --outDir node_modules/.verify --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verify/scripts/verify-ledger.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:deploy": "prisma db push --skip-generate --accept-data-loss",
+    "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.mjs",
     "postinstall": "prisma generate",
     "verify:league": "rm -rf node_modules/.verifyl && tsc scripts/verify-league.ts --outDir node_modules/.verifyl --module commonjs --moduleResolution node --target ES2022 --esModuleInterop --skipLibCheck --strict && node --env-file-if-exists=.env node_modules/.verifyl/scripts/verify-league.js",
